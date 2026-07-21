@@ -6,6 +6,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Contracts", "src\Gla
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Core", "src\Glance.Core\Glance.Core.vcxproj", "{C983019A-36F7-4901-A188-1A3DB8BAEF8B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.DialogHook", "src\Glance.DialogHook\Glance.DialogHook.vcxproj", "{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.App", "src\Glance.App\Glance.App.vcxproj", "{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.OfficeHost", "src\Glance.OfficeHost\Glance.OfficeHost.vcxproj", "{D890E6BE-551D-498E-94EC-E219044D3B77}"
@@ -26,6 +28,10 @@ Global
 		{C983019A-36F7-4901-A188-1A3DB8BAEF8B}.Debug|x64.Build.0 = Debug|x64
 		{C983019A-36F7-4901-A188-1A3DB8BAEF8B}.Release|x64.ActiveCfg = Release|x64
 		{C983019A-36F7-4901-A188-1A3DB8BAEF8B}.Release|x64.Build.0 = Release|x64
+		{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}.Debug|x64.ActiveCfg = Debug|x64
+		{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}.Debug|x64.Build.0 = Debug|x64
+		{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}.Release|x64.ActiveCfg = Release|x64
+		{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}.Release|x64.Build.0 = Release|x64
 		{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}.Debug|x64.ActiveCfg = Debug|x64
 		{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}.Debug|x64.Build.0 = Debug|x64
 		{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}.Release|x64.ActiveCfg = Release|x64

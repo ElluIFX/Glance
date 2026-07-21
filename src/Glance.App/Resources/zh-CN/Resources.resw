@@ -105,6 +105,13 @@
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态和已保存的应用状态</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>输入核心</value></data>
   <data name="RefreshCoreButton.ToolTipService.ToolTip" xml:space="preserve"><value>刷新状态</value></data>
+  <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>诊断包</value></data>
+  <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>导出</value></data>
+  <data name="DiagnosticBundleDescription" xml:space="preserve"><value>打包全部诊断日志和崩溃转储</value></data>
+  <data name="DiagnosticBundlePickerTitle" xml:space="preserve"><value>选择诊断包输出文件夹</value></data>
+  <data name="DiagnosticBundlePackaging" xml:space="preserve"><value>正在创建诊断包...</value></data>
+  <data name="DiagnosticBundleCreated" xml:space="preserve"><value>已保存至 {0}</value></data>
+  <data name="DiagnosticBundleFailed" xml:space="preserve"><value>无法创建诊断包</value></data>
   <data name="WindowSizesLabel.Text" xml:space="preserve"><value>预览窗口尺寸</value></data>
   <data name="WindowSizeResetStatusText.Text" xml:space="preserve"><value>按预览类型分别保存</value></data>
   <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>重置</value></data>

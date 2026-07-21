@@ -72,6 +72,7 @@
     <ClInclude Include="preview_file.h" />
     <ClInclude Include="preview_provider.h" />
     <ClInclude Include="syntax_highlighter.h" />
+    <ClInclude Include="startup_registration.h" />
     <ClInclude Include="text_preferences.h" />
     <ClInclude Include="tray_icon.h" />
     <ClInclude Include="window_size_store.h" />
@@ -100,6 +101,7 @@
     <ClCompile Include="pipe_client.cpp" />
     <ClCompile Include="preview_provider.cpp" />
     <ClCompile Include="syntax_highlighter.cpp" />
+    <ClCompile Include="startup_registration.cpp" />
     <ClCompile Include="text_preferences.cpp" />
     <ClCompile Include="tray_icon.cpp" />
     <ClCompile Include="window_size_store.cpp" />
@@ -146,7 +148,10 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.1" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.0" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.5" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.3" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.3.1" />
     <PackageReference Include="Microsoft.Windows.CppWinRT" Version="3.0.260715.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
     <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />

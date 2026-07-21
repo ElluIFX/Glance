@@ -125,7 +125,11 @@ namespace glance::core
             captured->store(should_capture, std::memory_order_release);
             if (should_capture)
             {
-                PostMessageW(notification_window_, notification_message_, static_cast<WPARAM>(action), 0);
+                PostMessageW(
+                    notification_window_,
+                    notification_message_,
+                    static_cast<WPARAM>(action),
+                    static_cast<LPARAM>(GetTickCount64()));
             }
             return should_capture;
         }

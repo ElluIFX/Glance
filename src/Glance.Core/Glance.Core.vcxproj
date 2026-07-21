@@ -19,15 +19,16 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\Glance.Contracts\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\Glance.Contracts\include;$(ProjectDir)..\Glance.DialogHook\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Ole32.lib;OleAut32.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;Uiautomationcore.lib;User32.lib;Wtsapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Ole32.lib;OleAcc.lib;OleAut32.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;Uiautomationcore.lib;User32.lib;Wtsapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\core_application.h" />
+    <ClInclude Include="include\dialog_hook_client.h" />
     <ClInclude Include="include\explorer_selection.h" />
     <ClInclude Include="include\input_decision.h" />
     <ClInclude Include="include\keyboard_hook.h" />
@@ -36,6 +37,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\core_application.cpp" />
+    <ClCompile Include="src\dialog_hook_client.cpp" />
     <ClCompile Include="src\explorer_selection.cpp" />
     <ClCompile Include="src\keyboard_hook.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -48,6 +50,10 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Glance.DialogHook\Glance.DialogHook.vcxproj">
+      <Project>{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
     <ProjectReference Include="..\Glance.Contracts\Glance.Contracts.vcxproj">
       <Project>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</Project>
     </ProjectReference>

@@ -4,6 +4,7 @@
 #include "localization.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
+#include "startup_registration.h"
 #include "text_preferences.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
@@ -18,6 +19,7 @@
 #include <array>
 #include <filesystem>
 #include <cmath>
+#include <optional>
 #include <ranges>
 #include <string_view>
 
@@ -27,12 +29,129 @@ namespace Controls = Microsoft::UI::Xaml::Controls;
 
 namespace
 {
-    std::wstring executable_path()
+    std::wstring quote_argument(std::wstring_view value)
     {
-        std::wstring path(32768, L'\0');
-        const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
-        path.resize(length);
-        return path;
+        std::wstring quoted(1, L'"');
+        for (const wchar_t character : value)
+        {
+            if (character == L'"')
+            {
+                quoted += L"\\\"";
+            }
+            else
+            {
+                quoted += character;
+            }
+        }
+        quoted += L'"';
+        return quoted;
+    }
+
+    std::wstring bundle_timestamp()
+    {
+        SYSTEMTIME time{};
+        GetLocalTime(&time);
+        wchar_t value[32]{};
+        swprintf_s(
+            value,
+            L"%04u%02u%02u-%02u%02u%02u",
+            time.wYear,
+            time.wMonth,
+            time.wDay,
+            time.wHour,
+            time.wMinute,
+            time.wSecond);
+        return value;
+    }
+
+    std::optional<std::filesystem::path> select_output_directory(HWND owner, std::wstring_view title)
+    {
+        com_ptr<IFileOpenDialog> dialog;
+        check_hresult(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(dialog.put())));
+        FILEOPENDIALOGOPTIONS options{};
+        check_hresult(dialog->GetOptions(&options));
+        check_hresult(dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM));
+        const std::wstring dialog_title(title);
+        check_hresult(dialog->SetTitle(dialog_title.c_str()));
+        const HRESULT result = dialog->Show(owner);
+        if (result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+        {
+            return std::nullopt;
+        }
+        check_hresult(result);
+
+        com_ptr<IShellItem> item;
+        check_hresult(dialog->GetResult(item.put()));
+        PWSTR path{};
+        check_hresult(item->GetDisplayName(SIGDN_FILESYSPATH, &path));
+        const std::filesystem::path selected(path);
+        CoTaskMemFree(path);
+        return selected;
+    }
+
+    std::pair<bool, std::wstring> create_diagnostic_bundle(const std::filesystem::path& output_directory)
+    {
+        const std::filesystem::path diagnostics_root(glance::contracts::diagnostics_root_path());
+        if (diagnostics_root.empty())
+        {
+            return { false, {} };
+        }
+
+        wchar_t system_directory[MAX_PATH]{};
+        const UINT system_directory_length = GetSystemDirectoryW(system_directory, ARRAYSIZE(system_directory));
+        if (system_directory_length == 0 || system_directory_length >= ARRAYSIZE(system_directory))
+        {
+            return { false, {} };
+        }
+        const std::filesystem::path tar_path = std::filesystem::path(system_directory) / L"tar.exe";
+        if (!std::filesystem::exists(tar_path))
+        {
+            return { false, {} };
+        }
+
+        const auto output_path = output_directory /
+            (L"Glance-Diagnostics-" + bundle_timestamp() + L"-" + std::to_wstring(GetCurrentProcessId()) + L".zip");
+        std::wstring command_line = quote_argument(tar_path.wstring()) +
+            L" -a -c -f " + quote_argument(output_path.wstring()) +
+            L" -C " + quote_argument(diagnostics_root.wstring()) + L" Logs Dumps";
+        STARTUPINFOW startup{ sizeof(startup) };
+        PROCESS_INFORMATION process{};
+        if (!CreateProcessW(
+                tar_path.c_str(),
+                command_line.data(),
+                nullptr,
+                nullptr,
+                FALSE,
+                CREATE_NO_WINDOW,
+                nullptr,
+                nullptr,
+                &startup,
+                &process))
+        {
+            return { false, {} };
+        }
+
+        CloseHandle(process.hThread);
+        const DWORD wait_result = WaitForSingleObject(process.hProcess, 120000);
+        DWORD exit_code = ERROR_GEN_FAILURE;
+        if (wait_result == WAIT_OBJECT_0)
+        {
+            GetExitCodeProcess(process.hProcess, &exit_code);
+        }
+        else if (wait_result == WAIT_TIMEOUT)
+        {
+            TerminateProcess(process.hProcess, ERROR_TIMEOUT);
+            WaitForSingleObject(process.hProcess, 5000);
+        }
+        CloseHandle(process.hProcess);
+
+        if (wait_result != WAIT_OBJECT_0 || exit_code != 0 || !std::filesystem::exists(output_path))
+        {
+            std::error_code error;
+            std::filesystem::remove(output_path, error);
+            return { false, {} };
+        }
+        return { true, output_path.wstring() };
     }
 }
 
@@ -86,6 +205,7 @@ namespace winrt::Glance::App::implementation
         UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
         initializing_ = false;
         refresh_core_status();
+        refresh_diagnostic_bundle_status();
     }
 
     void SettingsWindow::InitializeSession(
@@ -209,6 +329,9 @@ namespace winrt::Glance::App::implementation
         Controls::ToolTipService::SetToolTip(
             RefreshCoreButton(),
             box_value(glance::app::localize(L"RefreshCoreButton.ToolTipService.ToolTip")));
+        set_text(DiagnosticBundleLabel(), L"DiagnosticBundleLabel.Text");
+        set_content(ExportDiagnosticBundleButton(), L"ExportDiagnosticBundleButton.Content");
+        refresh_diagnostic_bundle_status();
         set_text(AboutPageTitle(), L"AboutPageTitle.Text");
         set_text(AboutPageDescription(), L"AboutPageDescription.Text");
         set_text(AboutAuthorLabel(), L"AboutAuthorLabel.Text");
@@ -221,50 +344,18 @@ namespace winrt::Glance::App::implementation
 
     bool SettingsWindow::launch_at_sign_in_enabled() const
     {
-        wchar_t value[32768]{};
-        DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-                   L"Glance",
-                   RRF_RT_REG_SZ,
-                   nullptr,
-                   value,
-                   &size) == ERROR_SUCCESS;
+        return glance::app::launch_at_sign_in_enabled();
     }
 
     void SettingsWindow::set_launch_at_sign_in(bool enabled)
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
+        if (glance::app::set_launch_at_sign_in(enabled))
         {
             return;
         }
-        if (enabled)
-        {
-            const std::wstring command = L"\"" + executable_path() + L"\"";
-            RegSetValueExW(
-                key,
-                L"Glance",
-                0,
-                REG_SZ,
-                reinterpret_cast<const BYTE*>(command.c_str()),
-                static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
-        }
-        else
-        {
-            RegDeleteValueW(key, L"Glance");
-        }
-        RegCloseKey(key);
+        initializing_ = true;
+        LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
+        initializing_ = false;
     }
 
     void SettingsWindow::refresh_core_status()
@@ -275,6 +366,26 @@ namespace winrt::Glance::App::implementation
         if (mutex != nullptr)
         {
             CloseHandle(mutex);
+        }
+    }
+
+    void SettingsWindow::refresh_diagnostic_bundle_status()
+    {
+        switch (diagnostic_bundle_state_)
+        {
+        case DiagnosticBundleState::packaging:
+            DiagnosticBundleStatusText().Text(glance::app::localize(L"DiagnosticBundlePackaging"));
+            break;
+        case DiagnosticBundleState::succeeded:
+            DiagnosticBundleStatusText().Text(glance::app::localize_format(
+                L"DiagnosticBundleCreated", { diagnostic_bundle_path_ }));
+            break;
+        case DiagnosticBundleState::failed:
+            DiagnosticBundleStatusText().Text(glance::app::localize(L"DiagnosticBundleFailed"));
+            break;
+        default:
+            DiagnosticBundleStatusText().Text(glance::app::localize(L"DiagnosticBundleDescription"));
+            break;
         }
     }
 
@@ -305,6 +416,59 @@ namespace winrt::Glance::App::implementation
     void SettingsWindow::RefreshCoreStatusButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         refresh_core_status();
+    }
+
+    fire_and_forget SettingsWindow::ExportDiagnosticBundleButton_Click(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        const auto lifetime = get_strong();
+        std::optional<std::filesystem::path> output_directory;
+        try
+        {
+            HWND window{};
+            check_hresult(this->try_as<::IWindowNative>()->get_WindowHandle(&window));
+            output_directory = select_output_directory(
+                window, glance::app::localize(L"DiagnosticBundlePickerTitle"));
+        }
+        catch (...)
+        {
+            diagnostic_bundle_state_ = DiagnosticBundleState::failed;
+            refresh_diagnostic_bundle_status();
+            co_return;
+        }
+        if (!output_directory)
+        {
+            co_return;
+        }
+
+        diagnostic_bundle_state_ = DiagnosticBundleState::packaging;
+        diagnostic_bundle_path_.clear();
+        ExportDiagnosticBundleButton().IsEnabled(false);
+        refresh_diagnostic_bundle_status();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        bool succeeded{};
+        std::wstring output_path;
+        try
+        {
+            const auto result = create_diagnostic_bundle(*output_directory);
+            succeeded = result.first;
+            output_path = result.second;
+        }
+        catch (...)
+        {
+            succeeded = false;
+            output_path.clear();
+        }
+        static_cast<void>(dispatcher.TryEnqueue([lifetime, succeeded, output_path] {
+            lifetime->diagnostic_bundle_state_ = succeeded
+                ? DiagnosticBundleState::succeeded
+                : DiagnosticBundleState::failed;
+            lifetime->diagnostic_bundle_path_ = output_path;
+            lifetime->ExportDiagnosticBundleButton().IsEnabled(true);
+            lifetime->refresh_diagnostic_bundle_status();
+        }));
     }
 
     void SettingsWindow::ResetWindowSizesButton_Click(IInspectable const&, RoutedEventArgs const&)

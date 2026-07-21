@@ -4,6 +4,7 @@
 #include <commctrl.h>
 #include <hstring.h>
 #include <restrictederrorinfo.h>
+#include <shobjidl_core.h>
 #include <unknwn.h>
 
 #undef GetCurrentTime

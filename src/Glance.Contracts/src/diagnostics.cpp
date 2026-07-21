@@ -14,7 +14,7 @@ namespace
     std::wstring process_name = L"Glance";
     std::mutex log_mutex;
 
-    std::filesystem::path diagnostics_directory(std::wstring_view child)
+    std::filesystem::path diagnostics_root_directory()
     {
         std::wstring local_app_data(32768, L'\0');
         const DWORD length = GetEnvironmentVariableW(
@@ -24,6 +24,12 @@ namespace
             ? std::filesystem::temp_directory_path()
             : std::filesystem::path(local_app_data);
         result /= L"Glance";
+        return result;
+    }
+
+    std::filesystem::path diagnostics_directory(std::wstring_view child)
+    {
+        auto result = diagnostics_root_directory();
         result /= child;
         std::error_code error;
         std::filesystem::create_directories(result, error);
@@ -88,7 +94,7 @@ namespace glance::contracts
 {
     bool diagnostics_enabled() noexcept
     {
-        DWORD enabled{ 1 };
+        DWORD enabled{};
         DWORD size = sizeof(enabled);
         RegGetValueW(
             HKEY_CURRENT_USER,
@@ -99,6 +105,23 @@ namespace glance::contracts
             &enabled,
             &size);
         return enabled != 0;
+    }
+
+    std::wstring diagnostics_root_path() noexcept
+    {
+        try
+        {
+            const auto root = diagnostics_root_directory();
+            std::error_code error;
+            std::filesystem::create_directories(root / L"Logs", error);
+            error.clear();
+            std::filesystem::create_directories(root / L"Dumps", error);
+            return root.wstring();
+        }
+        catch (...)
+        {
+            return {};
+        }
     }
 
     void set_diagnostics_enabled(bool enabled) noexcept

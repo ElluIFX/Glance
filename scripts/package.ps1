@@ -41,6 +41,33 @@ $payloadDirectory = Join-Path $artifactsDirectory "package\payload"
 $installerOutputDirectory = Join-Path $artifactsDirectory "installer"
 $installerScript = Join-Path $repositoryRoot "installer\Glance.iss"
 $version = Get-GlanceVersion
+$ffmpegVersion = "8.1.1"
+$ffmpegArchiveName = "ffmpeg-$ffmpegVersion-essentials_build.zip"
+$ffmpegArchiveUrl = "https://github.com/GyanD/codexffmpeg/releases/download/$ffmpegVersion/$ffmpegArchiveName"
+$ffmpegArchiveSha256 = "6f58ce889f59c311410f7d2b18895b33c03456463486f3b1ebc93d97a0f54541"
+$dependencyCacheDirectory = Join-Path $artifactsDirectory "dependencies"
+$ffmpegArchive = Join-Path $dependencyCacheDirectory $ffmpegArchiveName
+$ffmpegExtractDirectory = Join-Path $artifactsDirectory "package\ffmpeg"
+
+New-Item -ItemType Directory -Path $dependencyCacheDirectory -Force | Out-Null
+if (Test-Path -LiteralPath $ffmpegArchive -PathType Leaf) {
+    $actualHash = (Get-FileHash -LiteralPath $ffmpegArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne $ffmpegArchiveSha256) {
+        Remove-GlanceWorkspaceItem -Path $ffmpegArchive
+    }
+}
+if (-not (Test-Path -LiteralPath $ffmpegArchive -PathType Leaf)) {
+    $download = "$ffmpegArchive.download"
+    Remove-GlanceWorkspaceItem -Path $download
+    Write-Host "Downloading FFmpeg $ffmpegVersion essentials build..."
+    Invoke-WebRequest -UseBasicParsing -Uri $ffmpegArchiveUrl -OutFile $download
+    $actualHash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne $ffmpegArchiveSha256) {
+        Remove-GlanceWorkspaceItem -Path $download
+        throw "FFmpeg archive SHA-256 mismatch. Expected $ffmpegArchiveSha256, received $actualHash."
+    }
+    Move-Item -LiteralPath $download -Destination $ffmpegArchive
+}
 
 Remove-GlanceWorkspaceItem -Path (Join-Path $artifactsDirectory "package")
 Remove-GlanceWorkspaceItem -Path $installerOutputDirectory
@@ -53,14 +80,34 @@ New-Item -ItemType Directory -Path $installerOutputDirectory -Force | Out-Null
     -SelfContained `
     -OutputDirectory $payloadDirectory
 
+Expand-Archive -LiteralPath $ffmpegArchive -DestinationPath $ffmpegExtractDirectory -Force
+$ffprobe = Get-ChildItem -LiteralPath $ffmpegExtractDirectory -Filter "ffprobe.exe" -Recurse -File |
+    Select-Object -First 1
+if (-not $ffprobe) {
+    throw "The pinned FFmpeg archive does not contain ffprobe.exe."
+}
+Copy-Item -LiteralPath $ffprobe.FullName -Destination (Join-Path $payloadDirectory "ffprobe.exe") -Force
+
+$licenseDirectory = Join-Path $payloadDirectory "licenses"
+New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\FFmpeg-GPL-3.0.txt") `
+    -Destination (Join-Path $licenseDirectory "FFmpeg-GPL-3.0.txt") -Force
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\FFmpeg-NOTICE.txt") `
+    -Destination (Join-Path $licenseDirectory "FFmpeg-NOTICE.txt") -Force
+Remove-GlanceWorkspaceItem -Path $ffmpegExtractDirectory
+
 $requiredFiles = @(
     "Glance.exe",
     "Glance.Core.exe",
+    "Glance.DialogHook.dll",
     "Glance.OfficeHost.exe",
+    "ffprobe.exe",
     "Glance.pri",
     "App.xbf",
     "MainWindow.xbf",
-    "SettingsWindow.xbf"
+    "SettingsWindow.xbf",
+    "licenses\FFmpeg-GPL-3.0.txt",
+    "licenses\FFmpeg-NOTICE.txt"
 )
 foreach ($file in $requiredFiles) {
     $path = Join-Path $payloadDirectory $file
@@ -74,6 +121,27 @@ $developmentArtifacts = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -F
 }
 foreach ($artifact in $developmentArtifacts) {
     Remove-GlanceWorkspaceItem -Path $artifact.FullName
+}
+
+$forbiddenRuntimeFiles = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File | Where-Object {
+    $_.Name -in @(
+        "DirectML.dll",
+        "NPUDetect.dll",
+        "onnxruntime.dll",
+        "PerceptiveStreaming.dll",
+        "Microsoft.Windows.Widgets.dll",
+        "Microsoft.Windows.Widgets.winmd"
+    ) -or
+    $_.Name -like "Microsoft.Windows.AI.*" -or
+    $_.Name -like "Microsoft.Windows.Internal.AI.*" -or
+    $_.Name -like "Microsoft.Windows.Workloads*" -or
+    $_.Name -like "workloads*.json"
+}
+if ($forbiddenRuntimeFiles) {
+    $relativePaths = $forbiddenRuntimeFiles | ForEach-Object {
+        [System.IO.Path]::GetRelativePath($payloadDirectory, $_.FullName)
+    }
+    throw "Unused Windows App SDK AI, ML, or Widgets files entered the package payload: $($relativePaths -join ', ')"
 }
 
 $compiler = Get-InnoSetupCompiler

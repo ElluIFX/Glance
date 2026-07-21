@@ -3,12 +3,25 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <iomanip>
 #include <sstream>
 #include <vector>
 
 namespace
 {
+    std::filesystem::path executable_directory()
+    {
+        std::wstring path(32768, L'\0');
+        const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+        if (length == 0 || length >= path.size())
+        {
+            return {};
+        }
+        path.resize(length);
+        return std::filesystem::path(path).parent_path();
+    }
+
     std::wstring quote_argument(std::wstring_view value)
     {
         std::wstring result{ L'"' };
@@ -36,13 +49,40 @@ namespace
         return result;
     }
 
-    std::string run_ffprobe(std::wstring_view path, bool audio)
+    std::vector<std::filesystem::path> ffprobe_candidates()
     {
-        wchar_t executable[32768]{};
-        if (SearchPathW(nullptr, L"ffprobe.exe", nullptr, static_cast<DWORD>(std::size(executable)), executable, nullptr) == 0)
+        std::vector<std::filesystem::path> result;
+        const auto bundled = executable_directory() / L"ffprobe.exe";
+        std::error_code error;
+        if (!bundled.empty() && std::filesystem::is_regular_file(bundled, error))
         {
-            return {};
+            result.push_back(bundled);
         }
+
+        wchar_t executable[32768]{};
+        const DWORD length = SearchPathW(
+            nullptr,
+            L"ffprobe.exe",
+            nullptr,
+            static_cast<DWORD>(std::size(executable)),
+            executable,
+            nullptr);
+        if (length > 0 && length < std::size(executable))
+        {
+            const std::filesystem::path fallback(executable);
+            if (result.empty() || _wcsicmp(result.front().c_str(), fallback.c_str()) != 0)
+            {
+                result.push_back(fallback);
+            }
+        }
+        return result;
+    }
+
+    std::string run_ffprobe_executable(
+        const std::filesystem::path& executable,
+        std::wstring_view path,
+        bool audio)
+    {
 
         SECURITY_ATTRIBUTES security{ sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
         HANDLE read_pipe{};
@@ -53,7 +93,7 @@ namespace
         }
         SetHandleInformation(read_pipe, HANDLE_FLAG_INHERIT, 0);
 
-        std::wstring command = quote_argument(executable)
+        std::wstring command = quote_argument(executable.wstring())
             + L" -v error -select_streams " + (audio ? std::wstring(L"a:0") : std::wstring(L"v:0"))
             + L" -show_entries stream=codec_name,avg_frame_rate,bit_rate,sample_rate,bits_per_sample,bits_per_raw_sample"
             + L" -of json " + quote_argument(path);
@@ -63,7 +103,7 @@ namespace
         startup.hStdError = write_pipe;
         PROCESS_INFORMATION process{};
         const BOOL created = CreateProcessW(
-            executable,
+            executable.c_str(),
             command.data(),
             nullptr,
             nullptr,
@@ -97,6 +137,19 @@ namespace
         CloseHandle(process.hThread);
         CloseHandle(process.hProcess);
         return output;
+    }
+
+    std::string run_ffprobe(std::wstring_view path, bool audio)
+    {
+        for (const auto& executable : ffprobe_candidates())
+        {
+            auto output = run_ffprobe_executable(executable, path, audio);
+            if (!output.empty())
+            {
+                return output;
+            }
+        }
+        return {};
     }
 
     std::wstring friendly_codec(std::wstring value)

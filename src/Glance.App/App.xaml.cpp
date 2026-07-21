@@ -4,6 +4,7 @@
 #include "localization.h"
 #include "MainWindow.xaml.h"
 #include "SettingsWindow.xaml.h"
+#include "startup_registration.h"
 #include "glance/contracts/diagnostics.h"
 
 #include <shellapi.h>
@@ -23,6 +24,36 @@ namespace
         const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
         path.resize(length);
         return std::filesystem::path(path).parent_path();
+    }
+
+    std::vector<std::wstring> command_line_arguments()
+    {
+        int count{};
+        LPWSTR* raw = CommandLineToArgvW(GetCommandLineW(), &count);
+        if (raw == nullptr)
+        {
+            return {};
+        }
+        std::vector<std::wstring> result;
+        result.reserve(count > 1 ? static_cast<std::size_t>(count - 1) : 0U);
+        for (int index = 1; index < count; ++index)
+        {
+            result.emplace_back(raw[index]);
+        }
+        LocalFree(raw);
+        return result;
+    }
+
+    std::wstring executable_path()
+    {
+        std::wstring path(32768, L'\0');
+        const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+        if (length == 0 || length >= path.size())
+        {
+            return {};
+        }
+        path.resize(length);
+        return path;
     }
 }
 
@@ -66,6 +97,23 @@ namespace winrt::Glance::App::implementation
 
     void App::OnLaunched(LaunchActivatedEventArgs const&)
     {
+        for (const auto& argument : command_line_arguments())
+        {
+            if (argument == L"--set-startup=enabled")
+            {
+                ExitProcess(glance::app::set_launch_at_sign_in(true) ? 0 : 1);
+            }
+            if (argument == L"--set-startup=disabled")
+            {
+                ExitProcess(glance::app::set_launch_at_sign_in(false) ? 0 : 1);
+            }
+            if (argument == L"--cleanup-startup")
+            {
+                const auto path = executable_path();
+                ExitProcess(!path.empty() && glance::app::cleanup_launch_at_sign_in(path) ? 0 : 1);
+            }
+        }
+
         glance::contracts::initialize_diagnostics(L"Glance.App");
         instance_mutex_ = CreateMutexW(nullptr, FALSE, L"Local\\Glance.App");
         if (instance_mutex_ == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)

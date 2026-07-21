@@ -478,6 +478,25 @@
                                     <FontIcon FontSize="14" Glyph="&#xE72C;" />
                                 </Button>
                             </Grid>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="DiagnosticBundleLabel" x:Uid="DiagnosticBundleLabel" Text="Diagnostic package" />
+                                    <TextBlock x:Name="DiagnosticBundleStatusText" Style="{StaticResource SettingsDescriptionStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button
+                                    x:Name="ExportDiagnosticBundleButton"
+                                    x:Uid="ExportDiagnosticBundleButton"
+                                    Grid.Column="1"
+                                    MinWidth="88"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="ExportDiagnosticBundleButton_Click"
+                                    Content="Export" />
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>

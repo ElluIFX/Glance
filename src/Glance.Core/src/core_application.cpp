@@ -1,4 +1,5 @@
 #include "core_application.h"
+#include "explorer_selection.h"
 #include "glance/contracts/diagnostics.h"
 
 #include <winrt/Windows.Data.Json.h>
@@ -22,6 +23,7 @@ namespace glance::core
 
     CoreApplication::~CoreApplication()
     {
+        stop_selection_worker();
         if (window_ != nullptr)
         {
             WTSUnRegisterSessionNotification(window_);
@@ -83,7 +85,12 @@ namespace glance::core
             return 2;
         }
 
-        SetTimer(window_, selection_timer_id, selection_interval_ms, nullptr);
+        if (!start_selection_worker())
+        {
+            glance::contracts::log_event(L"Failed to start the selection worker.");
+            return 3;
+        }
+        SetTimer(window_, selection_timer_id, 100, nullptr);
         SetTimer(window_, hook_refresh_timer_id, hook_refresh_interval_ms, nullptr);
         static_cast<void>(WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION));
         MSG message{};
@@ -146,7 +153,12 @@ namespace glance::core
         case WM_TIMER:
             if (wparam == selection_timer_id)
             {
-                self->update_selection();
+                const auto now = GetTickCount64();
+                if (self->selection_.timestamp_ms == 0 ||
+                    now - self->selection_.timestamp_ms > selection_stale_after_ms)
+                {
+                    self->input_state_.eligible_selection.store(false, std::memory_order_release);
+                }
                 return 0;
             }
             if (wparam == hook_refresh_timer_id && self->keyboard_hook_ != nullptr)
@@ -190,9 +202,15 @@ namespace glance::core
             self->raw_input_count_.fetch_add(1, std::memory_order_relaxed);
             return 0;
         case hook_action_message:
-            self->handle_hook_action(static_cast<HookAction>(wparam));
+            self->handle_hook_action(
+                static_cast<HookAction>(wparam),
+                static_cast<std::uint64_t>(lparam));
+            return 0;
+        case selection_result_message:
+            self->apply_pending_selection();
             return 0;
         case WM_DESTROY:
+            self->stop_selection_worker();
             PostQuitMessage(0);
             return 0;
         default:
@@ -224,9 +242,130 @@ namespace glance::core
         }
     }
 
-    void CoreApplication::update_selection()
+    bool CoreApplication::start_selection_worker()
     {
-        const auto preview_state = preview_state_.load(std::memory_order_acquire);
+        selection_stop_event_.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+        if (!selection_stop_event_)
+        {
+            return false;
+        }
+
+        try
+        {
+            selection_worker_ = std::thread([this] {
+                const HRESULT apartment_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+                if (FAILED(apartment_result))
+                {
+                    glance::contracts::log_event(
+                        L"Selection worker COM initialization failed with HRESULT " +
+                        std::to_wstring(static_cast<unsigned long>(apartment_result)) + L".");
+                    return;
+                }
+
+                try
+                {
+                    ExplorerSelectionService selection_service;
+                    while (WaitForSingleObject(selection_stop_event_.get(), 0) == WAIT_TIMEOUT)
+                    {
+                        const auto query_started = std::chrono::steady_clock::now();
+                        auto next = selection_service.query_foreground();
+                        const auto query_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - query_started);
+                        next.timestamp_ms = GetTickCount64();
+                        if (query_duration >= std::chrono::milliseconds(100))
+                        {
+                            glance::contracts::log_event(
+                                L"Explorer selection query took " +
+                                std::to_wstring(query_duration.count()) + L" ms.");
+                        }
+                        publish_selection(std::move(next));
+
+                        const HANDLE stop_event = selection_stop_event_.get();
+                        const DWORD wait_result = MsgWaitForMultipleObjectsEx(
+                            1,
+                            &stop_event,
+                            selection_interval_ms,
+                            QS_ALLINPUT,
+                            MWMO_INPUTAVAILABLE);
+                        if (wait_result == WAIT_OBJECT_0)
+                        {
+                            break;
+                        }
+                        if (wait_result == WAIT_OBJECT_0 + 1)
+                        {
+                            MSG message{};
+                            while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+                            {
+                                TranslateMessage(&message);
+                                DispatchMessageW(&message);
+                            }
+                        }
+                    }
+                }
+                catch (const std::exception&)
+                {
+                    glance::contracts::log_event(L"Selection worker stopped after a standard exception.");
+                }
+                catch (...)
+                {
+                    glance::contracts::log_event(L"Selection worker stopped after an unknown exception.");
+                }
+
+                CoUninitialize();
+            });
+        }
+        catch (...)
+        {
+            selection_stop_event_.reset();
+            return false;
+        }
+        return true;
+    }
+
+    void CoreApplication::stop_selection_worker() noexcept
+    {
+        if (selection_stop_event_)
+        {
+            SetEvent(selection_stop_event_.get());
+        }
+        if (selection_worker_.joinable())
+        {
+            selection_worker_.join();
+        }
+        selection_stop_event_.reset();
+    }
+
+    void CoreApplication::publish_selection(glance::contracts::SelectionSnapshot next)
+    {
+        {
+            const std::scoped_lock lock(pending_selection_mutex_);
+            pending_selection_ = std::move(next);
+        }
+        if (!selection_message_pending_.exchange(true, std::memory_order_acq_rel) &&
+            !PostMessageW(window_, selection_result_message, 0, 0))
+        {
+            selection_message_pending_.store(false, std::memory_order_release);
+        }
+    }
+
+    void CoreApplication::apply_pending_selection()
+    {
+        std::optional<glance::contracts::SelectionSnapshot> next;
+        {
+            const std::scoped_lock lock(pending_selection_mutex_);
+            next = std::move(pending_selection_);
+            pending_selection_.reset();
+            selection_message_pending_.store(false, std::memory_order_release);
+        }
+        if (next)
+        {
+            apply_selection(std::move(*next));
+        }
+    }
+
+    void CoreApplication::apply_selection(glance::contracts::SelectionSnapshot next)
+    {
+        auto preview_state = preview_state_.load(std::memory_order_acquire);
         if (preview_state == glance::contracts::PreviewWindowState::active_following &&
             selection_.source_window != 0 &&
             reinterpret_cast<std::uintptr_t>(GetForegroundWindow()) != selection_.source_window)
@@ -237,26 +376,18 @@ namespace glance::core
                     glance::contracts::PreviewWindowState::hidden,
                     std::memory_order_release);
                 input_state_.preview_active.store(false, std::memory_order_release);
+                preview_state = glance::contracts::PreviewWindowState::hidden;
             }
-            return;
-        }
-
-        const auto query_started = std::chrono::steady_clock::now();
-        auto next = selection_service_.query_foreground();
-        const auto query_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - query_started);
-        if (query_duration >= std::chrono::milliseconds(100))
-        {
-            glance::contracts::log_event(
-                L"Explorer selection query took " + std::to_wstring(query_duration.count()) + L" ms.");
         }
         const bool changed = selection_changed(next);
         if (changed)
         {
-            if (next.host_kind == glance::contracts::HostKind::explorer)
+            if (next.host_kind != glance::contracts::HostKind::unsupported)
             {
                 glance::contracts::log_event(
-                    L"Explorer selection state: eligible=" + std::to_wstring(next.accepts_hotkey) +
+                    L"Selection state: host=" +
+                    std::to_wstring(static_cast<unsigned>(next.host_kind)) +
+                    L", eligible=" + std::to_wstring(next.accepts_hotkey) +
                     L", items=" + std::to_wstring(next.items.size()) + L".");
             }
             next.generation = ++selection_generation_;
@@ -316,8 +447,15 @@ namespace glance::core
         return false;
     }
 
-    void CoreApplication::handle_hook_action(HookAction action)
+    void CoreApplication::handle_hook_action(HookAction action, std::uint64_t posted_at_ms)
     {
+        const auto dispatch_delay = GetTickCount64() - posted_at_ms;
+        if (dispatch_delay >= 50)
+        {
+            glance::contracts::log_event(
+                L"Hook action dispatch was delayed by " + std::to_wstring(dispatch_delay) + L" ms.");
+        }
+
         if (!input_state_.ui_connected.load(std::memory_order_acquire))
         {
             return;
@@ -340,8 +478,11 @@ namespace glance::core
             return;
         }
 
-        update_selection();
-        if (selection_.items.empty())
+        const HWND foreground = GetForegroundWindow();
+        const HWND foreground_root = foreground == nullptr ? nullptr : GetAncestor(foreground, GA_ROOT);
+        if (selection_.items.empty() ||
+            selection_.source_window != reinterpret_cast<std::uintptr_t>(foreground_root) ||
+            GetTickCount64() - selection_.timestamp_ms > selection_stale_after_ms)
         {
             return;
         }
