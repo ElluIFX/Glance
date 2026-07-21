@@ -21,6 +21,7 @@ namespace winrt::Glance::App::implementation
             AppearanceChangedCallback appearance_changed_callback,
             TextPreferencesChangedCallback text_preferences_changed_callback);
         void ApplyAppearancePreferences();
+        void ApplyLocalizedResources();
         winrt::fire_and_forget ConfirmExit();
 
         void LaunchAtSignInToggle_Toggled(

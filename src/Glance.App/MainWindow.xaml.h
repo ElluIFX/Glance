@@ -34,6 +34,7 @@ namespace winrt::Glance::App::implementation
             HWND source_window);
         void HidePreview();
         void ApplyAppearancePreferences();
+        void ApplyLocalizedResources();
         void ApplyTextPreferences();
         [[nodiscard]] std::uint64_t InstanceId() const noexcept { return instance_id_; }
 

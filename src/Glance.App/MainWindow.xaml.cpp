@@ -94,6 +94,7 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"MainWindow InitializeComponent begin.");
         InitializeComponent();
         glance::contracts::log_event(L"MainWindow InitializeComponent complete.");
+        ApplyLocalizedResources();
         ApplyAppearancePreferences();
         configure_window();
         glance::contracts::log_event(L"MainWindow native configuration complete.");
@@ -126,6 +127,47 @@ namespace winrt::Glance::App::implementation
                 render_markdown();
             }
         }
+    }
+
+    void MainWindow::ApplyLocalizedResources()
+    {
+        const auto set_tooltip = [](const auto& control, wchar_t const* key) {
+            ToolTipService::SetToolTip(control, box_value(glance::app::localize(key)));
+        };
+
+        set_tooltip(TopmostButton(), L"TopmostButton.ToolTipService.ToolTip");
+        set_tooltip(PinButton(), L"PinButton.ToolTipService.ToolTip");
+        set_tooltip(ClosePreviewButton(), L"ClosePreviewButton.ToolTipService.ToolTip");
+        LoadCloudFileText().Text(glance::app::localize(L"LoadCloudFileText.Text"));
+        set_tooltip(MediaPlayPauseButton(), L"MediaPlayPauseButton.ToolTipService.ToolTip");
+        set_tooltip(MediaMuteButton(), L"MediaMuteButton.ToolTipService.ToolTip");
+        set_tooltip(PreviousPdfButton(), L"PreviousPdfButton.ToolTipService.ToolTip");
+        set_tooltip(NextPdfButton(), L"NextPdfButton.ToolTipService.ToolTip");
+        ArchiveNameHeader().Text(glance::app::localize(L"ArchiveNameHeader.Text"));
+        ArchiveTypeHeader().Text(glance::app::localize(L"ArchiveTypeHeader.Text"));
+        ArchiveModifiedHeader().Text(glance::app::localize(L"ArchiveModifiedHeader.Text"));
+        ArchiveSizeHeader().Text(glance::app::localize(L"ArchiveSizeHeader.Text"));
+        MarkdownPreviewButton().Content(box_value(glance::app::localize(L"MarkdownPreviewButton.Content")));
+        MarkdownCodeButton().Content(box_value(glance::app::localize(L"MarkdownCodeButton.Content")));
+        SystemAnsiItem().Text(glance::app::localize(L"SystemAnsiItem.Text"));
+        set_tooltip(SyntaxHighlightButton(), L"SyntaxHighlightButton.ToolTipService.ToolTip");
+        set_tooltip(ZoomOutButton(), L"ZoomOutButton.ToolTipService.ToolTip");
+        set_tooltip(ZoomInButton(), L"ZoomInButton.ToolTipService.ToolTip");
+        set_tooltip(RotateButton(), L"RotateButton.ToolTipService.ToolTip");
+        set_tooltip(ImageExifButton(), L"ImageExifButton.ToolTipService.ToolTip");
+        set_tooltip(WordWrapButton(), L"WordWrapButton.ToolTipService.ToolTip");
+        set_tooltip(CopyPathButton(), L"CopyPathButton.ToolTipService.ToolTip");
+        set_tooltip(OpenDefaultButton(), L"OpenDefaultButton.ToolTipService.ToolTip");
+        set_tooltip(OpenFolderButton(), L"OpenFolderButton.ToolTipService.ToolTip");
+        if (files_.empty())
+        {
+            EncodingSelector().Content(box_value(glance::app::localize(L"EncodingSelector.Content")));
+        }
+        if (!TextEncodingText().Text().empty())
+        {
+            TextEncodingText().Text(glance::app::localize(L"PreviewTruncated"));
+        }
+        update_line_number_visibility();
     }
 
     void MainWindow::ApplyTextPreferences()

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "appearance_preferences.h"
+#include "localization.h"
 
 #include <winrt/Windows.UI.ViewManagement.h>
 
@@ -94,6 +95,7 @@ namespace glance::app
         {
             result.language = language;
         }
+        result.language = resolve_ui_language(result.language);
         return result;
     }
 

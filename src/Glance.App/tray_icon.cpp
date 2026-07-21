@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "tray_icon.h"
+#include "localization.h"
 #include "resource.h"
 
 namespace glance::app
@@ -135,9 +136,11 @@ namespace glance::app
         {
             return;
         }
-        AppendMenuW(menu, MF_STRING, settings_command, L"Settings");
+        const auto settings = localize(L"TraySettings");
+        const auto exit = localize(L"TrayExit");
+        AppendMenuW(menu, MF_STRING, settings_command, settings.c_str());
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(menu, MF_STRING, exit_command, L"Exit Glance");
+        AppendMenuW(menu, MF_STRING, exit_command, exit.c_str());
         SetForegroundWindow(window_);
         const UINT command = TrackPopupMenu(
             menu,

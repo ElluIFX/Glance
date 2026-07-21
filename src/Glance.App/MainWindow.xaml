@@ -334,6 +334,7 @@
                                 FontSize="11"
                                 Text="0:00 / 0:00" />
                             <Button
+                                x:Name="MediaMuteButton"
                                 x:Uid="MediaMuteButton"
                                 Grid.Column="3"
                                 Style="{StaticResource IconButtonStyle}"
@@ -400,6 +401,7 @@
                         Orientation="Horizontal"
                         Spacing="8">
                         <Button
+                            x:Name="PreviousPdfButton"
                             x:Uid="PreviousPdfButton"
                             Style="{StaticResource IconButtonStyle}"
                             Click="PreviousPdfPageButton_Click"
@@ -412,6 +414,7 @@
                             VerticalAlignment="Center"
                             TextAlignment="Center" />
                         <Button
+                            x:Name="NextPdfButton"
                             x:Uid="NextPdfButton"
                             Style="{StaticResource IconButtonStyle}"
                             Click="NextPdfPageButton_Click"
@@ -444,10 +447,10 @@
                             <ColumnDefinition Width="150" />
                             <ColumnDefinition Width="90" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Uid="ArchiveNameHeader" Grid.Column="1" VerticalAlignment="Center" FontSize="11" Text="Name" />
-                        <TextBlock x:Uid="ArchiveTypeHeader" Grid.Column="2" VerticalAlignment="Center" FontSize="11" Text="Type" />
-                        <TextBlock x:Uid="ArchiveModifiedHeader" Grid.Column="3" VerticalAlignment="Center" FontSize="11" Text="Modified" />
-                        <TextBlock x:Uid="ArchiveSizeHeader" Grid.Column="4" VerticalAlignment="Center" FontSize="11" Text="Size" TextAlignment="Right" />
+                        <TextBlock x:Name="ArchiveNameHeader" x:Uid="ArchiveNameHeader" Grid.Column="1" VerticalAlignment="Center" FontSize="11" Text="Name" />
+                        <TextBlock x:Name="ArchiveTypeHeader" x:Uid="ArchiveTypeHeader" Grid.Column="2" VerticalAlignment="Center" FontSize="11" Text="Type" />
+                        <TextBlock x:Name="ArchiveModifiedHeader" x:Uid="ArchiveModifiedHeader" Grid.Column="3" VerticalAlignment="Center" FontSize="11" Text="Modified" />
+                        <TextBlock x:Name="ArchiveSizeHeader" x:Uid="ArchiveSizeHeader" Grid.Column="4" VerticalAlignment="Center" FontSize="11" Text="Size" TextAlignment="Right" />
                     </Grid>
                     <ListView
                         x:Name="ArchiveEntryList"
@@ -522,6 +525,7 @@
                 </StackPanel>
                 <DropDownButton
                     x:Name="EncodingSelector"
+                    x:Uid="EncodingSelector"
                     Width="112"
                     Height="28"
                     Padding="8,0"
@@ -541,6 +545,7 @@
                             <MenuFlyoutItem Click="EncodingOption_Click" Tag="big5" Text="Big5" />
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem
+                                x:Name="SystemAnsiItem"
                                 x:Uid="SystemAnsiItem"
                                 Click="EncodingOption_Click"
                                 Tag="system"
@@ -574,6 +579,7 @@
                 Spacing="4"
                 Visibility="Collapsed">
                 <Button
+                    x:Name="ZoomOutButton"
                     x:Uid="ZoomOutButton"
                     Style="{StaticResource IconButtonStyle}"
                     Click="ZoomOutButton_Click"
@@ -581,6 +587,7 @@
                     <FontIcon FontSize="14" Glyph="&#xE71F;" />
                 </Button>
                 <Button
+                    x:Name="ZoomInButton"
                     x:Uid="ZoomInButton"
                     Style="{StaticResource IconButtonStyle}"
                     Click="ZoomInButton_Click"
@@ -588,6 +595,7 @@
                     <FontIcon FontSize="14" Glyph="&#xE8A3;" />
                 </Button>
                 <Button
+                    x:Name="RotateButton"
                     x:Uid="RotateButton"
                     Style="{StaticResource IconButtonStyle}"
                     Click="RotateButton_Click"

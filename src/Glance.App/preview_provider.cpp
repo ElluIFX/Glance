@@ -553,7 +553,7 @@ namespace glance::app
         }
         else if (encoding == TextEncoding::system)
         {
-            result.encoding = L"System code page";
+            result.encoding = localize(L"SystemCodePage");
             result.content = decode_multibyte(payload, CP_ACP);
         }
         else if (encoding == TextEncoding::automatic)
@@ -593,7 +593,7 @@ namespace glance::app
         }
         else
         {
-            result.encoding = L"System code page";
+            result.encoding = localize(L"SystemCodePage");
             result.content = decode_multibyte(payload, CP_ACP);
         }
 

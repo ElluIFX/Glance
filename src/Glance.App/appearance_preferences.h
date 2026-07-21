@@ -30,7 +30,7 @@ namespace glance::app
     {
         ThemePreference theme{ ThemePreference::system };
         AccentPreference accent{ AccentPreference::system };
-        std::wstring language{ L"en-US" };
+        std::wstring language;
     };
 
     [[nodiscard]] AppearancePreferences load_appearance_preferences() noexcept;

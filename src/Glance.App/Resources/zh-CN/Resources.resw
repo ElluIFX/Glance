@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="AppName" xml:space="preserve"><value>Glance</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>Glance 设置</value></data>
+  <data name="Loading" xml:space="preserve"><value>正在加载...</value></data>
+  <data name="LoadingFolder" xml:space="preserve"><value>正在加载文件夹...</value></data>
+  <data name="LoadingArchive" xml:space="preserve"><value>正在读取目录...</value></data>
+  <data name="LoadingPdf" xml:space="preserve"><value>正在加载 PDF...</value></data>
+  <data name="ConvertingOffice" xml:space="preserve"><value>正在使用 Microsoft Office 转换...</value></data>
+  <data name="LoadingConvertedDocument" xml:space="preserve"><value>正在加载转换后的文档...</value></data>
+  <data name="EncodingDetecting" xml:space="preserve"><value>正在检测...</value></data>
+  <data name="EncodingUnknown" xml:space="preserve"><value>未知</value></data>
+  <data name="PreviewTruncated" xml:space="preserve"><value>预览已截断至 8 MB</value></data>
+  <data name="LineNumbersTooltip" xml:space="preserve"><value>显示行号</value></data>
+  <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>自动换行时无法显示行号</value></data>
+  <data name="NoImageMetadata" xml:space="preserve"><value>没有内嵌的图像元数据。</value></data>
+  <data name="ImageDecodeError" xml:space="preserve"><value>无法解码图像。{0}</value></data>
+  <data name="MediaOpenError" xml:space="preserve"><value>无法打开媒体文件。{0}</value></data>
+  <data name="PdfEmptyError" xml:space="preserve"><value>PDF 中没有页面。</value></data>
+  <data name="PdfOpenError" xml:space="preserve"><value>无法打开 PDF。不支持受保护的 PDF 文件。</value></data>
+  <data name="PdfRenderError" xml:space="preserve"><value>无法渲染 PDF 页面。{0}</value></data>
+  <data name="OfficeConvertError" xml:space="preserve"><value>Microsoft Office 无法将此文档转换为 PDF。</value></data>
+  <data name="CloudLoadError" xml:space="preserve"><value>无法加载文件。错误 {0}。</value></data>
+  <data name="TextFileOpenError" xml:space="preserve"><value>无法打开文件。</value></data>
+  <data name="TextFileSizeError" xml:space="preserve"><value>无法读取文件大小。</value></data>
+  <data name="TextDecodeError" xml:space="preserve"><value>无法解码文本编码。</value></data>
+  <data name="ArchiveReadError" xml:space="preserve"><value>Windows ZIP 处理程序无法读取压缩包目录。</value></data>
+  <data name="FolderReadError" xml:space="preserve"><value>无法读取文件夹。</value></data>
+  <data name="FolderType" xml:space="preserve"><value>文件夹</value></data>
+  <data name="FileType" xml:space="preserve"><value>文件</value></data>
+  <data name="ExtensionFileType" xml:space="preserve"><value>{0} 文件</value></data>
+  <data name="EntryCount" xml:space="preserve"><value>{0} 个条目</value></data>
+  <data name="TotalSize" xml:space="preserve"><value>总计 {0}</value></data>
+  <data name="PartialTotalSize" xml:space="preserve"><value>总计超过 {0}</value></data>
+  <data name="ListTruncated" xml:space="preserve"><value>列表已截断</value></data>
+  <data name="UnknownTime" xml:space="preserve"><value>未知时间</value></data>
+  <data name="CoreRunning" xml:space="preserve"><value>正在运行</value></data>
+  <data name="CoreNotRunning" xml:space="preserve"><value>未运行</value></data>
+  <data name="SizesReset" xml:space="preserve"><value>已重置保存的窗口尺寸</value></data>
+  <data name="SizesResetFailed" xml:space="preserve"><value>无法重置保存的窗口尺寸</value></data>
+
+  <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>始终置顶</value></data>
+  <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>钉住文件</value></data>
+  <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭预览</value></data>
+  <data name="LoadCloudFileText.Text" xml:space="preserve"><value>加载文件</value></data>
+  <data name="SystemAnsiItem.Text" xml:space="preserve"><value>系统 ANSI</value></data>
+  <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>预览</value></data>
+  <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>代码</value></data>
+  <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>播放或暂停</value></data>
+  <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>静音或取消静音</value></data>
+  <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>上一页</value></data>
+  <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>下一页</value></data>
+  <data name="ArchiveNameHeader.Text" xml:space="preserve"><value>名称</value></data>
+  <data name="ArchiveTypeHeader.Text" xml:space="preserve"><value>类型</value></data>
+  <data name="ArchiveModifiedHeader.Text" xml:space="preserve"><value>修改日期</value></data>
+  <data name="ArchiveSizeHeader.Text" xml:space="preserve"><value>大小</value></data>
+  <data name="SyntaxHighlightButton.ToolTipService.ToolTip" xml:space="preserve"><value>语法高亮</value></data>
+  <data name="ZoomOutButton.ToolTipService.ToolTip" xml:space="preserve"><value>缩小</value></data>
+  <data name="ZoomInButton.ToolTipService.ToolTip" xml:space="preserve"><value>放大</value></data>
+  <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>顺时针旋转</value></data>
+  <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>图像元数据 (EXIF)</value></data>
+  <data name="WordWrapButton.ToolTipService.ToolTip" xml:space="preserve"><value>自动换行</value></data>
+  <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>复制路径</value></data>
+  <data name="OpenFolderButton.ToolTipService.ToolTip" xml:space="preserve"><value>打开所在文件夹</value></data>
+  <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>使用默认应用打开</value></data>
+
+  <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>常规</value></data>
+  <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>文本预览</value></data>
+  <data name="PathCopyNavigationItem.Content" xml:space="preserve"><value>路径复制</value></data>
+  <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>维护</value></data>
+  <data name="AboutNavigationItem.Content" xml:space="preserve"><value>关于</value></data>
+  <data name="GeneralPageTitle.Text" xml:space="preserve"><value>常规</value></data>
+  <data name="GeneralPageDescription.Text" xml:space="preserve"><value>外观、应用启动和诊断</value></data>
+  <data name="LaunchTitle.Text" xml:space="preserve"><value>登录时启动</value></data>
+  <data name="LaunchDescription.Text" xml:space="preserve"><value>登录 Windows 时自动启动 Glance</value></data>
+  <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>诊断</value></data>
+  <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>保存诊断日志和崩溃转储</value></data>
+  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
+  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体文件尺寸自动调整预览窗口</value></data>
+  <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文本预览</value></data>
+  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>编辑器外观和布局</value></data>
+  <data name="FontFamilyLabel.Text" xml:space="preserve"><value>字体</value></data>
+  <data name="FontSizeLabel.Text" xml:space="preserve"><value>字号</value></data>
+  <data name="SyntaxHighlightingLabel.Text" xml:space="preserve"><value>语法高亮</value></data>
+  <data name="LineNumbersLabel.Text" xml:space="preserve"><value>行号</value></data>
+  <data name="WordWrapLabel.Text" xml:space="preserve"><value>自动换行</value></data>
+  <data name="PathCopyPageTitle.Text" xml:space="preserve"><value>路径复制</value></data>
+  <data name="PathCopyPageDescription.Text" xml:space="preserve"><value>设置从预览窗口复制的路径格式</value></data>
+  <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>为复制的路径添加引号</value></data>
+  <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>使用双引号包裹复制的路径</value></data>
+  <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix 路径分隔符</value></data>
+  <data name="UnixPathSeparatorsDescription.Text" xml:space="preserve"><value>将反斜杠替换为正斜杠</value></data>
+  <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>维护</value></data>
+  <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态和已保存的应用状态</value></data>
+  <data name="InputCoreLabel.Text" xml:space="preserve"><value>输入核心</value></data>
+  <data name="RefreshCoreButton.ToolTipService.ToolTip" xml:space="preserve"><value>刷新状态</value></data>
+  <data name="WindowSizesLabel.Text" xml:space="preserve"><value>预览窗口尺寸</value></data>
+  <data name="WindowSizeResetStatusText.Text" xml:space="preserve"><value>按预览类型分别保存</value></data>
+  <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>重置</value></data>
+  <data name="AboutPageTitle.Text" xml:space="preserve"><value>关于</value></data>
+  <data name="AboutPageDescription.Text" xml:space="preserve"><value>应用信息</value></data>
+  <data name="AboutAuthorLabel.Text" xml:space="preserve"><value>作者</value></data>
+  <data name="AboutLicenseText.Text" xml:space="preserve"><value>许可证：GPL-3.0</value></data>
+  <data name="AboutProjectLink.Content" xml:space="preserve"><value>GitHub 仓库</value></data>
+  <data name="ExitConfirmationTitle" xml:space="preserve"><value>退出 Glance？</value></data>
+  <data name="ExitConfirmationMessage" xml:space="preserve"><value>重新启动 Glance 前，预览快捷键将停止工作。</value></data>
+  <data name="ExitConfirmationPrimary" xml:space="preserve"><value>退出</value></data>
+  <data name="Cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="ExitButtonText.Text" xml:space="preserve"><value>退出 Glance</value></data>
+  <data name="VersionFormat" xml:space="preserve"><value>版本 {0}</value></data>
+  <data name="TraySettings" xml:space="preserve"><value>设置</value></data>
+  <data name="TrayExit" xml:space="preserve"><value>退出 Glance</value></data>
+  <data name="SystemCodePage" xml:space="preserve"><value>系统代码页</value></data>
+  <data name="GenericHeader" xml:space="preserve"><value>文件头 ({0} 字节)</value></data>
+  <data name="AttributeReadOnly" xml:space="preserve"><value>只读</value></data>
+  <data name="AttributeHidden" xml:space="preserve"><value>隐藏</value></data>
+  <data name="AttributeSystem" xml:space="preserve"><value>系统</value></data>
+  <data name="AttributeArchive" xml:space="preserve"><value>存档</value></data>
+  <data name="AttributeCompressed" xml:space="preserve"><value>压缩</value></data>
+  <data name="AttributeEncrypted" xml:space="preserve"><value>加密</value></data>
+  <data name="AttributeOffline" xml:space="preserve"><value>脱机</value></data>
+  <data name="AttributeSparse" xml:space="preserve"><value>稀疏</value></data>
+  <data name="AttributeReparsePoint" xml:space="preserve"><value>重解析点</value></data>
+  <data name="AttributeNormal" xml:space="preserve"><value>常规</value></data>
+  <data name="GenericOwner" xml:space="preserve"><value>所有者：{0}</value></data>
+  <data name="AccessRead" xml:space="preserve"><value>读取</value></data>
+  <data name="AccessWrite" xml:space="preserve"><value>写入</value></data>
+  <data name="AccessExecute" xml:space="preserve"><value>执行</value></data>
+  <data name="AccessDelete" xml:space="preserve"><value>删除</value></data>
+  <data name="GenericAccess" xml:space="preserve"><value>访问权限：{0}</value></data>
+  <data name="GenericAttributes" xml:space="preserve"><value>属性：{0}</value></data>
+  <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance 设置</value></data>
+  <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭设置</value></data>
+  <data name="LanguageLabel.Text" xml:space="preserve"><value>语言</value></data>
+  <data name="EnglishLanguageItem.Content" xml:space="preserve"><value>English</value></data>
+  <data name="ChineseLanguageItem.Content" xml:space="preserve"><value>简体中文</value></data>
+  <data name="ThemeLabel.Text" xml:space="preserve"><value>主题</value></data>
+  <data name="ThemeSystemItem.Content" xml:space="preserve"><value>跟随系统</value></data>
+  <data name="ThemeLightItem.Content" xml:space="preserve"><value>浅色</value></data>
+  <data name="ThemeDarkItem.Content" xml:space="preserve"><value>深色</value></data>
+  <data name="AccentColorLabel.Text" xml:space="preserve"><value>强调色</value></data>
+  <data name="AccentSystemText.Text" xml:space="preserve"><value>跟随系统</value></data>
+  <data name="AccentBlueText.Text" xml:space="preserve"><value>蓝色</value></data>
+  <data name="AccentTealText.Text" xml:space="preserve"><value>青色</value></data>
+  <data name="AccentGreenText.Text" xml:space="preserve"><value>绿色</value></data>
+  <data name="AccentOrangeText.Text" xml:space="preserve"><value>橙色</value></data>
+  <data name="AccentRedText.Text" xml:space="preserve"><value>红色</value></data>
+  <data name="AccentPinkText.Text" xml:space="preserve"><value>粉色</value></data>
+  <data name="AccentPurpleText.Text" xml:space="preserve"><value>紫色</value></data>
+  <data name="EncodingSelector.Content" xml:space="preserve"><value>正在检测...</value></data>
+  <data name="LineNumbersButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示行号</value></data>
+</root>

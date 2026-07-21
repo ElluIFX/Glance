@@ -41,9 +41,7 @@ namespace winrt::Glance::App::implementation
     SettingsWindow::SettingsWindow()
     {
         InitializeComponent();
-        Title(glance::app::localize(L"SettingsTitle"));
-        SettingsTitleText().Text(glance::app::localize(L"SettingsTitle"));
-        AboutVersionText().Text(L"Version " GLANCE_VERSION_WSTRING);
+        ApplyLocalizedResources();
         ApplyAppearancePreferences();
         configure_window();
         HWND window{};
@@ -61,7 +59,7 @@ namespace winrt::Glance::App::implementation
 
         initializing_ = true;
         appearance_preferences_ = glance::app::load_appearance_preferences();
-        LanguageComboBox().SelectedIndex(0);
+        LanguageComboBox().SelectedIndex(appearance_preferences_.language == L"zh-CN" ? 1 : 0);
         ThemeComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.theme));
         AccentComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.accent));
         LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
@@ -134,6 +132,91 @@ namespace winrt::Glance::App::implementation
     {
         RootGrid().RequestedTheme(glance::app::element_theme(
             glance::app::load_appearance_preferences().theme));
+    }
+
+    void SettingsWindow::ApplyLocalizedResources()
+    {
+        const auto set_text = [](const auto& control, wchar_t const* key) {
+            control.Text(glance::app::localize(key));
+        };
+        const auto set_content = [](const auto& control, wchar_t const* key) {
+            control.Content(box_value(glance::app::localize(key)));
+        };
+
+        Title(glance::app::localize(L"SettingsTitle"));
+        set_text(SettingsTitleText(), L"SettingsTitleText.Text");
+        Controls::ToolTipService::SetToolTip(
+            CloseSettingsButton(),
+            box_value(glance::app::localize(L"CloseSettingsButton.ToolTipService.ToolTip")));
+        set_content(GeneralNavigationItem(), L"GeneralNavigationItem.Content");
+        set_content(TextPreviewNavigationItem(), L"TextPreviewNavigationItem.Content");
+        set_content(PathCopyNavigationItem(), L"PathCopyNavigationItem.Content");
+        set_content(MaintenanceNavigationItem(), L"MaintenanceNavigationItem.Content");
+        set_content(AboutNavigationItem(), L"AboutNavigationItem.Content");
+        set_text(ExitButtonText(), L"ExitButtonText.Text");
+        set_text(GeneralPageTitle(), L"GeneralPageTitle.Text");
+        set_text(GeneralPageDescription(), L"GeneralPageDescription.Text");
+        set_text(LanguageLabel(), L"LanguageLabel.Text");
+        set_content(EnglishLanguageItem(), L"EnglishLanguageItem.Content");
+        set_content(ChineseLanguageItem(), L"ChineseLanguageItem.Content");
+        set_text(ThemeLabel(), L"ThemeLabel.Text");
+        const int selected_theme = ThemeComboBox().SelectedIndex();
+        const bool was_initializing = initializing_;
+        initializing_ = true;
+        ThemeComboBox().Items().Clear();
+        ThemeComboBox().Items().Append(box_value(glance::app::localize(L"ThemeSystemItem.Content")));
+        ThemeComboBox().Items().Append(box_value(glance::app::localize(L"ThemeLightItem.Content")));
+        ThemeComboBox().Items().Append(box_value(glance::app::localize(L"ThemeDarkItem.Content")));
+        if (selected_theme >= 0)
+        {
+            ThemeComboBox().SelectedIndex(selected_theme);
+        }
+        initializing_ = was_initializing;
+        set_text(AccentColorLabel(), L"AccentColorLabel.Text");
+        set_text(AccentSystemText(), L"AccentSystemText.Text");
+        set_text(AccentBlueText(), L"AccentBlueText.Text");
+        set_text(AccentTealText(), L"AccentTealText.Text");
+        set_text(AccentGreenText(), L"AccentGreenText.Text");
+        set_text(AccentOrangeText(), L"AccentOrangeText.Text");
+        set_text(AccentRedText(), L"AccentRedText.Text");
+        set_text(AccentPinkText(), L"AccentPinkText.Text");
+        set_text(AccentPurpleText(), L"AccentPurpleText.Text");
+        set_text(LaunchTitle(), L"LaunchTitle.Text");
+        set_text(LaunchDescription(), L"LaunchDescription.Text");
+        set_text(DiagnosticsTitle(), L"DiagnosticsTitle.Text");
+        set_text(DiagnosticsDescription(), L"DiagnosticsDescription.Text");
+        set_text(AutoFitWindowSizeLabel(), L"AutoFitWindowSizeLabel.Text");
+        set_text(AutoFitWindowSizeDescription(), L"AutoFitWindowSizeDescription.Text");
+        set_text(WindowSizesLabel(), L"WindowSizesLabel.Text");
+        set_text(WindowSizeResetStatusText(), L"WindowSizeResetStatusText.Text");
+        set_content(ResetWindowSizesButton(), L"ResetWindowSizesButton.Content");
+        set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
+        set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
+        set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
+        set_text(FontSizeLabel(), L"FontSizeLabel.Text");
+        set_text(SyntaxHighlightingLabel(), L"SyntaxHighlightingLabel.Text");
+        set_text(LineNumbersLabel(), L"LineNumbersLabel.Text");
+        set_text(WordWrapLabel(), L"WordWrapLabel.Text");
+        set_text(PathCopyPageTitle(), L"PathCopyPageTitle.Text");
+        set_text(PathCopyPageDescription(), L"PathCopyPageDescription.Text");
+        set_text(QuoteCopiedPathLabel(), L"QuoteCopiedPathLabel.Text");
+        set_text(QuoteCopiedPathDescription(), L"QuoteCopiedPathDescription.Text");
+        set_text(UnixPathSeparatorsLabel(), L"UnixPathSeparatorsLabel.Text");
+        set_text(UnixPathSeparatorsDescription(), L"UnixPathSeparatorsDescription.Text");
+        set_text(MaintenancePageTitle(), L"MaintenancePageTitle.Text");
+        set_text(MaintenancePageDescription(), L"MaintenancePageDescription.Text");
+        set_text(InputCoreLabel(), L"InputCoreLabel.Text");
+        Controls::ToolTipService::SetToolTip(
+            RefreshCoreButton(),
+            box_value(glance::app::localize(L"RefreshCoreButton.ToolTipService.ToolTip")));
+        set_text(AboutPageTitle(), L"AboutPageTitle.Text");
+        set_text(AboutPageDescription(), L"AboutPageDescription.Text");
+        set_text(AboutAuthorLabel(), L"AboutAuthorLabel.Text");
+        set_text(AboutLicenseText(), L"AboutLicenseText.Text");
+        set_content(AboutProjectLink(), L"AboutProjectLink.Content");
+        AboutVersionText().Text(glance::app::localize_format(
+            L"VersionFormat", { GLANCE_VERSION_WSTRING }));
+        refresh_core_status();
     }
 
     bool SettingsWindow::launch_at_sign_in_enabled() const
@@ -296,13 +379,19 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
-        appearance_preferences_.language = L"en-US";
+        const auto language_item = LanguageComboBox().SelectedItem().try_as<Controls::ComboBoxItem>();
+        const auto language_tag = language_item == nullptr
+            ? hstring(L"en-US")
+            : unbox_value_or<hstring>(language_item.Tag(), L"en-US");
+        appearance_preferences_.language = glance::app::resolve_ui_language(language_tag.c_str());
         appearance_preferences_.theme = static_cast<glance::app::ThemePreference>(
             std::clamp(ThemeComboBox().SelectedIndex(), 0, 2));
         appearance_preferences_.accent = static_cast<glance::app::AccentPreference>(
             std::clamp(AccentComboBox().SelectedIndex(), 0, 7));
         glance::app::save_appearance_preferences(appearance_preferences_);
+        glance::app::apply_ui_language(appearance_preferences_.language);
         glance::app::apply_accent_resources(appearance_preferences_);
+        ApplyLocalizedResources();
         ApplyAppearancePreferences();
         if (appearance_changed_callback_)
         {

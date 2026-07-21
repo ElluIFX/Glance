@@ -118,4 +118,46 @@
   <data name="ExitConfirmationPrimary" xml:space="preserve"><value>Exit</value></data>
   <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="ExitButtonText.Text" xml:space="preserve"><value>Exit Glance</value></data>
+  <data name="VersionFormat" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="TraySettings" xml:space="preserve"><value>Settings</value></data>
+  <data name="TrayExit" xml:space="preserve"><value>Exit Glance</value></data>
+  <data name="SystemCodePage" xml:space="preserve"><value>System code page</value></data>
+  <data name="GenericHeader" xml:space="preserve"><value>Header ({0} bytes)</value></data>
+  <data name="AttributeReadOnly" xml:space="preserve"><value>Read-only</value></data>
+  <data name="AttributeHidden" xml:space="preserve"><value>Hidden</value></data>
+  <data name="AttributeSystem" xml:space="preserve"><value>System</value></data>
+  <data name="AttributeArchive" xml:space="preserve"><value>Archive</value></data>
+  <data name="AttributeCompressed" xml:space="preserve"><value>Compressed</value></data>
+  <data name="AttributeEncrypted" xml:space="preserve"><value>Encrypted</value></data>
+  <data name="AttributeOffline" xml:space="preserve"><value>Offline</value></data>
+  <data name="AttributeSparse" xml:space="preserve"><value>Sparse</value></data>
+  <data name="AttributeReparsePoint" xml:space="preserve"><value>Reparse point</value></data>
+  <data name="AttributeNormal" xml:space="preserve"><value>Normal</value></data>
+  <data name="GenericOwner" xml:space="preserve"><value>Owner: {0}</value></data>
+  <data name="AccessRead" xml:space="preserve"><value>Read</value></data>
+  <data name="AccessWrite" xml:space="preserve"><value>Write</value></data>
+  <data name="AccessExecute" xml:space="preserve"><value>Execute</value></data>
+  <data name="AccessDelete" xml:space="preserve"><value>Delete</value></data>
+  <data name="GenericAccess" xml:space="preserve"><value>Access: {0}</value></data>
+  <data name="GenericAttributes" xml:space="preserve"><value>Attributes: {0}</value></data>
+  <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance Settings</value></data>
+  <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close settings</value></data>
+  <data name="LanguageLabel.Text" xml:space="preserve"><value>Language</value></data>
+  <data name="EnglishLanguageItem.Content" xml:space="preserve"><value>English</value></data>
+  <data name="ChineseLanguageItem.Content" xml:space="preserve"><value>简体中文</value></data>
+  <data name="ThemeLabel.Text" xml:space="preserve"><value>Theme</value></data>
+  <data name="ThemeSystemItem.Content" xml:space="preserve"><value>System</value></data>
+  <data name="ThemeLightItem.Content" xml:space="preserve"><value>Light</value></data>
+  <data name="ThemeDarkItem.Content" xml:space="preserve"><value>Dark</value></data>
+  <data name="AccentColorLabel.Text" xml:space="preserve"><value>Accent color</value></data>
+  <data name="AccentSystemText.Text" xml:space="preserve"><value>System</value></data>
+  <data name="AccentBlueText.Text" xml:space="preserve"><value>Blue</value></data>
+  <data name="AccentTealText.Text" xml:space="preserve"><value>Teal</value></data>
+  <data name="AccentGreenText.Text" xml:space="preserve"><value>Green</value></data>
+  <data name="AccentOrangeText.Text" xml:space="preserve"><value>Orange</value></data>
+  <data name="AccentRedText.Text" xml:space="preserve"><value>Red</value></data>
+  <data name="AccentPinkText.Text" xml:space="preserve"><value>Pink</value></data>
+  <data name="AccentPurpleText.Text" xml:space="preserve"><value>Purple</value></data>
+  <data name="EncodingSelector.Content" xml:space="preserve"><value>Detecting...</value></data>
+  <data name="LineNumbersButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show line numbers</value></data>
 </root>

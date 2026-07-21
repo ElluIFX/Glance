@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "generic_file_info.h"
+#include "localization.h"
 
 #include <aclapi.h>
 
@@ -34,7 +35,7 @@ namespace
         }
 
         std::wostringstream output;
-        output << L"Header (" << count << L" bytes)";
+        output << glance::app::localize_format(L"GenericHeader", { std::to_wstring(count) });
         for (DWORD offset = 0; offset < count; offset += 16)
         {
             output << L'\n' << std::hex << std::uppercase << std::setfill(L'0')
@@ -73,25 +74,26 @@ namespace
             wchar_t const* name;
         };
         constexpr AttributeName names[]{
-            { FILE_ATTRIBUTE_READONLY, L"Read-only" },
-            { FILE_ATTRIBUTE_HIDDEN, L"Hidden" },
-            { FILE_ATTRIBUTE_SYSTEM, L"System" },
-            { FILE_ATTRIBUTE_ARCHIVE, L"Archive" },
-            { FILE_ATTRIBUTE_COMPRESSED, L"Compressed" },
-            { FILE_ATTRIBUTE_ENCRYPTED, L"Encrypted" },
-            { FILE_ATTRIBUTE_OFFLINE, L"Offline" },
-            { FILE_ATTRIBUTE_SPARSE_FILE, L"Sparse" },
-            { FILE_ATTRIBUTE_REPARSE_POINT, L"Reparse point" },
+            { FILE_ATTRIBUTE_READONLY, L"AttributeReadOnly" },
+            { FILE_ATTRIBUTE_HIDDEN, L"AttributeHidden" },
+            { FILE_ATTRIBUTE_SYSTEM, L"AttributeSystem" },
+            { FILE_ATTRIBUTE_ARCHIVE, L"AttributeArchive" },
+            { FILE_ATTRIBUTE_COMPRESSED, L"AttributeCompressed" },
+            { FILE_ATTRIBUTE_ENCRYPTED, L"AttributeEncrypted" },
+            { FILE_ATTRIBUTE_OFFLINE, L"AttributeOffline" },
+            { FILE_ATTRIBUTE_SPARSE_FILE, L"AttributeSparse" },
+            { FILE_ATTRIBUTE_REPARSE_POINT, L"AttributeReparsePoint" },
         };
         std::wstring result;
         for (const auto& entry : names)
         {
             if ((attributes & entry.flag) != 0)
             {
-                result += result.empty() ? entry.name : L", " + std::wstring(entry.name);
+                const auto name = glance::app::localize(entry.name);
+                result += result.empty() ? name : L", " + name;
             }
         }
-        return result.empty() ? L"Normal" : result;
+        return result.empty() ? glance::app::localize(L"AttributeNormal") : result;
     }
 
     std::wstring owner_name(PSID owner)
@@ -146,7 +148,7 @@ namespace
             const auto owner_text = owner_name(owner);
             if (!owner_text.empty())
             {
-                result = L"Owner: " + owner_text;
+                result = glance::app::localize_format(L"GenericOwner", { owner_text });
             }
         }
 
@@ -165,16 +167,18 @@ namespace
                 if (GetEffectiveRightsFromAclW(dacl, &trustee, &rights) == ERROR_SUCCESS)
                 {
                     std::wstring access;
-                    const auto append = [&access](wchar_t const* value) {
-                        access += access.empty() ? value : L", " + std::wstring(value);
+                    const auto append = [&access](wchar_t const* key) {
+                        const auto value = glance::app::localize(key);
+                        access += access.empty() ? value : L", " + value;
                     };
-                    if ((rights & (FILE_READ_DATA | FILE_LIST_DIRECTORY | GENERIC_READ)) != 0) append(L"Read");
-                    if ((rights & (FILE_WRITE_DATA | FILE_ADD_FILE | GENERIC_WRITE)) != 0) append(L"Write");
-                    if ((rights & (FILE_EXECUTE | FILE_TRAVERSE | GENERIC_EXECUTE)) != 0) append(L"Execute");
-                    if ((rights & DELETE) != 0) append(L"Delete");
+                    if ((rights & (FILE_READ_DATA | FILE_LIST_DIRECTORY | GENERIC_READ)) != 0) append(L"AccessRead");
+                    if ((rights & (FILE_WRITE_DATA | FILE_ADD_FILE | GENERIC_WRITE)) != 0) append(L"AccessWrite");
+                    if ((rights & (FILE_EXECUTE | FILE_TRAVERSE | GENERIC_EXECUTE)) != 0) append(L"AccessExecute");
+                    if ((rights & DELETE) != 0) append(L"AccessDelete");
                     if (!access.empty())
                     {
-                        result += result.empty() ? L"Access: " + access : L"\nAccess: " + access;
+                        const auto access_text = glance::app::localize_format(L"GenericAccess", { access });
+                        result += result.empty() ? access_text : L"\n" + access_text;
                     }
                 }
             }
@@ -195,7 +199,7 @@ namespace glance::app
             const auto attributes = file_attributes(path);
             if (!attributes.empty())
             {
-                result = L"Attributes: " + attributes;
+                result = glance::app::localize_format(L"GenericAttributes", { attributes });
             }
             const auto security = security_info(path);
             if (!security.empty())

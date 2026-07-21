@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "App.xaml.h"
 #include "appearance_preferences.h"
+#include "localization.h"
 #include "MainWindow.xaml.h"
 #include "SettingsWindow.xaml.h"
 #include "glance/contracts/diagnostics.h"
@@ -74,7 +75,9 @@ namespace winrt::Glance::App::implementation
         }
 
         dispatcher_ = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
-        glance::app::apply_accent_resources(glance::app::load_appearance_preferences());
+        const auto appearance = glance::app::load_appearance_preferences();
+        glance::app::apply_ui_language(appearance.language);
+        glance::app::apply_accent_resources(appearance);
         glance::contracts::log_event(L"Creating the initial preview window.");
         create_active_window();
         glance::contracts::log_event(L"Creating the notification area icon.");
@@ -182,15 +185,21 @@ namespace winrt::Glance::App::implementation
         glance::app::apply_accent_resources(glance::app::load_appearance_preferences());
         if (active_window_ != nullptr)
         {
-            get_self<implementation::MainWindow>(active_window_)->ApplyAppearancePreferences();
+            const auto window = get_self<implementation::MainWindow>(active_window_);
+            window->ApplyAppearancePreferences();
+            window->ApplyLocalizedResources();
         }
         for (const auto& window : detached_windows_)
         {
-            get_self<implementation::MainWindow>(window)->ApplyAppearancePreferences();
+            const auto implementation = get_self<implementation::MainWindow>(window);
+            implementation->ApplyAppearancePreferences();
+            implementation->ApplyLocalizedResources();
         }
         if (settings_window_ != nullptr)
         {
-            get_self<implementation::SettingsWindow>(settings_window_)->ApplyAppearancePreferences();
+            const auto window = get_self<implementation::SettingsWindow>(settings_window_);
+            window->ApplyAppearancePreferences();
+            window->ApplyLocalizedResources();
         }
     }
 
