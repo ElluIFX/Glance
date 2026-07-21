@@ -47,30 +47,6 @@ namespace
         return name;
     }
 
-    bool is_text_input_focused(const GUITHREADINFO& thread_info)
-    {
-        if (thread_info.hwndCaret != nullptr || (thread_info.flags & GUI_CARETBLINKING) != 0)
-        {
-            return true;
-        }
-
-        ComPtr<IUIAutomation> automation;
-        ComPtr<IUIAutomationElement> focused;
-        CONTROLTYPEID control_type{};
-        if (FAILED(CoCreateInstance(
-                CLSID_CUIAutomation,
-                nullptr,
-                CLSCTX_INPROC_SERVER,
-                IID_PPV_ARGS(&automation))) ||
-            FAILED(automation->GetFocusedElement(&focused)) ||
-            focused == nullptr ||
-            FAILED(focused->get_CurrentControlType(&control_type)))
-        {
-            return false;
-        }
-        return control_type == UIA_EditControlTypeId || control_type == UIA_DocumentControlTypeId;
-    }
-
     std::wstring shell_item_name(IShellItem* item, SIGDN kind)
     {
         PWSTR value{};
@@ -113,6 +89,41 @@ namespace
 
 namespace glance::core
 {
+    ExplorerSelectionService::ExplorerSelectionService() = default;
+    ExplorerSelectionService::~ExplorerSelectionService() = default;
+
+    bool ExplorerSelectionService::is_text_input_focused(const GUITHREADINFO& thread_info) const
+    {
+        if (thread_info.hwndCaret != nullptr || (thread_info.flags & GUI_CARETBLINKING) != 0)
+        {
+            return true;
+        }
+
+        if (automation_ == nullptr)
+        {
+            if (FAILED(CoCreateInstance(
+                    CLSID_CUIAutomation8,
+                    nullptr,
+                    CLSCTX_INPROC_SERVER,
+                    IID_PPV_ARGS(&automation_))))
+            {
+                return true;
+            }
+            static_cast<void>(automation_->put_ConnectionTimeout(100));
+            static_cast<void>(automation_->put_TransactionTimeout(100));
+        }
+
+        ComPtr<IUIAutomationElement> focused;
+        CONTROLTYPEID control_type{};
+        if (FAILED(automation_->GetFocusedElement(&focused)) ||
+            focused == nullptr ||
+            FAILED(focused->get_CurrentControlType(&control_type)))
+        {
+            return true;
+        }
+        return control_type == UIA_EditControlTypeId || control_type == UIA_DocumentControlTypeId;
+    }
+
     bool ExplorerSelectionService::is_explorer_window(HWND window, DWORD& process_id)
     {
         GetWindowThreadProcessId(window, &process_id);

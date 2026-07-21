@@ -128,6 +128,17 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void MainWindow::ApplyTextPreferences()
+    {
+        apply_text_preferences();
+        if (current_kind_ == glance::app::PreviewKind::text ||
+            current_kind_ == glance::app::PreviewKind::markdown)
+        {
+            render_text_content();
+            update_text_layout();
+        }
+    }
+
     void MainWindow::configure_window()
     {
         glance::contracts::log_event(L"Resolving the native window handle.");
@@ -675,10 +686,7 @@ namespace winrt::Glance::App::implementation
         current_text_markdown_ = markdown;
         current_text_encoding_ = glance::app::TextEncoding::automatic;
         markdown_preview_ = markdown;
-        updating_encoding_selector_ = true;
-        AutoEncodingItem().Content(box_value(glance::app::localize(L"AutoEncoding")));
-        EncodingSelector().SelectedIndex(0);
-        updating_encoding_selector_ = false;
+        EncodingSelector().Content(box_value(glance::app::localize(L"EncodingDetecting")));
         apply_text_preferences();
         current_text_ = glance::app::localize(L"Loading");
         render_text_content();
@@ -1210,6 +1218,10 @@ namespace winrt::Glance::App::implementation
         }
         if (!preview.error.empty())
         {
+            if (current_text_encoding_ == glance::app::TextEncoding::automatic)
+            {
+                EncodingSelector().Content(box_value(glance::app::localize(L"EncodingUnknown")));
+            }
             current_text_ = std::move(preview.error);
             render_text_content();
             LineNumberText().Text(L"");
@@ -1221,8 +1233,7 @@ namespace winrt::Glance::App::implementation
         current_text_ = std::move(preview.content);
         if (current_text_encoding_ == glance::app::TextEncoding::automatic)
         {
-            AutoEncodingItem().Content(box_value(
-                glance::app::localize_format(L"AutoEncodingDetected", { preview.encoding })));
+            EncodingSelector().Content(box_value(preview.encoding));
         }
         TextEncodingText().Text(preview.truncated ? glance::app::localize(L"PreviewTruncated") : L"");
 
@@ -1629,16 +1640,53 @@ namespace winrt::Glance::App::implementation
         update_text_layout();
     }
 
-    void MainWindow::EncodingSelector_SelectionChanged(
-        IInspectable const&,
-        SelectionChangedEventArgs const&)
+    void MainWindow::EncodingOption_Click(IInspectable const& sender, RoutedEventArgs const&)
     {
-        if (updating_encoding_selector_ || current_text_path_.empty())
+        const auto option = sender.try_as<MenuFlyoutItem>();
+        if (!option || current_text_path_.empty())
         {
             return;
         }
-        const int selected = std::clamp(EncodingSelector().SelectedIndex(), 0, 5);
-        current_text_encoding_ = static_cast<glance::app::TextEncoding>(selected);
+
+        const auto tag = unbox_value_or<hstring>(option.Tag(), L"");
+        if (tag == L"utf8")
+        {
+            current_text_encoding_ = glance::app::TextEncoding::utf8;
+        }
+        else if (tag == L"utf16_le")
+        {
+            current_text_encoding_ = glance::app::TextEncoding::utf16_le;
+        }
+        else if (tag == L"utf16_be")
+        {
+            current_text_encoding_ = glance::app::TextEncoding::utf16_be;
+        }
+        else if (tag == L"gb2312")
+        {
+            current_text_encoding_ = glance::app::TextEncoding::gb2312;
+        }
+        else if (tag == L"gbk")
+        {
+            current_text_encoding_ = glance::app::TextEncoding::gbk;
+        }
+        else if (tag == L"gb18030")
+        {
+            current_text_encoding_ = glance::app::TextEncoding::gb18030;
+        }
+        else if (tag == L"big5")
+        {
+            current_text_encoding_ = glance::app::TextEncoding::big5;
+        }
+        else if (tag == L"system")
+        {
+            current_text_encoding_ = glance::app::TextEncoding::system;
+        }
+        else
+        {
+            return;
+        }
+
+        EncodingSelector().Content(box_value(option.Text()));
         current_text_ = glance::app::localize(L"Loading");
         render_text_content();
         LineNumberText().Text(L"");

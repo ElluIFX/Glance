@@ -92,10 +92,12 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::InitializeSession(
         ExitCallback exit_callback,
-        AppearanceChangedCallback appearance_changed_callback)
+        AppearanceChangedCallback appearance_changed_callback,
+        TextPreferencesChangedCallback text_preferences_changed_callback)
     {
         exit_callback_ = std::move(exit_callback);
         appearance_changed_callback_ = std::move(appearance_changed_callback);
+        text_preferences_changed_callback_ = std::move(text_preferences_changed_callback);
     }
 
     void SettingsWindow::configure_window()
@@ -248,6 +250,10 @@ namespace winrt::Glance::App::implementation
         text_preferences_.line_numbers = LineNumbersToggle().IsOn();
         text_preferences_.word_wrap = WordWrapToggle().IsOn();
         glance::app::save_text_preferences(text_preferences_);
+        if (text_preferences_changed_callback_)
+        {
+            text_preferences_changed_callback_();
+        }
     }
 
     void SettingsWindow::FontFamilyComboBox_SelectionChanged(
@@ -351,7 +357,9 @@ namespace winrt::Glance::App::implementation
         lifetime->exit_confirmation_open_ = false;
         if (result == Controls::ContentDialogResult::Primary && lifetime->exit_callback_)
         {
-            lifetime->exit_callback_();
+            const auto callback = lifetime->exit_callback_;
+            static_cast<void>(Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue(
+                [callback] { callback(); }));
         }
     }
 

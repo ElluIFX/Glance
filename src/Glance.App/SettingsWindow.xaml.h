@@ -13,11 +13,13 @@ namespace winrt::Glance::App::implementation
     {
         using ExitCallback = std::function<void()>;
         using AppearanceChangedCallback = std::function<void()>;
+        using TextPreferencesChangedCallback = std::function<void()>;
 
         SettingsWindow();
         void InitializeSession(
             ExitCallback exit_callback,
-            AppearanceChangedCallback appearance_changed_callback);
+            AppearanceChangedCallback appearance_changed_callback,
+            TextPreferencesChangedCallback text_preferences_changed_callback);
         void ApplyAppearancePreferences();
         winrt::fire_and_forget ConfirmExit();
 
@@ -72,6 +74,7 @@ namespace winrt::Glance::App::implementation
         glance::app::AppearancePreferences appearance_preferences_{};
         ExitCallback exit_callback_;
         AppearanceChangedCallback appearance_changed_callback_;
+        TextPreferencesChangedCallback text_preferences_changed_callback_;
     };
 }
 

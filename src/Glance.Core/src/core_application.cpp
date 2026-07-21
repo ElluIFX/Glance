@@ -6,6 +6,7 @@
 #include <winrt/Windows.Foundation.Collections.h>
 
 #include <algorithm>
+#include <chrono>
 #include <memory>
 #include <ranges>
 #include <wtsapi32.h>
@@ -34,7 +35,7 @@ namespace glance::core
         pipe_server_.stop();
     }
 
-    int CoreApplication::run(HINSTANCE instance)
+    int CoreApplication::run(HINSTANCE instance, DWORD parent_process_id)
     {
         single_instance_mutex_.reset(CreateMutexW(nullptr, FALSE, L"Local\\Glance.Core"));
         if (!single_instance_mutex_ || GetLastError() == ERROR_ALREADY_EXISTS)
@@ -47,6 +48,20 @@ namespace glance::core
         {
             glance::contracts::log_event(L"Failed to create the Core message window.");
             return 1;
+        }
+
+        if (parent_process_id != 0)
+        {
+            parent_process_.reset(OpenProcess(SYNCHRONIZE, FALSE, parent_process_id));
+            if (parent_process_)
+            {
+                SetTimer(window_, parent_process_timer_id, parent_process_interval_ms, nullptr);
+            }
+            else
+            {
+                glance::contracts::log_event(
+                    L"Could not monitor the UI process " + std::to_wstring(parent_process_id) + L".");
+            }
         }
 
         RAWINPUTDEVICE keyboard{};
@@ -148,6 +163,13 @@ namespace glance::core
                 }
                 return 0;
             }
+            if (wparam == parent_process_timer_id && self->parent_process_ &&
+                WaitForSingleObject(self->parent_process_.get(), 0) == WAIT_OBJECT_0)
+            {
+                glance::contracts::log_event(L"UI process exited; Core is shutting down.");
+                DestroyWindow(window);
+                return 0;
+            }
             break;
         case WM_POWERBROADCAST:
             if (wparam == PBT_APMRESUMEAUTOMATIC && self->keyboard_hook_ != nullptr)
@@ -219,7 +241,15 @@ namespace glance::core
             return;
         }
 
+        const auto query_started = std::chrono::steady_clock::now();
         auto next = selection_service_.query_foreground();
+        const auto query_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - query_started);
+        if (query_duration >= std::chrono::milliseconds(100))
+        {
+            glance::contracts::log_event(
+                L"Explorer selection query took " + std::to_wstring(query_duration.count()) + L" ms.");
+        }
         const bool changed = selection_changed(next);
         if (changed)
         {
@@ -361,6 +391,7 @@ namespace glance::core
                 glance::contracts::PreviewWindowState::hidden,
                 std::memory_order_release);
             input_state_.preview_active.store(false, std::memory_order_release);
+            PostMessageW(window_, WM_CLOSE, 0, 0);
         }
     }
 

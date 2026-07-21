@@ -45,7 +45,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;icu.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

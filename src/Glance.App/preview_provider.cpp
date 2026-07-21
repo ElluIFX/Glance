@@ -3,15 +3,20 @@
 #include "preview_provider.h"
 
 #include <windows.h>
+#include <icu.h>
 
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstring>
 #include <cwctype>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
+#include <memory>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string_view>
@@ -205,6 +210,178 @@ namespace
         }
         return result;
     }
+
+    struct DetectedText
+    {
+        std::wstring content;
+        std::wstring encoding;
+        std::int32_t confidence{};
+    };
+
+    struct CharsetDetectorCloser
+    {
+        void operator()(UCharsetDetector* detector) const noexcept
+        {
+            ucsdet_close(detector);
+        }
+    };
+
+    std::wstring chinese_encoding_name(const std::span<const std::byte> bytes)
+    {
+        bool requires_gbk{};
+        for (std::size_t index = 0; index < bytes.size();)
+        {
+            const auto lead = std::to_integer<unsigned char>(bytes[index]);
+            if (lead <= 0x7FU)
+            {
+                ++index;
+                continue;
+            }
+            if (lead < 0x81U || lead > 0xFEU || index + 1 >= bytes.size())
+            {
+                return L"GB18030";
+            }
+
+            const auto trail = std::to_integer<unsigned char>(bytes[index + 1]);
+            if (trail >= 0x30U && trail <= 0x39U)
+            {
+                if (index + 3 >= bytes.size())
+                {
+                    return L"GB18030";
+                }
+                const auto third = std::to_integer<unsigned char>(bytes[index + 2]);
+                const auto fourth = std::to_integer<unsigned char>(bytes[index + 3]);
+                if (third < 0x81U || third > 0xFEU || fourth < 0x30U || fourth > 0x39U)
+                {
+                    return L"GB18030";
+                }
+                return L"GB18030";
+            }
+            if (trail < 0x40U || trail == 0x7FU || trail > 0xFEU)
+            {
+                return L"GB18030";
+            }
+            requires_gbk = requires_gbk ||
+                lead < 0xA1U || lead > 0xF7U || trail < 0xA1U;
+            index += 2;
+        }
+        return requires_gbk ? L"GBK" : L"GB2312";
+    }
+
+    std::wstring display_encoding_name(
+        const char* name,
+        const std::span<const std::byte> bytes)
+    {
+        if (name == nullptr)
+        {
+            return {};
+        }
+        if (_stricmp(name, "UTF-16LE") == 0)
+        {
+            return L"UTF-16 LE";
+        }
+        if (_stricmp(name, "UTF-16BE") == 0)
+        {
+            return L"UTF-16 BE";
+        }
+        if (_stricmp(name, "UTF-32LE") == 0)
+        {
+            return L"UTF-32 LE";
+        }
+        if (_stricmp(name, "UTF-32BE") == 0)
+        {
+            return L"UTF-32 BE";
+        }
+        if (_stricmp(name, "GB18030") == 0)
+        {
+            return chinese_encoding_name(bytes);
+        }
+        if (_strnicmp(name, "windows-", 8) == 0)
+        {
+            std::wstring result{ L"Windows-" };
+            for (name += 8; *name != '\0'; ++name)
+            {
+                result.push_back(static_cast<unsigned char>(*name));
+            }
+            return result;
+        }
+
+        std::wstring result;
+        for (; *name != '\0'; ++name)
+        {
+            result.push_back(static_cast<unsigned char>(*name));
+        }
+        return result;
+    }
+
+    std::optional<DetectedText> detect_text_encoding(const std::span<const std::byte> bytes)
+    {
+        if (bytes.empty())
+        {
+            return DetectedText{ {}, L"UTF-8", 100 };
+        }
+        if (bytes.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()))
+        {
+            return std::nullopt;
+        }
+
+        UErrorCode status = U_ZERO_ERROR;
+        std::unique_ptr<UCharsetDetector, CharsetDetectorCloser> detector(ucsdet_open(&status));
+        if (U_FAILURE(status) || detector == nullptr)
+        {
+            return std::nullopt;
+        }
+        ucsdet_setText(
+            detector.get(),
+            reinterpret_cast<const char*>(bytes.data()),
+            static_cast<std::int32_t>(bytes.size()),
+            &status);
+        const UCharsetMatch* match = U_FAILURE(status) ? nullptr : ucsdet_detect(detector.get(), &status);
+        if (U_FAILURE(status) || match == nullptr)
+        {
+            return std::nullopt;
+        }
+
+        const char* name = ucsdet_getName(match, &status);
+        if (U_FAILURE(status) || name == nullptr)
+        {
+            return std::nullopt;
+        }
+        const std::int32_t confidence = ucsdet_getConfidence(match, &status);
+        if (U_FAILURE(status))
+        {
+            return std::nullopt;
+        }
+
+        status = U_ZERO_ERROR;
+        const std::int32_t required = ucsdet_getUChars(match, nullptr, 0, &status);
+        if (required < 0 || (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status)))
+        {
+            return std::nullopt;
+        }
+        status = U_ZERO_ERROR;
+        std::vector<UChar> converted(static_cast<std::size_t>(required) + 1U);
+        const std::int32_t written = ucsdet_getUChars(
+            match,
+            converted.data(),
+            static_cast<std::int32_t>(converted.size()),
+            &status);
+        if (U_FAILURE(status) || written < 0)
+        {
+            return std::nullopt;
+        }
+
+        static_assert(sizeof(UChar) == sizeof(wchar_t));
+        DetectedText result;
+        result.content.resize(static_cast<std::size_t>(written));
+        std::memcpy(
+            result.content.data(),
+            converted.data(),
+            static_cast<std::size_t>(written) * sizeof(UChar));
+        result.encoding = display_encoding_name(name, bytes);
+        result.confidence = confidence;
+        return result.encoding.empty() ? std::nullopt : std::optional{ std::move(result) };
+    }
 }
 
 namespace glance::app
@@ -311,9 +488,15 @@ namespace glance::app
             std::to_integer<unsigned char>(payload[0]) == 0xEF &&
             std::to_integer<unsigned char>(payload[1]) == 0xBB &&
             std::to_integer<unsigned char>(payload[2]) == 0xBF;
+        const bool utf32_le_bom = payload.size() >= 4 &&
+            std::to_integer<unsigned char>(payload[0]) == 0xFF &&
+            std::to_integer<unsigned char>(payload[1]) == 0xFE &&
+            std::to_integer<unsigned char>(payload[2]) == 0x00 &&
+            std::to_integer<unsigned char>(payload[3]) == 0x00;
         const bool utf16_le_bom = payload.size() >= 2 &&
             std::to_integer<unsigned char>(payload[0]) == 0xFF &&
-            std::to_integer<unsigned char>(payload[1]) == 0xFE;
+            std::to_integer<unsigned char>(payload[1]) == 0xFE &&
+            !utf32_le_bom;
         const bool utf16_be_bom = payload.size() >= 2 &&
             std::to_integer<unsigned char>(payload[0]) == 0xFE &&
             std::to_integer<unsigned char>(payload[1]) == 0xFF;
@@ -348,20 +531,65 @@ namespace glance::app
             result.encoding = L"UTF-16 BE";
             result.content = decode_utf16(payload, true);
         }
+        else if (encoding == TextEncoding::gb2312)
+        {
+            result.encoding = L"GB2312";
+            result.content = decode_multibyte(payload, 936);
+        }
+        else if (encoding == TextEncoding::gbk)
+        {
+            result.encoding = L"GBK";
+            result.content = decode_multibyte(payload, 936);
+        }
         else if (encoding == TextEncoding::gb18030)
         {
             result.encoding = L"GB18030";
             result.content = decode_multibyte(payload, 54936);
+        }
+        else if (encoding == TextEncoding::big5)
+        {
+            result.encoding = L"Big5";
+            result.content = decode_multibyte(payload, 950);
         }
         else if (encoding == TextEncoding::system)
         {
             result.encoding = L"System code page";
             result.content = decode_multibyte(payload, CP_ACP);
         }
-        else if (encoding == TextEncoding::automatic && valid_utf8(payload))
+        else if (encoding == TextEncoding::automatic)
         {
-            result.encoding = L"UTF-8";
-            result.content = decode_multibyte(payload, CP_UTF8);
+            const bool utf8 = std::ranges::find(payload, std::byte{}) == payload.end() &&
+                valid_utf8(payload);
+            const bool ascii = utf8 && std::ranges::all_of(payload, [](std::byte value) {
+                return std::to_integer<unsigned char>(value) <= 0x7FU;
+            });
+            if (ascii)
+            {
+                result.encoding = L"UTF-8";
+                result.content = decode_multibyte(payload, CP_UTF8);
+            }
+            else if (auto detected = detect_text_encoding(payload))
+            {
+                if (utf8 && detected->encoding != L"UTF-8" && detected->confidence < 50)
+                {
+                    result.encoding = L"UTF-8";
+                    result.content = decode_multibyte(payload, CP_UTF8);
+                }
+                else
+                {
+                    result.encoding = std::move(detected->encoding);
+                    result.content = std::move(detected->content);
+                }
+            }
+            else if (utf8)
+            {
+                result.encoding = L"UTF-8";
+                result.content = decode_multibyte(payload, CP_UTF8);
+            }
+            else
+            {
+                result.error = localize(L"TextDecodeError");
+            }
         }
         else
         {

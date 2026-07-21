@@ -118,6 +118,11 @@ namespace glance::app
                 return 0;
             }
         }
+        if (message == WM_COMMAND)
+        {
+            self->invoke_command(LOWORD(wparam));
+            return 0;
+        }
         return DefWindowProcW(window, message, wparam, lparam);
     }
 
@@ -143,6 +148,14 @@ namespace glance::app
             window_,
             nullptr);
         DestroyMenu(menu);
+        if (command != 0)
+        {
+            PostMessageW(window_, WM_COMMAND, MAKEWPARAM(command, 0), 0);
+        }
+    }
+
+    void TrayIcon::invoke_command(UINT command)
+    {
         if (command == settings_command && settings_callback_)
         {
             settings_callback_();

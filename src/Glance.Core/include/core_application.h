@@ -26,14 +26,16 @@ namespace glance::core
         CoreApplication(const CoreApplication&) = delete;
         CoreApplication& operator=(const CoreApplication&) = delete;
 
-        [[nodiscard]] int run(HINSTANCE instance);
+        [[nodiscard]] int run(HINSTANCE instance, DWORD parent_process_id);
 
     private:
         static constexpr UINT hook_action_message = WM_APP + 1;
         static constexpr UINT selection_timer_id = 1;
         static constexpr UINT hook_refresh_timer_id = 2;
+        static constexpr UINT parent_process_timer_id = 3;
         static constexpr UINT selection_interval_ms = 50;
         static constexpr UINT hook_refresh_interval_ms = 1000;
+        static constexpr UINT parent_process_interval_ms = 1000;
 
         static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
         [[nodiscard]] bool create_message_window(HINSTANCE instance);
@@ -47,6 +49,7 @@ namespace glance::core
 
         HWND window_{};
         unique_handle single_instance_mutex_;
+        unique_handle parent_process_;
         InputDecisionState input_state_;
         ExplorerSelectionService selection_service_;
         glance::contracts::SelectionSnapshot selection_;

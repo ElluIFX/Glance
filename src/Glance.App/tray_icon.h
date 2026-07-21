@@ -28,6 +28,7 @@ namespace glance::app
 
         static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
         void show_menu();
+        void invoke_command(UINT command);
         [[nodiscard]] bool add_icon();
 
         HWND window_{};

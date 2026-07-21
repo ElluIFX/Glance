@@ -159,6 +159,7 @@
                                     FontFamily="Cascadia Mono, Consolas"
                                     FontSize="13"
                                     LineHeight="18"
+                                    LineStackingStrategy="BlockLineHeight"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     IsHitTestVisible="False"
                                     Opacity="0.42"
@@ -519,23 +520,34 @@
                         Content="Code"
                         FontSize="11" />
                 </StackPanel>
-                <ComboBox
+                <DropDownButton
                     x:Name="EncodingSelector"
                     Width="112"
                     Height="28"
-                    Padding="6,0"
+                    Padding="8,0"
                     Background="Transparent"
                     BorderBrush="Transparent"
                     FontSize="11"
-                    SelectedIndex="0"
-                    SelectionChanged="EncodingSelector_SelectionChanged">
-                    <ComboBoxItem x:Name="AutoEncodingItem" x:Uid="AutoEncodingItem" Content="Auto encoding" />
-                    <ComboBoxItem Content="UTF-8" />
-                    <ComboBoxItem Content="UTF-16 LE" />
-                    <ComboBoxItem Content="UTF-16 BE" />
-                    <ComboBoxItem Content="GB18030" />
-                    <ComboBoxItem x:Uid="SystemAnsiItem" Content="System ANSI" />
-                </ComboBox>
+                    Content="Detecting...">
+                    <DropDownButton.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="utf8" Text="UTF-8" />
+                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="utf16_le" Text="UTF-16 LE" />
+                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="utf16_be" Text="UTF-16 BE" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="gb2312" Text="GB2312" />
+                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="gbk" Text="GBK" />
+                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="gb18030" Text="GB18030" />
+                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="big5" Text="Big5" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem
+                                x:Uid="SystemAnsiItem"
+                                Click="EncodingOption_Click"
+                                Tag="system"
+                                Text="System ANSI" />
+                        </MenuFlyout>
+                    </DropDownButton.Flyout>
+                </DropDownButton>
                 <TextBlock
                     x:Name="TextEncodingText"
                     MaxWidth="92"

@@ -82,7 +82,7 @@ namespace winrt::Glance::App::implementation
         if (!tray_icon_->create(
                 GetModuleHandleW(nullptr),
                 [this] { show_settings(); },
-                [this] { confirm_exit(); }))
+                [this] { exit_application(); }))
         {
             tray_icon_.reset();
             show_settings();
@@ -109,10 +109,12 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
+        const auto parameters = L"--parent-pid=" + std::to_wstring(GetCurrentProcessId());
         SHELLEXECUTEINFOW execute{ sizeof(SHELLEXECUTEINFOW) };
         execute.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
         execute.lpVerb = L"runas";
         execute.lpFile = core_path.c_str();
+        execute.lpParameters = parameters.c_str();
         execute.nShow = SW_HIDE;
         if (ShellExecuteExW(&execute))
         {
@@ -166,24 +168,13 @@ namespace winrt::Glance::App::implementation
             settings_window_ = make<SettingsWindow>();
             get_self<implementation::SettingsWindow>(settings_window_)->InitializeSession(
                 [this] { exit_application(); },
-                [this] { apply_appearance_preferences(); });
+                [this] { apply_appearance_preferences(); },
+                [this] { apply_text_preferences(); });
             settings_window_.Closed([this](IInspectable const&, WindowEventArgs const&) {
                 settings_window_ = nullptr;
             });
         }
         settings_window_.Activate();
-    }
-
-    void App::confirm_exit()
-    {
-        show_settings();
-        if (settings_window_ != nullptr)
-        {
-            const auto settings = settings_window_;
-            static_cast<void>(dispatcher_.TryEnqueue([settings] {
-                get_self<implementation::SettingsWindow>(settings)->ConfirmExit();
-            }));
-        }
     }
 
     void App::apply_appearance_preferences()
@@ -203,18 +194,33 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void App::apply_text_preferences()
+    {
+        if (active_window_ != nullptr)
+        {
+            get_self<implementation::MainWindow>(active_window_)->ApplyTextPreferences();
+        }
+        for (const auto& window : detached_windows_)
+        {
+            get_self<implementation::MainWindow>(window)->ApplyTextPreferences();
+        }
+    }
+
     void App::exit_application()
     {
         if (shutting_down_.exchange(true, std::memory_order_acq_rel))
         {
             return;
         }
-        static_cast<void>(pipe_client_.send(glance::contracts::MessageType::shutdown));
         if (core_watchdog_timer_ != nullptr)
         {
             core_watchdog_timer_.Stop();
         }
+        const bool shutdown_sent = pipe_client_.send(glance::contracts::MessageType::shutdown);
+        glance::contracts::log_event(
+            shutdown_sent ? L"Core shutdown requested." : L"Core shutdown request could not be sent.");
         tray_icon_.reset();
+        pipe_client_.stop();
         if (settings_window_ != nullptr)
         {
             settings_window_.Close();

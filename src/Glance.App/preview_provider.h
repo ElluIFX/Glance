@@ -31,7 +31,10 @@ namespace glance::app
         utf8,
         utf16_le,
         utf16_be,
+        gb2312,
+        gbk,
         gb18030,
+        big5,
         system,
     };
 

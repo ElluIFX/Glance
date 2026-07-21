@@ -34,6 +34,7 @@ namespace winrt::Glance::App::implementation
             HWND source_window);
         void HidePreview();
         void ApplyAppearancePreferences();
+        void ApplyTextPreferences();
         [[nodiscard]] std::uint64_t InstanceId() const noexcept { return instance_id_; }
 
         void TopmostButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -44,9 +45,7 @@ namespace winrt::Glance::App::implementation
         void LineNumbersButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void SyntaxHighlightButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void WordWrapButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void EncodingSelector_SelectionChanged(
-            IInspectable const&,
-            Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+        void EncodingOption_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void TextPreviewScroller_SizeChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::SizeChangedEventArgs const&);
@@ -186,7 +185,6 @@ namespace winrt::Glance::App::implementation
         bool line_numbers_visible_{ true };
         bool syntax_highlighting_{ true };
         bool word_wrap_{};
-        bool updating_encoding_selector_{};
         bool media_is_audio_{};
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};

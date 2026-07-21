@@ -31,8 +31,8 @@ namespace winrt::Glance::App::implementation
         void start_core_watchdog();
         void create_active_window();
         void show_settings();
-        void confirm_exit();
         void apply_appearance_preferences();
+        void apply_text_preferences();
         void exit_application();
         void handle_pipe_message(glance::contracts::MessageType type, std::uint32_t flags, std::string payload);
         void handle_connection_changed(bool connected);

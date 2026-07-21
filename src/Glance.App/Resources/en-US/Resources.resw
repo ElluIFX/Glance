@@ -19,8 +19,8 @@
   <data name="LoadingPdf" xml:space="preserve"><value>Loading PDF...</value></data>
   <data name="ConvertingOffice" xml:space="preserve"><value>Converting with Microsoft Office...</value></data>
   <data name="LoadingConvertedDocument" xml:space="preserve"><value>Loading converted document...</value></data>
-  <data name="AutoEncoding" xml:space="preserve"><value>Auto encoding</value></data>
-  <data name="AutoEncodingDetected" xml:space="preserve"><value>Auto ({0})</value></data>
+  <data name="EncodingDetecting" xml:space="preserve"><value>Detecting...</value></data>
+  <data name="EncodingUnknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="PreviewTruncated" xml:space="preserve"><value>Preview truncated at 8 MB</value></data>
   <data name="LineNumbersTooltip" xml:space="preserve"><value>Show line numbers</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>Line numbers are unavailable while wrapping</value></data>
@@ -54,8 +54,7 @@
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>Pin file</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close preview</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>Load file</value></data>
-  <data name="AutoEncodingItem.Content" xml:space="preserve"><value>Auto encoding</value></data>
-  <data name="SystemAnsiItem.Content" xml:space="preserve"><value>System ANSI</value></data>
+  <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
   <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>Preview</value></data>
   <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>Code</value></data>
   <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>Play or pause</value></data>
