@@ -1,0 +1,365 @@
+<Window
+    x:Class="Glance.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid x:Name="RootGrid" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="42" />
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="TitleBarDragRegion" Grid.Row="0" Padding="12,0,140,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                x:Name="TitleText"
+                VerticalAlignment="Center"
+                FontSize="13"
+                FontWeight="SemiBold"
+                TextTrimming="CharacterEllipsis" />
+            <Button
+                x:Name="TopmostButton"
+                Grid.Column="1"
+                Width="32"
+                Height="32"
+                Margin="4,0,0,0"
+                Click="TopmostButton_Click"
+                ToolTipService.ToolTip="Always on top">
+                <FontIcon FontSize="14" Glyph="&#xE840;" />
+            </Button>
+            <Button
+                x:Name="FitContentButton"
+                Grid.Column="2"
+                Width="32"
+                Height="32"
+                Margin="4,0,0,0"
+                Click="FitContentButton_Click"
+                ToolTipService.ToolTip="Fit content">
+                <FontIcon FontSize="14" Glyph="&#xE9A6;" />
+            </Button>
+            <Button
+                x:Name="PinButton"
+                Grid.Column="3"
+                Width="32"
+                Height="32"
+                Margin="4,0,0,0"
+                Click="PinButton_Click"
+                ToolTipService.ToolTip="Pin file">
+                <FontIcon FontSize="14" Glyph="&#xE718;" />
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="FileListColumn" Width="0" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ListView
+                x:Name="FileList"
+                Grid.Column="0"
+                Margin="8"
+                SelectionChanged="FileList_SelectionChanged"
+                Visibility="Collapsed" />
+
+            <Grid Grid.Column="1">
+                <StackPanel
+                    x:Name="GenericPanel"
+                    Padding="28"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="10">
+                    <FontIcon FontSize="56" Glyph="&#xE8A5;" />
+                    <TextBlock
+                        x:Name="FileNameText"
+                        MaxWidth="620"
+                        HorizontalAlignment="Center"
+                        FontSize="20"
+                        FontWeight="SemiBold"
+                        TextAlignment="Center"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        x:Name="FilePathText"
+                        MaxWidth="620"
+                        HorizontalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextAlignment="Center"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        x:Name="FileMetadataText"
+                        HorizontalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Button
+                        x:Name="LoadCloudFileButton"
+                        Margin="0,8,0,0"
+                        Visibility="Collapsed">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="14" Glyph="&#xE753;" />
+                                <TextBlock Text="Load file" />
+                            </StackPanel>
+                        </Button.Content>
+                        <Button.Flyout>
+                            <Flyout>
+                                <StackPanel Width="260" Spacing="12">
+                                    <TextBlock Text="Loading may download this file from its cloud provider." TextWrapping="Wrap" />
+                                    <Button HorizontalAlignment="Right" Click="ConfirmCloudLoad_Click" Content="Load" />
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    <TextBlock
+                        x:Name="ErrorText"
+                        MaxWidth="620"
+                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+                </StackPanel>
+
+                <Grid x:Name="TextPanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="36" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Padding="12,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="TextEncodingText"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            FontSize="12" />
+                        <ToggleButton
+                            x:Name="MarkdownModeButton"
+                            Grid.Column="1"
+                            MinWidth="86"
+                            Height="28"
+                            Click="MarkdownModeButton_Click"
+                            Content="Preview"
+                            Visibility="Collapsed" />
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <TextBox
+                            x:Name="TextPreviewBox"
+                            Padding="16,12"
+                            AcceptsReturn="True"
+                            FontFamily="Cascadia Mono, Consolas"
+                            FontSize="13"
+                            IsReadOnly="True"
+                            TextWrapping="NoWrap"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                        <ScrollViewer
+                            x:Name="MarkdownPreviewScroller"
+                            Padding="28,16"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto"
+                            Visibility="Collapsed">
+                            <RichTextBlock
+                                x:Name="MarkdownPreviewText"
+                                MaxWidth="900"
+                                HorizontalAlignment="Left"
+                                FontSize="14"
+                                TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Grid>
+                </Grid>
+
+                <Grid
+                    x:Name="ImagePanel"
+                    SizeChanged="ImagePanel_SizeChanged"
+                    Visibility="Collapsed">
+                    <ScrollViewer
+                        x:Name="ImageScroller"
+                        HorizontalScrollBarVisibility="Auto"
+                        HorizontalScrollMode="Enabled"
+                        MaxZoomFactor="16"
+                        MinZoomFactor="1"
+                        VerticalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Enabled"
+                        ZoomMode="Enabled">
+                        <Grid x:Name="ImageFitSurface">
+                            <Image
+                                x:Name="ImagePreview"
+                                RenderTransformOrigin="0.5,0.5"
+                                Stretch="Uniform">
+                                <Image.RenderTransform>
+                                    <CompositeTransform x:Name="ImageTransform" />
+                                </Image.RenderTransform>
+                            </Image>
+                        </Grid>
+                    </ScrollViewer>
+                    <StackPanel
+                        Margin="0,10,10,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Orientation="Horizontal"
+                        Spacing="4">
+                        <Button
+                            Width="32"
+                            Height="32"
+                            Click="ZoomOutButton_Click"
+                            ToolTipService.ToolTip="Zoom out">
+                            <FontIcon FontSize="14" Glyph="&#xE71F;" />
+                        </Button>
+                        <Button
+                            Width="32"
+                            Height="32"
+                            Click="ZoomInButton_Click"
+                            ToolTipService.ToolTip="Zoom in">
+                            <FontIcon FontSize="14" Glyph="&#xE8A3;" />
+                        </Button>
+                        <Button
+                            Width="32"
+                            Height="32"
+                            Click="RotateLeftButton_Click"
+                            ToolTipService.ToolTip="Rotate left">
+                            <FontIcon FontSize="14" Glyph="&#xE7AD;" />
+                        </Button>
+                        <Button
+                            Width="32"
+                            Height="32"
+                            Click="RotateRightButton_Click"
+                            ToolTipService.ToolTip="Rotate right">
+                            <FontIcon FontSize="14" Glyph="&#xE7A8;" />
+                        </Button>
+                    </StackPanel>
+                    <Border
+                        x:Name="ImageMetadataOverlay"
+                        Margin="12"
+                        Padding="10,7"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="#B3202020"
+                        CornerRadius="4"
+                        Visibility="Collapsed">
+                        <TextBlock
+                            x:Name="ImageMetadataText"
+                            Foreground="White"
+                            FontSize="12"
+                            TextWrapping="Wrap" />
+                    </Border>
+                </Grid>
+
+                <Grid x:Name="MediaPanel" Visibility="Collapsed">
+                    <MediaPlayerElement
+                        x:Name="MediaPreview"
+                        AreTransportControlsEnabled="True"
+                        AutoPlay="False"
+                        Stretch="Uniform" />
+                </Grid>
+
+                <Grid x:Name="PdfPanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="38" />
+                    </Grid.RowDefinitions>
+                    <ScrollViewer
+                        Grid.Row="0"
+                        HorizontalScrollBarVisibility="Auto"
+                        HorizontalScrollMode="Enabled"
+                        MaxZoomFactor="8"
+                        MinZoomFactor="1"
+                        VerticalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Enabled"
+                        ZoomMode="Enabled">
+                        <Image x:Name="PdfPageImage" Stretch="Uniform" />
+                    </ScrollViewer>
+                    <StackPanel
+                        Grid.Row="1"
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <Button
+                            Width="32"
+                            Height="32"
+                            Click="PreviousPdfPageButton_Click"
+                            ToolTipService.ToolTip="Previous page">
+                            <FontIcon FontSize="14" Glyph="&#xE76B;" />
+                        </Button>
+                        <TextBlock
+                            x:Name="PdfPageText"
+                            MinWidth="88"
+                            VerticalAlignment="Center"
+                            TextAlignment="Center" />
+                        <Button
+                            Width="32"
+                            Height="32"
+                            Click="NextPdfPageButton_Click"
+                            ToolTipService.ToolTip="Next page">
+                            <FontIcon FontSize="14" Glyph="&#xE76C;" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Grid x:Name="ArchivePanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="36" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock
+                        x:Name="ArchiveStatusText"
+                        Margin="12,0"
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        FontSize="12" />
+                    <ListView
+                        x:Name="ArchiveEntryList"
+                        Grid.Row="1"
+                        Margin="8"
+                        IsItemClickEnabled="False"
+                        SelectionMode="None" />
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <Grid Grid.Row="2" Padding="12,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                x:Name="FooterMetadataText"
+                VerticalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                FontSize="12" />
+            <Button
+                Grid.Column="1"
+                Width="32"
+                Height="32"
+                Click="CopyPathButton_Click"
+                ToolTipService.ToolTip="Copy path">
+                <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+            </Button>
+            <Button
+                x:Name="OpenFolderButton"
+                Grid.Column="2"
+                Width="32"
+                Height="32"
+                Margin="4,0,0,0"
+                Click="OpenFolderButton_Click"
+                ToolTipService.ToolTip="Open containing folder">
+                <FontIcon FontSize="14" Glyph="&#xE838;" />
+            </Button>
+            <Button
+                x:Name="OpenDefaultButton"
+                Grid.Column="3"
+                Width="32"
+                Height="32"
+                Margin="4,0,0,0"
+                Click="OpenDefaultButton_Click"
+                ToolTipService.ToolTip="Open with default application">
+                <FontIcon FontSize="14" Glyph="&#xE8A7;" />
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

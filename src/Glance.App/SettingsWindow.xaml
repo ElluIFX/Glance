@@ -1,0 +1,52 @@
+<Window
+    x:Class="Glance.App.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Padding="24" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock FontSize="24" FontWeight="SemiBold" Text="Settings" />
+        <Grid Grid.Row="1" Margin="0,28,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock VerticalAlignment="Center" Text="Launch at sign-in" />
+            <ToggleSwitch
+                x:Name="LaunchAtSignInToggle"
+                Grid.Column="1"
+                Toggled="LaunchAtSignInToggle_Toggled" />
+        </Grid>
+        <Grid Grid.Row="2" Margin="0,24,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+                <TextBlock Text="Input core" />
+                <TextBlock
+                    x:Name="CoreStatusText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    FontSize="12" />
+            </StackPanel>
+            <Button
+                Grid.Column="1"
+                Width="32"
+                Height="32"
+                Click="RefreshCoreStatusButton_Click"
+                ToolTipService.ToolTip="Refresh status">
+                <FontIcon FontSize="14" Glyph="&#xE72C;" />
+            </Button>
+        </Grid>
+        <Button
+            Grid.Row="4"
+            HorizontalAlignment="Right"
+            Click="ExitButton_Click"
+            Content="Exit Glance" />
+    </Grid>
+</Window>

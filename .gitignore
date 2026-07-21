@@ -1,0 +1,9 @@
+.vs/
+bin/
+obj/
+packages/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+Generated Files/
