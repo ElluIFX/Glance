@@ -9,7 +9,7 @@
             <RowDefinition Height="42" />
         </Grid.RowDefinitions>
 
-        <Grid x:Name="TitleBarDragRegion" Grid.Row="0" Padding="12,0,140,0">
+        <Grid x:Name="TitleBarDragRegion" Grid.Row="0" Padding="12,0,6,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -22,35 +22,35 @@
                 FontSize="13"
                 FontWeight="SemiBold"
                 TextTrimming="CharacterEllipsis" />
-            <Button
+            <ToggleButton
                 x:Name="TopmostButton"
+                x:Uid="TopmostButton"
                 Grid.Column="1"
-                Width="32"
-                Height="32"
+                Style="{StaticResource IconToggleButtonStyle}"
                 Margin="4,0,0,0"
                 Click="TopmostButton_Click"
                 ToolTipService.ToolTip="Always on top">
-                <FontIcon FontSize="14" Glyph="&#xE840;" />
-            </Button>
-            <Button
-                x:Name="FitContentButton"
-                Grid.Column="2"
-                Width="32"
-                Height="32"
-                Margin="4,0,0,0"
-                Click="FitContentButton_Click"
-                ToolTipService.ToolTip="Fit content">
-                <FontIcon FontSize="14" Glyph="&#xE9A6;" />
-            </Button>
-            <Button
+                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE74A;" />
+            </ToggleButton>
+            <ToggleButton
                 x:Name="PinButton"
-                Grid.Column="3"
-                Width="32"
-                Height="32"
+                x:Uid="PinButton"
+                Grid.Column="2"
+                Style="{StaticResource IconToggleButtonStyle}"
                 Margin="4,0,0,0"
                 Click="PinButton_Click"
                 ToolTipService.ToolTip="Pin file">
-                <FontIcon FontSize="14" Glyph="&#xE718;" />
+                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE718;" />
+            </ToggleButton>
+            <Button
+                x:Name="ClosePreviewButton"
+                x:Uid="ClosePreviewButton"
+                Grid.Column="3"
+                Style="{StaticResource IconButtonStyle}"
+                Margin="4,0,0,0"
+                Click="ClosePreviewButton_Click"
+                ToolTipService.ToolTip="Close preview">
+                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE711;" />
             </Button>
         </Grid>
 
@@ -93,24 +93,33 @@
                         x:Name="FileMetadataText"
                         HorizontalAlignment="Center"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ScrollViewer
+                        x:Name="GenericAdvancedInfoScroller"
+                        Margin="0,8,0,0"
+                        MaxWidth="720"
+                        MaxHeight="240"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto"
+                        Visibility="Collapsed">
+                        <TextBlock
+                            x:Name="GenericAdvancedInfoText"
+                            FontFamily="Cascadia Mono, Consolas"
+                            FontSize="12"
+                            IsTextSelectionEnabled="True"
+                            TextWrapping="NoWrap" />
+                    </ScrollViewer>
                     <Button
                         x:Name="LoadCloudFileButton"
                         Margin="0,8,0,0"
+                        HorizontalAlignment="Center"
+                        Click="LoadCloudFileButton_Click"
                         Visibility="Collapsed">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="14" Glyph="&#xE753;" />
-                                <TextBlock Text="Load file" />
+                                <TextBlock x:Name="LoadCloudFileText" x:Uid="LoadCloudFileText" Text="Load file" />
                             </StackPanel>
                         </Button.Content>
-                        <Button.Flyout>
-                            <Flyout>
-                                <StackPanel Width="260" Spacing="12">
-                                    <TextBlock Text="Loading may download this file from its cloud provider." TextWrapping="Wrap" />
-                                    <Button HorizontalAlignment="Right" Click="ConfirmCloudLoad_Click" Content="Load" />
-                                </StackPanel>
-                            </Flyout>
-                        </Button.Flyout>
                     </Button>
                     <TextBlock
                         x:Name="ErrorText"
@@ -123,7 +132,7 @@
 
                 <Grid x:Name="TextPanel" Visibility="Collapsed">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="36" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <Grid Grid.Row="0" Padding="12,0">
@@ -131,44 +140,82 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock
-                            x:Name="TextEncodingText"
-                            VerticalAlignment="Center"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            FontSize="12" />
-                        <ToggleButton
-                            x:Name="MarkdownModeButton"
+                        <StackPanel
+                            x:Name="MarkdownModeButtons"
                             Grid.Column="1"
-                            MinWidth="86"
-                            Height="28"
-                            Click="MarkdownModeButton_Click"
-                            Content="Preview"
-                            Visibility="Collapsed" />
+                            Margin="0,6"
+                            Orientation="Horizontal"
+                            Spacing="2"
+                            Visibility="Collapsed">
+                            <ToggleButton
+                                x:Name="MarkdownPreviewButton"
+                                x:Uid="MarkdownPreviewButton"
+                                Height="24"
+                                MinWidth="54"
+                                Padding="8,0"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0"
+                                Click="MarkdownPreviewButton_Click"
+                                Content="Preview"
+                                FontSize="11" />
+                            <ToggleButton
+                                x:Name="MarkdownCodeButton"
+                                x:Uid="MarkdownCodeButton"
+                                Height="24"
+                                MinWidth="42"
+                                Padding="8,0"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0"
+                                Click="MarkdownCodeButton_Click"
+                                Content="Code"
+                                FontSize="11" />
+                        </StackPanel>
                     </Grid>
                     <Grid Grid.Row="1">
-                        <TextBox
-                            x:Name="TextPreviewBox"
-                            Padding="16,12"
-                            AcceptsReturn="True"
-                            FontFamily="Cascadia Mono, Consolas"
-                            FontSize="13"
-                            IsReadOnly="True"
-                            TextWrapping="NoWrap"
-                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
                         <ScrollViewer
-                            x:Name="MarkdownPreviewScroller"
-                            Padding="28,16"
-                            HorizontalScrollBarVisibility="Disabled"
+                            x:Name="TextPreviewScroller"
+                            HorizontalScrollBarVisibility="Auto"
+                            HorizontalScrollMode="Enabled"
+                            SizeChanged="TextPreviewScroller_SizeChanged"
                             VerticalScrollBarVisibility="Auto"
-                            Visibility="Collapsed">
-                            <RichTextBlock
-                                x:Name="MarkdownPreviewText"
-                                MaxWidth="900"
-                                HorizontalAlignment="Left"
-                                FontSize="14"
-                                TextWrapping="Wrap" />
+                            VerticalScrollMode="Enabled">
+                            <Grid x:Name="TextCodePanel">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    x:Name="LineNumberGutter"
+                                    Background="{ThemeResource SubtleFillColorTransparentBrush}">
+                                    <TextBlock
+                                        x:Name="LineNumberText"
+                                        MinWidth="42"
+                                        Padding="10,12,10,12"
+                                        FontFamily="Cascadia Mono, Consolas"
+                                        FontSize="13"
+                                        LineHeight="18"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        IsHitTestVisible="False"
+                                        Opacity="0.42"
+                                        TextAlignment="Right"
+                                        TextWrapping="NoWrap" />
+                                </Border>
+                                <RichTextBlock
+                                    x:Name="TextContentRichText"
+                                    Grid.Column="1"
+                                    Padding="16,12"
+                                    FontFamily="Cascadia Mono, Consolas"
+                                    FontSize="13"
+                                    IsTextSelectionEnabled="True"
+                                    TextWrapping="NoWrap" />
+                            </Grid>
                         </ScrollViewer>
+                        <WebView2
+                            x:Name="MarkdownPreviewWebView"
+                            DefaultBackgroundColor="Transparent"
+                            Visibility="Collapsed" />
                     </Grid>
                 </Grid>
 
@@ -184,8 +231,16 @@
                         MinZoomFactor="1"
                         VerticalScrollBarVisibility="Auto"
                         VerticalScrollMode="Enabled"
-                        ZoomMode="Enabled">
-                        <Grid x:Name="ImageFitSurface">
+                        ZoomMode="Enabled"
+                        PointerCanceled="ImageScroller_PointerCanceled"
+                        PointerCaptureLost="ImageScroller_PointerCaptureLost"
+                        PointerMoved="ImageScroller_PointerMoved"
+                        PointerPressed="ImageScroller_PointerPressed"
+                        PointerReleased="ImageScroller_PointerReleased">
+                        <Grid
+                            x:Name="ImageFitSurface"
+                            Background="Transparent"
+                            PointerWheelChanged="ImageScroller_PointerWheelChanged">
                             <Image
                                 x:Name="ImagePreview"
                                 RenderTransformOrigin="0.5,0.5"
@@ -196,72 +251,158 @@
                             </Image>
                         </Grid>
                     </ScrollViewer>
-                    <StackPanel
-                        Margin="0,10,10,0"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        Orientation="Horizontal"
-                        Spacing="4">
-                        <Button
-                            Width="32"
-                            Height="32"
-                            Click="ZoomOutButton_Click"
-                            ToolTipService.ToolTip="Zoom out">
-                            <FontIcon FontSize="14" Glyph="&#xE71F;" />
-                        </Button>
-                        <Button
-                            Width="32"
-                            Height="32"
-                            Click="ZoomInButton_Click"
-                            ToolTipService.ToolTip="Zoom in">
-                            <FontIcon FontSize="14" Glyph="&#xE8A3;" />
-                        </Button>
-                        <Button
-                            Width="32"
-                            Height="32"
-                            Click="RotateLeftButton_Click"
-                            ToolTipService.ToolTip="Rotate left">
-                            <FontIcon FontSize="14" Glyph="&#xE7AD;" />
-                        </Button>
-                        <Button
-                            Width="32"
-                            Height="32"
-                            Click="RotateRightButton_Click"
-                            ToolTipService.ToolTip="Rotate right">
-                            <FontIcon FontSize="14" Glyph="&#xE7A8;" />
-                        </Button>
-                    </StackPanel>
                     <Border
                         x:Name="ImageMetadataOverlay"
                         Margin="12"
+                        MaxWidth="440"
+                        MaxHeight="360"
                         Padding="10,7"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Top"
                         Background="#B3202020"
                         CornerRadius="4"
                         Visibility="Collapsed">
-                        <TextBlock
-                            x:Name="ImageMetadataText"
-                            Foreground="White"
-                            FontSize="12"
-                            TextWrapping="Wrap" />
+                        <ScrollViewer
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto">
+                            <TextBlock
+                                x:Name="ImageMetadataText"
+                                Foreground="White"
+                                FontSize="12"
+                                IsTextSelectionEnabled="True"
+                                TextWrapping="Wrap" />
+                        </ScrollViewer>
                     </Border>
                 </Grid>
 
-                <Grid x:Name="MediaPanel" Visibility="Collapsed">
+                <Grid
+                    x:Name="MediaPanel"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                    PointerMoved="MediaPanel_PointerMoved"
+                    Visibility="Collapsed">
                     <MediaPlayerElement
                         x:Name="MediaPreview"
-                        AreTransportControlsEnabled="True"
-                        AutoPlay="False"
+                        AreTransportControlsEnabled="False"
+                        AutoPlay="True"
                         Stretch="Uniform" />
+                    <Grid
+                        x:Name="AudioMetadataPanel"
+                        MaxWidth="760"
+                        Padding="32,28,32,84"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="32" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="200" Height="200">
+                            <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="4">
+                                <FontIcon
+                                    x:Name="MediaCoverPlaceholder"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="64"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Glyph="&#xE8D6;" />
+                            </Border>
+                            <Image
+                                x:Name="MediaCoverImage"
+                                Stretch="UniformToFill"
+                                Visibility="Collapsed" />
+                        </Grid>
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="8">
+                            <TextBlock
+                                x:Name="MediaTitleText"
+                                FontSize="24"
+                                FontWeight="SemiBold"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                x:Name="MediaAlbumText"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                FontSize="15"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                x:Name="MediaArtistText"
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                FontSize="13"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                    <Border
+                        x:Name="MediaControlsOverlay"
+                        Height="56"
+                        Padding="10,0"
+                        VerticalAlignment="Bottom"
+                        Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <Border.OpacityTransition>
+                            <ScalarTransition Duration="0:0:0.18" />
+                        </Border.OpacityTransition>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="88" />
+                            </Grid.ColumnDefinitions>
+                            <Button
+                                x:Name="MediaPlayPauseButton"
+                                x:Uid="MediaPlayPauseButton"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="MediaPlayPauseButton_Click"
+                                ToolTipService.ToolTip="Play or pause">
+                                <FontIcon x:Name="MediaPlayPauseIcon" FontSize="14" Glyph="&#xE769;" />
+                            </Button>
+                            <Slider
+                                x:Name="MediaSeekSlider"
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                ValueChanged="MediaSeekSlider_ValueChanged" />
+                            <TextBlock
+                                x:Name="MediaTimeText"
+                                Grid.Column="2"
+                                MinWidth="92"
+                                VerticalAlignment="Center"
+                                FontSize="11"
+                                Text="0:00 / 0:00" />
+                            <Button
+                                x:Uid="MediaMuteButton"
+                                Grid.Column="3"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="MediaMuteButton_Click"
+                                ToolTipService.ToolTip="Mute or unmute">
+                                <FontIcon
+                                    x:Name="MediaMuteIcon"
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="16"
+                                    Glyph="&#xE767;" />
+                            </Button>
+                            <Slider
+                                x:Name="MediaVolumeSlider"
+                                Grid.Column="4"
+                                Maximum="100"
+                                Value="100"
+                                VerticalAlignment="Center"
+                                ValueChanged="MediaVolumeSlider_ValueChanged" />
+                        </Grid>
+                    </Border>
                 </Grid>
 
-                <Grid x:Name="PdfPanel" Visibility="Collapsed">
+                <Grid
+                    x:Name="PdfPanel"
+                    SizeChanged="PdfPanel_SizeChanged"
+                    Visibility="Collapsed">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
                         <RowDefinition Height="38" />
                     </Grid.RowDefinitions>
                     <ScrollViewer
+                        x:Name="PdfScroller"
                         Grid.Row="0"
                         HorizontalScrollBarVisibility="Auto"
                         HorizontalScrollMode="Enabled"
@@ -270,16 +411,34 @@
                         VerticalScrollBarVisibility="Auto"
                         VerticalScrollMode="Enabled"
                         ZoomMode="Enabled">
-                        <Image x:Name="PdfPageImage" Stretch="Uniform" />
+                        <Grid
+                            x:Name="PdfFitSurface"
+                            Background="Transparent"
+                            PointerWheelChanged="PdfScroller_PointerWheelChanged">
+                            <Image x:Name="PdfPageImage" Stretch="Uniform" />
+                        </Grid>
                     </ScrollViewer>
+                    <StackPanel
+                        x:Name="PdfLoadingOverlay"
+                        Grid.Row="0"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12"
+                        Visibility="Collapsed">
+                        <ProgressRing Width="32" Height="32" IsActive="True" />
+                        <TextBlock
+                            x:Name="PdfLoadingText"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextAlignment="Center" />
+                    </StackPanel>
                     <StackPanel
                         Grid.Row="1"
                         HorizontalAlignment="Center"
                         Orientation="Horizontal"
                         Spacing="8">
                         <Button
-                            Width="32"
-                            Height="32"
+                            x:Uid="PreviousPdfButton"
+                            Style="{StaticResource IconButtonStyle}"
                             Click="PreviousPdfPageButton_Click"
                             ToolTipService.ToolTip="Previous page">
                             <FontIcon FontSize="14" Glyph="&#xE76B;" />
@@ -290,8 +449,8 @@
                             VerticalAlignment="Center"
                             TextAlignment="Center" />
                         <Button
-                            Width="32"
-                            Height="32"
+                            x:Uid="NextPdfButton"
+                            Style="{StaticResource IconButtonStyle}"
                             Click="NextPdfPageButton_Click"
                             ToolTipService.ToolTip="Next page">
                             <FontIcon FontSize="14" Glyph="&#xE76C;" />
@@ -302,6 +461,7 @@
                 <Grid x:Name="ArchivePanel" Visibility="Collapsed">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="36" />
+                        <RowDefinition Height="28" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <TextBlock
@@ -310,12 +470,36 @@
                         VerticalAlignment="Center"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         FontSize="12" />
+                    <Grid
+                        Grid.Row="1"
+                        Padding="12,0"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="90" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Uid="ArchiveNameHeader" Grid.Column="1" VerticalAlignment="Center" FontSize="11" Text="Name" />
+                        <TextBlock x:Uid="ArchiveTypeHeader" Grid.Column="2" VerticalAlignment="Center" FontSize="11" Text="Type" />
+                        <TextBlock x:Uid="ArchiveModifiedHeader" Grid.Column="3" VerticalAlignment="Center" FontSize="11" Text="Modified" />
+                        <TextBlock x:Uid="ArchiveSizeHeader" Grid.Column="4" VerticalAlignment="Center" FontSize="11" Text="Size" TextAlignment="Right" />
+                    </Grid>
                     <ListView
                         x:Name="ArchiveEntryList"
-                        Grid.Row="1"
-                        Margin="8"
+                        Grid.Row="2"
+                        Margin="6,2"
                         IsItemClickEnabled="False"
-                        SelectionMode="None" />
+                        SelectionMode="None">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="MinHeight" Value="30" />
+                                <Setter Property="Padding" Value="6,2" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
                 </Grid>
             </Grid>
         </Grid>
@@ -326,39 +510,145 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock
                 x:Name="FooterMetadataText"
                 VerticalAlignment="Center"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 FontSize="12" />
-            <Button
+            <StackPanel
+                x:Name="TextStatusControls"
                 Grid.Column="1"
-                Width="32"
-                Height="32"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6"
+                Visibility="Collapsed">
+                <ComboBox
+                    x:Name="EncodingSelector"
+                    Width="112"
+                    Height="28"
+                    Padding="6,0"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    FontSize="11"
+                    SelectedIndex="0"
+                    SelectionChanged="EncodingSelector_SelectionChanged">
+                    <ComboBoxItem x:Name="AutoEncodingItem" x:Uid="AutoEncodingItem" Content="Auto encoding" />
+                    <ComboBoxItem Content="UTF-8" />
+                    <ComboBoxItem Content="UTF-16 LE" />
+                    <ComboBoxItem Content="UTF-16 BE" />
+                    <ComboBoxItem Content="GB18030" />
+                    <ComboBoxItem x:Uid="SystemAnsiItem" Content="System ANSI" />
+                </ComboBox>
+                <TextBlock
+                    x:Name="TextEncodingText"
+                    MaxWidth="92"
+                    VerticalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    FontSize="11"
+                    TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <ToggleButton
+                x:Name="SyntaxHighlightButton"
+                x:Uid="SyntaxHighlightButton"
+                Grid.Column="2"
+                Style="{StaticResource IconToggleButtonStyle}"
+                Click="SyntaxHighlightButton_Click"
+                IsChecked="True"
+                ToolTipService.ToolTip="Syntax highlighting"
+                Visibility="Collapsed">
+                <FontIcon FontSize="14" Glyph="&#xE943;" />
+            </ToggleButton>
+            <StackPanel
+                x:Name="ImageStatusControls"
+                Grid.Column="2"
+                Orientation="Horizontal"
+                Spacing="4"
+                Visibility="Collapsed">
+                <Button
+                    x:Uid="ZoomOutButton"
+                    Style="{StaticResource IconButtonStyle}"
+                    Click="ZoomOutButton_Click"
+                    ToolTipService.ToolTip="Zoom out">
+                    <FontIcon FontSize="14" Glyph="&#xE71F;" />
+                </Button>
+                <Button
+                    x:Uid="ZoomInButton"
+                    Style="{StaticResource IconButtonStyle}"
+                    Click="ZoomInButton_Click"
+                    ToolTipService.ToolTip="Zoom in">
+                    <FontIcon FontSize="14" Glyph="&#xE8A3;" />
+                </Button>
+                <Button
+                    x:Uid="RotateButton"
+                    Style="{StaticResource IconButtonStyle}"
+                    Click="RotateButton_Click"
+                    ToolTipService.ToolTip="Rotate clockwise">
+                    <FontIcon FontSize="14" Glyph="&#xE7AD;" />
+                </Button>
+                <ToggleButton
+                    x:Name="ImageExifButton"
+                    x:Uid="ImageExifButton"
+                    Style="{StaticResource IconToggleButtonStyle}"
+                    Click="ImageExifButton_Click"
+                    ToolTipService.ToolTip="Image metadata (EXIF)">
+                    <FontIcon FontSize="14" Glyph="&#xE946;" />
+                </ToggleButton>
+            </StackPanel>
+            <ToggleButton
+                x:Name="WordWrapButton"
+                x:Uid="WordWrapButton"
+                Grid.Column="3"
+                Style="{StaticResource IconToggleButtonStyle}"
+                Click="WordWrapButton_Click"
+                ToolTipService.ToolTip="Wrap long lines"
+                Visibility="Collapsed">
+                <FontIcon FontSize="14" Glyph="&#xE751;" />
+            </ToggleButton>
+            <ToggleButton
+                x:Name="LineNumbersButton"
+                x:Uid="LineNumbersButton"
+                Grid.Column="4"
+                Style="{StaticResource IconToggleButtonStyle}"
+                Click="LineNumbersButton_Click"
+                IsChecked="True"
+                ToolTipService.ToolTip="Show line numbers"
+                Visibility="Collapsed">
+                <FontIcon FontSize="14" Glyph="&#xE8FD;" />
+            </ToggleButton>
+            <Button
+                x:Name="CopyPathButton"
+                x:Uid="CopyPathButton"
+                Grid.Column="5"
+                Style="{StaticResource IconButtonStyle}"
                 Click="CopyPathButton_Click"
                 ToolTipService.ToolTip="Copy path">
-                <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                <FontIcon x:Name="CopyPathIcon" FontSize="14" Glyph="&#xE8C8;" />
+            </Button>
+            <Button
+                x:Name="OpenDefaultButton"
+                x:Uid="OpenDefaultButton"
+                Grid.Column="6"
+                Style="{StaticResource IconButtonStyle}"
+                Margin="4,0,0,0"
+                Click="OpenDefaultButton_Click"
+                RightTapped="OpenDefaultButton_RightTapped"
+                ToolTipService.ToolTip="Open file">
+                <FontIcon FontSize="14" Glyph="&#xE7C3;" />
             </Button>
             <Button
                 x:Name="OpenFolderButton"
-                Grid.Column="2"
-                Width="32"
-                Height="32"
+                x:Uid="OpenFolderButton"
+                Grid.Column="7"
+                Style="{StaticResource IconButtonStyle}"
                 Margin="4,0,0,0"
                 Click="OpenFolderButton_Click"
                 ToolTipService.ToolTip="Open containing folder">
                 <FontIcon FontSize="14" Glyph="&#xE838;" />
-            </Button>
-            <Button
-                x:Name="OpenDefaultButton"
-                Grid.Column="3"
-                Width="32"
-                Height="32"
-                Margin="4,0,0,0"
-                Click="OpenDefaultButton_Click"
-                ToolTipService.ToolTip="Open with default application">
-                <FontIcon FontSize="14" Glyph="&#xE8A7;" />
             </Button>
         </Grid>
     </Grid>

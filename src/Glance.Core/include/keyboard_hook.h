@@ -32,6 +32,10 @@ namespace glance::core
 
         [[nodiscard]] bool start();
         [[nodiscard]] bool refresh();
+        [[nodiscard]] std::uint64_t event_count() const noexcept
+        {
+            return event_count_.load(std::memory_order_relaxed);
+        }
         void stop() noexcept;
 
     private:
@@ -68,5 +72,6 @@ namespace glance::core
         std::atomic_bool space_captured_{};
         std::atomic_bool escape_down_{};
         std::atomic_bool escape_captured_{};
+        std::atomic_uint64_t event_count_{};
     };
 }

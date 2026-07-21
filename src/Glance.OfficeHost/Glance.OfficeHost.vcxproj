@@ -32,6 +32,9 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
+    <ResourceCompile Include="..\version.rc">
+      <PreprocessorDefinitions>GLANCE_BINARY_KIND=3;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.CppWinRT" Version="3.0.260715.1" />

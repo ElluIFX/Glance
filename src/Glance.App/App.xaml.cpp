@@ -1,11 +1,14 @@
 #include "pch.h"
 #include "App.xaml.h"
+#include "appearance_preferences.h"
 #include "MainWindow.xaml.h"
 #include "SettingsWindow.xaml.h"
+#include "glance/contracts/diagnostics.h"
 
 #include <shellapi.h>
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 
 using namespace winrt;
@@ -31,6 +34,11 @@ namespace winrt::Glance::App::implementation
               },
               [this](bool connected) { handle_connection_changed(connected); })
     {
+        UnhandledException([](IInspectable const&, UnhandledExceptionEventArgs const& event)
+        {
+            glance::contracts::log_event(
+                L"WinUI unhandled exception: " + std::wstring(event.Message()));
+        });
 #if defined _DEBUG && !defined DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION
         UnhandledException([](IInspectable const&, UnhandledExceptionEventArgs const& event)
         {
@@ -57,6 +65,7 @@ namespace winrt::Glance::App::implementation
 
     void App::OnLaunched(LaunchActivatedEventArgs const&)
     {
+        glance::contracts::initialize_diagnostics(L"Glance.App");
         instance_mutex_ = CreateMutexW(nullptr, FALSE, L"Local\\Glance.App");
         if (instance_mutex_ == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
         {
@@ -65,7 +74,10 @@ namespace winrt::Glance::App::implementation
         }
 
         dispatcher_ = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        glance::app::apply_accent_resources(glance::app::load_appearance_preferences());
+        glance::contracts::log_event(L"Creating the initial preview window.");
         create_active_window();
+        glance::contracts::log_event(L"Creating the notification area icon.");
         tray_icon_ = std::make_unique<glance::app::TrayIcon>();
         if (!tray_icon_->create(
                 GetModuleHandleW(nullptr),
@@ -76,7 +88,9 @@ namespace winrt::Glance::App::implementation
             show_settings();
         }
         ensure_core_started();
+        glance::contracts::log_event(L"Starting the Core pipe client.");
         static_cast<void>(pipe_client_.start());
+        start_core_watchdog();
     }
 
     void App::ensure_core_started()
@@ -91,6 +105,7 @@ namespace winrt::Glance::App::implementation
         const auto core_path = executable_directory() / L"Glance.Core.exe";
         if (!std::filesystem::exists(core_path))
         {
+            glance::contracts::log_event(L"Glance.Core.exe was not found.");
             return;
         }
 
@@ -101,6 +116,7 @@ namespace winrt::Glance::App::implementation
         execute.nShow = SW_HIDE;
         if (ShellExecuteExW(&execute))
         {
+            glance::contracts::log_event(L"Core process launch requested with elevation.");
             if (execute.hProcess != nullptr)
             {
                 CloseHandle(execute.hProcess);
@@ -111,8 +127,25 @@ namespace winrt::Glance::App::implementation
         execute.lpVerb = nullptr;
         if (ShellExecuteExW(&execute) && execute.hProcess != nullptr)
         {
+            glance::contracts::log_event(L"Core process launch requested without elevation.");
             CloseHandle(execute.hProcess);
         }
+    }
+
+    void App::start_core_watchdog()
+    {
+        if (core_watchdog_timer_ == nullptr)
+        {
+            core_watchdog_timer_ = DispatcherTimer();
+            core_watchdog_timer_.Interval(std::chrono::seconds(3));
+            core_watchdog_timer_.Tick([this](IInspectable const&, IInspectable const&) {
+                if (!shutting_down_.load(std::memory_order_acquire))
+                {
+                    ensure_core_started();
+                }
+            });
+        }
+        core_watchdog_timer_.Start();
     }
 
     void App::create_active_window()
@@ -132,12 +165,30 @@ namespace winrt::Glance::App::implementation
         {
             settings_window_ = make<SettingsWindow>();
             get_self<implementation::SettingsWindow>(settings_window_)->InitializeSession(
-                [this] { exit_application(); });
+                [this] { exit_application(); },
+                [this] { apply_appearance_preferences(); });
             settings_window_.Closed([this](IInspectable const&, WindowEventArgs const&) {
                 settings_window_ = nullptr;
             });
         }
         settings_window_.Activate();
+    }
+
+    void App::apply_appearance_preferences()
+    {
+        glance::app::apply_accent_resources(glance::app::load_appearance_preferences());
+        if (active_window_ != nullptr)
+        {
+            get_self<implementation::MainWindow>(active_window_)->ApplyAppearancePreferences();
+        }
+        for (const auto& window : detached_windows_)
+        {
+            get_self<implementation::MainWindow>(window)->ApplyAppearancePreferences();
+        }
+        if (settings_window_ != nullptr)
+        {
+            get_self<implementation::SettingsWindow>(settings_window_)->ApplyAppearancePreferences();
+        }
     }
 
     void App::exit_application()
@@ -147,6 +198,10 @@ namespace winrt::Glance::App::implementation
             return;
         }
         static_cast<void>(pipe_client_.send(glance::contracts::MessageType::shutdown));
+        if (core_watchdog_timer_ != nullptr)
+        {
+            core_watchdog_timer_.Stop();
+        }
         tray_icon_.reset();
         if (settings_window_ != nullptr)
         {
@@ -197,15 +252,23 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
-        if (!connected)
-        {
-            dispatcher_.TryEnqueue([this] {
-                if (!shutting_down_.load(std::memory_order_acquire))
+        glance::contracts::log_event(connected ? L"Core pipe connected." : L"Core pipe disconnected.");
+        dispatcher_.TryEnqueue([this, connected] {
+            if (shutting_down_.load(std::memory_order_acquire))
+            {
+                return;
+            }
+            if (connected)
+            {
+                if (core_watchdog_timer_ != nullptr)
                 {
-                    close_active_preview();
+                    core_watchdog_timer_.Stop();
                 }
-            });
-        }
+                return;
+            }
+            close_active_preview();
+            start_core_watchdog();
+        });
     }
 
     void App::handle_window_state(
@@ -234,15 +297,25 @@ namespace winrt::Glance::App::implementation
         }
         else if (state == glance::contracts::PreviewWindowState::closed)
         {
-            if (is_active_window)
-            {
-                active_window_ = nullptr;
-                create_active_window();
-                return;
-            }
-            std::erase_if(detached_windows_, [instance_id](const auto& window) {
-                return get_self<implementation::MainWindow>(window)->InstanceId() == instance_id;
-            });
+            // Closing a WinUI window synchronously raises WM_NCDESTROY. Keep its
+            // final reference until the close callback and timer tick have unwound.
+            static_cast<void>(dispatcher_.TryEnqueue([this, instance_id] {
+                if (shutting_down_.load(std::memory_order_acquire))
+                {
+                    return;
+                }
+                const bool active = active_window_ != nullptr
+                    && get_self<implementation::MainWindow>(active_window_)->InstanceId() == instance_id;
+                if (active)
+                {
+                    active_window_ = nullptr;
+                    create_active_window();
+                    return;
+                }
+                std::erase_if(detached_windows_, [instance_id](const auto& window) {
+                    return get_self<implementation::MainWindow>(window)->InstanceId() == instance_id;
+                });
+            }));
         }
     }
 
@@ -283,13 +356,16 @@ namespace winrt::Glance::App::implementation
 
         if (active_window_ == nullptr)
         {
+            glance::contracts::log_event(L"No active preview window; creating a replacement.");
             create_active_window();
         }
+        glance::contracts::log_event(L"Dispatching the preview request to the active window.");
         get_self<implementation::MainWindow>(active_window_)->ShowPreview(
             std::move(files),
             focused_index,
             source_kind,
             reinterpret_cast<HWND>(source_window));
+        glance::contracts::log_event(L"Preview request dispatch complete.");
     }
 
     void App::close_active_preview()

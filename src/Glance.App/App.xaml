@@ -7,7 +7,38 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="Transparent" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="Transparent" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="Transparent" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="Transparent" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="Transparent" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPressed" Color="Transparent" />
+            <Style x:Key="IconButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="36" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="MinWidth" Value="36" />
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="4" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
+            <Style x:Key="IconToggleButtonStyle" TargetType="ToggleButton">
+                <Setter Property="Width" Value="36" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="MinWidth" Value="36" />
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="4" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
-

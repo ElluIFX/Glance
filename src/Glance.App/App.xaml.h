@@ -28,8 +28,10 @@ namespace winrt::Glance::App::implementation
 
     private:
         void ensure_core_started();
+        void start_core_watchdog();
         void create_active_window();
         void show_settings();
+        void apply_appearance_preferences();
         void exit_application();
         void handle_pipe_message(glance::contracts::MessageType type, std::uint32_t flags, std::string payload);
         void handle_connection_changed(bool connected);
@@ -42,6 +44,7 @@ namespace winrt::Glance::App::implementation
         HANDLE instance_mutex_{};
         std::atomic_bool shutting_down_{};
         Microsoft::UI::Dispatching::DispatcherQueue dispatcher_{ nullptr };
+        Microsoft::UI::Xaml::DispatcherTimer core_watchdog_timer_{ nullptr };
         glance::app::PipeClient pipe_client_;
         Glance::App::MainWindow active_window_{ nullptr };
         Glance::App::SettingsWindow settings_window_{ nullptr };

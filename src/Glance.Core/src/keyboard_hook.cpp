@@ -1,5 +1,8 @@
 #include "keyboard_hook.h"
 #include "input_decision.h"
+#include "glance/contracts/diagnostics.h"
+
+#include <string>
 
 namespace glance::core
 {
@@ -44,6 +47,10 @@ namespace glance::core
 
     bool KeyboardHookService::refresh()
     {
+        space_down_.store(false, std::memory_order_release);
+        space_captured_.store(false, std::memory_order_release);
+        escape_down_.store(false, std::memory_order_release);
+        escape_captured_.store(false, std::memory_order_release);
         standby_.stop();
         if (!standby_.start())
         {
@@ -105,6 +112,16 @@ namespace glance::core
                 eligible,
                 modified);
 
+            if (key.vkCode == VK_SPACE)
+            {
+                glance::contracts::log_event(
+                    L"Space input decision: connected=" + std::to_wstring(connected) +
+                    L", active=" + std::to_wstring(active) +
+                    L", eligible=" + std::to_wstring(eligible) +
+                    L", modified=" + std::to_wstring(modified) +
+                    L", capture=" + std::to_wstring(should_capture) + L".");
+            }
+
             captured->store(should_capture, std::memory_order_release);
             if (should_capture)
             {
@@ -162,6 +179,7 @@ namespace glance::core
     {
         if (code == HC_ACTION && current_ != nullptr)
         {
+            current_->owner_.event_count_.fetch_add(1, std::memory_order_relaxed);
             const auto& key = *reinterpret_cast<const KBDLLHOOKSTRUCT*>(data);
             if (current_->owner_.handle_key(message, key))
             {
@@ -180,6 +198,11 @@ namespace glance::core
 
         hook_ = SetWindowsHookExW(WH_KEYBOARD_LL, hook_proc, GetModuleHandleW(nullptr), 0);
         start_succeeded_ = hook_ != nullptr;
+        if (!start_succeeded_)
+        {
+            glance::contracts::log_event(
+                L"SetWindowsHookExW failed with error " + std::to_wstring(GetLastError()) + L".");
+        }
         SetEvent(ready_event_);
 
         if (start_succeeded_)

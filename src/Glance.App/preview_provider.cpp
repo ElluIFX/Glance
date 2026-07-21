@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "localization.h"
 #include "preview_provider.h"
 
 #include <windows.h>
@@ -188,6 +189,22 @@ namespace
             required);
         return result;
     }
+
+    std::wstring decode_utf16(std::span<const std::byte> bytes, bool big_endian)
+    {
+        bytes = bytes.first(bytes.size() - bytes.size() % 2);
+        std::wstring result(bytes.size() / 2, L'\0');
+        for (std::size_t index = 0; index < result.size(); ++index)
+        {
+            const auto first = std::to_integer<unsigned char>(bytes[index * 2]);
+            const auto second = std::to_integer<unsigned char>(bytes[index * 2 + 1]);
+            result[index] = static_cast<wchar_t>(
+                big_endian
+                    ? (static_cast<unsigned int>(first) << 8U) | second
+                    : (static_cast<unsigned int>(second) << 8U) | first);
+        }
+        return result;
+    }
 }
 
 namespace glance::app
@@ -257,13 +274,16 @@ namespace glance::app
         return sniff_unknown_file(path);
     }
 
-    TextPreview load_text_preview(const std::wstring& path, std::size_t maximum_bytes)
+    TextPreview load_text_preview(
+        const std::wstring& path,
+        std::size_t maximum_bytes,
+        TextEncoding encoding)
     {
         TextPreview result;
         std::ifstream stream(std::filesystem::path(path), std::ios::binary);
         if (!stream)
         {
-            result.error = L"The file could not be opened.";
+            result.error = localize(L"TextFileOpenError");
             return result;
         }
 
@@ -272,7 +292,7 @@ namespace glance::app
         stream.seekg(0, std::ios::beg);
         if (file_size < 0)
         {
-            result.error = L"The file size could not be read.";
+            result.error = localize(L"TextFileSizeError");
             return result;
         }
 
@@ -285,27 +305,58 @@ namespace glance::app
         result.truncated = static_cast<std::uint64_t>(file_size) > bytes.size();
 
         std::span<const std::byte> payload = bytes;
-        if (payload.size() >= 3 &&
+        const bool utf8_bom = payload.size() >= 3 &&
             std::to_integer<unsigned char>(payload[0]) == 0xEF &&
             std::to_integer<unsigned char>(payload[1]) == 0xBB &&
-            std::to_integer<unsigned char>(payload[2]) == 0xBF)
+            std::to_integer<unsigned char>(payload[2]) == 0xBF;
+        const bool utf16_le_bom = payload.size() >= 2 &&
+            std::to_integer<unsigned char>(payload[0]) == 0xFF &&
+            std::to_integer<unsigned char>(payload[1]) == 0xFE;
+        const bool utf16_be_bom = payload.size() >= 2 &&
+            std::to_integer<unsigned char>(payload[0]) == 0xFE &&
+            std::to_integer<unsigned char>(payload[1]) == 0xFF;
+
+        if (encoding == TextEncoding::utf8 ||
+            (encoding == TextEncoding::automatic && utf8_bom))
         {
-            payload = payload.subspan(3);
+            if (utf8_bom)
+            {
+                payload = payload.subspan(3);
+            }
             result.encoding = L"UTF-8";
             result.content = decode_multibyte(payload, CP_UTF8);
         }
-        else if (payload.size() >= 2 &&
-                 std::to_integer<unsigned char>(payload[0]) == 0xFF &&
-                 std::to_integer<unsigned char>(payload[1]) == 0xFE)
+        else if (encoding == TextEncoding::utf16_le ||
+                 (encoding == TextEncoding::automatic && utf16_le_bom))
         {
-            payload = payload.subspan(2);
-            payload = payload.first(payload.size() - payload.size() % 2);
+            if (utf16_le_bom)
+            {
+                payload = payload.subspan(2);
+            }
             result.encoding = L"UTF-16 LE";
-            result.content.assign(
-                reinterpret_cast<const wchar_t*>(payload.data()),
-                payload.size() / sizeof(wchar_t));
+            result.content = decode_utf16(payload, false);
         }
-        else if (valid_utf8(payload))
+        else if (encoding == TextEncoding::utf16_be ||
+                 (encoding == TextEncoding::automatic && utf16_be_bom))
+        {
+            if (utf16_be_bom)
+            {
+                payload = payload.subspan(2);
+            }
+            result.encoding = L"UTF-16 BE";
+            result.content = decode_utf16(payload, true);
+        }
+        else if (encoding == TextEncoding::gb18030)
+        {
+            result.encoding = L"GB18030";
+            result.content = decode_multibyte(payload, 54936);
+        }
+        else if (encoding == TextEncoding::system)
+        {
+            result.encoding = L"System code page";
+            result.content = decode_multibyte(payload, CP_ACP);
+        }
+        else if (encoding == TextEncoding::automatic && valid_utf8(payload))
         {
             result.encoding = L"UTF-8";
             result.content = decode_multibyte(payload, CP_UTF8);
@@ -318,7 +369,7 @@ namespace glance::app
 
         if (!payload.empty() && result.content.empty())
         {
-            result.error = L"The text encoding could not be decoded.";
+            result.error = localize(L"TextDecodeError");
         }
         return result;
     }

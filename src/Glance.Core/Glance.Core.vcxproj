@@ -23,7 +23,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Ole32.lib;OleAut32.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Wtsapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Ole32.lib;OleAut32.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;Uiautomationcore.lib;User32.lib;Wtsapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -43,6 +43,9 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
+    <ResourceCompile Include="..\version.rc">
+      <PreprocessorDefinitions>GLANCE_BINARY_KIND=2;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Glance.Contracts\Glance.Contracts.vcxproj">

@@ -1,4 +1,5 @@
 #include "core_application.h"
+#include "glance/contracts/diagnostics.h"
 
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.Foundation.h>
@@ -44,6 +45,7 @@ namespace glance::core
         winrt::init_apartment(winrt::apartment_type::single_threaded);
         if (!create_message_window(instance))
         {
+            glance::contracts::log_event(L"Failed to create the Core message window.");
             return 1;
         }
 
@@ -52,12 +54,17 @@ namespace glance::core
         keyboard.usUsage = 0x06;
         keyboard.dwFlags = RIDEV_INPUTSINK;
         keyboard.hwndTarget = window_;
-        RegisterRawInputDevices(&keyboard, 1, sizeof(keyboard));
+        if (!RegisterRawInputDevices(&keyboard, 1, sizeof(keyboard)))
+        {
+            glance::contracts::log_event(
+                L"RegisterRawInputDevices failed with error " + std::to_wstring(GetLastError()) + L".");
+        }
 
         static_cast<void>(pipe_server_.start());
         keyboard_hook_ = new KeyboardHookService(window_, hook_action_message, input_state_);
         if (!keyboard_hook_->start())
         {
+            glance::contracts::log_event(L"Failed to start the keyboard hook.");
             return 2;
         }
 
@@ -129,20 +136,29 @@ namespace glance::core
             }
             if (wparam == hook_refresh_timer_id && self->keyboard_hook_ != nullptr)
             {
-                static_cast<void>(self->keyboard_hook_->refresh());
+                const auto raw_count = self->raw_input_count_.load(std::memory_order_relaxed);
+                const auto hook_count = self->keyboard_hook_->event_count();
+                const bool stalled = raw_count != self->previous_raw_input_count_ &&
+                    hook_count == self->previous_hook_event_count_;
+                self->previous_raw_input_count_ = raw_count;
+                self->previous_hook_event_count_ = hook_count;
+                if (stalled)
+                {
+                    self->recover_keyboard_hook(L"Raw Input advanced while hook events stalled");
+                }
                 return 0;
             }
             break;
         case WM_POWERBROADCAST:
             if (wparam == PBT_APMRESUMEAUTOMATIC && self->keyboard_hook_ != nullptr)
             {
-                static_cast<void>(self->keyboard_hook_->refresh());
+                self->recover_keyboard_hook(L"System resume");
             }
             return TRUE;
         case WM_WTSSESSION_CHANGE:
             if (wparam == WTS_SESSION_UNLOCK && self->keyboard_hook_ != nullptr)
             {
-                static_cast<void>(self->keyboard_hook_->refresh());
+                self->recover_keyboard_hook(L"Session unlock");
             }
             return 0;
         case WM_CLOSE:
@@ -161,6 +177,29 @@ namespace glance::core
             break;
         }
         return DefWindowProcW(window, message, wparam, lparam);
+    }
+
+    void CoreApplication::recover_keyboard_hook(std::wstring_view reason)
+    {
+        if (keyboard_hook_ == nullptr)
+        {
+            return;
+        }
+        if (keyboard_hook_->refresh())
+        {
+            glance::contracts::log_event(L"Keyboard hook recovered: " + std::wstring(reason) + L".");
+            return;
+        }
+
+        glance::contracts::log_event(
+            L"Keyboard hook refresh failed; rebuilding service: " + std::wstring(reason) + L".");
+        keyboard_hook_->stop();
+        delete keyboard_hook_;
+        keyboard_hook_ = new KeyboardHookService(window_, hook_action_message, input_state_);
+        if (!keyboard_hook_->start())
+        {
+            glance::contracts::log_event(L"Keyboard hook service rebuild failed.");
+        }
     }
 
     void CoreApplication::update_selection()
@@ -184,6 +223,12 @@ namespace glance::core
         const bool changed = selection_changed(next);
         if (changed)
         {
+            if (next.host_kind == glance::contracts::HostKind::explorer)
+            {
+                glance::contracts::log_event(
+                    L"Explorer selection state: eligible=" + std::to_wstring(next.accepts_hotkey) +
+                    L", items=" + std::to_wstring(next.items.size()) + L".");
+            }
             next.generation = ++selection_generation_;
             selection_ = std::move(next);
         }
@@ -308,6 +353,7 @@ namespace glance::core
 
     void CoreApplication::handle_connection_changed(bool connected)
     {
+        glance::contracts::log_event(connected ? L"UI pipe connected." : L"UI pipe disconnected.");
         input_state_.ui_connected.store(connected, std::memory_order_release);
         if (!connected)
         {

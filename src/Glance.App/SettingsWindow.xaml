@@ -2,51 +2,449 @@
     x:Class="Glance.App.SettingsWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Padding="24" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+    <Grid x:Name="RootGrid" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="40" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <TextBlock FontSize="24" FontWeight="SemiBold" Text="Settings" />
-        <Grid Grid.Row="1" Margin="0,28,0,0">
+        <Grid x:Name="SettingsTitleBarDragRegion" Grid.Row="0" Padding="14,0,6,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock VerticalAlignment="Center" Text="Launch at sign-in" />
-            <ToggleSwitch
-                x:Name="LaunchAtSignInToggle"
-                Grid.Column="1"
-                Toggled="LaunchAtSignInToggle_Toggled" />
-        </Grid>
-        <Grid Grid.Row="2" Margin="0,24,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Spacing="4">
-                <TextBlock Text="Input core" />
-                <TextBlock
-                    x:Name="CoreStatusText"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    FontSize="12" />
-            </StackPanel>
+            <TextBlock
+                x:Name="SettingsTitleText"
+                VerticalAlignment="Center"
+                FontSize="13"
+                FontWeight="SemiBold"
+                Text="Settings" />
             <Button
+                x:Name="CloseSettingsButton"
                 Grid.Column="1"
-                Width="32"
-                Height="32"
-                Click="RefreshCoreStatusButton_Click"
-                ToolTipService.ToolTip="Refresh status">
-                <FontIcon FontSize="14" Glyph="&#xE72C;" />
+                Margin="4,0,0,0"
+                Style="{StaticResource IconButtonStyle}"
+                Click="CloseSettingsButton_Click"
+                ToolTipService.ToolTip="Close settings">
+                <FontIcon FontSize="16" Glyph="&#xE711;" />
             </Button>
         </Grid>
-        <Button
-            Grid.Row="4"
-            HorizontalAlignment="Right"
-            Click="ExitButton_Click"
-            Content="Exit Glance" />
+        <NavigationView
+        x:Name="SettingsNavigation"
+        Grid.Row="1"
+        AlwaysShowHeader="False"
+        Background="Transparent"
+        IsBackButtonVisible="Collapsed"
+        IsPaneToggleButtonVisible="False"
+        IsSettingsVisible="False"
+        OpenPaneLength="190"
+        PaneDisplayMode="Left"
+        SelectionChanged="SettingsNavigation_SelectionChanged">
+        <NavigationView.Resources>
+            <Style x:Key="SettingsGroupStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+            </Style>
+            <Style x:Key="SettingsRowStyle" TargetType="Grid">
+                <Setter Property="MinHeight" Value="56" />
+                <Setter Property="Padding" Value="16,10" />
+            </Style>
+            <Style x:Key="SettingsDescriptionStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style x:Key="SettingsPageTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="24" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+        </NavigationView.Resources>
+        <NavigationView.MenuItems>
+            <NavigationViewItem
+                x:Name="GeneralNavigationItem"
+                x:Uid="GeneralNavigationItem"
+                Content="General"
+                IsSelected="True"
+                Tag="general">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE713;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
+                x:Name="TextPreviewNavigationItem"
+                x:Uid="TextPreviewNavigationItem"
+                Content="Text preview"
+                Tag="text">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE8D2;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
+                x:Name="PathCopyNavigationItem"
+                x:Uid="PathCopyNavigationItem"
+                Content="Path copy"
+                Tag="path">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE8C8;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
+                x:Name="MaintenanceNavigationItem"
+                x:Uid="MaintenanceNavigationItem"
+                Content="Maintenance"
+                Tag="maintenance">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE90F;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.MenuItems>
+        <NavigationView.PaneFooter>
+            <StackPanel>
+                <TextBlock
+                    x:Name="VersionTextBlock"
+                    Margin="16,0,12,6"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    FontSize="11" />
+                <Button
+                    x:Name="ExitButton"
+                    Margin="4,0,4,8"
+                    Padding="12,8"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="0"
+                    Click="ExitButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <FontIcon FontSize="16" Glyph="&#xE8BB;" />
+                        <TextBlock x:Name="ExitButtonText" x:Uid="ExitButtonText" Text="Exit Glance" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </NavigationView.PaneFooter>
+
+        <Grid Padding="32,24,36,28">
+            <ScrollViewer
+                x:Name="GeneralSettingsPanel"
+                HorizontalContentAlignment="Stretch"
+                VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="GeneralPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="General" />
+                        <TextBlock x:Uid="GeneralPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Appearance, application startup, and diagnostics" />
+                    </StackPanel>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Text="Language" />
+                                    <TextBlock Style="{StaticResource SettingsDescriptionStyle}" Text="Application display language" />
+                                </StackPanel>
+                                <ComboBox
+                                    x:Name="LanguageComboBox"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    SelectionChanged="AppearanceComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="English" Tag="en-US" />
+                                </ComboBox>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Text="Theme" />
+                                    <TextBlock Style="{StaticResource SettingsDescriptionStyle}" Text="Use the system, light, or dark appearance" />
+                                </StackPanel>
+                                <ComboBox
+                                    x:Name="ThemeComboBox"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    SelectionChanged="AppearanceComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="System" />
+                                    <ComboBoxItem Content="Light" />
+                                    <ComboBoxItem Content="Dark" />
+                                </ComboBox>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Text="Accent color" />
+                                    <TextBlock Style="{StaticResource SettingsDescriptionStyle}" Text="Highlight active controls" />
+                                </StackPanel>
+                                <ComboBox
+                                    x:Name="AccentComboBox"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    SelectionChanged="AppearanceComboBox_SelectionChanged">
+                                    <ComboBoxItem>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Width="12" Height="12" Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            <TextBlock Text="System" />
+                                        </StackPanel>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Width="12" Height="12" Fill="#0078D4" />
+                                            <TextBlock Text="Blue" />
+                                        </StackPanel>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Width="12" Height="12" Fill="#008272" />
+                                            <TextBlock Text="Teal" />
+                                        </StackPanel>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Width="12" Height="12" Fill="#107C10" />
+                                            <TextBlock Text="Green" />
+                                        </StackPanel>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Width="12" Height="12" Fill="#CA5010" />
+                                            <TextBlock Text="Orange" />
+                                        </StackPanel>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Width="12" Height="12" Fill="#D13438" />
+                                            <TextBlock Text="Red" />
+                                        </StackPanel>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Width="12" Height="12" Fill="#E3008C" />
+                                            <TextBlock Text="Pink" />
+                                        </StackPanel>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Width="12" Height="12" Fill="#5C2D91" />
+                                            <TextBlock Text="Purple" />
+                                        </StackPanel>
+                                    </ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Uid="LaunchTitle" Text="Launch at sign-in" />
+                                    <TextBlock x:Uid="LaunchDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start Glance in the notification area" />
+                                </StackPanel>
+                                <ToggleSwitch
+                                    x:Name="LaunchAtSignInToggle"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    OffContent="{x:Null}"
+                                    OnContent="{x:Null}"
+                                    VerticalAlignment="Center"
+                                    Toggled="LaunchAtSignInToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Uid="DiagnosticsTitle" Text="Diagnostics" />
+                                    <TextBlock x:Uid="DiagnosticsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Write basic logs and crash dumps" />
+                                </StackPanel>
+                                <ToggleSwitch
+                                    x:Name="DiagnosticsToggle"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    OffContent="{x:Null}"
+                                    OnContent="{x:Null}"
+                                    VerticalAlignment="Center"
+                                    Toggled="DiagnosticsToggle_Toggled" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer
+                x:Name="TextPreviewSettingsPanel"
+                HorizontalContentAlignment="Stretch"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="TextPreviewPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Text preview" />
+                        <TextBlock x:Uid="TextPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Editor appearance and layout" />
+                    </StackPanel>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Uid="FontFamilyLabel" VerticalAlignment="Center" Text="Font family" />
+                                <ComboBox
+                                    x:Name="FontFamilyComboBox"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    SelectionChanged="FontFamilyComboBox_SelectionChanged" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Uid="FontSizeLabel" VerticalAlignment="Center" Text="Font size" />
+                                <NumberBox
+                                    x:Name="FontSizeNumberBox"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    Maximum="32"
+                                    Minimum="9"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Inline"
+                                    ValueChanged="FontSizeNumberBox_ValueChanged" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Uid="SyntaxHighlightingLabel" VerticalAlignment="Center" Text="Syntax highlighting" />
+                                <ToggleSwitch x:Name="SyntaxHighlightingToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Uid="LineNumbersLabel" VerticalAlignment="Center" Text="Line numbers" />
+                                <ToggleSwitch x:Name="LineNumbersToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Uid="WordWrapLabel" VerticalAlignment="Center" Text="Wrap long lines" />
+                                <ToggleSwitch x:Name="WordWrapToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer
+                x:Name="PathCopySettingsPanel"
+                HorizontalContentAlignment="Stretch"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="PathCopyPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Path copy" />
+                        <TextBlock x:Uid="PathCopyPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Format paths copied from preview windows" />
+                    </StackPanel>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Uid="QuoteCopiedPathLabel" Text="Quote copied paths" />
+                                    <TextBlock x:Uid="QuoteCopiedPathDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Wrap copied paths in double quotes" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="QuoteCopiedPathToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Uid="UnixPathSeparatorsLabel" Text="Unix separators" />
+                                    <TextBlock x:Uid="UnixPathSeparatorsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Replace backslashes with forward slashes" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="UnixPathSeparatorsToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer
+                x:Name="MaintenanceSettingsPanel"
+                HorizontalContentAlignment="Stretch"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="MaintenancePageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Maintenance" />
+                        <TextBlock x:Uid="MaintenancePageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Runtime status and saved application state" />
+                    </StackPanel>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Uid="InputCoreLabel" Text="Input core" />
+                                    <TextBlock x:Name="CoreStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
+                                </StackPanel>
+                                <Button x:Uid="RefreshCoreButton" Grid.Column="1" Style="{StaticResource IconButtonStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="RefreshCoreStatusButton_Click" ToolTipService.ToolTip="Refresh status">
+                                    <FontIcon FontSize="14" Glyph="&#xE72C;" />
+                                </Button>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Uid="WindowSizesLabel" Text="Preview window sizes" />
+                                    <TextBlock x:Name="WindowSizeResetStatusText" x:Uid="WindowSizeResetStatusText" Style="{StaticResource SettingsDescriptionStyle}" Text="Stored separately by preview type" />
+                                </StackPanel>
+                                <Button x:Name="ResetWindowSizesButton" x:Uid="ResetWindowSizesButton" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ResetWindowSizesButton_Click" Content="Reset" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+        </NavigationView>
     </Grid>
 </Window>

@@ -1,4 +1,5 @@
-.vs/
+/.*/
+/*.md
 bin/
 obj/
 packages/

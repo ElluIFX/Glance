@@ -1,0 +1,51 @@
+#include <winres.h>
+#include "version.h"
+
+#if GLANCE_BINARY_KIND == 1
+#define GLANCE_FILE_DESCRIPTION "Glance Preview"
+#define GLANCE_INTERNAL_NAME "Glance"
+#define GLANCE_ORIGINAL_FILENAME "Glance.exe"
+#elif GLANCE_BINARY_KIND == 2
+#define GLANCE_FILE_DESCRIPTION "Glance Input Core"
+#define GLANCE_INTERNAL_NAME "Glance.Core"
+#define GLANCE_ORIGINAL_FILENAME "Glance.Core.exe"
+#elif GLANCE_BINARY_KIND == 3
+#define GLANCE_FILE_DESCRIPTION "Glance Office Preview Host"
+#define GLANCE_INTERNAL_NAME "Glance.OfficeHost"
+#define GLANCE_ORIGINAL_FILENAME "Glance.OfficeHost.exe"
+#else
+#error GLANCE_BINARY_KIND must identify the target executable.
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION GLANCE_VERSION_NUMERIC
+ PRODUCTVERSION GLANCE_VERSION_NUMERIC
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Glance contributors\0"
+            VALUE "FileDescription", GLANCE_FILE_DESCRIPTION "\0"
+            VALUE "FileVersion", GLANCE_FILE_VERSION_STRING "\0"
+            VALUE "InternalName", GLANCE_INTERNAL_NAME "\0"
+            VALUE "LegalCopyright", "Copyright (c) 2026 Glance contributors\0"
+            VALUE "OriginalFilename", GLANCE_ORIGINAL_FILENAME "\0"
+            VALUE "ProductName", "Glance\0"
+            VALUE "ProductVersion", GLANCE_VERSION_STRING "\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

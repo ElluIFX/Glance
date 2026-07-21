@@ -7,6 +7,7 @@
 #include <servprov.h>
 #include <shlguid.h>
 #include <shobjidl_core.h>
+#include <uiautomationclient.h>
 #include <wrl/client.h>
 
 #include <algorithm>
@@ -37,6 +38,37 @@ namespace
         CloseHandle(process);
         path.resize(size);
         return path;
+    }
+
+    std::wstring window_class_name(HWND window)
+    {
+        wchar_t name[128]{};
+        GetClassNameW(window, name, static_cast<int>(std::size(name)));
+        return name;
+    }
+
+    bool is_text_input_focused(const GUITHREADINFO& thread_info)
+    {
+        if (thread_info.hwndCaret != nullptr || (thread_info.flags & GUI_CARETBLINKING) != 0)
+        {
+            return true;
+        }
+
+        ComPtr<IUIAutomation> automation;
+        ComPtr<IUIAutomationElement> focused;
+        CONTROLTYPEID control_type{};
+        if (FAILED(CoCreateInstance(
+                CLSID_CUIAutomation,
+                nullptr,
+                CLSCTX_INPROC_SERVER,
+                IID_PPV_ARGS(&automation))) ||
+            FAILED(automation->GetFocusedElement(&focused)) ||
+            focused == nullptr ||
+            FAILED(focused->get_CurrentControlType(&control_type)))
+        {
+            return false;
+        }
+        return control_type == UIA_EditControlTypeId || control_type == UIA_DocumentControlTypeId;
     }
 
     std::wstring shell_item_name(IShellItem* item, SIGDN kind)
@@ -162,14 +194,26 @@ namespace glance::core
             }
 
             HWND view_window{};
-            GUITHREADINFO thread_info{ sizeof(GUITHREADINFO) };
-            const DWORD foreground_thread = GetWindowThreadProcessId(root, nullptr);
-            if (SUCCEEDED(shell_view->GetWindow(&view_window)) &&
-                GetGUIThreadInfo(foreground_thread, &thread_info))
+            if (FAILED(shell_view->GetWindow(&view_window)) || view_window == nullptr)
             {
-                snapshot.accepts_hotkey = thread_info.hwndFocus == view_window ||
-                    (thread_info.hwndFocus != nullptr && IsChild(view_window, thread_info.hwndFocus));
+                continue;
             }
+
+            GUITHREADINFO thread_info{ sizeof(GUITHREADINFO) };
+            if (!GetGUIThreadInfo(0, &thread_info))
+            {
+                continue;
+            }
+            const bool focused_view = thread_info.hwndFocus == view_window ||
+                (thread_info.hwndFocus != nullptr && IsChild(view_window, thread_info.hwndFocus));
+            const bool input_site = thread_info.hwndFocus != nullptr &&
+                GetAncestor(thread_info.hwndFocus, GA_ROOT) == root &&
+                _wcsicmp(window_class_name(thread_info.hwndFocus).c_str(), L"InputSiteWindowClass") == 0;
+            if (!focused_view && (!input_site || is_text_input_focused(thread_info)))
+            {
+                continue;
+            }
+            snapshot.accepts_hotkey = true;
 
             ComPtr<IShellItemArray> selected_items;
             if (FAILED(folder_view->Items(SVGIO_SELECTION, IID_PPV_ARGS(&selected_items))) || selected_items == nullptr)

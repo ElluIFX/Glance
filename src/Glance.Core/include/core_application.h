@@ -13,6 +13,7 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace glance::core
 {
@@ -32,7 +33,7 @@ namespace glance::core
         static constexpr UINT selection_timer_id = 1;
         static constexpr UINT hook_refresh_timer_id = 2;
         static constexpr UINT selection_interval_ms = 50;
-        static constexpr UINT hook_refresh_interval_ms = 60000;
+        static constexpr UINT hook_refresh_interval_ms = 1000;
 
         static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
         [[nodiscard]] bool create_message_window(HINSTANCE instance);
@@ -40,6 +41,7 @@ namespace glance::core
         void handle_hook_action(HookAction action);
         void handle_pipe_message(glance::contracts::MessageType type, std::uint32_t flags, std::string_view payload);
         void handle_connection_changed(bool connected);
+        void recover_keyboard_hook(std::wstring_view reason);
         [[nodiscard]] std::string make_open_payload(const glance::contracts::SelectionSnapshot& selection) const;
         [[nodiscard]] bool selection_changed(const glance::contracts::SelectionSnapshot& next) const;
 
@@ -52,6 +54,8 @@ namespace glance::core
         PipeServer pipe_server_;
         KeyboardHookService* keyboard_hook_{};
         std::atomic_uint64_t raw_input_count_{};
+        std::uint64_t previous_raw_input_count_{};
+        std::uint64_t previous_hook_event_count_{};
         std::atomic<glance::contracts::PreviewWindowState> preview_state_{
             glance::contracts::PreviewWindowState::hidden };
     };

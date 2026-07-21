@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="AppName" xml:space="preserve"><value>Glance</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>Glance Settings</value></data>
+  <data name="Loading" xml:space="preserve"><value>Loading...</value></data>
+  <data name="LoadingFolder" xml:space="preserve"><value>Loading folder...</value></data>
+  <data name="LoadingArchive" xml:space="preserve"><value>Loading directory...</value></data>
+  <data name="LoadingPdf" xml:space="preserve"><value>Loading PDF...</value></data>
+  <data name="ConvertingOffice" xml:space="preserve"><value>Converting with Microsoft Office...</value></data>
+  <data name="LoadingConvertedDocument" xml:space="preserve"><value>Loading converted document...</value></data>
+  <data name="AutoEncoding" xml:space="preserve"><value>Auto encoding</value></data>
+  <data name="AutoEncodingDetected" xml:space="preserve"><value>Auto ({0})</value></data>
+  <data name="PreviewTruncated" xml:space="preserve"><value>Preview truncated at 8 MB</value></data>
+  <data name="LineNumbersTooltip" xml:space="preserve"><value>Show line numbers</value></data>
+  <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>Line numbers are unavailable while wrapping</value></data>
+  <data name="NoImageMetadata" xml:space="preserve"><value>No embedded image metadata.</value></data>
+  <data name="ImageDecodeError" xml:space="preserve"><value>The image could not be decoded. {0}</value></data>
+  <data name="MediaOpenError" xml:space="preserve"><value>The media file could not be opened. {0}</value></data>
+  <data name="PdfEmptyError" xml:space="preserve"><value>The PDF contains no pages.</value></data>
+  <data name="PdfOpenError" xml:space="preserve"><value>The PDF could not be opened. Protected PDF files are not supported.</value></data>
+  <data name="PdfRenderError" xml:space="preserve"><value>The PDF page could not be rendered. {0}</value></data>
+  <data name="OfficeConvertError" xml:space="preserve"><value>Microsoft Office could not convert this document to PDF.</value></data>
+  <data name="CloudLoadError" xml:space="preserve"><value>The file could not be loaded. Error {0}.</value></data>
+  <data name="TextFileOpenError" xml:space="preserve"><value>The file could not be opened.</value></data>
+  <data name="TextFileSizeError" xml:space="preserve"><value>The file size could not be read.</value></data>
+  <data name="TextDecodeError" xml:space="preserve"><value>The text encoding could not be decoded.</value></data>
+  <data name="ArchiveReadError" xml:space="preserve"><value>The archive directory could not be read by the Windows ZIP handler.</value></data>
+  <data name="FolderReadError" xml:space="preserve"><value>The folder could not be read.</value></data>
+  <data name="FolderType" xml:space="preserve"><value>Folder</value></data>
+  <data name="FileType" xml:space="preserve"><value>File</value></data>
+  <data name="ExtensionFileType" xml:space="preserve"><value>{0} file</value></data>
+  <data name="EntryCount" xml:space="preserve"><value>{0} entries</value></data>
+  <data name="ListTruncated" xml:space="preserve"><value>List truncated</value></data>
+  <data name="UnknownTime" xml:space="preserve"><value>Unknown time</value></data>
+  <data name="CoreRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="CoreNotRunning" xml:space="preserve"><value>Not running</value></data>
+  <data name="SizesReset" xml:space="preserve"><value>Saved sizes reset</value></data>
+  <data name="SizesResetFailed" xml:space="preserve"><value>Could not reset saved sizes</value></data>
+
+  <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>Always on top</value></data>
+  <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>Pin file</value></data>
+  <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close preview</value></data>
+  <data name="LoadCloudFileText.Text" xml:space="preserve"><value>Load file</value></data>
+  <data name="AutoEncodingItem.Content" xml:space="preserve"><value>Auto encoding</value></data>
+  <data name="SystemAnsiItem.Content" xml:space="preserve"><value>System ANSI</value></data>
+  <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>Preview</value></data>
+  <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>Code</value></data>
+  <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>Play or pause</value></data>
+  <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mute or unmute</value></data>
+  <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Previous page</value></data>
+  <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Next page</value></data>
+  <data name="ArchiveNameHeader.Text" xml:space="preserve"><value>Name</value></data>
+  <data name="ArchiveTypeHeader.Text" xml:space="preserve"><value>Type</value></data>
+  <data name="ArchiveModifiedHeader.Text" xml:space="preserve"><value>Modified</value></data>
+  <data name="ArchiveSizeHeader.Text" xml:space="preserve"><value>Size</value></data>
+  <data name="SyntaxHighlightButton.ToolTipService.ToolTip" xml:space="preserve"><value>Syntax highlighting</value></data>
+  <data name="ZoomOutButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom out</value></data>
+  <data name="ZoomInButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom in</value></data>
+  <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>Rotate clockwise</value></data>
+  <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>Image metadata (EXIF)</value></data>
+  <data name="WordWrapButton.ToolTipService.ToolTip" xml:space="preserve"><value>Wrap long lines</value></data>
+  <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>Copy path</value></data>
+  <data name="OpenFolderButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open containing folder</value></data>
+  <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open with default application</value></data>
+
+  <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>General</value></data>
+  <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>Text preview</value></data>
+  <data name="PathCopyNavigationItem.Content" xml:space="preserve"><value>Path copy</value></data>
+  <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>Maintenance</value></data>
+  <data name="GeneralPageTitle.Text" xml:space="preserve"><value>General</value></data>
+  <data name="GeneralPageDescription.Text" xml:space="preserve"><value>Application startup and diagnostics</value></data>
+  <data name="LaunchTitle.Text" xml:space="preserve"><value>Launch at sign-in</value></data>
+  <data name="LaunchDescription.Text" xml:space="preserve"><value>Start Glance in the notification area</value></data>
+  <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>Diagnostics</value></data>
+  <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>Write basic logs and crash dumps</value></data>
+  <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Text preview</value></data>
+  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Editor appearance and layout</value></data>
+  <data name="FontFamilyLabel.Text" xml:space="preserve"><value>Font family</value></data>
+  <data name="FontSizeLabel.Text" xml:space="preserve"><value>Font size</value></data>
+  <data name="SyntaxHighlightingLabel.Text" xml:space="preserve"><value>Syntax highlighting</value></data>
+  <data name="LineNumbersLabel.Text" xml:space="preserve"><value>Line numbers</value></data>
+  <data name="WordWrapLabel.Text" xml:space="preserve"><value>Wrap long lines</value></data>
+  <data name="PathCopyPageTitle.Text" xml:space="preserve"><value>Path copy</value></data>
+  <data name="PathCopyPageDescription.Text" xml:space="preserve"><value>Format paths copied from preview windows</value></data>
+  <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>Quote copied paths</value></data>
+  <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>Wrap copied paths in double quotes</value></data>
+  <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix separators</value></data>
+  <data name="UnixPathSeparatorsDescription.Text" xml:space="preserve"><value>Replace backslashes with forward slashes</value></data>
+  <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>Maintenance</value></data>
+  <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>Runtime status and saved application state</value></data>
+  <data name="InputCoreLabel.Text" xml:space="preserve"><value>Input core</value></data>
+  <data name="RefreshCoreButton.ToolTipService.ToolTip" xml:space="preserve"><value>Refresh status</value></data>
+  <data name="WindowSizesLabel.Text" xml:space="preserve"><value>Preview window sizes</value></data>
+  <data name="WindowSizeResetStatusText.Text" xml:space="preserve"><value>Stored separately by preview type</value></data>
+  <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>Reset</value></data>
+  <data name="ExitButtonText.Text" xml:space="preserve"><value>Exit Glance</value></data>
+</root>

@@ -1,24 +1,40 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "appearance_preferences.h"
+#include "generic_file_info.h"
+#include "image_metadata_provider.h"
+#include "localization.h"
+#include "markdown_renderer.h"
+#include "media_metadata_provider.h"
+#include "path_copy_preferences.h"
+#include "syntax_highlighter.h"
+#include "window_size_store.h"
+#include "glance/contracts/diagnostics.h"
 #if __has_include("MainWindow.g.cpp")
 #include "MainWindow.g.cpp"
 #endif
 
 #include <microsoft.ui.xaml.window.h>
+#include <dwrite.h>
 #include <shellapi.h>
+#include <shlobj_core.h>
 #include <shlwapi.h>
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cwctype>
 #include <cmath>
 #include <filesystem>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
 using namespace Microsoft::UI::Xaml::Controls;
 using namespace Microsoft::UI::Xaml::Documents;
+using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
@@ -62,8 +78,21 @@ namespace winrt::Glance::App::implementation
 {
     MainWindow::MainWindow()
     {
+        glance::contracts::log_event(L"MainWindow InitializeComponent begin.");
         InitializeComponent();
+        glance::contracts::log_event(L"MainWindow InitializeComponent complete.");
+        ApplyAppearancePreferences();
         configure_window();
+        glance::contracts::log_event(L"MainWindow native configuration complete.");
+        media_timer_ = DispatcherTimer();
+        media_timer_.Interval(std::chrono::milliseconds(250));
+        const auto weak = get_weak();
+        media_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+            if (const auto self = weak.get())
+            {
+                self->update_media_controls();
+            }
+        });
     }
 
     void MainWindow::InitializeSession(std::uint64_t instance_id, StateCallback callback)
@@ -72,19 +101,60 @@ namespace winrt::Glance::App::implementation
         state_callback_ = std::move(callback);
     }
 
+    void MainWindow::ApplyAppearancePreferences()
+    {
+        RootGrid().RequestedTheme(glance::app::element_theme(
+            glance::app::load_appearance_preferences().theme));
+        if (!current_text_.empty())
+        {
+            render_text_content();
+            if (current_text_markdown_)
+            {
+                render_markdown();
+            }
+        }
+    }
+
     void MainWindow::configure_window()
     {
+        glance::contracts::log_event(L"Resolving the native window handle.");
         const auto window_native = this->try_as<::IWindowNative>();
         check_hresult(window_native->get_WindowHandle(&window_));
 
+        glance::contracts::log_event(L"Applying native window styles.");
         LONG_PTR extended_style = GetWindowLongPtrW(window_, GWL_EXSTYLE);
         extended_style |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
         SetWindowLongPtrW(window_, GWL_EXSTYLE, extended_style);
+
+        LONG_PTR window_style = GetWindowLongPtrW(window_, GWL_STYLE);
+        window_style &= ~(WS_SYSMENU | WS_MINIMIZEBOX);
+        SetWindowLongPtrW(window_, GWL_STYLE, window_style);
         SetWindowSubclass(window_, window_subclass, 1, reinterpret_cast<DWORD_PTR>(this));
 
+        if (const auto presenter = AppWindow().Presenter().try_as<Microsoft::UI::Windowing::OverlappedPresenter>())
+        {
+            presenter.IsMinimizable(false);
+            presenter.IsMaximizable(true);
+            presenter.SetBorderAndTitleBar(true, false);
+        }
+
+        glance::contracts::log_event(L"Enabling the custom title bar.");
         ExtendsContentIntoTitleBar(true);
+        glance::contracts::log_event(L"Assigning the title bar drag region.");
         SetTitleBar(TitleBarDragRegion());
-        Title(L"Glance");
+        glance::contracts::log_event(L"Refreshing the native window frame.");
+        SetWindowPos(
+            window_,
+            nullptr,
+            0,
+            0,
+            0,
+            0,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        glance::contracts::log_event(L"Assigning the window title.");
+        const std::wstring window_title = glance::app::localize(L"AppName");
+        SetWindowTextW(window_, window_title.c_str());
+        glance::contracts::log_event(L"Priming the hidden preview window.");
         ShowWindow(window_, SW_SHOWNOACTIVATE);
         ShowWindow(window_, SW_HIDE);
     }
@@ -113,6 +183,7 @@ namespace winrt::Glance::App::implementation
         if (message == WM_EXITSIZEMOVE && self != nullptr)
         {
             self->user_sized_ = true;
+            self->save_current_window_size();
         }
         if (message == WM_SYSCOMMAND && self != nullptr &&
             (wparam & 0xFFF0U) == SC_MAXIMIZE)
@@ -121,7 +192,13 @@ namespace winrt::Glance::App::implementation
         }
         if (message == WM_NCDESTROY && self != nullptr)
         {
+            glance::contracts::log_event(L"MainWindow received WM_NCDESTROY.");
             RemoveWindowSubclass(window, window_subclass, 1);
+            self->stop_detached_focus_monitor();
+            if (self->media_timer_ != nullptr)
+            {
+                self->media_timer_.Stop();
+            }
             if (!self->office_temp_pdf_.empty())
             {
                 DeleteFileW(self->office_temp_pdf_.c_str());
@@ -154,6 +231,8 @@ namespace winrt::Glance::App::implementation
             pinned_ = false;
             detached_ = false;
             user_sized_ = false;
+            TopmostButton().IsChecked(false);
+            PinButton().IsChecked(false);
         }
         visible_ = true;
 
@@ -188,6 +267,7 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        stop_media_playback();
         visible_ = false;
         ShowWindow(window_, SW_HIDE);
         state_ = glance::contracts::PreviewWindowState::hidden;
@@ -197,30 +277,70 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void MainWindow::position_initial_window()
+    void MainWindow::position_initial_window(bool ignore_saved_size)
     {
         HMONITOR monitor = MonitorFromWindow(source_window_ != nullptr ? source_window_ : GetForegroundWindow(), MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{ sizeof(MONITORINFO) };
         GetMonitorInfoW(monitor, &info);
 
         const UINT dpi = source_window_ != nullptr ? GetDpiForWindow(source_window_) : 96;
-        const int desired_width = MulDiv(files_.size() > 1 ? 920 : 720, static_cast<int>(dpi), 96);
-        const int desired_height = MulDiv(520, static_cast<int>(dpi), 96);
+        int desired_width = MulDiv(files_.size() > 1 ? 920 : 720, static_cast<int>(dpi), 96);
+        int desired_height = MulDiv(520, static_cast<int>(dpi), 96);
+        if (!ignore_saved_size)
+        {
+            if (const auto saved_size = glance::app::load_window_size(current_kind_))
+            {
+                desired_width = MulDiv(saved_size->cx, static_cast<int>(dpi), 96);
+                desired_height = MulDiv(saved_size->cy, static_cast<int>(dpi), 96);
+            }
+        }
         const int work_width = info.rcWork.right - info.rcWork.left;
         const int work_height = info.rcWork.bottom - info.rcWork.top;
-        const int width = std::min(desired_width, work_width);
-        const int height = std::min(desired_height, work_height);
+        const int minimum_width = MulDiv(480, static_cast<int>(dpi), 96);
+        const int minimum_height = MulDiv(320, static_cast<int>(dpi), 96);
+        const int width = std::clamp(desired_width, std::min(minimum_width, work_width), work_width);
+        const int height = std::clamp(desired_height, std::min(minimum_height, work_height), work_height);
         const int x = info.rcWork.left + (work_width - width) / 2;
         const int y = info.rcWork.top + (work_height - height) / 2;
 
         SetWindowPos(
             window_,
-            topmost_ ? HWND_TOPMOST : HWND_TOP,
+            HWND_TOPMOST,
             x,
             y,
             width,
             height,
             SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        if (!topmost_)
+        {
+            SetWindowPos(
+                window_,
+                HWND_NOTOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    }
+
+    void MainWindow::save_current_window_size() const noexcept
+    {
+        if (!visible_ || window_ == nullptr || IsZoomed(window_))
+        {
+            return;
+        }
+        RECT bounds{};
+        if (!GetWindowRect(window_, &bounds))
+        {
+            return;
+        }
+        const UINT dpi = GetDpiForWindow(window_);
+        glance::app::save_window_size(
+            current_kind_,
+            SIZE{
+                MulDiv(bounds.right - bounds.left, 96, static_cast<int>(dpi)),
+                MulDiv(bounds.bottom - bounds.top, 96, static_cast<int>(dpi)) });
     }
 
     void MainWindow::present_file(std::uint32_t index)
@@ -240,15 +360,27 @@ namespace winrt::Glance::App::implementation
 
         const bool from_explorer = source_kind_ == 1;
         OpenFolderButton().Visibility(from_explorer ? Visibility::Collapsed : Visibility::Visible);
-        OpenDefaultButton().Visibility(from_explorer ? Visibility::Collapsed : Visibility::Visible);
+        OpenDefaultButton().Visibility(file.path.empty() ? Visibility::Collapsed : Visibility::Visible);
 
         if (file.is_cloud_placeholder || file.path.empty())
         {
+            current_kind_ = glance::app::PreviewKind::generic;
             present_generic(file);
             return;
         }
 
+        if ((file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+        {
+            current_kind_ = glance::app::PreviewKind::archive;
+            show_content_panel(current_kind_);
+            ArchiveStatusText().Text(glance::app::localize(L"LoadingFolder"));
+            ArchiveEntryList().Items().Clear();
+            load_directory_async(file.path, generation);
+            return;
+        }
+
         const auto kind = glance::app::resolve_preview_kind(file.path);
+        current_kind_ = kind;
         switch (kind)
         {
         case glance::app::PreviewKind::text:
@@ -260,19 +392,38 @@ namespace winrt::Glance::App::implementation
         case glance::app::PreviewKind::image:
             show_content_panel(kind);
             image_rotation_ = 0;
+            image_panning_ = false;
+            image_metadata_.clear();
+            image_metadata_visible_ = false;
             ImageTransform().Rotation(image_rotation_);
             ImagePreview().Source(nullptr);
+            ImageExifButton().IsChecked(false);
+            ImageMetadataText().Text(L"");
             ImageMetadataOverlay().Visibility(Visibility::Collapsed);
             static_cast<void>(ImageScroller().ChangeView(nullptr, nullptr, 1.0F, true));
             load_image_async(file.path, generation);
+            load_image_metadata_async(file.path, generation);
             break;
         case glance::app::PreviewKind::media:
             show_content_panel(kind);
+            MediaCoverImage().Source(nullptr);
+            MediaCoverImage().Visibility(Visibility::Collapsed);
+            MediaCoverPlaceholder().Visibility(Visibility::Visible);
+            MediaTitleText().Text(file.display_name);
+            MediaAlbumText().Text(L"");
+            MediaArtistText().Text(L"");
+            media_dimensions_.clear();
+            media_technical_info_.clear();
+            media_controls_idle_ticks_ = 0;
+            show_media_controls();
             load_media_async(file.path, generation);
             break;
         case glance::app::PreviewKind::pdf:
             show_content_panel(kind);
-            PdfPageText().Text(L"Loading...");
+            pdf_wheel_delta_ = 0;
+            PdfPageText().Text(glance::app::localize(L"Loading"));
+            PdfLoadingText().Text(glance::app::localize(L"LoadingPdf"));
+            PdfLoadingOverlay().Visibility(Visibility::Visible);
             load_pdf_async(file.path, generation);
             break;
         case glance::app::PreviewKind::archive:
@@ -284,7 +435,7 @@ namespace winrt::Glance::App::implementation
                     TRUE) == CSTR_EQUAL)
             {
                 show_content_panel(kind);
-                ArchiveStatusText().Text(L"Loading directory...");
+                ArchiveStatusText().Text(glance::app::localize(L"LoadingArchive"));
                 ArchiveEntryList().Items().Clear();
                 load_archive_async(file.path, generation);
             }
@@ -295,7 +446,10 @@ namespace winrt::Glance::App::implementation
             break;
         case glance::app::PreviewKind::office:
             show_content_panel(glance::app::PreviewKind::pdf);
-            PdfPageText().Text(L"Converting with Microsoft Office...");
+            pdf_wheel_delta_ = 0;
+            PdfPageText().Text(L"1 / 1");
+            PdfLoadingText().Text(glance::app::localize(L"ConvertingOffice"));
+            PdfLoadingOverlay().Visibility(Visibility::Visible);
             load_office_async(file.path, generation);
             break;
         default:
@@ -306,37 +460,74 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::present_generic(const glance::app::PreviewFile& file)
     {
+        current_kind_ = glance::app::PreviewKind::generic;
         show_content_panel(glance::app::PreviewKind::generic);
         FileNameText().Text(file.display_name);
         FilePathText().Text(!file.path.empty() ? file.path : file.parsing_name);
         FileMetadataText().Text(formatted_size(file.size) + L"  |  " + formatted_time(file.last_write_time));
+        GenericAdvancedInfoText().Text(L"");
+        GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
         LoadCloudFileButton().Visibility(file.is_cloud_placeholder ? Visibility::Visible : Visibility::Collapsed);
         ErrorText().Visibility(Visibility::Collapsed);
+        if (!file.path.empty() && !file.is_cloud_placeholder &&
+            (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+        {
+            load_generic_file_info_async(file.path, content_generation_);
+        }
+    }
+
+    fire_and_forget MainWindow::load_generic_file_info_async(std::wstring path, std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        auto info = glance::app::load_generic_file_info(path);
+        static_cast<void>(dispatcher.TryEnqueue([lifetime, generation, info = std::move(info)]() mutable {
+            if (generation != lifetime->content_generation_ || info.empty())
+            {
+                return;
+            }
+            lifetime->GenericAdvancedInfoText().Text(std::move(info));
+            lifetime->GenericAdvancedInfoScroller().Visibility(Visibility::Visible);
+        }));
     }
 
     void MainWindow::present_text(const glance::app::PreviewFile& file, bool markdown)
     {
+        current_kind_ = markdown ? glance::app::PreviewKind::markdown : glance::app::PreviewKind::text;
         show_content_panel(markdown ? glance::app::PreviewKind::markdown : glance::app::PreviewKind::text);
         current_text_.clear();
+        current_text_path_ = file.path;
+        current_text_markdown_ = markdown;
+        current_text_encoding_ = glance::app::TextEncoding::automatic;
         markdown_preview_ = markdown;
-        TextPreviewBox().Text(L"Loading...");
-        TextPreviewBox().Visibility(markdown ? Visibility::Collapsed : Visibility::Visible);
-        MarkdownPreviewScroller().Visibility(markdown ? Visibility::Visible : Visibility::Collapsed);
-        MarkdownModeButton().Visibility(markdown ? Visibility::Visible : Visibility::Collapsed);
-        MarkdownModeButton().Content(box_value(markdown ? L"Code" : L"Preview"));
-        MarkdownPreviewText().Blocks().Clear();
-        load_text_async(file.path, markdown, content_generation_);
+        updating_encoding_selector_ = true;
+        AutoEncodingItem().Content(box_value(glance::app::localize(L"AutoEncoding")));
+        EncodingSelector().SelectedIndex(0);
+        updating_encoding_selector_ = false;
+        apply_text_preferences();
+        current_text_ = glance::app::localize(L"Loading");
+        render_text_content();
+        LineNumberText().Text(L"");
+        MarkdownModeButtons().Visibility(markdown ? Visibility::Visible : Visibility::Collapsed);
+        set_markdown_preview_mode(markdown);
+        if (markdown)
+        {
+            MarkdownPreviewWebView().Opacity(0.0);
+        }
+        load_text_async(file.path, markdown, content_generation_, current_text_encoding_);
     }
 
     fire_and_forget MainWindow::load_text_async(
         std::wstring path,
         bool markdown,
-        std::uint64_t generation)
+        std::uint64_t generation,
+        glance::app::TextEncoding encoding)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
-        auto preview = glance::app::load_text_preview(path);
+        auto preview = glance::app::load_text_preview(path, 8U * 1024U * 1024U, encoding);
         static_cast<void>(dispatcher.TryEnqueue(
             [lifetime, preview = std::move(preview), markdown, generation]() mutable {
                 lifetime->apply_text_preview(std::move(preview), markdown, generation);
@@ -356,9 +547,7 @@ namespace winrt::Glance::App::implementation
             co_await bitmap.SetSourceAsync(stream);
             const auto width = properties.Width() != 0 ? properties.Width() : static_cast<std::uint32_t>(bitmap.PixelWidth());
             const auto height = properties.Height() != 0 ? properties.Height() : static_cast<std::uint32_t>(bitmap.PixelHeight());
-            const std::wstring camera = std::wstring(properties.CameraManufacturer()) +
-                (properties.CameraModel().empty() ? L"" : L" " + std::wstring(properties.CameraModel()));
-            static_cast<void>(dispatcher.TryEnqueue([lifetime, bitmap, generation, width, height, camera] {
+            static_cast<void>(dispatcher.TryEnqueue([lifetime, bitmap, generation, width, height] {
                 if (generation != lifetime->content_generation_)
                 {
                     return;
@@ -369,46 +558,205 @@ namespace winrt::Glance::App::implementation
                 {
                     const auto& current = lifetime->files_[lifetime->current_index_];
                     lifetime->FooterMetadataText().Text(
-                        lifetime->formatted_size(current.size) + L"  |  " +
-                        std::to_wstring(width) + L" x " + std::to_wstring(height));
+                        lifetime->formatted_size(current.size)
+                        + L"  |  " + lifetime->formatted_time(current.last_write_time)
+                        + L"  |  " + std::to_wstring(width) + L" x " + std::to_wstring(height));
                 }
-                lifetime->ImageMetadataText().Text(
-                    std::to_wstring(width) + L" x " + std::to_wstring(height) +
-                    (camera.empty() ? L"" : L"\n" + camera));
-                lifetime->ImageMetadataOverlay().Visibility(Visibility::Visible);
             }));
         }
         catch (const hresult_error& error)
         {
-            const std::wstring message = L"The image could not be decoded. " + std::wstring(error.message());
+            const auto message = glance::app::localize_format(L"ImageDecodeError", { error.message() });
             static_cast<void>(dispatcher.TryEnqueue([lifetime, message, generation] {
                 lifetime->show_provider_error(message, generation);
             }));
         }
     }
 
-    fire_and_forget MainWindow::load_media_async(std::wstring path, std::uint64_t generation)
+    fire_and_forget MainWindow::load_image_metadata_async(std::wstring path, std::uint64_t generation)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        auto metadata = glance::app::load_image_metadata(path);
+        static_cast<void>(dispatcher.TryEnqueue(
+            [lifetime, metadata = std::move(metadata), generation]() mutable {
+                if (generation != lifetime->content_generation_)
+                {
+                    return;
+                }
+                lifetime->image_metadata_ = std::move(metadata);
+                lifetime->ImageMetadataText().Text(
+                    lifetime->image_metadata_.empty()
+                        ? glance::app::localize(L"NoImageMetadata")
+                        : lifetime->image_metadata_);
+                lifetime->update_image_metadata_visibility();
+            }));
+    }
+
+    fire_and_forget MainWindow::load_media_async(std::wstring path, std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
         try
         {
             const auto file = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
             const auto source = Windows::Media::Core::MediaSource::CreateFromStorageFile(file);
-            static_cast<void>(dispatcher.TryEnqueue([lifetime, source, generation] {
-                if (generation == lifetime->content_generation_)
+            if (generation != content_generation_)
+            {
+                co_return;
+            }
+
+            auto extension = std::filesystem::path(path).extension().wstring();
+            std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+                return static_cast<wchar_t>(std::towlower(value));
+            });
+            static constexpr std::array audio_extensions{
+                std::wstring_view(L".mp3"), std::wstring_view(L".flac"), std::wstring_view(L".wav"),
+                std::wstring_view(L".m4a"), std::wstring_view(L".aac"), std::wstring_view(L".ogg") };
+            media_is_audio_ = std::ranges::find(audio_extensions, extension) != audio_extensions.end();
+            AudioMetadataPanel().Visibility(media_is_audio_ ? Visibility::Visible : Visibility::Collapsed);
+            MediaPreview().Visibility(media_is_audio_ ? Visibility::Collapsed : Visibility::Visible);
+            if (media_is_audio_)
+            {
+                MediaPanel().Background(Application::Current().Resources().Lookup(
+                    box_value(L"SolidBackgroundFillColorBaseBrush")).as<Media::Brush>());
+                MediaControlsOverlay().Background(Application::Current().Resources().Lookup(
+                    box_value(L"LayerFillColorDefaultBrush")).as<Media::Brush>());
+                MediaPlayPauseIcon().ClearValue(IconElement::ForegroundProperty());
+                MediaMuteIcon().ClearValue(IconElement::ForegroundProperty());
+                MediaTimeText().ClearValue(TextBlock::ForegroundProperty());
+            }
+            else
+            {
+                MediaPanel().Background(Media::SolidColorBrush(Windows::UI::Color{ 255, 0, 0, 0 }));
+                MediaControlsOverlay().Background(Media::SolidColorBrush(Windows::UI::Color{ 153, 0, 0, 0 }));
+                const auto white = Media::SolidColorBrush(Windows::UI::Color{ 255, 255, 255, 255 });
+                MediaPlayPauseIcon().Foreground(white);
+                MediaMuteIcon().Foreground(white);
+                MediaTimeText().Foreground(white);
+            }
+            MediaPreview().Source(source);
+            MediaPreview().MediaPlayer().Volume(MediaVolumeSlider().Value() / 100.0);
+            MediaPreview().MediaPlayer().Play();
+            media_timer_.Start();
+
+            std::uint64_t native_bitrate{};
+            if (media_is_audio_)
+            {
+                try
                 {
-                    lifetime->MediaPreview().Source(source);
+                    const auto properties = co_await file.Properties().GetMusicPropertiesAsync();
+                    if (generation != content_generation_)
+                    {
+                        co_return;
+                    }
+                    const std::wstring title = properties.Title().empty()
+                        ? std::filesystem::path(path).stem().wstring()
+                        : std::wstring(properties.Title());
+                    std::wstring artist(properties.Artist());
+                    if (artist.empty())
+                    {
+                        artist = std::wstring(properties.AlbumArtist());
+                    }
+                    native_bitrate = properties.Bitrate();
+                    MediaTitleText().Text(title);
+                    MediaAlbumText().Text(properties.Album());
+                    MediaArtistText().Text(artist);
+
+                    const auto thumbnail = co_await file.GetThumbnailAsync(
+                        Windows::Storage::FileProperties::ThumbnailMode::MusicView,
+                        320);
+                    if (generation == content_generation_ && thumbnail != nullptr && thumbnail.Size() > 0)
+                    {
+                        Microsoft::UI::Xaml::Media::Imaging::BitmapImage bitmap;
+                        co_await bitmap.SetSourceAsync(thumbnail);
+                        if (generation == content_generation_)
+                        {
+                            MediaCoverImage().Source(bitmap);
+                            MediaCoverImage().Visibility(Visibility::Visible);
+                            MediaCoverPlaceholder().Visibility(Visibility::Collapsed);
+                        }
+                    }
                 }
-            }));
+                catch (const hresult_error&)
+                {
+                    MediaTitleText().Text(std::filesystem::path(path).stem().wstring());
+                }
+            }
+            else
+            {
+                try
+                {
+                    const auto properties = co_await file.Properties().GetVideoPropertiesAsync();
+                    if (generation != content_generation_ || current_index_ >= files_.size())
+                    {
+                        co_return;
+                    }
+                    native_bitrate = properties.Bitrate();
+                    if (properties.Width() > 0 && properties.Height() > 0)
+                    {
+                        media_dimensions_ = std::to_wstring(properties.Width())
+                            + L" x " + std::to_wstring(properties.Height());
+                    }
+                    update_media_footer();
+                }
+                catch (const hresult_error&)
+                {
+                }
+            }
+            load_media_technical_metadata_async(path, generation, media_is_audio_, native_bitrate);
         }
         catch (const hresult_error& error)
         {
-            const std::wstring message = L"The media file could not be opened. " + std::wstring(error.message());
-            static_cast<void>(dispatcher.TryEnqueue([lifetime, message, generation] {
-                lifetime->show_provider_error(message, generation);
-            }));
+            const auto message = glance::app::localize_format(L"MediaOpenError", { error.message() });
+            lifetime->show_provider_error(message, generation);
         }
+    }
+
+    fire_and_forget MainWindow::load_media_technical_metadata_async(
+        std::wstring path,
+        std::uint64_t generation,
+        bool audio,
+        std::uint64_t fallback_bitrate)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        auto metadata = glance::app::probe_media_metadata(path, audio);
+        if (metadata.bitrate == 0)
+        {
+            metadata.bitrate = fallback_bitrate;
+        }
+        auto formatted = glance::app::format_media_metadata(metadata, audio);
+        static_cast<void>(dispatcher.TryEnqueue(
+            [lifetime, generation, formatted = std::move(formatted)]() mutable {
+                if (generation != lifetime->content_generation_)
+                {
+                    return;
+                }
+                lifetime->media_technical_info_ = std::move(formatted);
+                lifetime->update_media_footer();
+            }));
+    }
+
+    void MainWindow::update_media_footer()
+    {
+        if (current_index_ >= files_.size())
+        {
+            return;
+        }
+        const auto& file = files_[current_index_];
+        std::wstring metadata = formatted_size(file.size)
+            + L"  |  " + formatted_time(file.last_write_time);
+        if (!media_dimensions_.empty())
+        {
+            metadata += L"  |  " + media_dimensions_;
+        }
+        if (!media_technical_info_.empty())
+        {
+            metadata += L"  |  " + media_technical_info_;
+        }
+        FooterMetadataText().Text(metadata);
     }
 
     fire_and_forget MainWindow::load_pdf_async(std::wstring path, std::uint64_t generation)
@@ -426,7 +774,7 @@ namespace winrt::Glance::App::implementation
             pdf_page_index_ = 0;
             if (document.PageCount() == 0)
             {
-                show_provider_error(L"The PDF contains no pages.", generation);
+                show_provider_error(glance::app::localize(L"PdfEmptyError"), generation);
                 co_return;
             }
             render_pdf_page_async(pdf_page_index_, generation);
@@ -434,7 +782,7 @@ namespace winrt::Glance::App::implementation
         catch (const hresult_error&)
         {
             show_provider_error(
-                L"The PDF could not be opened. Protected PDF files are not supported.",
+                glance::app::localize(L"PdfOpenError"),
                 generation);
         }
     }
@@ -461,13 +809,14 @@ namespace winrt::Glance::App::implementation
                 co_return;
             }
             PdfPageImage().Source(bitmap);
+            PdfLoadingOverlay().Visibility(Visibility::Collapsed);
             PdfPageText().Text(
                 std::to_wstring(page_index + 1) + L" / " + std::to_wstring(pdf_document_.PageCount()));
         }
         catch (const hresult_error& error)
         {
             show_provider_error(
-                L"The PDF page could not be rendered. " + std::wstring(error.message()),
+                glance::app::localize_format(L"PdfRenderError", { error.message() }),
                 generation);
         }
     }
@@ -478,6 +827,18 @@ namespace winrt::Glance::App::implementation
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
         auto preview = glance::app::load_shell_archive_preview(path);
+        static_cast<void>(dispatcher.TryEnqueue(
+            [lifetime, preview = std::move(preview), generation]() mutable {
+                lifetime->apply_archive_preview(std::move(preview), generation);
+            }));
+    }
+
+    fire_and_forget MainWindow::load_directory_async(std::wstring path, std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        auto preview = glance::app::load_directory_preview(path);
         static_cast<void>(dispatcher.TryEnqueue(
             [lifetime, preview = std::move(preview), generation]() mutable {
                 lifetime->apply_archive_preview(std::move(preview), generation);
@@ -502,14 +863,49 @@ namespace winrt::Glance::App::implementation
         items.Clear();
         for (const auto& entry : preview.entries)
         {
-            std::wstring text = entry.is_folder
-                ? L"[Folder]  " + entry.name
-                : entry.name + L"    " + formatted_size(entry.size);
-            items.Append(box_value(text));
+            Grid row;
+            ColumnDefinition icon_column;
+            icon_column.Width(GridLength{ 28, GridUnitType::Pixel });
+            row.ColumnDefinitions().Append(icon_column);
+            ColumnDefinition name_column;
+            name_column.Width(GridLength{ 1, GridUnitType::Star });
+            row.ColumnDefinitions().Append(name_column);
+            for (const double width : { 110.0, 150.0, 90.0 })
+            {
+                ColumnDefinition column;
+                column.Width(GridLength{ width, GridUnitType::Pixel });
+                row.ColumnDefinitions().Append(column);
+            }
+
+            FontIcon icon;
+            icon.FontSize(13);
+            icon.Glyph(entry.is_folder ? L"\xE8B7" : L"\xE8A5");
+            icon.HorizontalAlignment(HorizontalAlignment::Left);
+            Grid::SetColumn(icon, 0);
+            row.Children().Append(icon);
+
+            const auto append_text = [&row](std::wstring_view value, int column, TextAlignment alignment = TextAlignment::Left) {
+                TextBlock text;
+                text.Text(value);
+                text.FontSize(12);
+                text.VerticalAlignment(VerticalAlignment::Center);
+                text.TextAlignment(alignment);
+                text.TextTrimming(TextTrimming::CharacterEllipsis);
+                Grid::SetColumn(text, column);
+                row.Children().Append(text);
+            };
+            append_text(entry.name, 1);
+            append_text(entry.type_name, 2);
+            append_text(entry.modified_time == 0 ? L"" : formatted_time(entry.modified_time), 3);
+            append_text(entry.is_folder ? L"" : formatted_size(entry.size), 4, TextAlignment::Right);
+
+            ListViewItem item;
+            item.Content(row);
+            items.Append(item);
         }
         ArchiveStatusText().Text(
-            std::to_wstring(preview.entries.size()) + L" entries" +
-            (preview.truncated ? L"  |  List truncated" : L""));
+            glance::app::localize_format(L"EntryCount", { std::to_wstring(preview.entries.size()) }) +
+            (preview.truncated ? L"  |  " + glance::app::localize(L"ListTruncated") : L""));
     }
 
     fire_and_forget MainWindow::load_office_async(std::wstring path, std::uint64_t generation)
@@ -567,7 +963,7 @@ namespace winrt::Glance::App::implementation
             if (!succeeded)
             {
                 lifetime->show_provider_error(
-                    L"Microsoft Office could not convert this document to PDF.",
+                    glance::app::localize(L"OfficeConvertError"),
                     generation);
                 return;
             }
@@ -576,7 +972,7 @@ namespace winrt::Glance::App::implementation
                 DeleteFileW(lifetime->office_temp_pdf_.c_str());
             }
             lifetime->office_temp_pdf_ = output;
-            lifetime->PdfPageText().Text(L"Loading converted document...");
+            lifetime->PdfPageText().Text(L"1 / 1");
             lifetime->load_pdf_async(output, generation);
         }));
     }
@@ -592,72 +988,286 @@ namespace winrt::Glance::App::implementation
         }
         if (!preview.error.empty())
         {
-            TextPreviewBox().Text(preview.error);
-            TextPreviewBox().Visibility(Visibility::Visible);
-            MarkdownPreviewScroller().Visibility(Visibility::Collapsed);
+            current_text_ = std::move(preview.error);
+            render_text_content();
+            LineNumberText().Text(L"");
+            TextPreviewScroller().Visibility(Visibility::Visible);
+            MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
             return;
         }
 
         current_text_ = std::move(preview.content);
-        TextEncodingText().Text(
-            preview.encoding + (preview.truncated ? L"  |  Preview truncated at 8 MB" : L""));
-
-        std::size_t line_count = 1;
-        line_count += static_cast<std::size_t>(std::ranges::count(current_text_, L'\n'));
-        const auto number_width = std::to_wstring(line_count).size();
-        std::wstringstream input(current_text_);
-        std::wostringstream numbered;
-        std::wstring line;
-        std::size_t line_number = 1;
-        while (std::getline(input, line))
+        if (current_text_encoding_ == glance::app::TextEncoding::automatic)
         {
-            numbered << std::setw(static_cast<int>(number_width)) << line_number++ << L"  " << line << L'\n';
+            AutoEncodingItem().Content(box_value(
+                glance::app::localize_format(L"AutoEncodingDetected", { preview.encoding })));
         }
-        TextPreviewBox().Text(numbered.str());
+        TextEncodingText().Text(preview.truncated ? glance::app::localize(L"PreviewTruncated") : L"");
+
+        render_text_content();
+        update_line_numbers();
+        update_line_number_visibility();
 
         if (markdown)
         {
             render_markdown();
-            TextPreviewBox().Visibility(markdown_preview_ ? Visibility::Collapsed : Visibility::Visible);
-            MarkdownPreviewScroller().Visibility(markdown_preview_ ? Visibility::Visible : Visibility::Collapsed);
+            set_markdown_preview_mode(markdown_preview_);
         }
     }
 
     void MainWindow::render_markdown()
     {
-        auto blocks = MarkdownPreviewText().Blocks();
-        blocks.Clear();
-        std::wistringstream input(current_text_);
-        std::wstring line;
-        bool code_block{};
-        while (std::getline(input, line))
-        {
-            if (line.starts_with(L"```"))
-            {
-                code_block = !code_block;
-                continue;
-            }
+        const auto html = glance::app::render_markdown_html(
+            current_text_,
+            RootGrid().ActualTheme() == ElementTheme::Dark);
+        const auto generation = content_generation_;
+        const auto weak = get_weak();
+        static_cast<void>(DispatcherQueue().TryEnqueue(
+            [weak, html, generation] {
+                if (const auto self = weak.get();
+                    self != nullptr && generation == self->content_generation_)
+                {
+                    self->render_markdown_async(html, generation);
+                }
+            }));
+    }
 
-            Paragraph paragraph;
-            Run run;
-            std::size_t heading_level{};
-            while (heading_level < line.size() && heading_level < 6 && line[heading_level] == L'#')
+    fire_and_forget MainWindow::render_markdown_async(std::wstring html, std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        try
+        {
+            co_await MarkdownPreviewWebView().EnsureCoreWebView2Async();
+            if (generation != content_generation_)
             {
-                ++heading_level;
+                co_return;
             }
-            if (heading_level > 0 && heading_level < line.size() && line[heading_level] == L' ')
-            {
-                line.erase(0, heading_level + 1);
-                run.FontSize(28.0 - static_cast<double>(heading_level) * 2.5);
-            }
-            if (code_block)
-            {
-                run.FontFamily(Media::FontFamily(L"Cascadia Mono, Consolas"));
-            }
-            run.Text(line.empty() ? L" " : line);
-            paragraph.Inlines().Append(run);
-            blocks.Append(paragraph);
+            MarkdownPreviewWebView().NavigateToString(html);
+            MarkdownPreviewWebView().Opacity(1.0);
         }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(
+                L"Markdown WebView initialization failed: " + std::wstring(error.message()));
+            if (generation == content_generation_)
+            {
+                set_markdown_preview_mode(false);
+            }
+        }
+    }
+
+    void MainWindow::render_text_content()
+    {
+        auto blocks = TextContentRichText().Blocks();
+        blocks.Clear();
+        Paragraph paragraph;
+        const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
+        paragraph.LineHeight(line_height);
+        paragraph.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
+        LineNumberText().LineHeight(line_height);
+
+        const bool use_highlighting = syntax_highlighting_ && current_text_.size() <= 1024U * 1024U;
+        if (use_highlighting)
+        {
+            auto extension = std::filesystem::path(current_text_path_).extension().wstring();
+            std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+                return static_cast<wchar_t>(std::towlower(value));
+            });
+            const bool dark = RootGrid().ActualTheme() == ElementTheme::Dark;
+            const auto brush = [dark](glance::app::SyntaxStyle style) -> Media::Brush {
+                Windows::UI::Color color{};
+                color.A = 255;
+                switch (style)
+                {
+                case glance::app::SyntaxStyle::keyword:
+                    color.R = dark ? 86 : 0;
+                    color.G = dark ? 156 : 95;
+                    color.B = dark ? 214 : 184;
+                    break;
+                case glance::app::SyntaxStyle::string:
+                    color.R = dark ? 206 : 16;
+                    color.G = dark ? 145 : 124;
+                    color.B = dark ? 120 : 16;
+                    break;
+                case glance::app::SyntaxStyle::comment:
+                    color.R = dark ? 106 : 107;
+                    color.G = dark ? 153 : 107;
+                    color.B = dark ? 85 : 107;
+                    break;
+                case glance::app::SyntaxStyle::number:
+                    color.R = dark ? 181 : 156;
+                    color.G = dark ? 206 : 101;
+                    color.B = dark ? 168 : 0;
+                    break;
+                case glance::app::SyntaxStyle::directive:
+                    color.R = dark ? 197 : 164;
+                    color.G = dark ? 134 : 38;
+                    color.B = dark ? 192 : 44;
+                    break;
+                default:
+                    return nullptr;
+                }
+                return Media::SolidColorBrush(color);
+            };
+            for (const auto& span : glance::app::highlight_source(current_text_, extension))
+            {
+                Run run;
+                run.Text(span.text);
+                if (const auto foreground = brush(span.style))
+                {
+                    run.Foreground(foreground);
+                }
+                paragraph.Inlines().Append(run);
+            }
+        }
+        else
+        {
+            Run run;
+            run.Text(current_text_.empty() ? L" " : current_text_);
+            paragraph.Inlines().Append(run);
+        }
+        blocks.Append(paragraph);
+    }
+
+    void MainWindow::apply_text_preferences()
+    {
+        text_preferences_ = glance::app::load_text_preferences();
+        line_numbers_visible_ = text_preferences_.line_numbers;
+        syntax_highlighting_ = text_preferences_.syntax_highlighting;
+        word_wrap_ = text_preferences_.word_wrap;
+        const Media::FontFamily font(text_preferences_.font_family);
+        TextContentRichText().FontFamily(font);
+        TextContentRichText().FontSize(text_preferences_.font_size);
+        LineNumberText().FontFamily(font);
+        LineNumberText().FontSize(text_preferences_.font_size);
+        SyntaxHighlightButton().IsChecked(syntax_highlighting_);
+        WordWrapButton().IsChecked(word_wrap_);
+        update_text_layout();
+        update_line_number_visibility();
+    }
+
+    void MainWindow::update_text_layout()
+    {
+        TextContentRichText().TextWrapping(word_wrap_ ? TextWrapping::Wrap : TextWrapping::NoWrap);
+        TextPreviewScroller().HorizontalScrollMode(
+            word_wrap_ ? ScrollMode::Disabled : ScrollMode::Enabled);
+        TextPreviewScroller().HorizontalScrollBarVisibility(
+            word_wrap_ ? ScrollBarVisibility::Disabled : ScrollBarVisibility::Auto);
+        TextContentRichText().Width(
+            word_wrap_
+                ? std::max(1.0, TextPreviewScroller().ActualWidth() - LineNumberGutter().ActualWidth())
+                : std::numeric_limits<double>::quiet_NaN());
+        update_line_numbers();
+        update_line_number_visibility();
+    }
+
+    void MainWindow::update_line_numbers()
+    {
+        if (current_text_.empty())
+        {
+            LineNumberText().Text(L"");
+            return;
+        }
+
+        const auto simple_numbers = [this] {
+            const std::size_t line_count = 1
+                + static_cast<std::size_t>(std::ranges::count(current_text_, L'\n'));
+            std::wostringstream output;
+            for (std::size_t line = 1; line <= line_count; ++line)
+            {
+                if (line > 1)
+                {
+                    output << L'\n';
+                }
+                output << line;
+            }
+            return output.str();
+        };
+
+        if (!word_wrap_ || current_text_.size() > 1024U * 1024U)
+        {
+            LineNumberText().Text(simple_numbers());
+            return;
+        }
+
+        const double content_width = TextContentRichText().Width() - 32.0;
+        if (!std::isfinite(content_width) || content_width <= 1.0)
+        {
+            LineNumberText().Text(simple_numbers());
+            return;
+        }
+
+        com_ptr<IDWriteFactory> factory;
+        if (FAILED(DWriteCreateFactory(
+                DWRITE_FACTORY_TYPE_SHARED,
+                __uuidof(IDWriteFactory),
+                reinterpret_cast<IUnknown**>(factory.put()))))
+        {
+            LineNumberText().Text(simple_numbers());
+            return;
+        }
+        com_ptr<IDWriteTextFormat> format;
+        if (FAILED(factory->CreateTextFormat(
+                text_preferences_.font_family.c_str(),
+                nullptr,
+                DWRITE_FONT_WEIGHT_NORMAL,
+                DWRITE_FONT_STYLE_NORMAL,
+                DWRITE_FONT_STRETCH_NORMAL,
+                static_cast<float>(text_preferences_.font_size),
+                L"",
+                format.put())))
+        {
+            LineNumberText().Text(simple_numbers());
+            return;
+        }
+        format->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+        com_ptr<IDWriteTextLayout> layout;
+        if (FAILED(factory->CreateTextLayout(
+                current_text_.data(),
+                static_cast<UINT32>(current_text_.size()),
+                format.get(),
+                static_cast<float>(content_width),
+                std::numeric_limits<float>::max(),
+                layout.put())))
+        {
+            LineNumberText().Text(simple_numbers());
+            return;
+        }
+
+        UINT32 metric_count{};
+        layout->GetLineMetrics(nullptr, 0, &metric_count);
+        std::vector<DWRITE_LINE_METRICS> metrics(metric_count);
+        if (FAILED(layout->GetLineMetrics(metrics.data(), metric_count, &metric_count)))
+        {
+            LineNumberText().Text(simple_numbers());
+            return;
+        }
+
+        std::wostringstream output;
+        std::size_t logical_line = 1;
+        bool first_visual_line = true;
+        for (UINT32 index = 0; index < metric_count; ++index)
+        {
+            if (index > 0)
+            {
+                output << L'\n';
+            }
+            if (first_visual_line)
+            {
+                output << logical_line;
+            }
+            first_visual_line = false;
+            if (metrics[index].newlineLength > 0)
+            {
+                ++logical_line;
+                first_visual_line = true;
+            }
+        }
+        if (!current_text_.empty() && current_text_.back() == L'\n')
+        {
+            output << L'\n' << logical_line;
+        }
+        LineNumberText().Text(output.str());
     }
 
     void MainWindow::show_content_panel(glance::app::PreviewKind kind)
@@ -669,14 +1279,23 @@ namespace winrt::Glance::App::implementation
         MediaPanel().Visibility(kind == glance::app::PreviewKind::media ? Visibility::Visible : Visibility::Collapsed);
         PdfPanel().Visibility(kind == glance::app::PreviewKind::pdf ? Visibility::Visible : Visibility::Collapsed);
         ArchivePanel().Visibility(kind == glance::app::PreviewKind::archive ? Visibility::Visible : Visibility::Collapsed);
+        ImageStatusControls().Visibility(
+            kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
+        TextStatusControls().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
+        LineNumbersButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
+        SyntaxHighlightButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
+        WordWrapButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         if (kind != glance::app::PreviewKind::image)
         {
             ImagePreview().Source(nullptr);
+            image_metadata_.clear();
+            image_metadata_visible_ = false;
+            ImageExifButton().IsChecked(false);
             ImageMetadataOverlay().Visibility(Visibility::Collapsed);
         }
         if (kind != glance::app::PreviewKind::media)
         {
-            MediaPreview().Source(nullptr);
+            stop_media_playback();
         }
         if (kind != glance::app::PreviewKind::pdf)
         {
@@ -707,25 +1326,112 @@ namespace winrt::Glance::App::implementation
         ImageFitSurface().Height(std::max(1.0, ImagePanel().ActualHeight()));
     }
 
+    void MainWindow::update_pdf_fit_surface()
+    {
+        PdfFitSurface().Width(std::max(1.0, PdfScroller().ActualWidth()));
+        PdfFitSurface().Height(std::max(1.0, PdfScroller().ActualHeight()));
+    }
+
     void MainWindow::TopmostButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        topmost_ = !topmost_;
+        topmost_ = TopmostButton().IsChecked().Value();
         set_topmost(topmost_);
         update_state();
     }
 
-    void MainWindow::FitContentButton_Click(IInspectable const&, RoutedEventArgs const&)
+    void MainWindow::ClosePreviewButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        user_sized_ = false;
-        position_initial_window();
+        if (detached_)
+        {
+            stop_detached_focus_monitor();
+            Close();
+            return;
+        }
+        pinned_ = false;
+        topmost_ = false;
+        PinButton().IsChecked(false);
+        TopmostButton().IsChecked(false);
+        set_topmost(false);
+        HidePreview();
     }
 
-    void MainWindow::MarkdownModeButton_Click(IInspectable const&, RoutedEventArgs const&)
+    void MainWindow::set_markdown_preview_mode(bool preview)
     {
-        markdown_preview_ = !markdown_preview_;
-        MarkdownModeButton().Content(box_value(markdown_preview_ ? L"Code" : L"Preview"));
-        TextPreviewBox().Visibility(markdown_preview_ ? Visibility::Collapsed : Visibility::Visible);
-        MarkdownPreviewScroller().Visibility(markdown_preview_ ? Visibility::Visible : Visibility::Collapsed);
+        markdown_preview_ = preview;
+        MarkdownPreviewButton().IsChecked(preview);
+        MarkdownCodeButton().IsChecked(!preview);
+        TextPreviewScroller().Visibility(preview ? Visibility::Collapsed : Visibility::Visible);
+        MarkdownPreviewWebView().Visibility(preview ? Visibility::Visible : Visibility::Collapsed);
+    }
+
+    void MainWindow::MarkdownPreviewButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        set_markdown_preview_mode(true);
+    }
+
+    void MainWindow::MarkdownCodeButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        set_markdown_preview_mode(false);
+    }
+
+    void MainWindow::update_line_number_visibility()
+    {
+        LineNumberGutter().Visibility(line_numbers_visible_ ? Visibility::Visible : Visibility::Collapsed);
+        LineNumbersButton().IsEnabled(true);
+        LineNumbersButton().IsChecked(line_numbers_visible_);
+        ToolTipService::SetToolTip(
+            LineNumbersButton(),
+            box_value(glance::app::localize(L"LineNumbersTooltip")));
+    }
+
+    void MainWindow::LineNumbersButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        line_numbers_visible_ = LineNumbersButton().IsChecked().Value();
+        text_preferences_.line_numbers = line_numbers_visible_;
+        glance::app::save_text_preferences(text_preferences_);
+        update_line_numbers();
+        update_line_number_visibility();
+    }
+
+    void MainWindow::SyntaxHighlightButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        syntax_highlighting_ = SyntaxHighlightButton().IsChecked().Value();
+        text_preferences_.syntax_highlighting = syntax_highlighting_;
+        glance::app::save_text_preferences(text_preferences_);
+        render_text_content();
+    }
+
+    void MainWindow::WordWrapButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        word_wrap_ = WordWrapButton().IsChecked().Value();
+        text_preferences_.word_wrap = word_wrap_;
+        glance::app::save_text_preferences(text_preferences_);
+        update_text_layout();
+    }
+
+    void MainWindow::EncodingSelector_SelectionChanged(
+        IInspectable const&,
+        SelectionChangedEventArgs const&)
+    {
+        if (updating_encoding_selector_ || current_text_path_.empty())
+        {
+            return;
+        }
+        const int selected = std::clamp(EncodingSelector().SelectedIndex(), 0, 5);
+        current_text_encoding_ = static_cast<glance::app::TextEncoding>(selected);
+        current_text_ = glance::app::localize(L"Loading");
+        render_text_content();
+        LineNumberText().Text(L"");
+        const auto generation = ++content_generation_;
+        load_text_async(current_text_path_, current_text_markdown_, generation, current_text_encoding_);
+    }
+
+    void MainWindow::TextPreviewScroller_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
+    {
+        if (word_wrap_)
+        {
+            update_text_layout();
+        }
     }
 
     void MainWindow::ImagePanel_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
@@ -733,28 +1439,283 @@ namespace winrt::Glance::App::implementation
         update_image_fit_surface();
     }
 
+    void MainWindow::PdfPanel_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
+    {
+        update_pdf_fit_surface();
+    }
+
+    void MainWindow::update_image_metadata_visibility()
+    {
+        const bool show = image_metadata_visible_ && !ImageMetadataText().Text().empty();
+        ImageMetadataOverlay().Visibility(show ? Visibility::Visible : Visibility::Collapsed);
+        ImageExifButton().IsChecked(image_metadata_visible_);
+    }
+
+    void MainWindow::ImageExifButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        image_metadata_visible_ = ImageExifButton().IsChecked().Value();
+        update_image_metadata_visibility();
+    }
+
+    void MainWindow::set_image_zoom(float zoom, Windows::Foundation::Point anchor)
+    {
+        const float old_zoom = ImageScroller().ZoomFactor();
+        const float new_zoom = std::clamp(zoom, 1.0F, 16.0F);
+        if (std::abs(new_zoom - old_zoom) < 0.001F)
+        {
+            return;
+        }
+
+        const double horizontal =
+            (ImageScroller().HorizontalOffset() + anchor.X) * new_zoom / old_zoom - anchor.X;
+        const double vertical =
+            (ImageScroller().VerticalOffset() + anchor.Y) * new_zoom / old_zoom - anchor.Y;
+        static_cast<void>(ImageScroller().ChangeView(
+            std::max(0.0, horizontal),
+            std::max(0.0, vertical),
+            new_zoom,
+            true));
+    }
+
     void MainWindow::ZoomOutButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         const float zoom = std::max(1.0F, ImageScroller().ZoomFactor() / 1.25F);
-        static_cast<void>(ImageScroller().ChangeView(nullptr, nullptr, zoom));
+        set_image_zoom(
+            zoom,
+            Windows::Foundation::Point{
+                static_cast<float>(ImageScroller().ActualWidth() / 2.0),
+                static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
     }
 
     void MainWindow::ZoomInButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         const float zoom = std::min(16.0F, ImageScroller().ZoomFactor() * 1.25F);
-        static_cast<void>(ImageScroller().ChangeView(nullptr, nullptr, zoom));
+        set_image_zoom(
+            zoom,
+            Windows::Foundation::Point{
+                static_cast<float>(ImageScroller().ActualWidth() / 2.0),
+                static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
     }
 
-    void MainWindow::RotateLeftButton_Click(IInspectable const&, RoutedEventArgs const&)
+    void MainWindow::ImageScroller_PointerWheelChanged(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
     {
-        image_rotation_ = std::fmod(image_rotation_ - 90.0 + 360.0, 360.0);
-        ImageTransform().Rotation(image_rotation_);
+        const auto point = args.GetCurrentPoint(ImageScroller());
+        const int delta = point.Properties().MouseWheelDelta();
+        if (delta == 0)
+        {
+            return;
+        }
+        const float factor = std::pow(1.2F, static_cast<float>(delta) / 120.0F);
+        set_image_zoom(ImageScroller().ZoomFactor() * factor, point.Position());
+        args.Handled(true);
     }
 
-    void MainWindow::RotateRightButton_Click(IInspectable const&, RoutedEventArgs const&)
+    void MainWindow::ImageScroller_PointerPressed(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        const auto point = args.GetCurrentPoint(ImageScroller());
+        if (!point.Properties().IsLeftButtonPressed() || ImageScroller().ZoomFactor() <= 1.001F)
+        {
+            return;
+        }
+        if (!ImageScroller().CapturePointer(args.Pointer()))
+        {
+            return;
+        }
+        image_panning_ = true;
+        image_pan_start_ = point.Position();
+        image_pan_horizontal_offset_ = ImageScroller().HorizontalOffset();
+        image_pan_vertical_offset_ = ImageScroller().VerticalOffset();
+        args.Handled(true);
+    }
+
+    void MainWindow::ImageScroller_PointerMoved(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        if (!image_panning_)
+        {
+            return;
+        }
+        const auto point = args.GetCurrentPoint(ImageScroller());
+        if (!point.Properties().IsLeftButtonPressed())
+        {
+            end_image_pan(args);
+            return;
+        }
+        const auto position = point.Position();
+        static_cast<void>(ImageScroller().ChangeView(
+            std::max(0.0, image_pan_horizontal_offset_ + image_pan_start_.X - position.X),
+            std::max(0.0, image_pan_vertical_offset_ + image_pan_start_.Y - position.Y),
+            nullptr,
+            true));
+        args.Handled(true);
+    }
+
+    void MainWindow::end_image_pan(PointerRoutedEventArgs const& args)
+    {
+        if (!image_panning_)
+        {
+            return;
+        }
+        image_panning_ = false;
+        ImageScroller().ReleasePointerCapture(args.Pointer());
+        args.Handled(true);
+    }
+
+    void MainWindow::ImageScroller_PointerReleased(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        end_image_pan(args);
+    }
+
+    void MainWindow::ImageScroller_PointerCanceled(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        end_image_pan(args);
+    }
+
+    void MainWindow::ImageScroller_PointerCaptureLost(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        image_panning_ = false;
+        args.Handled(true);
+    }
+
+    void MainWindow::RotateButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         image_rotation_ = std::fmod(image_rotation_ + 90.0, 360.0);
         ImageTransform().Rotation(image_rotation_);
+    }
+
+    void MainWindow::show_media_controls()
+    {
+        media_controls_idle_ticks_ = 0;
+        MediaControlsOverlay().Opacity(1.0);
+        MediaControlsOverlay().IsHitTestVisible(true);
+    }
+
+    void MainWindow::stop_media_playback()
+    {
+        media_timer_.Stop();
+        if (MediaPreview().MediaPlayer() != nullptr)
+        {
+            MediaPreview().MediaPlayer().Pause();
+        }
+        MediaPreview().Source(nullptr);
+    }
+
+    void MainWindow::update_media_controls()
+    {
+        if (MediaPanel().Visibility() != Visibility::Visible || MediaPreview().MediaPlayer() == nullptr)
+        {
+            return;
+        }
+        const auto player = MediaPreview().MediaPlayer();
+        const auto session = player.PlaybackSession();
+        const double duration = std::max(0.0, session.NaturalDuration().count() / 10000000.0);
+        const double position = std::max(0.0, session.Position().count() / 10000000.0);
+        updating_media_position_ = true;
+        MediaSeekSlider().Maximum(std::max(1.0, duration));
+        MediaSeekSlider().Value(std::min(position, std::max(1.0, duration)));
+        updating_media_position_ = false;
+
+        const auto format_duration = [](double seconds) {
+            const auto total = static_cast<std::uint64_t>(seconds);
+            const auto hours = total / 3600;
+            const auto minutes = total / 60 % 60;
+            const auto remaining = total % 60;
+            std::wostringstream output;
+            if (hours > 0)
+            {
+                output << hours << L':' << std::setfill(L'0') << std::setw(2) << minutes;
+            }
+            else
+            {
+                output << minutes;
+            }
+            output << L':' << std::setfill(L'0') << std::setw(2) << remaining;
+            return output.str();
+        };
+        MediaTimeText().Text(format_duration(position) + L" / " + format_duration(duration));
+        const bool playing = session.PlaybackState() == Windows::Media::Playback::MediaPlaybackState::Playing;
+        MediaPlayPauseIcon().Glyph(playing ? L"\xE769" : L"\xE768");
+        MediaMuteIcon().Glyph(player.IsMuted() || player.Volume() == 0.0 ? L"\xE74F" : L"\xE767");
+
+        if (!media_is_audio_ && playing && MediaControlsOverlay().Opacity() > 0.0)
+        {
+            ++media_controls_idle_ticks_;
+            if (media_controls_idle_ticks_ >= 10)
+            {
+                MediaControlsOverlay().Opacity(0.0);
+                MediaControlsOverlay().IsHitTestVisible(false);
+            }
+        }
+    }
+
+    void MainWindow::MediaPanel_PointerMoved(IInspectable const&, PointerRoutedEventArgs const&)
+    {
+        show_media_controls();
+    }
+
+    void MainWindow::MediaPlayPauseButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (MediaPreview().MediaPlayer() == nullptr)
+        {
+            return;
+        }
+        const auto player = MediaPreview().MediaPlayer();
+        if (player.PlaybackSession().PlaybackState() == Windows::Media::Playback::MediaPlaybackState::Playing)
+        {
+            player.Pause();
+        }
+        else
+        {
+            player.Play();
+        }
+        show_media_controls();
+    }
+
+    void MainWindow::MediaMuteButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (MediaPreview().MediaPlayer() == nullptr)
+        {
+            return;
+        }
+        const auto player = MediaPreview().MediaPlayer();
+        player.IsMuted(!player.IsMuted());
+        MediaMuteIcon().Glyph(player.IsMuted() ? L"\xE74F" : L"\xE767");
+        show_media_controls();
+    }
+
+    void MainWindow::MediaSeekSlider_ValueChanged(
+        IInspectable const&,
+        Primitives::RangeBaseValueChangedEventArgs const& args)
+    {
+        if (!updating_media_position_ && MediaPreview().MediaPlayer() != nullptr)
+        {
+            MediaPreview().MediaPlayer().PlaybackSession().Position(
+                std::chrono::duration_cast<Windows::Foundation::TimeSpan>(
+                    std::chrono::duration<double>(args.NewValue())));
+            show_media_controls();
+        }
+    }
+
+    void MainWindow::MediaVolumeSlider_ValueChanged(
+        IInspectable const&,
+        Primitives::RangeBaseValueChangedEventArgs const& args)
+    {
+        if (MediaPreview().MediaPlayer() != nullptr)
+        {
+            MediaPreview().MediaPlayer().Volume(args.NewValue() / 100.0);
+            show_media_controls();
+        }
     }
 
     void MainWindow::PreviousPdfPageButton_Click(IInspectable const&, RoutedEventArgs const&)
@@ -777,9 +1738,42 @@ namespace winrt::Glance::App::implementation
         render_pdf_page_async(pdf_page_index_, content_generation_);
     }
 
+    void MainWindow::PdfScroller_PointerWheelChanged(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        if ((GetKeyState(VK_CONTROL) & 0x8000) != 0)
+        {
+            pdf_wheel_delta_ = 0;
+            return;
+        }
+        if (PdfScroller().ZoomFactor() > 1.001F || pdf_document_ == nullptr)
+        {
+            pdf_wheel_delta_ = 0;
+            return;
+        }
+
+        pdf_wheel_delta_ += args.GetCurrentPoint(PdfFitSurface()).Properties().MouseWheelDelta();
+        if (std::abs(pdf_wheel_delta_) >= WHEEL_DELTA)
+        {
+            if (pdf_wheel_delta_ > 0 && pdf_page_index_ > 0)
+            {
+                --pdf_page_index_;
+                render_pdf_page_async(pdf_page_index_, content_generation_);
+            }
+            else if (pdf_wheel_delta_ < 0 && pdf_page_index_ + 1 < pdf_document_.PageCount())
+            {
+                ++pdf_page_index_;
+                render_pdf_page_async(pdf_page_index_, content_generation_);
+            }
+            pdf_wheel_delta_ = 0;
+        }
+        args.Handled(true);
+    }
+
     void MainWindow::PinButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        pinned_ = !pinned_;
+        pinned_ = PinButton().IsChecked().Value();
         if (detached_ && !pinned_)
         {
             state_ = glance::contracts::PreviewWindowState::detached_unpinned;
@@ -848,12 +1842,14 @@ namespace winrt::Glance::App::implementation
         {
             focus_timer_ = DispatcherTimer();
             focus_timer_.Interval(std::chrono::milliseconds(100));
-            focus_timer_.Tick([this](IInspectable const&, IInspectable const&)
+            const auto weak = get_weak();
+            focus_timer_.Tick([weak](IInspectable const&, IInspectable const&)
             {
-                if (GetForegroundWindow() != foreground_when_unpinned_)
+                if (const auto self = weak.get();
+                    self != nullptr && GetForegroundWindow() != self->foreground_when_unpinned_)
                 {
-                    stop_detached_focus_monitor();
-                    Close();
+                    self->stop_detached_focus_monitor();
+                    self->Close();
                 }
             });
         }
@@ -883,10 +1879,50 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
-        Windows::ApplicationModel::DataTransfer::DataPackage package;
-        package.SetText(!files_[current_index_].path.empty() ? files_[current_index_].path : files_[current_index_].parsing_name);
-        Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
-        Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
+        try
+        {
+            Windows::ApplicationModel::DataTransfer::DataPackage package;
+            std::wstring path = !files_[current_index_].path.empty()
+                ? files_[current_index_].path
+                : files_[current_index_].parsing_name;
+            const auto preferences = glance::app::load_path_copy_preferences();
+            if (preferences.use_unix_separators)
+            {
+                std::replace(path.begin(), path.end(), L'\\', L'/');
+            }
+            if (preferences.quote_path)
+            {
+                path = L"\"" + path + L"\"";
+            }
+            package.SetText(path);
+            Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
+            Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
+
+            CopyPathIcon().Glyph(L"\xE73E");
+            CopyPathIcon().Foreground(Application::Current().Resources().Lookup(
+                box_value(L"AccentTextFillColorPrimaryBrush")).as<Media::Brush>());
+            if (copy_feedback_timer_ == nullptr)
+            {
+                copy_feedback_timer_ = DispatcherTimer();
+                copy_feedback_timer_.Interval(std::chrono::milliseconds(1200));
+                const auto weak = get_weak();
+                copy_feedback_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+                    if (const auto self = weak.get())
+                    {
+                        self->copy_feedback_timer_.Stop();
+                        self->CopyPathIcon().Glyph(L"\xE8C8");
+                        self->CopyPathIcon().ClearValue(IconElement::ForegroundProperty());
+                    }
+                });
+            }
+            copy_feedback_timer_.Stop();
+            copy_feedback_timer_.Start();
+        }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(
+                L"Copy path failed: " + std::wstring(error.message()));
+        }
     }
 
     void MainWindow::OpenFolderButton_Click(IInspectable const&, RoutedEventArgs const&)
@@ -908,7 +1944,24 @@ namespace winrt::Glance::App::implementation
         ShellExecuteW(nullptr, L"open", files_[current_index_].path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
     }
 
-    void MainWindow::ConfirmCloudLoad_Click(IInspectable const&, RoutedEventArgs const&)
+    void MainWindow::OpenDefaultButton_RightTapped(
+        IInspectable const&,
+        RightTappedRoutedEventArgs const& args)
+    {
+        args.Handled(true);
+        if (current_index_ >= files_.size() || files_[current_index_].path.empty() ||
+            (files_[current_index_].attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+        {
+            return;
+        }
+        const OPENASINFO open_as{
+            files_[current_index_].path.c_str(),
+            nullptr,
+            OAIF_ALLOW_REGISTRATION | OAIF_EXEC };
+        static_cast<void>(SHOpenWithDialog(window_, &open_as));
+    }
+
+    void MainWindow::LoadCloudFileButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         if (current_index_ >= files_.size() || files_[current_index_].path.empty())
         {
@@ -925,7 +1978,8 @@ namespace winrt::Glance::App::implementation
             nullptr);
         if (file == INVALID_HANDLE_VALUE)
         {
-            ErrorText().Text(L"The file could not be loaded. Error " + std::to_wstring(GetLastError()) + L".");
+            ErrorText().Text(glance::app::localize_format(
+                L"CloudLoadError", { std::to_wstring(GetLastError()) }));
             ErrorText().Visibility(Visibility::Visible);
             return;
         }
@@ -959,7 +2013,7 @@ namespace winrt::Glance::App::implementation
         SYSTEMTIME system_time{};
         if (!FileTimeToLocalFileTime(&utc, &local) || !FileTimeToSystemTime(&local, &system_time))
         {
-            return L"Unknown time";
+            return glance::app::localize(L"UnknownTime");
         }
         wchar_t date[64]{};
         wchar_t time[64]{};

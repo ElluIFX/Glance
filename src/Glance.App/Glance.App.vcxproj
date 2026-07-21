@@ -45,14 +45,24 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Comctl32.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
+    <ResourceCompile Include="..\version.rc">
+      <PreprocessorDefinitions>GLANCE_BINARY_KIND=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="archive_provider.h" />
+    <ClInclude Include="generic_file_info.h" />
+    <ClInclude Include="appearance_preferences.h" />
+    <ClInclude Include="image_metadata_provider.h" />
+    <ClInclude Include="localization.h" />
+    <ClInclude Include="markdown_renderer.h" />
+    <ClInclude Include="media_metadata_provider.h" />
+    <ClInclude Include="path_copy_preferences.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="App.xaml.h"><DependentUpon>App.xaml</DependentUpon></ClInclude>
     <ClInclude Include="MainWindow.xaml.h"><DependentUpon>MainWindow.xaml</DependentUpon></ClInclude>
@@ -60,7 +70,13 @@
     <ClInclude Include="pipe_client.h" />
     <ClInclude Include="preview_file.h" />
     <ClInclude Include="preview_provider.h" />
+    <ClInclude Include="syntax_highlighter.h" />
+    <ClInclude Include="text_preferences.h" />
     <ClInclude Include="tray_icon.h" />
+    <ClInclude Include="window_size_store.h" />
+    <ClInclude Include="third_party\md4c\entity.h" />
+    <ClInclude Include="third_party\md4c\md4c.h" />
+    <ClInclude Include="third_party\md4c\md4c-html.h" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
@@ -69,14 +85,45 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="archive_provider.cpp" />
+    <ClCompile Include="generic_file_info.cpp" />
+    <ClCompile Include="appearance_preferences.cpp" />
+    <ClCompile Include="image_metadata_provider.cpp" />
+    <ClCompile Include="localization.cpp" />
+    <ClCompile Include="markdown_renderer.cpp" />
+    <ClCompile Include="media_metadata_provider.cpp" />
+    <ClCompile Include="path_copy_preferences.cpp" />
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="App.xaml.cpp"><DependentUpon>App.xaml</DependentUpon></ClCompile>
     <ClCompile Include="MainWindow.xaml.cpp"><DependentUpon>MainWindow.xaml</DependentUpon></ClCompile>
     <ClCompile Include="SettingsWindow.xaml.cpp"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClCompile>
     <ClCompile Include="pipe_client.cpp" />
     <ClCompile Include="preview_provider.cpp" />
+    <ClCompile Include="syntax_highlighter.cpp" />
+    <ClCompile Include="text_preferences.cpp" />
     <ClCompile Include="tray_icon.cpp" />
+    <ClCompile Include="window_size_store.cpp" />
+    <ClCompile Include="third_party\md4c\entity.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4267;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="third_party\md4c\md4c.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4267;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="third_party\md4c\md4c-html.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4267;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <PRIResource Include="Resources\en-US\Resources.resw" />
   </ItemGroup>
   <ItemGroup>
     <Midl Include="MainWindow.idl"><SubType>Code</SubType><DependentUpon>MainWindow.xaml</DependentUpon></Midl>
