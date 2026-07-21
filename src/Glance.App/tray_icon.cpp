@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "tray_icon.h"
+#include "resource.h"
 
 namespace glance::app
 {
@@ -10,6 +11,7 @@ namespace glance::app
 
     bool TrayIcon::create(HINSTANCE instance, Callback settings_callback, Callback exit_callback)
     {
+        instance_ = instance;
         settings_callback_ = std::move(settings_callback);
         exit_callback_ = std::move(exit_callback);
         taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
@@ -51,7 +53,11 @@ namespace glance::app
         icon_.uID = 1;
         icon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
         icon_.uCallbackMessage = callback_message;
-        icon_.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+        icon_.hIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_GLANCE_APP));
+        if (icon_.hIcon == nullptr)
+        {
+            icon_.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+        }
         wcscpy_s(icon_.szTip, L"Glance");
         if (!Shell_NotifyIconW(NIM_ADD, &icon_))
         {

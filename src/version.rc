@@ -1,5 +1,8 @@
 #include <winres.h>
 #include "version.h"
+#include "Glance.App\\resource.h"
+
+IDI_GLANCE_APP ICON "Glance.App\\Assets\\AppIcon.ico"
 
 #if GLANCE_BINARY_KIND == 1
 #define GLANCE_FILE_DESCRIPTION "Glance Preview"

@@ -31,6 +31,7 @@ namespace glance::app
         [[nodiscard]] bool add_icon();
 
         HWND window_{};
+        HINSTANCE instance_{};
         NOTIFYICONDATAW icon_{};
         UINT taskbar_created_message_{};
         Callback settings_callback_;

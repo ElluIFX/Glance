@@ -3,6 +3,7 @@
 #include "appearance_preferences.h"
 #include "localization.h"
 #include "path_copy_preferences.h"
+#include "resource.h"
 #include "text_preferences.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
@@ -42,7 +43,7 @@ namespace winrt::Glance::App::implementation
         InitializeComponent();
         Title(glance::app::localize(L"SettingsTitle"));
         SettingsTitleText().Text(glance::app::localize(L"SettingsTitle"));
-        VersionTextBlock().Text(L"Version " GLANCE_VERSION_WSTRING);
+        AboutVersionText().Text(L"Version " GLANCE_VERSION_WSTRING);
         ApplyAppearancePreferences();
         configure_window();
         HWND window{};
@@ -65,6 +66,7 @@ namespace winrt::Glance::App::implementation
         AccentComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.accent));
         LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
         DiagnosticsToggle().IsOn(glance::contracts::diagnostics_enabled());
+        AutoFitWindowSizeToggle().IsOn(glance::app::auto_fit_window_size_enabled());
         text_preferences_ = glance::app::load_text_preferences();
         const auto font_families = glance::app::system_font_families();
         int selected_font{};
@@ -100,6 +102,11 @@ namespace winrt::Glance::App::implementation
     {
         HWND window{};
         check_hresult(this->try_as<::IWindowNative>()->get_WindowHandle(&window));
+        if (const HICON icon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_GLANCE_APP)))
+        {
+            SendMessageW(window, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon));
+            SendMessageW(window, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon));
+        }
         LONG_PTR window_style = GetWindowLongPtrW(window, GWL_STYLE);
         window_style &= ~(WS_SYSMENU | WS_MINIMIZEBOX);
         SetWindowLongPtrW(window, GWL_STYLE, window_style);
@@ -199,6 +206,14 @@ namespace winrt::Glance::App::implementation
         if (!initializing_)
         {
             glance::contracts::set_diagnostics_enabled(DiagnosticsToggle().IsOn());
+        }
+    }
+
+    void SettingsWindow::AutoFitWindowSizeToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (!initializing_)
+        {
+            glance::app::set_auto_fit_window_size_enabled(AutoFitWindowSizeToggle().IsOn());
         }
     }
 
@@ -308,13 +323,35 @@ namespace winrt::Glance::App::implementation
         TextPreviewSettingsPanel().Visibility(tag == L"text" ? Visibility::Visible : Visibility::Collapsed);
         PathCopySettingsPanel().Visibility(tag == L"path" ? Visibility::Visible : Visibility::Collapsed);
         MaintenanceSettingsPanel().Visibility(tag == L"maintenance" ? Visibility::Visible : Visibility::Collapsed);
+        AboutSettingsPanel().Visibility(tag == L"about" ? Visibility::Visible : Visibility::Collapsed);
     }
 
-    void SettingsWindow::ExitButton_Click(IInspectable const&, RoutedEventArgs const&)
+    fire_and_forget SettingsWindow::ExitButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        if (exit_callback_)
+        ConfirmExit();
+        co_return;
+    }
+
+    fire_and_forget SettingsWindow::ConfirmExit()
+    {
+        const auto lifetime = get_strong();
+        if (exit_confirmation_open_)
         {
-            exit_callback_();
+            co_return;
+        }
+        exit_confirmation_open_ = true;
+        Controls::ContentDialog dialog;
+        dialog.XamlRoot(RootGrid().XamlRoot());
+        dialog.Title(box_value(glance::app::localize(L"ExitConfirmationTitle")));
+        dialog.Content(box_value(glance::app::localize(L"ExitConfirmationMessage")));
+        dialog.PrimaryButtonText(glance::app::localize(L"ExitConfirmationPrimary"));
+        dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+        dialog.DefaultButton(Controls::ContentDialogButton::Close);
+        const auto result = co_await dialog.ShowAsync();
+        lifetime->exit_confirmation_open_ = false;
+        if (result == Controls::ContentDialogResult::Primary && lifetime->exit_callback_)
+        {
+            lifetime->exit_callback_();
         }
     }
 

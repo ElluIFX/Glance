@@ -7,17 +7,22 @@
             <RowDefinition Height="40" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Grid x:Name="SettingsTitleBarDragRegion" Grid.Row="0" Padding="14,0,6,0">
+        <Grid Grid.Row="0" Padding="14,0,6,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock
-                x:Name="SettingsTitleText"
-                VerticalAlignment="Center"
-                FontSize="13"
-                FontWeight="SemiBold"
-                Text="Settings" />
+            <Grid
+                x:Name="SettingsTitleBarDragRegion"
+                Grid.Column="0"
+                Background="Transparent">
+                <TextBlock
+                    x:Name="SettingsTitleText"
+                    VerticalAlignment="Center"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    Text="Settings" />
+            </Grid>
             <Button
                 x:Name="CloseSettingsButton"
                 Grid.Column="1"
@@ -55,6 +60,14 @@
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Setter Property="FontSize" Value="12" />
                 <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style TargetType="ToggleSwitch">
+                <Setter Property="Width" Value="52" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="HorizontalAlignment" Value="Right" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="OffContent" Value="{x:Null}" />
+                <Setter Property="OnContent" Value="{x:Null}" />
             </Style>
             <Style x:Key="SettingsPageTitleStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="24" />
@@ -99,14 +112,18 @@
                     <FontIcon Glyph="&#xE90F;" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
+            <NavigationViewItem
+                x:Name="AboutNavigationItem"
+                x:Uid="AboutNavigationItem"
+                Content="About"
+                Tag="about">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE946;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
         </NavigationView.MenuItems>
         <NavigationView.PaneFooter>
             <StackPanel>
-                <TextBlock
-                    x:Name="VersionTextBlock"
-                    Margin="16,0,12,6"
-                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                    FontSize="11" />
                 <Button
                     x:Name="ExitButton"
                     Margin="4,0,4,8"
@@ -144,7 +161,6 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock Text="Language" />
-                                    <TextBlock Style="{StaticResource SettingsDescriptionStyle}" Text="Application display language" />
                                 </StackPanel>
                                 <ComboBox
                                     x:Name="LanguageComboBox"
@@ -163,7 +179,6 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock Text="Theme" />
-                                    <TextBlock Style="{StaticResource SettingsDescriptionStyle}" Text="Use the system, light, or dark appearance" />
                                 </StackPanel>
                                 <ComboBox
                                     x:Name="ThemeComboBox"
@@ -184,7 +199,6 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock Text="Accent color" />
-                                    <TextBlock Style="{StaticResource SettingsDescriptionStyle}" Text="Highlight active controls" />
                                 </StackPanel>
                                 <ComboBox
                                     x:Name="AccentComboBox"
@@ -253,7 +267,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Uid="LaunchTitle" Text="Launch at sign-in" />
-                                    <TextBlock x:Uid="LaunchDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start Glance in the notification area" />
+                                    <TextBlock x:Uid="LaunchDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start Glance automatically when you sign in to Windows" />
                                 </StackPanel>
                                 <ToggleSwitch
                                     x:Name="LaunchAtSignInToggle"
@@ -272,7 +286,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Uid="DiagnosticsTitle" Text="Diagnostics" />
-                                    <TextBlock x:Uid="DiagnosticsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Write basic logs and crash dumps" />
+                                    <TextBlock x:Uid="DiagnosticsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Save diagnostic logs and crash dumps" />
                                 </StackPanel>
                                 <ToggleSwitch
                                     x:Name="DiagnosticsToggle"
@@ -282,6 +296,40 @@
                                     OnContent="{x:Null}"
                                     VerticalAlignment="Center"
                                     Toggled="DiagnosticsToggle_Toggled" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Uid="AutoFitWindowSizeLabel" Text="Auto fit window size" />
+                                    <TextBlock x:Uid="AutoFitWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Automatically fit the preview window to media file dimensions" />
+                                </StackPanel>
+                                <ToggleSwitch
+                                    x:Name="AutoFitWindowSizeToggle"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    OffContent="{x:Null}"
+                                    OnContent="{x:Null}"
+                                    VerticalAlignment="Center"
+                                    Toggled="AutoFitWindowSizeToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Uid="WindowSizesLabel" Text="Preview window sizes" />
+                                    <TextBlock x:Name="WindowSizeResetStatusText" x:Uid="WindowSizeResetStatusText" Style="{StaticResource SettingsDescriptionStyle}" Text="Stored separately by preview type" />
+                                </StackPanel>
+                                <Button x:Name="ResetWindowSizesButton" x:Uid="ResetWindowSizesButton" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ResetWindowSizesButton_Click" Content="Reset" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -428,20 +476,36 @@
                                     <FontIcon FontSize="14" Glyph="&#xE72C;" />
                                 </Button>
                             </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Uid="WindowSizesLabel" Text="Preview window sizes" />
-                                    <TextBlock x:Name="WindowSizeResetStatusText" x:Uid="WindowSizeResetStatusText" Style="{StaticResource SettingsDescriptionStyle}" Text="Stored separately by preview type" />
-                                </StackPanel>
-                                <Button x:Name="ResetWindowSizesButton" x:Uid="ResetWindowSizesButton" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ResetWindowSizesButton_Click" Content="Reset" />
-                            </Grid>
                         </StackPanel>
                     </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer
+                x:Name="AboutSettingsPanel"
+                HorizontalContentAlignment="Stretch"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="AboutPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="About" />
+                        <TextBlock x:Uid="AboutPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Application information" />
+                    </StackPanel>
+                    <StackPanel Margin="0,20,0,0" HorizontalAlignment="Center" Spacing="10">
+                        <Image
+                            Width="144"
+                            Height="144"
+                            Source="Assets/AppIcon.png"
+                            Stretch="Uniform" />
+                        <TextBlock HorizontalAlignment="Center" FontSize="28" FontWeight="SemiBold" Text="Glance" />
+                        <TextBlock x:Name="AboutVersionText" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Margin="0,10,0,0" HorizontalAlignment="Center" Orientation="Horizontal" Spacing="6">
+                            <TextBlock x:Uid="AboutAuthorLabel" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Author" />
+                            <HyperlinkButton Padding="0" Content="@Ellu" NavigateUri="https://github.com/ElluIFX" />
+                        </StackPanel>
+                        <TextBlock x:Uid="AboutLicenseText" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="License: GPL-3.0" />
+                        <HyperlinkButton x:Uid="AboutProjectLink" HorizontalAlignment="Center" Content="GitHub repository" NavigateUri="https://github.com/ElluIFX/glance" />
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

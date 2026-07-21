@@ -182,6 +182,7 @@ namespace
         }
         static_cast<void>(set_property(application.get(), L"Visible", boolean_argument(false)));
         static_cast<void>(set_property(application.get(), L"DisplayAlerts", integer_argument(0)));
+        static_cast<void>(set_property(application.get(), L"ScreenUpdating", boolean_argument(false)));
         auto documents = get_dispatch_property(application.get(), L"Documents");
         auto document = documents
             ? invoke_dispatch_method(
@@ -209,6 +210,9 @@ namespace
         }
         static_cast<void>(set_property(application.get(), L"Visible", boolean_argument(false)));
         static_cast<void>(set_property(application.get(), L"DisplayAlerts", boolean_argument(false)));
+        static_cast<void>(set_property(application.get(), L"ScreenUpdating", boolean_argument(false)));
+        static_cast<void>(set_property(application.get(), L"EnableEvents", boolean_argument(false)));
+        static_cast<void>(set_property(application.get(), L"Interactive", boolean_argument(false)));
         auto workbooks = get_dispatch_property(application.get(), L"Workbooks");
         auto workbook = workbooks
             ? invoke_dispatch_method(
@@ -234,6 +238,7 @@ namespace
         {
             return 30;
         }
+        static_cast<void>(set_property(application.get(), L"DisplayAlerts", integer_argument(1)));
         auto presentations = get_dispatch_property(application.get(), L"Presentations");
         auto presentation = presentations
             ? invoke_dispatch_method(

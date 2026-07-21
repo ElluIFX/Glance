@@ -20,9 +20,14 @@ namespace glance::app
     {
         std::vector<ArchiveEntry> entries;
         std::wstring error;
+        std::uint64_t total_size{};
+        bool show_total_size{};
         bool truncated{};
     };
 
+    [[nodiscard]] ArchivePreview load_archive_preview(
+        const std::wstring& path,
+        std::size_t maximum_entries = 5000);
     [[nodiscard]] ArchivePreview load_shell_archive_preview(
         const std::wstring& path,
         std::size_t maximum_entries = 5000);

@@ -19,11 +19,15 @@ namespace winrt::Glance::App::implementation
             ExitCallback exit_callback,
             AppearanceChangedCallback appearance_changed_callback);
         void ApplyAppearancePreferences();
+        winrt::fire_and_forget ConfirmExit();
 
         void LaunchAtSignInToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         void DiagnosticsToggle_Toggled(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void AutoFitWindowSizeToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         void RefreshCoreStatusButton_Click(
@@ -50,7 +54,7 @@ namespace winrt::Glance::App::implementation
         void SettingsNavigation_SelectionChanged(
             Microsoft::UI::Xaml::Controls::NavigationView const&,
             Microsoft::UI::Xaml::Controls::NavigationViewSelectionChangedEventArgs const&);
-        void ExitButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        winrt::fire_and_forget ExitButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void CloseSettingsButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
@@ -62,6 +66,7 @@ namespace winrt::Glance::App::implementation
         void save_appearance_preferences();
 
         bool initializing_{};
+        bool exit_confirmation_open_{};
         glance::app::TextPreferences text_preferences_{};
         glance::app::PathCopyPreferences path_copy_preferences_{};
         glance::app::AppearancePreferences appearance_preferences_{};

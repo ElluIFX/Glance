@@ -7,6 +7,7 @@
 #include "markdown_renderer.h"
 #include "media_metadata_provider.h"
 #include "path_copy_preferences.h"
+#include "resource.h"
 #include "syntax_highlighter.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
@@ -72,6 +73,18 @@ namespace
         quoted.push_back(L'"');
         return quoted;
     }
+
+    bool is_audio_path(std::wstring_view path)
+    {
+        auto extension = std::filesystem::path(path).extension().wstring();
+        std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+            return static_cast<wchar_t>(std::towlower(value));
+        });
+        static constexpr std::array audio_extensions{
+            std::wstring_view(L".mp3"), std::wstring_view(L".flac"), std::wstring_view(L".wav"),
+            std::wstring_view(L".m4a"), std::wstring_view(L".aac"), std::wstring_view(L".ogg") };
+        return std::ranges::find(audio_extensions, extension) != audio_extensions.end();
+    }
 }
 
 namespace winrt::Glance::App::implementation
@@ -120,6 +133,12 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"Resolving the native window handle.");
         const auto window_native = this->try_as<::IWindowNative>();
         check_hresult(window_native->get_WindowHandle(&window_));
+
+        if (const HICON icon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_GLANCE_APP)))
+        {
+            SendMessageW(window_, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon));
+            SendMessageW(window_, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon));
+        }
 
         glance::contracts::log_event(L"Applying native window styles.");
         LONG_PTR extended_style = GetWindowLongPtrW(window_, GWL_EXSTYLE);
@@ -267,14 +286,102 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
-        stop_media_playback();
         visible_ = false;
         ShowWindow(window_, SW_HIDE);
+        clear_preview_content();
+        reset_hidden_window_size();
         state_ = glance::contracts::PreviewWindowState::hidden;
         if (state_callback_)
         {
             state_callback_(instance_id_, state_);
         }
+    }
+
+    void MainWindow::clear_preview_content()
+    {
+        ++content_generation_;
+        stop_media_playback();
+
+        ImagePreview().Source(nullptr);
+        ImageMetadataText().Text(L"");
+        ImageMetadataOverlay().Visibility(Visibility::Collapsed);
+        MediaCoverImage().Source(nullptr);
+        MediaTitleText().Text(L"");
+        MediaAlbumText().Text(L"");
+        MediaArtistText().Text(L"");
+        MediaTimeText().Text(L"0:00 / 0:00");
+        PdfPageImage().Source(nullptr);
+        PdfLoadingOverlay().Visibility(Visibility::Collapsed);
+        PdfPageText().Text(L"");
+        pdf_document_ = nullptr;
+        MarkdownPreviewWebView().Opacity(0.0);
+        MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
+        TextContentRichText().Blocks().Clear();
+        LineNumberText().Text(L"");
+        TextEncodingText().Text(L"");
+        ArchiveEntryList().Items().Clear();
+        ArchiveStatusText().Text(L"");
+        FileList().Items().Clear();
+        FileList().Visibility(Visibility::Collapsed);
+        FileListColumn().Width(GridLength{ 0, GridUnitType::Pixel });
+
+        TitleText().Text(L"");
+        FooterMetadataText().Text(L"");
+        FileNameText().Text(L"");
+        FilePathText().Text(L"");
+        FileMetadataText().Text(L"");
+        GenericAdvancedInfoText().Text(L"");
+        GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
+        LoadCloudFileButton().Visibility(Visibility::Collapsed);
+        ErrorText().Text(L"");
+        ErrorText().Visibility(Visibility::Collapsed);
+        GenericPanel().Visibility(Visibility::Visible);
+        TextPanel().Visibility(Visibility::Collapsed);
+        ImagePanel().Visibility(Visibility::Collapsed);
+        MediaPanel().Visibility(Visibility::Collapsed);
+        PdfPanel().Visibility(Visibility::Collapsed);
+        ArchivePanel().Visibility(Visibility::Collapsed);
+        TextStatusControls().Visibility(Visibility::Collapsed);
+        ImageStatusControls().Visibility(Visibility::Collapsed);
+        SyntaxHighlightButton().Visibility(Visibility::Collapsed);
+        WordWrapButton().Visibility(Visibility::Collapsed);
+        LineNumbersButton().Visibility(Visibility::Collapsed);
+
+        current_text_.clear();
+        current_text_path_.clear();
+        current_text_markdown_ = false;
+        image_metadata_.clear();
+        media_dimensions_.clear();
+        media_technical_info_.clear();
+        files_.clear();
+        current_index_ = 0;
+        source_kind_ = 0;
+        source_window_ = nullptr;
+        foreground_when_unpinned_ = nullptr;
+        current_kind_ = glance::app::PreviewKind::generic;
+        media_is_audio_ = false;
+        image_metadata_visible_ = false;
+        image_panning_ = false;
+        pdf_page_index_ = 0;
+        pdf_wheel_delta_ = 0;
+
+    }
+
+    void MainWindow::reset_hidden_window_size() noexcept
+    {
+        if (window_ == nullptr)
+        {
+            return;
+        }
+        const UINT dpi = GetDpiForWindow(window_);
+        SetWindowPos(
+            window_,
+            nullptr,
+            0,
+            0,
+            MulDiv(720, static_cast<int>(dpi), 96),
+            MulDiv(520, static_cast<int>(dpi), 96),
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
     void MainWindow::position_initial_window(bool ignore_saved_size)
@@ -286,9 +393,9 @@ namespace winrt::Glance::App::implementation
         const UINT dpi = source_window_ != nullptr ? GetDpiForWindow(source_window_) : 96;
         int desired_width = MulDiv(files_.size() > 1 ? 920 : 720, static_cast<int>(dpi), 96);
         int desired_height = MulDiv(520, static_cast<int>(dpi), 96);
-        if (!ignore_saved_size)
+        if (!ignore_saved_size && !auto_fit_applies())
         {
-            if (const auto saved_size = glance::app::load_window_size(current_kind_))
+            if (const auto saved_size = glance::app::load_window_size(current_kind_, media_is_audio_))
             {
                 desired_width = MulDiv(saved_size->cx, static_cast<int>(dpi), 96);
                 desired_height = MulDiv(saved_size->cy, static_cast<int>(dpi), 96);
@@ -324,9 +431,84 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    bool MainWindow::auto_fit_applies() const noexcept
+    {
+        if (!glance::app::auto_fit_window_size_enabled())
+        {
+            return false;
+        }
+        return current_kind_ == glance::app::PreviewKind::image ||
+            current_kind_ == glance::app::PreviewKind::pdf ||
+            current_kind_ == glance::app::PreviewKind::office ||
+            (current_kind_ == glance::app::PreviewKind::media && !media_is_audio_);
+    }
+
+    void MainWindow::auto_fit_window_to_content(double content_width, double content_height) noexcept
+    {
+        if (!auto_fit_applies() || window_ == nullptr ||
+            content_width <= 0.0 || content_height <= 0.0)
+        {
+            return;
+        }
+
+        RECT bounds{};
+        if (!GetWindowRect(window_, &bounds))
+        {
+            return;
+        }
+        HMONITOR monitor = MonitorFromWindow(window_, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO info{ sizeof(MONITORINFO) };
+        if (!GetMonitorInfoW(monitor, &info))
+        {
+            return;
+        }
+
+        FrameworkElement panel = current_kind_ == glance::app::PreviewKind::image
+            ? ImagePanel().as<FrameworkElement>()
+            : current_kind_ == glance::app::PreviewKind::media
+                ? MediaPanel().as<FrameworkElement>()
+                : PdfPanel().as<FrameworkElement>();
+        const int current_width = bounds.right - bounds.left;
+        const int current_height = bounds.bottom - bounds.top;
+        const int horizontal_chrome = std::max(0, current_width - static_cast<int>(std::lround(panel.ActualWidth())));
+        const int vertical_chrome = std::max(0, current_height - static_cast<int>(std::lround(panel.ActualHeight())));
+        const int work_width = info.rcWork.right - info.rcWork.left;
+        const int work_height = info.rcWork.bottom - info.rcWork.top;
+        const int maximum_width = std::max(1, static_cast<int>(std::floor(work_width * 0.75)));
+        const int maximum_height = std::max(1, static_cast<int>(std::floor(work_height * 0.75)));
+        const UINT dpi = GetDpiForWindow(window_);
+        const int minimum_width = std::min(maximum_width, MulDiv(480, static_cast<int>(dpi), 96));
+        const int minimum_height = std::min(maximum_height, MulDiv(320, static_cast<int>(dpi), 96));
+
+        const double maximum_content_width = std::max(1, maximum_width - horizontal_chrome);
+        const double maximum_content_height = std::max(1, maximum_height - vertical_chrome);
+        const double minimum_content_width = std::max(1, minimum_width - horizontal_chrome);
+        const double minimum_content_height = std::max(1, minimum_height - vertical_chrome);
+        const double lower_scale = std::max(
+            minimum_content_width / content_width,
+            minimum_content_height / content_height);
+        const double upper_scale = std::min(
+            maximum_content_width / content_width,
+            maximum_content_height / content_height);
+        const double scale = lower_scale > upper_scale
+            ? upper_scale
+            : std::clamp(1.0, lower_scale, upper_scale);
+        const int width = std::clamp(
+            static_cast<int>(std::lround(content_width * scale)) + horizontal_chrome,
+            minimum_width,
+            maximum_width);
+        const int height = std::clamp(
+            static_cast<int>(std::lround(content_height * scale)) + vertical_chrome,
+            minimum_height,
+            maximum_height);
+        const int x = info.rcWork.left + (work_width - width) / 2;
+        const int y = info.rcWork.top + (work_height - height) / 2;
+        SetWindowPos(window_, nullptr, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
+    }
+
     void MainWindow::save_current_window_size() const noexcept
     {
-        if (!visible_ || window_ == nullptr || IsZoomed(window_))
+        if (!visible_ || window_ == nullptr || IsZoomed(window_) || auto_fit_applies())
         {
             return;
         }
@@ -340,7 +522,8 @@ namespace winrt::Glance::App::implementation
             current_kind_,
             SIZE{
                 MulDiv(bounds.right - bounds.left, 96, static_cast<int>(dpi)),
-                MulDiv(bounds.bottom - bounds.top, 96, static_cast<int>(dpi)) });
+                MulDiv(bounds.bottom - bounds.top, 96, static_cast<int>(dpi)) },
+            media_is_audio_);
     }
 
     void MainWindow::present_file(std::uint32_t index)
@@ -406,6 +589,7 @@ namespace winrt::Glance::App::implementation
             break;
         case glance::app::PreviewKind::media:
             show_content_panel(kind);
+            media_is_audio_ = is_audio_path(file.path);
             MediaCoverImage().Source(nullptr);
             MediaCoverImage().Visibility(Visibility::Collapsed);
             MediaCoverPlaceholder().Visibility(Visibility::Visible);
@@ -427,30 +611,20 @@ namespace winrt::Glance::App::implementation
             load_pdf_async(file.path, generation);
             break;
         case glance::app::PreviewKind::archive:
-            if (CompareStringOrdinal(
-                    std::filesystem::path(file.path).extension().c_str(),
-                    -1,
-                    L".zip",
-                    -1,
-                    TRUE) == CSTR_EQUAL)
-            {
-                show_content_panel(kind);
-                ArchiveStatusText().Text(glance::app::localize(L"LoadingArchive"));
-                ArchiveEntryList().Items().Clear();
-                load_archive_async(file.path, generation);
-            }
-            else
-            {
-                present_generic(file);
-            }
+            show_content_panel(kind);
+            ArchiveStatusText().Text(glance::app::localize(L"LoadingArchive"));
+            ArchiveEntryList().Items().Clear();
+            load_archive_async(file.path, generation);
             break;
         case glance::app::PreviewKind::office:
             show_content_panel(glance::app::PreviewKind::pdf);
+            pdf_document_ = nullptr;
+            PdfPageImage().Source(nullptr);
             pdf_wheel_delta_ = 0;
             PdfPageText().Text(L"1 / 1");
             PdfLoadingText().Text(glance::app::localize(L"ConvertingOffice"));
             PdfLoadingOverlay().Visibility(Visibility::Visible);
-            load_office_async(file.path, generation);
+            load_office_async(file.path, generation, file.size, file.last_write_time);
             break;
         default:
             present_generic(file);
@@ -562,6 +736,7 @@ namespace winrt::Glance::App::implementation
                         + L"  |  " + lifetime->formatted_time(current.last_write_time)
                         + L"  |  " + std::to_wstring(width) + L" x " + std::to_wstring(height));
                 }
+                lifetime->auto_fit_window_to_content(width, height);
             }));
         }
         catch (const hresult_error& error)
@@ -606,14 +781,7 @@ namespace winrt::Glance::App::implementation
                 co_return;
             }
 
-            auto extension = std::filesystem::path(path).extension().wstring();
-            std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
-                return static_cast<wchar_t>(std::towlower(value));
-            });
-            static constexpr std::array audio_extensions{
-                std::wstring_view(L".mp3"), std::wstring_view(L".flac"), std::wstring_view(L".wav"),
-                std::wstring_view(L".m4a"), std::wstring_view(L".aac"), std::wstring_view(L".ogg") };
-            media_is_audio_ = std::ranges::find(audio_extensions, extension) != audio_extensions.end();
+            media_is_audio_ = is_audio_path(path);
             AudioMetadataPanel().Visibility(media_is_audio_ ? Visibility::Visible : Visibility::Collapsed);
             MediaPreview().Visibility(media_is_audio_ ? Visibility::Collapsed : Visibility::Visible);
             if (media_is_audio_)
@@ -697,6 +865,7 @@ namespace winrt::Glance::App::implementation
                     {
                         media_dimensions_ = std::to_wstring(properties.Width())
                             + L" x " + std::to_wstring(properties.Height());
+                        auto_fit_window_to_content(properties.Width(), properties.Height());
                     }
                     update_media_footer();
                 }
@@ -799,6 +968,7 @@ namespace winrt::Glance::App::implementation
                 co_return;
             }
             const auto page = pdf_document_.GetPage(page_index);
+            const auto dimensions = page.Dimensions().CropBox();
             Windows::Storage::Streams::InMemoryRandomAccessStream stream;
             co_await page.RenderToStreamAsync(stream);
             stream.Seek(0);
@@ -812,6 +982,7 @@ namespace winrt::Glance::App::implementation
             PdfLoadingOverlay().Visibility(Visibility::Collapsed);
             PdfPageText().Text(
                 std::to_wstring(page_index + 1) + L" / " + std::to_wstring(pdf_document_.PageCount()));
+            auto_fit_window_to_content(dimensions.Width, dimensions.Height);
         }
         catch (const hresult_error& error)
         {
@@ -826,7 +997,7 @@ namespace winrt::Glance::App::implementation
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
-        auto preview = glance::app::load_shell_archive_preview(path);
+        auto preview = glance::app::load_archive_preview(path);
         static_cast<void>(dispatcher.TryEnqueue(
             [lifetime, preview = std::move(preview), generation]() mutable {
                 lifetime->apply_archive_preview(std::move(preview), generation);
@@ -903,13 +1074,39 @@ namespace winrt::Glance::App::implementation
             item.Content(row);
             items.Append(item);
         }
-        ArchiveStatusText().Text(
-            glance::app::localize_format(L"EntryCount", { std::to_wstring(preview.entries.size()) }) +
-            (preview.truncated ? L"  |  " + glance::app::localize(L"ListTruncated") : L""));
+        std::wstring status = glance::app::localize_format(
+            L"EntryCount",
+            { std::to_wstring(preview.entries.size()) });
+        if (preview.show_total_size)
+        {
+            status += L"  |  " + glance::app::localize_format(
+                preview.truncated ? L"PartialTotalSize" : L"TotalSize",
+                { formatted_size(preview.total_size) });
+        }
+        if (preview.truncated)
+        {
+            status += L"  |  " + glance::app::localize(L"ListTruncated");
+        }
+        ArchiveStatusText().Text(status);
     }
 
-    fire_and_forget MainWindow::load_office_async(std::wstring path, std::uint64_t generation)
+    fire_and_forget MainWindow::load_office_async(
+        std::wstring path,
+        std::uint64_t generation,
+        std::uint64_t source_size,
+        std::uint64_t source_modified_time)
     {
+        std::error_code cache_error;
+        if (path == office_cache_source_path_ &&
+            source_size == office_cache_source_size_ &&
+            source_modified_time == office_cache_source_modified_time_ &&
+            std::filesystem::is_regular_file(office_temp_pdf_, cache_error))
+        {
+            PdfLoadingText().Text(glance::app::localize(L"LoadingConvertedDocument"));
+            load_pdf_async(office_temp_pdf_, generation);
+            co_return;
+        }
+
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
@@ -920,13 +1117,23 @@ namespace winrt::Glance::App::implementation
         const auto output_path = cache_directory /
             (L"preview-" + std::to_wstring(GetCurrentProcessId()) + L"-" +
              std::to_wstring(instance_id_) + L"-" + std::to_wstring(generation) + L".pdf");
+        const auto staged_input_path = cache_directory /
+            (L"source-" + std::to_wstring(GetCurrentProcessId()) + L"-" +
+             std::to_wstring(instance_id_) + L"-" + std::to_wstring(generation) +
+             std::filesystem::path(path).extension().wstring());
         const auto host_path = executable_directory() / L"Glance.OfficeHost.exe";
 
         DWORD exit_code = ERROR_FILE_NOT_FOUND;
-        if (!filesystem_error && std::filesystem::exists(host_path))
+        const bool staged = !filesystem_error && std::filesystem::copy_file(
+            path,
+            staged_input_path,
+            std::filesystem::copy_options::overwrite_existing,
+            filesystem_error);
+        if (staged && std::filesystem::exists(host_path))
         {
             std::wstring command_line = quote_command_line_argument(host_path.wstring()) + L" " +
-                quote_command_line_argument(path) + L" " + quote_command_line_argument(output_path.wstring());
+                quote_command_line_argument(staged_input_path.wstring()) + L" " +
+                quote_command_line_argument(output_path.wstring());
             STARTUPINFOW startup{ sizeof(STARTUPINFOW) };
             PROCESS_INFORMATION process{};
             if (CreateProcessW(
@@ -952,26 +1159,41 @@ namespace winrt::Glance::App::implementation
                 CloseHandle(process.hProcess);
             }
         }
+        DeleteFileW(staged_input_path.c_str());
 
+        filesystem_error.clear();
         const bool succeeded = exit_code == 0 && std::filesystem::is_regular_file(output_path, filesystem_error);
-        static_cast<void>(dispatcher.TryEnqueue([lifetime, output = output_path.wstring(), generation, succeeded] {
-            if (generation != lifetime->content_generation_)
-            {
-                DeleteFileW(output.c_str());
-                return;
-            }
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            source = std::move(path),
+            source_size,
+            source_modified_time,
+            output = output_path.wstring(),
+            generation,
+            succeeded] {
             if (!succeeded)
             {
-                lifetime->show_provider_error(
-                    glance::app::localize(L"OfficeConvertError"),
-                    generation);
+                DeleteFileW(output.c_str());
+                if (generation == lifetime->content_generation_)
+                {
+                    lifetime->show_provider_error(
+                        glance::app::localize(L"OfficeConvertError"),
+                        generation);
+                }
                 return;
             }
-            if (!lifetime->office_temp_pdf_.empty())
+            if (!lifetime->office_temp_pdf_.empty() && lifetime->office_temp_pdf_ != output)
             {
                 DeleteFileW(lifetime->office_temp_pdf_.c_str());
             }
             lifetime->office_temp_pdf_ = output;
+            lifetime->office_cache_source_path_ = source;
+            lifetime->office_cache_source_size_ = source_size;
+            lifetime->office_cache_source_modified_time_ = source_modified_time;
+            if (generation != lifetime->content_generation_)
+            {
+                return;
+            }
             lifetime->PdfPageText().Text(L"1 / 1");
             lifetime->load_pdf_async(output, generation);
         }));
@@ -1301,11 +1523,6 @@ namespace winrt::Glance::App::implementation
         {
             pdf_document_ = nullptr;
             PdfPageImage().Source(nullptr);
-            if (!office_temp_pdf_.empty())
-            {
-                DeleteFileW(office_temp_pdf_.c_str());
-                office_temp_pdf_.clear();
-            }
         }
     }
 
@@ -1344,6 +1561,7 @@ namespace winrt::Glance::App::implementation
         if (detached_)
         {
             stop_detached_focus_monitor();
+            clear_preview_content();
             Close();
             return;
         }
@@ -1360,6 +1578,8 @@ namespace winrt::Glance::App::implementation
         markdown_preview_ = preview;
         MarkdownPreviewButton().IsChecked(preview);
         MarkdownCodeButton().IsChecked(!preview);
+        MarkdownPreviewButton().FontWeight(preview ? Windows::UI::Text::FontWeights::SemiBold() : Windows::UI::Text::FontWeights::Normal());
+        MarkdownCodeButton().FontWeight(preview ? Windows::UI::Text::FontWeights::Normal() : Windows::UI::Text::FontWeights::SemiBold());
         TextPreviewScroller().Visibility(preview ? Visibility::Collapsed : Visibility::Visible);
         MarkdownPreviewWebView().Visibility(preview ? Visibility::Visible : Visibility::Collapsed);
     }

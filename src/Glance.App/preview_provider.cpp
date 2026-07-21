@@ -238,7 +238,9 @@ namespace glance::app
         static constexpr std::array archive_extensions{
             std::wstring_view(L".zip"), std::wstring_view(L".7z"), std::wstring_view(L".rar"),
             std::wstring_view(L".tar"), std::wstring_view(L".gz"), std::wstring_view(L".bz2"),
-            std::wstring_view(L".xz") };
+            std::wstring_view(L".xz"), std::wstring_view(L".tgz"), std::wstring_view(L".tbz"),
+            std::wstring_view(L".tbz2"), std::wstring_view(L".txz"), std::wstring_view(L".zst"),
+            std::wstring_view(L".cab") };
         static constexpr std::array office_extensions{
             std::wstring_view(L".doc"), std::wstring_view(L".docx"), std::wstring_view(L".xls"),
             std::wstring_view(L".xlsx"), std::wstring_view(L".ppt"), std::wstring_view(L".pptx") };

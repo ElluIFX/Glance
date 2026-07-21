@@ -7,7 +7,7 @@ namespace
 {
     constexpr wchar_t registry_path[] = L"Software\\Glance\\WindowSizes";
 
-    const wchar_t* value_name(glance::app::PreviewKind kind) noexcept
+    const wchar_t* value_name(glance::app::PreviewKind kind, bool media_is_audio) noexcept
     {
         using glance::app::PreviewKind;
         switch (kind)
@@ -19,7 +19,7 @@ namespace
         case PreviewKind::image:
             return L"Image";
         case PreviewKind::media:
-            return L"Media";
+            return media_is_audio ? L"Audio" : L"Video";
         case PreviewKind::pdf:
             return L"Pdf";
         case PreviewKind::archive:
@@ -34,14 +34,14 @@ namespace
 
 namespace glance::app
 {
-    std::optional<SIZE> load_window_size(PreviewKind kind)
+    std::optional<SIZE> load_window_size(PreviewKind kind, bool media_is_audio)
     {
         std::uint64_t packed{};
         DWORD size = sizeof(packed);
         if (RegGetValueW(
                 HKEY_CURRENT_USER,
                 registry_path,
-                value_name(kind),
+                value_name(kind, media_is_audio),
                 RRF_RT_REG_QWORD,
                 nullptr,
                 &packed,
@@ -60,7 +60,7 @@ namespace glance::app
         return result;
     }
 
-    void save_window_size(PreviewKind kind, SIZE size) noexcept
+    void save_window_size(PreviewKind kind, SIZE size, bool media_is_audio) noexcept
     {
         if (size.cx <= 0 || size.cy <= 0)
         {
@@ -87,7 +87,7 @@ namespace glance::app
             static_cast<std::uint32_t>(size.cy);
         RegSetValueExW(
             key,
-            value_name(kind),
+            value_name(kind, media_is_audio),
             0,
             REG_QWORD,
             reinterpret_cast<const BYTE*>(&packed),
@@ -99,5 +99,46 @@ namespace glance::app
     {
         const LSTATUS result = RegDeleteTreeW(HKEY_CURRENT_USER, registry_path);
         return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
+    }
+
+    bool auto_fit_window_size_enabled() noexcept
+    {
+        DWORD value{};
+        DWORD size = sizeof(value);
+        return RegGetValueW(
+                   HKEY_CURRENT_USER,
+                   L"Software\\Glance",
+                   L"AutoFitWindowSize",
+                   RRF_RT_REG_DWORD,
+                   nullptr,
+                   &value,
+                   &size) == ERROR_SUCCESS && value != 0;
+    }
+
+    void set_auto_fit_window_size_enabled(bool enabled) noexcept
+    {
+        HKEY key{};
+        if (RegCreateKeyExW(
+                HKEY_CURRENT_USER,
+                L"Software\\Glance",
+                0,
+                nullptr,
+                0,
+                KEY_SET_VALUE,
+                nullptr,
+                &key,
+                nullptr) != ERROR_SUCCESS)
+        {
+            return;
+        }
+        const DWORD value = enabled ? 1U : 0U;
+        RegSetValueExW(
+            key,
+            L"AutoFitWindowSize",
+            0,
+            REG_DWORD,
+            reinterpret_cast<const BYTE*>(&value),
+            sizeof(value));
+        RegCloseKey(key);
     }
 }

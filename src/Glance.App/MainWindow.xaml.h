@@ -111,7 +111,11 @@ namespace winrt::Glance::App::implementation
             DWORD_PTR reference_data) noexcept;
         void configure_window();
         void position_initial_window(bool ignore_saved_size = false);
+        void auto_fit_window_to_content(double width, double height) noexcept;
+        [[nodiscard]] bool auto_fit_applies() const noexcept;
         void save_current_window_size() const noexcept;
+        void clear_preview_content();
+        void reset_hidden_window_size() noexcept;
         void present_file(std::uint32_t index);
         void present_generic(const glance::app::PreviewFile& file);
         winrt::fire_and_forget load_generic_file_info_async(std::wstring path, std::uint64_t generation);
@@ -133,7 +137,11 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget render_pdf_page_async(std::uint32_t page_index, std::uint64_t generation);
         winrt::fire_and_forget load_archive_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_directory_async(std::wstring path, std::uint64_t generation);
-        winrt::fire_and_forget load_office_async(std::wstring path, std::uint64_t generation);
+        winrt::fire_and_forget load_office_async(
+            std::wstring path,
+            std::uint64_t generation,
+            std::uint64_t source_size,
+            std::uint64_t source_modified_time);
         void apply_archive_preview(glance::app::ArchivePreview preview, std::uint64_t generation);
         void apply_text_preview(glance::app::TextPreview preview, bool markdown, std::uint64_t generation);
         void render_markdown();
@@ -199,6 +207,9 @@ namespace winrt::Glance::App::implementation
         std::wstring media_dimensions_;
         std::wstring media_technical_info_;
         std::wstring office_temp_pdf_;
+        std::wstring office_cache_source_path_;
+        std::uint64_t office_cache_source_size_{};
+        std::uint64_t office_cache_source_modified_time_{};
         Windows::Data::Pdf::PdfDocument pdf_document_{ nullptr };
         std::uint32_t pdf_page_index_{};
         int pdf_wheel_delta_{};

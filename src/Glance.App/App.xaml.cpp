@@ -82,7 +82,7 @@ namespace winrt::Glance::App::implementation
         if (!tray_icon_->create(
                 GetModuleHandleW(nullptr),
                 [this] { show_settings(); },
-                [this] { exit_application(); }))
+                [this] { confirm_exit(); }))
         {
             tray_icon_.reset();
             show_settings();
@@ -172,6 +172,18 @@ namespace winrt::Glance::App::implementation
             });
         }
         settings_window_.Activate();
+    }
+
+    void App::confirm_exit()
+    {
+        show_settings();
+        if (settings_window_ != nullptr)
+        {
+            const auto settings = settings_window_;
+            static_cast<void>(dispatcher_.TryEnqueue([settings] {
+                get_self<implementation::SettingsWindow>(settings)->ConfirmExit();
+            }));
+        }
     }
 
     void App::apply_appearance_preferences()

@@ -9,19 +9,24 @@
             <RowDefinition Height="42" />
         </Grid.RowDefinitions>
 
-        <Grid x:Name="TitleBarDragRegion" Grid.Row="0" Padding="12,0,6,0">
+        <Grid Grid.Row="0" Padding="12,0,6,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock
-                x:Name="TitleText"
-                VerticalAlignment="Center"
-                FontSize="13"
-                FontWeight="SemiBold"
-                TextTrimming="CharacterEllipsis" />
+            <Grid
+                x:Name="TitleBarDragRegion"
+                Grid.Column="0"
+                Background="Transparent">
+                <TextBlock
+                    x:Name="TitleText"
+                    VerticalAlignment="Center"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    TextTrimming="CharacterEllipsis" />
+            </Grid>
             <ToggleButton
                 x:Name="TopmostButton"
                 x:Uid="TopmostButton"
@@ -105,6 +110,7 @@
                             x:Name="GenericAdvancedInfoText"
                             FontFamily="Cascadia Mono, Consolas"
                             FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             IsTextSelectionEnabled="True"
                             TextWrapping="NoWrap" />
                     </ScrollViewer>
@@ -131,92 +137,48 @@
                 </StackPanel>
 
                 <Grid x:Name="TextPanel" Visibility="Collapsed">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <Grid Grid.Row="0" Padding="12,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel
-                            x:Name="MarkdownModeButtons"
-                            Grid.Column="1"
-                            Margin="0,6"
-                            Orientation="Horizontal"
-                            Spacing="2"
-                            Visibility="Collapsed">
-                            <ToggleButton
-                                x:Name="MarkdownPreviewButton"
-                                x:Uid="MarkdownPreviewButton"
-                                Height="24"
-                                MinWidth="54"
-                                Padding="8,0"
-                                Background="Transparent"
-                                BorderBrush="Transparent"
-                                BorderThickness="0"
-                                Click="MarkdownPreviewButton_Click"
-                                Content="Preview"
-                                FontSize="11" />
-                            <ToggleButton
-                                x:Name="MarkdownCodeButton"
-                                x:Uid="MarkdownCodeButton"
-                                Height="24"
-                                MinWidth="42"
-                                Padding="8,0"
-                                Background="Transparent"
-                                BorderBrush="Transparent"
-                                BorderThickness="0"
-                                Click="MarkdownCodeButton_Click"
-                                Content="Code"
-                                FontSize="11" />
-                        </StackPanel>
-                    </Grid>
-                    <Grid Grid.Row="1">
-                        <ScrollViewer
-                            x:Name="TextPreviewScroller"
-                            HorizontalScrollBarVisibility="Auto"
-                            HorizontalScrollMode="Enabled"
-                            SizeChanged="TextPreviewScroller_SizeChanged"
-                            VerticalScrollBarVisibility="Auto"
-                            VerticalScrollMode="Enabled">
-                            <Grid x:Name="TextCodePanel">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Border
-                                    x:Name="LineNumberGutter"
-                                    Background="{ThemeResource SubtleFillColorTransparentBrush}">
-                                    <TextBlock
-                                        x:Name="LineNumberText"
-                                        MinWidth="42"
-                                        Padding="10,12,10,12"
-                                        FontFamily="Cascadia Mono, Consolas"
-                                        FontSize="13"
-                                        LineHeight="18"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        IsHitTestVisible="False"
-                                        Opacity="0.42"
-                                        TextAlignment="Right"
-                                        TextWrapping="NoWrap" />
-                                </Border>
-                                <RichTextBlock
-                                    x:Name="TextContentRichText"
-                                    Grid.Column="1"
-                                    Padding="16,12"
+                    <ScrollViewer
+                        x:Name="TextPreviewScroller"
+                        HorizontalScrollBarVisibility="Auto"
+                        HorizontalScrollMode="Enabled"
+                        SizeChanged="TextPreviewScroller_SizeChanged"
+                        VerticalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Enabled">
+                        <Grid x:Name="TextCodePanel">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border
+                                x:Name="LineNumberGutter"
+                                Background="{ThemeResource SubtleFillColorTransparentBrush}">
+                                <TextBlock
+                                    x:Name="LineNumberText"
+                                    MinWidth="42"
+                                    Padding="10,12,10,12"
                                     FontFamily="Cascadia Mono, Consolas"
                                     FontSize="13"
-                                    IsTextSelectionEnabled="True"
+                                    LineHeight="18"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    IsHitTestVisible="False"
+                                    Opacity="0.42"
+                                    TextAlignment="Right"
                                     TextWrapping="NoWrap" />
-                            </Grid>
-                        </ScrollViewer>
-                        <WebView2
-                            x:Name="MarkdownPreviewWebView"
-                            DefaultBackgroundColor="Transparent"
-                            Visibility="Collapsed" />
-                    </Grid>
+                            </Border>
+                            <RichTextBlock
+                                x:Name="TextContentRichText"
+                                Grid.Column="1"
+                                Padding="16,12"
+                                FontFamily="Cascadia Mono, Consolas"
+                                FontSize="13"
+                                IsTextSelectionEnabled="True"
+                                TextWrapping="NoWrap" />
+                        </Grid>
+                    </ScrollViewer>
+                    <WebView2
+                        x:Name="MarkdownPreviewWebView"
+                        DefaultBackgroundColor="Transparent"
+                        Visibility="Collapsed" />
                 </Grid>
 
                 <Grid
@@ -527,6 +489,36 @@
                 Orientation="Horizontal"
                 Spacing="6"
                 Visibility="Collapsed">
+                <StackPanel
+                    x:Name="MarkdownModeButtons"
+                    Orientation="Horizontal"
+                    Spacing="2"
+                    Visibility="Collapsed">
+                    <ToggleButton
+                        x:Name="MarkdownPreviewButton"
+                        x:Uid="MarkdownPreviewButton"
+                        Height="24"
+                        MinWidth="54"
+                        Padding="8,0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Click="MarkdownPreviewButton_Click"
+                        Content="Preview"
+                        FontSize="11" />
+                    <ToggleButton
+                        x:Name="MarkdownCodeButton"
+                        x:Uid="MarkdownCodeButton"
+                        Height="24"
+                        MinWidth="42"
+                        Padding="8,0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Click="MarkdownCodeButton_Click"
+                        Content="Code"
+                        FontSize="11" />
+                </StackPanel>
                 <ComboBox
                     x:Name="EncodingSelector"
                     Width="112"
