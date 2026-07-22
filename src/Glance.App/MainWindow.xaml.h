@@ -3,6 +3,7 @@
 #include "MainWindow.g.h"
 #include "appearance_preferences.h"
 #include "archive_provider.h"
+#include "footer_preferences.h"
 #include "generic_preview_preferences.h"
 #include "media_preview_preferences.h"
 #include "preview_file.h"
@@ -39,6 +40,7 @@ namespace winrt::Glance::App::implementation
         void ApplyAppearancePreferences();
         void ApplyLocalizedResources();
         void ApplyTextPreferences();
+        void ApplyFooterPreferences();
         [[nodiscard]] std::uint64_t InstanceId() const noexcept { return instance_id_; }
 
         void TopmostButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -135,6 +137,7 @@ namespace winrt::Glance::App::implementation
             bool use_file_attributes,
             std::uint64_t generation);
         winrt::fire_and_forget load_generic_file_info_async(std::wstring path, std::uint64_t generation);
+        winrt::fire_and_forget load_footer_access_async(std::wstring path, std::uint64_t generation);
         void prepare_text_preview(const glance::app::PreviewFile& file, bool markdown);
         void present_text(const glance::app::PreviewFile& file, bool markdown);
         winrt::fire_and_forget load_text_async(
@@ -197,6 +200,9 @@ namespace winrt::Glance::App::implementation
         void show_media_controls();
         void update_media_controls();
         void update_media_footer();
+        void update_footer_metadata();
+        void update_generic_file_metadata();
+        void request_footer_access_if_needed();
         void update_image_metadata_visibility();
         void set_image_zoom(float zoom, Windows::Foundation::Point anchor);
         void end_image_pan(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
@@ -241,7 +247,11 @@ namespace winrt::Glance::App::implementation
         bool current_text_markdown_{};
         glance::app::TextEncoding current_text_encoding_{ glance::app::TextEncoding::automatic };
         glance::app::TextPreferences text_preferences_{};
+        glance::app::FooterPreferences footer_preferences_{};
         glance::app::GenericPreviewPreferences generic_preview_preferences_{};
+        std::wstring footer_access_mode_;
+        bool footer_access_loaded_{};
+        bool footer_access_requested_{};
         std::wstring image_metadata_;
         std::wstring media_dimensions_;
         std::wstring media_technical_info_;

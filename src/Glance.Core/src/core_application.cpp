@@ -578,6 +578,7 @@ namespace glance::core
             file.SetNamedValue(L"path", JsonValue::CreateStringValue(item.filesystem_path));
             file.SetNamedValue(L"parsingName", JsonValue::CreateStringValue(item.shell_parsing_name));
             file.SetNamedValue(L"size", JsonValue::CreateStringValue(std::to_wstring(item.size)));
+            file.SetNamedValue(L"creationTime", JsonValue::CreateStringValue(std::to_wstring(item.creation_time)));
             file.SetNamedValue(L"lastWriteTime", JsonValue::CreateStringValue(std::to_wstring(item.last_write_time)));
             file.SetNamedValue(L"attributes", JsonValue::CreateNumberValue(item.attributes));
             file.SetNamedValue(L"isFilesystem", JsonValue::CreateBooleanValue(item.is_filesystem));

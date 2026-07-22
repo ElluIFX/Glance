@@ -21,6 +21,7 @@ namespace glance::contracts
         std::wstring filesystem_path;
         std::wstring shell_parsing_name;
         std::uint64_t size{};
+        std::uint64_t creation_time{};
         std::uint64_t last_write_time{};
         std::uint32_t attributes{};
         bool is_filesystem{};

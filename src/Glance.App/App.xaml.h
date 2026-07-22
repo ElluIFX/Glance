@@ -33,6 +33,7 @@ namespace winrt::Glance::App::implementation
         void show_settings();
         void apply_appearance_preferences();
         void apply_text_preferences();
+        void apply_footer_preferences();
         void exit_application();
         void handle_pipe_message(glance::contracts::MessageType type, std::uint32_t flags, std::string payload);
         void handle_connection_changed(bool connected);

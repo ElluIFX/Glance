@@ -85,15 +85,25 @@
   <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>使用默认应用打开</value></data>
 
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>常规</value></data>
+  <data name="FooterNavigationItem.Content" xml:space="preserve"><value>底栏</value></data>
   <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>文本预览</value></data>
   <data name="MediaPreviewNavigationItem.Content" xml:space="preserve"><value>媒体预览</value></data>
-  <data name="PathCopyNavigationItem.Content" xml:space="preserve"><value>路径复制</value></data>
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>维护</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>关于</value></data>
   <data name="GeneralPageTitle.Text" xml:space="preserve"><value>常规</value></data>
   <data name="GeneralPageDescription.Text" xml:space="preserve"><value>外观和应用启动</value></data>
   <data name="LaunchTitle.Text" xml:space="preserve"><value>登录时启动</value></data>
   <data name="LaunchDescription.Text" xml:space="preserve"><value>登录 Windows 时自动启动 Glance</value></data>
+  <data name="FooterPageTitle.Text" xml:space="preserve"><value>底栏</value></data>
+  <data name="FooterPageDescription.Text" xml:space="preserve"><value>预览元数据和路径复制</value></data>
+  <data name="FooterFieldsLabel.Text" xml:space="preserve"><value>显示字段</value></data>
+  <data name="FooterFieldsDescription.Text" xml:space="preserve"><value>选择并排序预览字段</value></data>
+  <data name="FooterSizeCheckBox.Content" xml:space="preserve"><value>大小</value></data>
+  <data name="FooterModifiedTimeCheckBox.Content" xml:space="preserve"><value>修改时间</value></data>
+  <data name="FooterCreationTimeCheckBox.Content" xml:space="preserve"><value>创建时间</value></data>
+  <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>文件权限 (RWXD)</value></data>
+  <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>上移</value></data>
+  <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>下移</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>诊断</value></data>
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>保存诊断日志和崩溃转储</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
@@ -122,8 +132,7 @@
   <data name="SyntaxThemeTomorrowNight" xml:space="preserve"><value>Tomorrow Night</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>行号</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>自动换行</value></data>
-  <data name="PathCopyPageTitle.Text" xml:space="preserve"><value>路径复制</value></data>
-  <data name="PathCopyPageDescription.Text" xml:space="preserve"><value>设置从预览窗口复制的路径格式</value></data>
+  <data name="PathCopyGroupLabel.Text" xml:space="preserve"><value>路径复制</value></data>
   <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>为复制的路径添加引号</value></data>
   <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>使用双引号包裹复制的路径</value></data>
   <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix 路径分隔符</value></data>
@@ -185,6 +194,11 @@
   <data name="GenericAccess" xml:space="preserve"><value>访问权限：{0}</value></data>
   <data name="GenericAttributes" xml:space="preserve"><value>属性：{0}</value></data>
   <data name="GenericModifiedAt" xml:space="preserve"><value>修改于 {0}</value></data>
+  <data name="GenericCreatedAt" xml:space="preserve"><value>创建于 {0}</value></data>
+  <data name="GenericVolumeId" xml:space="preserve"><value>卷标识：{0}</value></data>
+  <data name="GenericFileId" xml:space="preserve"><value>文件 ID：{0}</value></data>
+  <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>修改 {0}</value></data>
+  <data name="FooterCreationTimeFormat" xml:space="preserve"><value>创建 {0}</value></data>
   <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance 设置</value></data>
   <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭设置</value></data>
   <data name="LanguageLabel.Text" xml:space="preserve"><value>语言</value></data>

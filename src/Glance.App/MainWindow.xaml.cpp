@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
 #include "appearance_preferences.h"
+#include "footer_preferences.h"
 #include "generic_file_info.h"
 #include "image_metadata_provider.h"
 #include "localization.h"
@@ -151,6 +152,7 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"MainWindow InitializeComponent complete.");
         ApplyLocalizedResources();
         ApplyAppearancePreferences();
+        footer_preferences_ = glance::app::load_footer_preferences();
         configure_window();
         glance::contracts::log_event(L"MainWindow native configuration complete.");
         media_timer_ = DispatcherTimer();
@@ -228,6 +230,8 @@ namespace winrt::Glance::App::implementation
             TextEncodingText().Text(glance::app::localize(L"PreviewTruncated"));
         }
         update_line_number_visibility();
+        update_generic_file_metadata();
+        update_footer_metadata();
     }
 
     void MainWindow::ApplyTextPreferences()
@@ -239,6 +243,13 @@ namespace winrt::Glance::App::implementation
             render_text_content();
             update_text_layout();
         }
+    }
+
+    void MainWindow::ApplyFooterPreferences()
+    {
+        footer_preferences_ = glance::app::load_footer_preferences();
+        update_footer_metadata();
+        request_footer_access_if_needed();
     }
 
     void MainWindow::configure_window()
@@ -477,6 +488,9 @@ namespace winrt::Glance::App::implementation
         image_metadata_.clear();
         media_dimensions_.clear();
         media_technical_info_.clear();
+        footer_access_mode_.clear();
+        footer_access_loaded_ = false;
+        footer_access_requested_ = false;
         files_.clear();
         current_index_ = 0;
         source_kind_ = 0;
@@ -663,10 +677,15 @@ namespace winrt::Glance::App::implementation
         const auto& file = files_[index];
         const auto generation = ++content_generation_;
         TitleText().Text(file.display_name);
-
-        const auto size = formatted_size(file.size);
-        const auto time = formatted_time(file.last_write_time);
-        FooterMetadataText().Text(size + L"  |  " + time);
+        image_pixel_width_ = 0;
+        image_pixel_height_ = 0;
+        media_dimensions_.clear();
+        media_technical_info_.clear();
+        footer_access_mode_.clear();
+        footer_access_loaded_ = false;
+        footer_access_requested_ = false;
+        update_footer_metadata();
+        request_footer_access_if_needed();
 
         const bool from_explorer = source_kind_ == 1;
         OpenFolderButton().Visibility(from_explorer ? Visibility::Collapsed : Visibility::Visible);
@@ -778,11 +797,7 @@ namespace winrt::Glance::App::implementation
         show_content_panel(glance::app::PreviewKind::generic);
         FileNameText().Text(file.display_name);
         FilePathText().Text(!file.path.empty() ? file.path : file.parsing_name);
-        FileMetadataText().Text(
-            formatted_size(file.size) + L"  |  " +
-            glance::app::localize_format(
-                L"GenericModifiedAt",
-                { formatted_time(file.last_write_time) }));
+        update_generic_file_metadata();
         GenericFileIconImage().Source(nullptr);
         GenericFileIconImage().Visibility(Visibility::Collapsed);
         GenericFileFallbackIcon().Visibility(Visibility::Visible);
@@ -875,6 +890,25 @@ namespace winrt::Glance::App::implementation
         }));
     }
 
+    fire_and_forget MainWindow::load_footer_access_async(std::wstring path, std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        auto access = glance::app::load_file_access_mode(path);
+        static_cast<void>(dispatcher.TryEnqueue(
+            [lifetime, generation, access = std::move(access)]() mutable {
+                if (generation != lifetime->content_generation_)
+                {
+                    return;
+                }
+                lifetime->footer_access_requested_ = false;
+                lifetime->footer_access_loaded_ = true;
+                lifetime->footer_access_mode_ = access.value_or(L"--");
+                lifetime->update_footer_metadata();
+            }));
+    }
+
     void MainWindow::prepare_text_preview(const glance::app::PreviewFile& file, bool markdown)
     {
         current_kind_ = markdown ? glance::app::PreviewKind::markdown : glance::app::PreviewKind::text;
@@ -946,14 +980,7 @@ namespace winrt::Glance::App::implementation
                 lifetime->image_pixel_height_ = height;
                 lifetime->ImagePreview().Source(bitmap);
                 lifetime->fit_image_to_viewport();
-                if (lifetime->current_index_ < lifetime->files_.size())
-                {
-                    const auto& current = lifetime->files_[lifetime->current_index_];
-                    lifetime->FooterMetadataText().Text(
-                        lifetime->formatted_size(current.size)
-                        + L"  |  " + lifetime->formatted_time(current.last_write_time)
-                        + L"  |  " + std::to_wstring(width) + L" x " + std::to_wstring(height));
-                }
+                lifetime->update_footer_metadata();
                 lifetime->auto_fit_window_to_content(width, height);
             }));
         }
@@ -1129,22 +1156,120 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_media_footer()
     {
+        update_footer_metadata();
+    }
+
+    void MainWindow::update_footer_metadata()
+    {
         if (current_index_ >= files_.size())
+        {
+            FooterMetadataText().Text(L"");
+            return;
+        }
+
+        const auto& file = files_[current_index_];
+        std::vector<std::wstring> fields;
+        const auto append = [&fields](std::wstring value) {
+            if (!value.empty())
+            {
+                fields.push_back(std::move(value));
+            }
+        };
+        for (const auto field : footer_preferences_.order)
+        {
+            if (!glance::app::footer_field_enabled(footer_preferences_, field))
+            {
+                continue;
+            }
+            switch (field)
+            {
+            case glance::app::FooterField::size:
+                append(formatted_size(file.size));
+                break;
+            case glance::app::FooterField::modified_time:
+                if (file.last_write_time != 0)
+                {
+                    append(glance::app::localize_format(
+                        L"FooterModifiedTimeFormat",
+                        { formatted_time(file.last_write_time) }));
+                }
+                break;
+            case glance::app::FooterField::creation_time:
+                if (file.creation_time != 0)
+                {
+                    append(glance::app::localize_format(
+                        L"FooterCreationTimeFormat",
+                        { formatted_time(file.creation_time) }));
+                }
+                break;
+            case glance::app::FooterField::permissions:
+                append(footer_access_loaded_ ? footer_access_mode_ : L"--");
+                break;
+            }
+        }
+
+        if (current_kind_ == glance::app::PreviewKind::image &&
+            image_pixel_width_ > 0 && image_pixel_height_ > 0)
+        {
+            append(std::to_wstring(image_pixel_width_) + L" x " + std::to_wstring(image_pixel_height_));
+        }
+        if (current_kind_ == glance::app::PreviewKind::media)
+        {
+            append(media_dimensions_);
+            append(media_technical_info_);
+        }
+
+        std::wstring metadata;
+        for (const auto& field : fields)
+        {
+            metadata += metadata.empty() ? field : L"  |  " + field;
+        }
+        FooterMetadataText().Text(metadata);
+    }
+
+    void MainWindow::update_generic_file_metadata()
+    {
+        if (current_kind_ != glance::app::PreviewKind::generic || current_index_ >= files_.size())
         {
             return;
         }
         const auto& file = files_[current_index_];
-        std::wstring metadata = formatted_size(file.size)
-            + L"  |  " + formatted_time(file.last_write_time);
-        if (!media_dimensions_.empty())
+        std::wstring metadata = formatted_size(file.size);
+        if (file.last_write_time != 0)
         {
-            metadata += L"  |  " + media_dimensions_;
+            metadata += L"  |  " + glance::app::localize_format(
+                L"GenericModifiedAt",
+                { formatted_time(file.last_write_time) });
         }
-        if (!media_technical_info_.empty())
+        if (file.creation_time != 0)
         {
-            metadata += L"  |  " + media_technical_info_;
+            metadata += L"  |  " + glance::app::localize_format(
+                L"GenericCreatedAt",
+                { formatted_time(file.creation_time) });
         }
-        FooterMetadataText().Text(metadata);
+        FileMetadataText().Text(metadata);
+    }
+
+    void MainWindow::request_footer_access_if_needed()
+    {
+        if (!glance::app::footer_field_enabled(
+                footer_preferences_, glance::app::FooterField::permissions) ||
+            footer_access_loaded_ || footer_access_requested_ ||
+            current_index_ >= files_.size())
+        {
+            return;
+        }
+
+        const auto& file = files_[current_index_];
+        if (file.path.empty() || file.is_cloud_placeholder)
+        {
+            footer_access_mode_ = L"--";
+            footer_access_loaded_ = true;
+            update_footer_metadata();
+            return;
+        }
+        footer_access_requested_ = true;
+        load_footer_access_async(file.path, content_generation_);
     }
 
     fire_and_forget MainWindow::load_pdf_async(std::wstring path, std::uint64_t generation)

@@ -5,7 +5,9 @@
 #include <aclapi.h>
 
 #include <array>
+#include <filesystem>
 #include <iomanip>
+#include <optional>
 #include <sstream>
 #include <vector>
 
@@ -124,6 +126,124 @@ namespace
         return domain.empty() ? account : domain + L"\\" + account;
     }
 
+    std::optional<ACCESS_MASK> access_check_rights(PSECURITY_DESCRIPTOR descriptor)
+    {
+        HANDLE token{};
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token))
+        {
+            return std::nullopt;
+        }
+
+        HANDLE impersonation_token{};
+        const bool duplicated = DuplicateToken(token, SecurityImpersonation, &impersonation_token) != FALSE;
+        CloseHandle(token);
+        if (!duplicated)
+        {
+            return std::nullopt;
+        }
+
+        GENERIC_MAPPING mapping{
+            FILE_GENERIC_READ,
+            FILE_GENERIC_WRITE,
+            FILE_GENERIC_EXECUTE,
+            FILE_ALL_ACCESS,
+        };
+        PRIVILEGE_SET privileges{};
+        DWORD privileges_size = sizeof(privileges);
+        ACCESS_MASK rights{};
+        BOOL access_status{};
+        const bool succeeded = AccessCheck(
+            descriptor,
+            impersonation_token,
+            MAXIMUM_ALLOWED,
+            &mapping,
+            &privileges,
+            &privileges_size,
+            &rights,
+            &access_status) != FALSE;
+        CloseHandle(impersonation_token);
+        return succeeded && access_status
+            ? std::optional<ACCESS_MASK>{ rights }
+            : std::nullopt;
+    }
+
+    std::optional<ACCESS_MASK> path_rights(std::wstring_view path)
+    {
+        PSECURITY_DESCRIPTOR descriptor{};
+        const std::wstring owned_path(path);
+        if (GetNamedSecurityInfoW(
+                owned_path.data(),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr,
+                &descriptor) != ERROR_SUCCESS)
+        {
+            return std::nullopt;
+        }
+        const auto rights = access_check_rights(descriptor);
+        LocalFree(descriptor);
+        return rights;
+    }
+
+    bool parent_allows_child_delete(std::wstring_view path)
+    {
+        const auto parent = std::filesystem::path(path).parent_path();
+        if (parent.empty())
+        {
+            return false;
+        }
+        const auto rights = path_rights(parent.native());
+        return rights.has_value() && ((*rights & FILE_DELETE_CHILD) != 0);
+    }
+
+    bool allows_delete(std::wstring_view path, ACCESS_MASK rights)
+    {
+        return (rights & DELETE) != 0 || parent_allows_child_delete(path);
+    }
+
+    std::wstring file_identity(std::wstring_view path)
+    {
+        const HANDLE file = CreateFileW(
+            std::wstring(path).c_str(),
+            FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            nullptr);
+        if (file == INVALID_HANDLE_VALUE)
+        {
+            return {};
+        }
+
+        FILE_ID_INFO identity{};
+        const bool succeeded = GetFileInformationByHandleEx(
+            file,
+            FileIdInfo,
+            &identity,
+            sizeof(identity)) != FALSE;
+        CloseHandle(file);
+        if (!succeeded)
+        {
+            return {};
+        }
+
+        std::wostringstream volume;
+        volume << std::hex << std::uppercase << std::setfill(L'0')
+               << std::setw(16) << identity.VolumeSerialNumber;
+        std::wostringstream file_id;
+        file_id << std::hex << std::uppercase << std::setfill(L'0');
+        for (const auto byte : identity.FileId.Identifier)
+        {
+            file_id << std::setw(2) << static_cast<unsigned int>(byte);
+        }
+        return glance::app::localize_format(L"GenericVolumeId", { volume.str() }) + L"\n" +
+            glance::app::localize_format(L"GenericFileId", { file_id.str() });
+    }
+
     std::wstring security_info(std::wstring_view path)
     {
         PSID owner{};
@@ -201,6 +321,11 @@ namespace glance::app
             {
                 result = glance::app::localize_format(L"GenericAttributes", { attributes });
             }
+            const auto identity = file_identity(path);
+            if (!identity.empty())
+            {
+                result += result.empty() ? identity : L"\n" + identity;
+            }
             const auto security = security_info(path);
             if (!security.empty())
             {
@@ -216,6 +341,56 @@ namespace glance::app
         catch (...)
         {
             return {};
+        }
+    }
+
+    std::optional<std::wstring> load_file_access_mode(std::wstring_view path) noexcept
+    {
+        try
+        {
+            PSECURITY_DESCRIPTOR descriptor{};
+            const std::wstring owned_path(path);
+            if (GetNamedSecurityInfoW(
+                    owned_path.data(),
+                    SE_FILE_OBJECT,
+                    DACL_SECURITY_INFORMATION,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    &descriptor) != ERROR_SUCCESS)
+            {
+                return std::nullopt;
+            }
+            const auto rights = access_check_rights(descriptor);
+            LocalFree(descriptor);
+            if (!rights.has_value())
+            {
+                return std::nullopt;
+            }
+
+            std::wstring mode;
+            if ((*rights & FILE_READ_DATA) != 0)
+            {
+                mode += L'R';
+            }
+            if ((*rights & (FILE_WRITE_DATA | FILE_APPEND_DATA)) != 0)
+            {
+                mode += L'W';
+            }
+            if ((*rights & FILE_EXECUTE) != 0)
+            {
+                mode += L'X';
+            }
+            if (allows_delete(path, *rights))
+            {
+                mode += L'D';
+            }
+            return mode.empty() ? std::wstring(L"--") : mode;
+        }
+        catch (...)
+        {
+            return std::nullopt;
         }
     }
 }

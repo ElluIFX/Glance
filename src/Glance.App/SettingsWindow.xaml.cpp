@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "SettingsWindow.xaml.h"
 #include "appearance_preferences.h"
+#include "footer_preferences.h"
 #include "localization.h"
 #include "media_metadata_provider.h"
 #include "path_copy_preferences.h"
@@ -183,6 +184,17 @@ namespace
             : Windows::UI::Color{ 255, 196, 43, 28 }));
         Controls::ToolTipService::SetToolTip(icon, box_value(status));
     }
+
+    std::optional<glance::app::FooterField> footer_field_from_tag(
+        Windows::Foundation::IInspectable const& value)
+    {
+        const auto tag = unbox_value_or<hstring>(value, L"");
+        if (tag == L"size") return glance::app::FooterField::size;
+        if (tag == L"modified") return glance::app::FooterField::modified_time;
+        if (tag == L"created") return glance::app::FooterField::creation_time;
+        if (tag == L"permissions") return glance::app::FooterField::permissions;
+        return std::nullopt;
+    }
 }
 
 namespace winrt::Glance::App::implementation
@@ -238,6 +250,8 @@ namespace winrt::Glance::App::implementation
         path_copy_preferences_ = glance::app::load_path_copy_preferences();
         QuoteCopiedPathToggle().IsOn(path_copy_preferences_.quote_path);
         UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
+        footer_preferences_ = glance::app::load_footer_preferences();
+        rebuild_footer_field_rows();
         initializing_ = false;
         refresh_diagnostic_bundle_status();
         Activated([this](IInspectable const&, WindowActivatedEventArgs const& args) {
@@ -251,11 +265,13 @@ namespace winrt::Glance::App::implementation
     void SettingsWindow::InitializeSession(
         ExitCallback exit_callback,
         AppearanceChangedCallback appearance_changed_callback,
-        TextPreferencesChangedCallback text_preferences_changed_callback)
+        TextPreferencesChangedCallback text_preferences_changed_callback,
+        FooterPreferencesChangedCallback footer_preferences_changed_callback)
     {
         exit_callback_ = std::move(exit_callback);
         appearance_changed_callback_ = std::move(appearance_changed_callback);
         text_preferences_changed_callback_ = std::move(text_preferences_changed_callback);
+        footer_preferences_changed_callback_ = std::move(footer_preferences_changed_callback);
     }
 
     void SettingsWindow::configure_window()
@@ -302,6 +318,9 @@ namespace winrt::Glance::App::implementation
         const auto set_content = [](const auto& control, wchar_t const* key) {
             control.Content(box_value(glance::app::localize(key)));
         };
+        const auto set_tooltip = [](const auto& control, wchar_t const* key) {
+            Controls::ToolTipService::SetToolTip(control, box_value(glance::app::localize(key)));
+        };
 
         Title(glance::app::localize(L"SettingsTitle"));
         set_text(SettingsTitleText(), L"SettingsTitleText.Text");
@@ -309,9 +328,9 @@ namespace winrt::Glance::App::implementation
             CloseSettingsButton(),
             box_value(glance::app::localize(L"CloseSettingsButton.ToolTipService.ToolTip")));
         set_content(GeneralNavigationItem(), L"GeneralNavigationItem.Content");
+        set_content(FooterNavigationItem(), L"FooterNavigationItem.Content");
         set_content(TextPreviewNavigationItem(), L"TextPreviewNavigationItem.Content");
         set_content(MediaPreviewNavigationItem(), L"MediaPreviewNavigationItem.Content");
-        set_content(PathCopyNavigationItem(), L"PathCopyNavigationItem.Content");
         set_content(MaintenanceNavigationItem(), L"MaintenanceNavigationItem.Content");
         set_content(AboutNavigationItem(), L"AboutNavigationItem.Content");
         set_text(ExitButtonText(), L"ExitButtonText.Text");
@@ -344,6 +363,20 @@ namespace winrt::Glance::App::implementation
         set_text(AccentPurpleText(), L"AccentPurpleText.Text");
         set_text(LaunchTitle(), L"LaunchTitle.Text");
         set_text(LaunchDescription(), L"LaunchDescription.Text");
+        set_text(FooterPageTitle(), L"FooterPageTitle.Text");
+        set_text(FooterPageDescription(), L"FooterPageDescription.Text");
+        set_text(FooterFieldsLabel(), L"FooterFieldsLabel.Text");
+        set_text(FooterFieldsDescription(), L"FooterFieldsDescription.Text");
+        set_content(FooterSizeCheckBox(), L"FooterSizeCheckBox.Content");
+        set_content(FooterModifiedTimeCheckBox(), L"FooterModifiedTimeCheckBox.Content");
+        set_content(FooterCreationTimeCheckBox(), L"FooterCreationTimeCheckBox.Content");
+        set_content(FooterPermissionsCheckBox(), L"FooterPermissionsCheckBox.Content");
+        for (const auto field : footer_preferences_.order)
+        {
+            const auto controls = footer_field_controls(field);
+            set_tooltip(controls.move_up, L"FooterFieldMoveUpToolTip");
+            set_tooltip(controls.move_down, L"FooterFieldMoveDownToolTip");
+        }
         set_text(DiagnosticsTitle(), L"DiagnosticsTitle.Text");
         set_text(DiagnosticsDescription(), L"DiagnosticsDescription.Text");
         set_text(AutoFitWindowSizeLabel(), L"AutoFitWindowSizeLabel.Text");
@@ -392,8 +425,7 @@ namespace winrt::Glance::App::implementation
         initializing_ = was_initializing_syntax_theme;
         set_text(LineNumbersLabel(), L"LineNumbersLabel.Text");
         set_text(WordWrapLabel(), L"WordWrapLabel.Text");
-        set_text(PathCopyPageTitle(), L"PathCopyPageTitle.Text");
-        set_text(PathCopyPageDescription(), L"PathCopyPageDescription.Text");
+        set_text(PathCopyGroupLabel(), L"PathCopyGroupLabel.Text");
         set_text(QuoteCopiedPathLabel(), L"QuoteCopiedPathLabel.Text");
         set_text(QuoteCopiedPathDescription(), L"QuoteCopiedPathDescription.Text");
         set_text(UnixPathSeparatorsLabel(), L"UnixPathSeparatorsLabel.Text");
@@ -744,6 +776,129 @@ namespace winrt::Glance::App::implementation
         glance::app::save_path_copy_preferences(path_copy_preferences_);
     }
 
+    SettingsWindow::FooterFieldControls SettingsWindow::footer_field_controls(
+        glance::app::FooterField field)
+    {
+        using glance::app::FooterField;
+        switch (field)
+        {
+        case FooterField::size:
+            return { FooterSizeRow(), FooterSizeCheckBox(), FooterSizeMoveUpButton(), FooterSizeMoveDownButton() };
+        case FooterField::modified_time:
+            return { FooterModifiedTimeRow(), FooterModifiedTimeCheckBox(), FooterModifiedTimeMoveUpButton(), FooterModifiedTimeMoveDownButton() };
+        case FooterField::creation_time:
+            return { FooterCreationTimeRow(), FooterCreationTimeCheckBox(), FooterCreationTimeMoveUpButton(), FooterCreationTimeMoveDownButton() };
+        case FooterField::permissions:
+            return { FooterPermissionsRow(), FooterPermissionsCheckBox(), FooterPermissionsMoveUpButton(), FooterPermissionsMoveDownButton() };
+        default:
+            return {};
+        }
+    }
+
+    void SettingsWindow::rebuild_footer_field_rows()
+    {
+        const bool was_initializing = initializing_;
+        initializing_ = true;
+        auto children = FooterFieldsPanel().Children();
+        children.Clear();
+        for (std::size_t index = 0; index < footer_preferences_.order.size(); ++index)
+        {
+            const auto controls = footer_field_controls(footer_preferences_.order[index]);
+            controls.checkbox.IsChecked(glance::app::footer_field_enabled(
+                footer_preferences_, footer_preferences_.order[index]));
+            controls.move_up.IsEnabled(index > 0);
+            controls.move_down.IsEnabled(index + 1 < footer_preferences_.order.size());
+            controls.row.BorderThickness(Thickness{
+                0.0,
+                0.0,
+                0.0,
+                index + 1 < footer_preferences_.order.size() ? 1.0 : 0.0 });
+            children.Append(controls.row);
+        }
+        initializing_ = was_initializing;
+    }
+
+    void SettingsWindow::save_footer_preferences()
+    {
+        if (initializing_)
+        {
+            return;
+        }
+        glance::app::save_footer_preferences(footer_preferences_);
+        if (footer_preferences_changed_callback_)
+        {
+            footer_preferences_changed_callback_();
+        }
+    }
+
+    void SettingsWindow::FooterFieldCheckBox_Click(
+        IInspectable const& sender,
+        RoutedEventArgs const&)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+        const auto checkbox = sender.try_as<Controls::CheckBox>();
+        const auto field = checkbox == nullptr
+            ? std::nullopt
+            : footer_field_from_tag(checkbox.Tag());
+        if (!field.has_value())
+        {
+            return;
+        }
+        const auto bit = glance::app::footer_field_bit(*field);
+        if (checkbox.IsChecked().Value())
+        {
+            footer_preferences_.enabled_mask |= bit;
+        }
+        else
+        {
+            footer_preferences_.enabled_mask &= ~bit;
+        }
+        save_footer_preferences();
+    }
+
+    void SettingsWindow::FooterFieldMoveUpButton_Click(
+        IInspectable const& sender,
+        RoutedEventArgs const&)
+    {
+        const auto button = sender.try_as<Controls::Button>();
+        const auto field = button == nullptr ? std::nullopt : footer_field_from_tag(button.Tag());
+        if (!field.has_value())
+        {
+            return;
+        }
+        const auto position = std::ranges::find(footer_preferences_.order, *field);
+        if (position == footer_preferences_.order.end() || position == footer_preferences_.order.begin())
+        {
+            return;
+        }
+        std::iter_swap(position, position - 1);
+        rebuild_footer_field_rows();
+        save_footer_preferences();
+    }
+
+    void SettingsWindow::FooterFieldMoveDownButton_Click(
+        IInspectable const& sender,
+        RoutedEventArgs const&)
+    {
+        const auto button = sender.try_as<Controls::Button>();
+        const auto field = button == nullptr ? std::nullopt : footer_field_from_tag(button.Tag());
+        if (!field.has_value())
+        {
+            return;
+        }
+        const auto position = std::ranges::find(footer_preferences_.order, *field);
+        if (position == footer_preferences_.order.end() || position + 1 == footer_preferences_.order.end())
+        {
+            return;
+        }
+        std::iter_swap(position, position + 1);
+        rebuild_footer_field_rows();
+        save_footer_preferences();
+    }
+
     void SettingsWindow::save_appearance_preferences()
     {
         if (initializing_)
@@ -786,9 +941,9 @@ namespace winrt::Glance::App::implementation
             ? L"general"
             : unbox_value_or<hstring>(selected.Tag(), L"general");
         GeneralSettingsPanel().Visibility(tag == L"general" ? Visibility::Visible : Visibility::Collapsed);
+        FooterSettingsPanel().Visibility(tag == L"footer" ? Visibility::Visible : Visibility::Collapsed);
         TextPreviewSettingsPanel().Visibility(tag == L"text" ? Visibility::Visible : Visibility::Collapsed);
         MediaPreviewSettingsPanel().Visibility(tag == L"media" ? Visibility::Visible : Visibility::Collapsed);
-        PathCopySettingsPanel().Visibility(tag == L"path" ? Visibility::Visible : Visibility::Collapsed);
         MaintenanceSettingsPanel().Visibility(tag == L"maintenance" ? Visibility::Visible : Visibility::Collapsed);
         AboutSettingsPanel().Visibility(tag == L"about" ? Visibility::Visible : Visibility::Collapsed);
         if (tag == L"general")

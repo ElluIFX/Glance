@@ -88,6 +88,15 @@
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
             <NavigationViewItem
+                x:Name="FooterNavigationItem"
+                x:Uid="FooterNavigationItem"
+                Content="Footer"
+                Tag="footer">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE8A7;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
                 x:Name="TextPreviewNavigationItem"
                 x:Uid="TextPreviewNavigationItem"
                 Content="Text preview"
@@ -103,15 +112,6 @@
                 Tag="media">
                 <NavigationViewItem.Icon>
                     <FontIcon Glyph="&#xE714;" />
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-            <NavigationViewItem
-                x:Name="PathCopyNavigationItem"
-                x:Uid="PathCopyNavigationItem"
-                Content="Path copy"
-                Tag="path">
-                <NavigationViewItem.Icon>
-                    <FontIcon Glyph="&#xE8C8;" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
             <NavigationViewItem
@@ -295,6 +295,111 @@
             </ScrollViewer>
 
             <ScrollViewer
+                x:Name="FooterSettingsPanel"
+                HorizontalContentAlignment="Stretch"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="FooterPageTitle" x:Uid="FooterPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Footer" />
+                        <TextBlock x:Name="FooterPageDescription" x:Uid="FooterPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Preview metadata and path copying" />
+                    </StackPanel>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="FooterFieldsLabel" x:Uid="FooterFieldsLabel" Text="Displayed fields" />
+                                    <TextBlock x:Name="FooterFieldsDescription" x:Uid="FooterFieldsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Choose and order preview fields" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <StackPanel x:Name="FooterFieldsPanel">
+                                <Border x:Name="FooterSizeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                    <Grid MinHeight="44" Padding="16,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="FooterSizeCheckBox" x:Uid="FooterSizeCheckBox" VerticalAlignment="Center" Tag="size" Click="FooterFieldCheckBox_Click" Content="Size" />
+                                        <Button x:Name="FooterSizeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="size" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
+                                        <Button x:Name="FooterSizeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="size" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
+                                    </Grid>
+                                </Border>
+                                <Border x:Name="FooterModifiedTimeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                    <Grid MinHeight="44" Padding="16,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="FooterModifiedTimeCheckBox" x:Uid="FooterModifiedTimeCheckBox" VerticalAlignment="Center" Tag="modified" Click="FooterFieldCheckBox_Click" Content="Modified time" />
+                                        <Button x:Name="FooterModifiedTimeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="modified" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
+                                        <Button x:Name="FooterModifiedTimeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="modified" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
+                                    </Grid>
+                                </Border>
+                                <Border x:Name="FooterCreationTimeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                    <Grid MinHeight="44" Padding="16,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="FooterCreationTimeCheckBox" x:Uid="FooterCreationTimeCheckBox" VerticalAlignment="Center" Tag="created" Click="FooterFieldCheckBox_Click" Content="Created time" />
+                                        <Button x:Name="FooterCreationTimeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="created" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
+                                        <Button x:Name="FooterCreationTimeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="created" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
+                                    </Grid>
+                                </Border>
+                                <Border x:Name="FooterPermissionsRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                                    <Grid MinHeight="44" Padding="16,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="FooterPermissionsCheckBox" x:Uid="FooterPermissionsCheckBox" VerticalAlignment="Center" Tag="permissions" Click="FooterFieldCheckBox_Click" Content="Permissions (RWXD)" />
+                                        <Button x:Name="FooterPermissionsMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="permissions" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
+                                        <Button x:Name="FooterPermissionsMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="permissions" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <TextBlock x:Name="PathCopyGroupLabel" x:Uid="PathCopyGroupLabel" VerticalAlignment="Center" Text="Path copying" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="QuoteCopiedPathLabel" x:Uid="QuoteCopiedPathLabel" Text="Quote copied paths" />
+                                    <TextBlock x:Name="QuoteCopiedPathDescription" x:Uid="QuoteCopiedPathDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Wrap copied paths in double quotes" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="QuoteCopiedPathToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="UnixPathSeparatorsLabel" x:Uid="UnixPathSeparatorsLabel" Text="Unix separators" />
+                                    <TextBlock x:Name="UnixPathSeparatorsDescription" x:Uid="UnixPathSeparatorsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Replace backslashes with forward slashes" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="UnixPathSeparatorsToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer
                 x:Name="TextPreviewSettingsPanel"
                 HorizontalContentAlignment="Stretch"
                 VerticalScrollBarVisibility="Auto"
@@ -471,46 +576,6 @@
                                     <TextBlock x:Name="WindowSizeResetStatusText" x:Uid="WindowSizeResetStatusText" Style="{StaticResource SettingsDescriptionStyle}" Text="Stored separately by preview type" />
                                 </StackPanel>
                                 <Button x:Name="ResetWindowSizesButton" x:Uid="ResetWindowSizesButton" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ResetWindowSizesButton_Click" Content="Reset" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
-
-            <ScrollViewer
-                x:Name="PathCopySettingsPanel"
-                HorizontalContentAlignment="Stretch"
-                VerticalScrollBarVisibility="Auto"
-                Visibility="Collapsed">
-                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
-                    <StackPanel Spacing="4">
-                        <TextBlock x:Name="PathCopyPageTitle" x:Uid="PathCopyPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Path copy" />
-                        <TextBlock x:Name="PathCopyPageDescription" x:Uid="PathCopyPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Format paths copied from preview windows" />
-                    </StackPanel>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
-                        <StackPanel>
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="QuoteCopiedPathLabel" x:Uid="QuoteCopiedPathLabel" Text="Quote copied paths" />
-                                    <TextBlock x:Name="QuoteCopiedPathDescription" x:Uid="QuoteCopiedPathDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Wrap copied paths in double quotes" />
-                                </StackPanel>
-                                <ToggleSwitch x:Name="QuoteCopiedPathToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="UnixPathSeparatorsLabel" x:Uid="UnixPathSeparatorsLabel" Text="Unix separators" />
-                                    <TextBlock x:Name="UnixPathSeparatorsDescription" x:Uid="UnixPathSeparatorsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Replace backslashes with forward slashes" />
-                                </StackPanel>
-                                <ToggleSwitch x:Name="UnixPathSeparatorsToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
                             </Grid>
                         </StackPanel>
                     </Border>

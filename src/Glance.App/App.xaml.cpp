@@ -220,7 +220,8 @@ namespace winrt::Glance::App::implementation
             get_self<implementation::SettingsWindow>(settings_window_)->InitializeSession(
                 [this] { exit_application(); },
                 [this] { apply_appearance_preferences(); },
-                [this] { apply_text_preferences(); });
+                [this] { apply_text_preferences(); },
+                [this] { apply_footer_preferences(); });
             settings_window_.Closed([this](IInspectable const&, WindowEventArgs const&) {
                 settings_window_ = nullptr;
             });
@@ -260,6 +261,18 @@ namespace winrt::Glance::App::implementation
         for (const auto& window : detached_windows_)
         {
             get_self<implementation::MainWindow>(window)->ApplyTextPreferences();
+        }
+    }
+
+    void App::apply_footer_preferences()
+    {
+        if (active_window_ != nullptr)
+        {
+            get_self<implementation::MainWindow>(active_window_)->ApplyFooterPreferences();
+        }
+        for (const auto& window : detached_windows_)
+        {
+            get_self<implementation::MainWindow>(window)->ApplyFooterPreferences();
         }
     }
 
@@ -414,6 +427,7 @@ namespace winrt::Glance::App::implementation
                 file.path = object.GetNamedString(L"path").c_str();
                 file.parsing_name = object.GetNamedString(L"parsingName").c_str();
                 file.size = std::stoull(object.GetNamedString(L"size").c_str());
+                file.creation_time = std::stoull(object.GetNamedString(L"creationTime").c_str());
                 file.last_write_time = std::stoull(object.GetNamedString(L"lastWriteTime").c_str());
                 file.attributes = static_cast<std::uint32_t>(object.GetNamedNumber(L"attributes"));
                 file.is_filesystem = object.GetNamedBoolean(L"isFilesystem");

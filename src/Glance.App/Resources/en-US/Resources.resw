@@ -85,15 +85,25 @@
   <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open with default application</value></data>
 
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>General</value></data>
+  <data name="FooterNavigationItem.Content" xml:space="preserve"><value>Footer</value></data>
   <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>Text preview</value></data>
   <data name="MediaPreviewNavigationItem.Content" xml:space="preserve"><value>Media preview</value></data>
-  <data name="PathCopyNavigationItem.Content" xml:space="preserve"><value>Path copy</value></data>
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>Maintenance</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>About</value></data>
   <data name="GeneralPageTitle.Text" xml:space="preserve"><value>General</value></data>
   <data name="GeneralPageDescription.Text" xml:space="preserve"><value>Appearance and application startup</value></data>
   <data name="LaunchTitle.Text" xml:space="preserve"><value>Launch at sign-in</value></data>
   <data name="LaunchDescription.Text" xml:space="preserve"><value>Start Glance automatically when you sign in to Windows</value></data>
+  <data name="FooterPageTitle.Text" xml:space="preserve"><value>Footer</value></data>
+  <data name="FooterPageDescription.Text" xml:space="preserve"><value>Preview metadata and path copying</value></data>
+  <data name="FooterFieldsLabel.Text" xml:space="preserve"><value>Displayed fields</value></data>
+  <data name="FooterFieldsDescription.Text" xml:space="preserve"><value>Choose and order preview fields</value></data>
+  <data name="FooterSizeCheckBox.Content" xml:space="preserve"><value>Size</value></data>
+  <data name="FooterModifiedTimeCheckBox.Content" xml:space="preserve"><value>Modified time</value></data>
+  <data name="FooterCreationTimeCheckBox.Content" xml:space="preserve"><value>Created time</value></data>
+  <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>Permissions (RWXD)</value></data>
+  <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>Move up</value></data>
+  <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>Move down</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>Diagnostics</value></data>
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>Save diagnostic logs and crash dumps</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
@@ -122,8 +132,7 @@
   <data name="SyntaxThemeTomorrowNight" xml:space="preserve"><value>Tomorrow Night</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>Line numbers</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>Wrap long lines</value></data>
-  <data name="PathCopyPageTitle.Text" xml:space="preserve"><value>Path copy</value></data>
-  <data name="PathCopyPageDescription.Text" xml:space="preserve"><value>Format paths copied from preview windows</value></data>
+  <data name="PathCopyGroupLabel.Text" xml:space="preserve"><value>Path copying</value></data>
   <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>Quote copied paths</value></data>
   <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>Wrap copied paths in double quotes</value></data>
   <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix separators</value></data>
@@ -185,6 +194,11 @@
   <data name="GenericAccess" xml:space="preserve"><value>Access: {0}</value></data>
   <data name="GenericAttributes" xml:space="preserve"><value>Attributes: {0}</value></data>
   <data name="GenericModifiedAt" xml:space="preserve"><value>Modified at {0}</value></data>
+  <data name="GenericCreatedAt" xml:space="preserve"><value>Created at {0}</value></data>
+  <data name="GenericVolumeId" xml:space="preserve"><value>Volume ID: {0}</value></data>
+  <data name="GenericFileId" xml:space="preserve"><value>File ID: {0}</value></data>
+  <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>Modified {0}</value></data>
+  <data name="FooterCreationTimeFormat" xml:space="preserve"><value>Created {0}</value></data>
   <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance Settings</value></data>
   <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close settings</value></data>
   <data name="LanguageLabel.Text" xml:space="preserve"><value>Language</value></data>

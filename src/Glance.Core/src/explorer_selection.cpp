@@ -205,6 +205,8 @@ namespace
                 result.attributes = attributes.dwFileAttributes;
                 result.size = (static_cast<std::uint64_t>(attributes.nFileSizeHigh) << 32U) |
                               attributes.nFileSizeLow;
+                result.creation_time = (static_cast<std::uint64_t>(attributes.ftCreationTime.dwHighDateTime) << 32U) |
+                                       attributes.ftCreationTime.dwLowDateTime;
                 result.last_write_time = (static_cast<std::uint64_t>(attributes.ftLastWriteTime.dwHighDateTime) << 32U) |
                                          attributes.ftLastWriteTime.dwLowDateTime;
                 result.is_cloud_placeholder =

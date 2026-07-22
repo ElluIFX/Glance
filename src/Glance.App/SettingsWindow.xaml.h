@@ -2,6 +2,7 @@
 
 #include "SettingsWindow.g.h"
 #include "appearance_preferences.h"
+#include "footer_preferences.h"
 #include "media_preview_preferences.h"
 #include "path_copy_preferences.h"
 #include "text_preferences.h"
@@ -15,12 +16,14 @@ namespace winrt::Glance::App::implementation
         using ExitCallback = std::function<void()>;
         using AppearanceChangedCallback = std::function<void()>;
         using TextPreferencesChangedCallback = std::function<void()>;
+        using FooterPreferencesChangedCallback = std::function<void()>;
 
         SettingsWindow();
         void InitializeSession(
             ExitCallback exit_callback,
             AppearanceChangedCallback appearance_changed_callback,
-            TextPreferencesChangedCallback text_preferences_changed_callback);
+            TextPreferencesChangedCallback text_preferences_changed_callback,
+            FooterPreferencesChangedCallback footer_preferences_changed_callback);
         void ApplyAppearancePreferences();
         void ApplyLocalizedResources();
         winrt::fire_and_forget ConfirmExit();
@@ -64,6 +67,15 @@ namespace winrt::Glance::App::implementation
         void PathCopyPreferenceToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void FooterFieldCheckBox_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void FooterFieldMoveUpButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void FooterFieldMoveDownButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
         void AppearanceComboBox_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
@@ -82,6 +94,14 @@ namespace winrt::Glance::App::implementation
             failed,
         };
 
+        struct FooterFieldControls
+        {
+            Microsoft::UI::Xaml::Controls::Border row{ nullptr };
+            Microsoft::UI::Xaml::Controls::CheckBox checkbox{ nullptr };
+            Microsoft::UI::Xaml::Controls::Button move_up{ nullptr };
+            Microsoft::UI::Xaml::Controls::Button move_down{ nullptr };
+        };
+
         void configure_window();
         void refresh_runtime_statuses();
         void refresh_diagnostic_bundle_status();
@@ -90,6 +110,9 @@ namespace winrt::Glance::App::implementation
         void set_launch_at_sign_in(bool enabled);
         void save_text_preferences();
         void save_appearance_preferences();
+        void save_footer_preferences();
+        void rebuild_footer_field_rows();
+        [[nodiscard]] FooterFieldControls footer_field_controls(glance::app::FooterField field);
         void set_media_volume(
             Microsoft::UI::Xaml::Controls::NumberBox const& control,
             double value,
@@ -104,9 +127,11 @@ namespace winrt::Glance::App::implementation
         glance::app::PathCopyPreferences path_copy_preferences_{};
         glance::app::AppearancePreferences appearance_preferences_{};
         glance::app::MediaPreviewPreferences media_preview_preferences_{};
+        glance::app::FooterPreferences footer_preferences_{};
         ExitCallback exit_callback_;
         AppearanceChangedCallback appearance_changed_callback_;
         TextPreferencesChangedCallback text_preferences_changed_callback_;
+        FooterPreferencesChangedCallback footer_preferences_changed_callback_;
     };
 }
 
