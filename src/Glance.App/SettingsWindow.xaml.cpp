@@ -264,6 +264,7 @@ namespace winrt::Glance::App::implementation
         DefaultWindowHeightNumberBox().Value(window_preferences_.default_height);
         RememberWindowSizeToggle().IsOn(window_preferences_.remember_size);
         AutoFitWindowSizeToggle().IsOn(window_preferences_.auto_fit_media);
+        ShowAfterAutoFitToggle().IsOn(window_preferences_.show_after_auto_fit);
         DynamicAutoFitToggle().IsOn(window_preferences_.dynamic_auto_fit);
         AdaptiveMinimumPercentNumberBox().Value(window_preferences_.adaptive_minimum_percent);
         AdaptiveMaximumPercentNumberBox().Value(window_preferences_.adaptive_maximum_percent);
@@ -461,6 +462,8 @@ namespace winrt::Glance::App::implementation
         set_text(RememberWindowSizeDescription(), L"RememberWindowSizeDescription.Text");
         set_text(AutoFitWindowSizeLabel(), L"AutoFitWindowSizeLabel.Text");
         set_text(AutoFitWindowSizeDescription(), L"AutoFitWindowSizeDescription.Text");
+        set_text(ShowAfterAutoFitLabel(), L"ShowAfterAutoFitLabel.Text");
+        set_text(ShowAfterAutoFitDescription(), L"ShowAfterAutoFitDescription.Text");
         set_text(AdaptiveMediaSizeSectionTitle(), L"AdaptiveMediaSizeSectionTitle.Text");
         set_text(AdaptiveMediaSizeSectionDescription(), L"AdaptiveMediaSizeSectionDescription.Text");
         set_text(DynamicAutoFitLabel(), L"DynamicAutoFitLabel.Text");
@@ -645,6 +648,7 @@ namespace winrt::Glance::App::implementation
         {
             window_preferences_.remember_size = RememberWindowSizeToggle().IsOn();
             window_preferences_.auto_fit_media = AutoFitWindowSizeToggle().IsOn();
+            window_preferences_.show_after_auto_fit = ShowAfterAutoFitToggle().IsOn();
             window_preferences_.dynamic_auto_fit = DynamicAutoFitToggle().IsOn();
             window_preferences_.remember_position = RememberWindowPositionToggle().IsOn();
             update_auto_fit_controls_enabled();
@@ -738,6 +742,7 @@ namespace winrt::Glance::App::implementation
     void SettingsWindow::update_auto_fit_controls_enabled() noexcept
     {
         const bool enabled = AutoFitWindowSizeToggle().IsOn();
+        ShowAfterAutoFitToggle().IsEnabled(enabled);
         DynamicAutoFitToggle().IsEnabled(enabled);
         AdaptiveMinimumPercentNumberBox().IsEnabled(enabled);
         AdaptiveMaximumPercentNumberBox().IsEnabled(enabled);

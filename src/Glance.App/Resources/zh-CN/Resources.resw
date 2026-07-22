@@ -140,6 +140,8 @@
   <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>图片、视频、文档的窗口尺寸策略</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体固有尺寸调整窗口</value></data>
+  <data name="ShowAfterAutoFitLabel.Text" xml:space="preserve"><value>适应后再显示</value></data>
+  <data name="ShowAfterAutoFitDescription.Text" xml:space="preserve"><value>牺牲响应速度避免窗口尺寸闪烁</value></data>
   <data name="DynamicAutoFitLabel.Text" xml:space="preserve"><value>动态适应页面</value></data>
   <data name="DynamicAutoFitDescription.Text" xml:space="preserve"><value>页面尺寸变化时同步调整窗口尺寸</value></data>
   <data name="AdaptiveSizeRangeLabel.Text" xml:space="preserve"><value>自适应尺寸范围</value></data>

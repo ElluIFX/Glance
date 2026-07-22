@@ -12,6 +12,7 @@ namespace glance::app
         std::uint32_t default_height{ 520 };
         bool remember_size{ true };
         bool auto_fit_media{ true };
+        bool show_after_auto_fit{};
         bool dynamic_auto_fit{};
         std::uint32_t adaptive_minimum_percent{ 40 };
         std::uint32_t adaptive_maximum_percent{ 75 };

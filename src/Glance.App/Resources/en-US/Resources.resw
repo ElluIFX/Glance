@@ -140,6 +140,8 @@
   <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>Window sizing for images, video, and Office documents</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Fit the window to the media dimensions</value></data>
+  <data name="ShowAfterAutoFitLabel.Text" xml:space="preserve"><value>Show after auto fit</value></data>
+  <data name="ShowAfterAutoFitDescription.Text" xml:space="preserve"><value>Trade response speed to prevent window size flicker</value></data>
   <data name="DynamicAutoFitLabel.Text" xml:space="preserve"><value>Adapt between pages</value></data>
   <data name="DynamicAutoFitDescription.Text" xml:space="preserve"><value>Resize the window when the page dimensions change</value></data>
   <data name="AdaptiveSizeRangeLabel.Text" xml:space="preserve"><value>Adaptive size range</value></data>

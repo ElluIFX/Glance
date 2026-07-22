@@ -103,6 +103,7 @@ namespace glance::app
             .default_height = std::clamp<DWORD>(read_dword(L"DefaultHeight", 520), 320, 4320),
             .remember_size = read_dword(L"RememberSize", 1) != 0,
             .auto_fit_media = read_dword(L"AutoFitMedia", read_legacy_auto_fit() ? 1U : 0U) != 0,
+            .show_after_auto_fit = read_dword(L"ShowAfterAutoFit", 0) != 0,
             .dynamic_auto_fit = read_dword(L"DynamicAutoFit", 0) != 0,
             .adaptive_minimum_percent = std::clamp<DWORD>(
                 read_dword(L"AdaptiveMinimumPercent", 40), 10, 100),
@@ -139,6 +140,7 @@ namespace glance::app
         write_dword(key, L"DefaultHeight", std::clamp<std::uint32_t>(preferences.default_height, 320, 4320));
         write_dword(key, L"RememberSize", preferences.remember_size ? 1U : 0U);
         write_dword(key, L"AutoFitMedia", preferences.auto_fit_media ? 1U : 0U);
+        write_dword(key, L"ShowAfterAutoFit", preferences.show_after_auto_fit ? 1U : 0U);
         write_dword(key, L"DynamicAutoFit", preferences.dynamic_auto_fit ? 1U : 0U);
         write_dword(
             key,

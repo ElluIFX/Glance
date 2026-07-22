@@ -676,6 +676,7 @@ namespace winrt::Glance::App::implementation
         HWND source_window)
     {
         const bool new_session = !visible_;
+        const bool replace_deferred_session = defer_auto_fit_show_;
         stop_detached_focus_monitor();
         files_ = std::move(files);
         source_kind_ = source_kind;
@@ -691,6 +692,8 @@ namespace winrt::Glance::App::implementation
             PinButton().IsChecked(false);
             update_window_action_visibility();
         }
+        defer_auto_fit_show_ = (new_session || replace_deferred_session) &&
+            should_defer_auto_fit_show();
         visible_ = true;
 
         FileList().Items().Clear();
@@ -725,6 +728,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
         visible_ = false;
+        defer_auto_fit_show_ = false;
         ShowWindow(window_, SW_HIDE);
         clear_preview_content();
         reset_hidden_window_size();
@@ -737,6 +741,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::clear_preview_content()
     {
+        defer_auto_fit_show_ = false;
         cancel_office_conversion();
         cancel_pdf_render();
         ++content_generation_;
@@ -954,7 +959,7 @@ namespace winrt::Glance::App::implementation
             position.y,
             width,
             height,
-            SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            SWP_NOACTIVATE | (defer_auto_fit_show_ ? 0U : SWP_SHOWWINDOW));
         if (!topmost_)
         {
             SetWindowPos(
@@ -965,6 +970,52 @@ namespace winrt::Glance::App::implementation
                 0,
                 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    }
+
+    bool MainWindow::should_defer_auto_fit_show() const noexcept
+    {
+        if (current_index_ >= files_.size())
+        {
+            return false;
+        }
+        const auto& file = files_[current_index_];
+        if (file.path.empty() || file.is_cloud_placeholder ||
+            (file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+        {
+            return false;
+        }
+
+        const auto preferences = glance::app::load_window_preferences();
+        if (!preferences.auto_fit_media || !preferences.show_after_auto_fit ||
+            glance::app::auto_fit_ignores_path(preferences, file.path))
+        {
+            return false;
+        }
+
+        const auto kind = glance::app::resolve_preview_kind(file.path);
+        return kind == glance::app::PreviewKind::image ||
+            kind == glance::app::PreviewKind::pdf ||
+            (kind == glance::app::PreviewKind::media && !is_audio_path(file.path));
+    }
+
+    void MainWindow::reveal_deferred_preview() noexcept
+    {
+        if (!defer_auto_fit_show_ || window_ == nullptr)
+        {
+            return;
+        }
+        defer_auto_fit_show_ = false;
+        if (!SetWindowPos(
+                window_,
+                nullptr,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW))
+        {
+            ShowWindow(window_, SW_SHOWNOACTIVATE);
         }
     }
 
@@ -989,21 +1040,28 @@ namespace winrt::Glance::App::implementation
         double content_height,
         bool dynamic_update) noexcept
     {
-        if (!auto_fit_applies(dynamic_update) || window_ == nullptr ||
+        if (window_ == nullptr)
+        {
+            return;
+        }
+        if (!auto_fit_applies(dynamic_update) ||
             content_width <= 0.0 || content_height <= 0.0)
         {
+            reveal_deferred_preview();
             return;
         }
 
         RECT bounds{};
         if (!GetWindowRect(window_, &bounds))
         {
+            reveal_deferred_preview();
             return;
         }
         HMONITOR monitor = MonitorFromWindow(window_, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{ sizeof(MONITORINFO) };
         if (!GetMonitorInfoW(monitor, &info))
         {
+            reveal_deferred_preview();
             return;
         }
 
@@ -1082,14 +1140,22 @@ namespace winrt::Glance::App::implementation
             width,
             height,
             center_offset);
-        SetWindowPos(
+        const bool reveal_after_resize = defer_auto_fit_show_;
+        if (SetWindowPos(
             window_,
             nullptr,
             position.x,
             position.y,
             width,
             height,
-            SWP_NOACTIVATE | SWP_NOZORDER);
+            SWP_NOACTIVATE | SWP_NOZORDER | (reveal_after_resize ? SWP_SHOWWINDOW : 0U)))
+        {
+            defer_auto_fit_show_ = false;
+        }
+        else if (reveal_after_resize)
+        {
+            reveal_deferred_preview();
+        }
     }
 
     void MainWindow::save_current_window_placement() const noexcept
@@ -1651,6 +1717,7 @@ namespace winrt::Glance::App::implementation
                 catch (const hresult_error&)
                 {
                 }
+                reveal_deferred_preview();
             }
             load_media_technical_metadata_async(path, generation, media_is_audio_, native_bitrate);
         }
@@ -1858,6 +1925,7 @@ namespace winrt::Glance::App::implementation
             PdfLoadingOverlay().Visibility(Visibility::Collapsed);
             pdf_source_path_ = std::move(path);
             pdf_password_ = std::move(password);
+            reveal_deferred_preview();
             show_password_prompt(
                 PasswordPromptTarget::pdf,
                 result.status == Status::invalid_password);
@@ -3907,6 +3975,7 @@ namespace winrt::Glance::App::implementation
         present_generic(files_[current_index_]);
         ErrorText().Text(std::move(message));
         ErrorText().Visibility(Visibility::Visible);
+        reveal_deferred_preview();
     }
 
     void MainWindow::update_image_fit_surface()

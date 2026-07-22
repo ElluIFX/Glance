@@ -156,6 +156,8 @@ namespace winrt::Glance::App::implementation
             DWORD_PTR reference_data) noexcept;
         void configure_window();
         void position_initial_window(bool ignore_saved_size = false);
+        [[nodiscard]] bool should_defer_auto_fit_show() const noexcept;
+        void reveal_deferred_preview() noexcept;
         void auto_fit_window_to_content(
             double width,
             double height,
@@ -341,6 +343,7 @@ namespace winrt::Glance::App::implementation
         bool topmost_{};
         bool pinned_{};
         bool detached_{};
+        bool defer_auto_fit_show_{};
         bool user_sized_{};
         bool tracking_move_size_{};
         RECT move_size_start_bounds_{};

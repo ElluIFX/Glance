@@ -411,6 +411,18 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="ShowAfterAutoFitLabel" x:Uid="ShowAfterAutoFitLabel" Text="Show after auto fit" />
+                                    <TextBlock x:Name="ShowAfterAutoFitDescription" x:Uid="ShowAfterAutoFitDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Trade response speed to prevent window size flicker" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="ShowAfterAutoFitToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="DynamicAutoFitLabel" x:Uid="DynamicAutoFitLabel" Text="Adapt between pages" />
                                     <TextBlock x:Name="DynamicAutoFitDescription" x:Uid="DynamicAutoFitDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Resize the window when the page dimensions change" />
                                 </StackPanel>
