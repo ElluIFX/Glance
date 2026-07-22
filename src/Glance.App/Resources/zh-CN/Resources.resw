@@ -126,7 +126,7 @@
   <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>文件权限 (RWXD)</value></data>
   <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>上移</value></data>
   <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>下移</value></data>
-  <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>诊断</value></data>
+  <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>保存诊断信息</value></data>
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>保存诊断日志和崩溃转储</value></data>
   <data name="WindowPageTitle.Text" xml:space="preserve"><value>窗口</value></data>
   <data name="WindowPageDescription.Text" xml:space="preserve"><value>预览窗口的尺寸、位置和外观</value></data>
@@ -136,7 +136,7 @@
   <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>没有可用记忆尺寸时使用的宽度和高度</value></data>
   <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>记忆窗口尺寸</value></data>
   <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口尺寸</value></data>
-  <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>自适应媒体尺寸</value></data>
+  <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>媒体自适应</value></data>
   <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>图片、视频、文档的窗口尺寸策略</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体固有尺寸调整窗口</value></data>
@@ -196,10 +196,13 @@
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>维护</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态、诊断和已保存的应用状态</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>输入核心</value></data>
-  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>媒体信息组件</value></data>
+  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>媒体信息可用性</value></data>
+  <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 可用性</value></data>
+  <data name="WebViewAvailable" xml:space="preserve"><value>运行时可用</value></data>
+  <data name="WebViewUnavailable" xml:space="preserve"><value>未检测到运行时</value></data>
   <data name="OfficeAvailabilityLabel.Text" xml:space="preserve"><value>Office 可用性</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>管理员权限</value></data>
-  <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>诊断包</value></data>
+  <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>导出诊断包</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>导出</value></data>
   <data name="DiagnosticBundleDescription" xml:space="preserve"><value>打包全部诊断日志和崩溃转储</value></data>
   <data name="DiagnosticBundlePickerTitle" xml:space="preserve"><value>选择诊断包输出文件夹</value></data>
@@ -215,6 +218,7 @@
   <data name="ResetAllSettingsFailedTitle" xml:space="preserve"><value>无法重置设置</value></data>
   <data name="ResetAllSettingsFailedMessage" xml:space="preserve"><value>部分设置无法清除，Glance 将保持运行。</value></data>
   <data name="OK" xml:space="preserve"><value>确定</value></data>
+  <data name="DuplicateInstanceMessage" xml:space="preserve"><value>Glance 已在运行，按空格即可预览文件。</value></data>
   <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>重置</value></data>
   <data name="AboutPageTitle.Text" xml:space="preserve"><value>关于</value></data>
   <data name="AboutPageDescription.Text" xml:space="preserve"><value>应用信息</value></data>

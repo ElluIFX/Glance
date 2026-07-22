@@ -388,7 +388,7 @@
                         <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" Text="Adaptive media size" />
+                                    <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" Text="Media auto fit" />
                                     <TextBlock x:Name="AdaptiveMediaSizeSectionDescription" x:Uid="AdaptiveMediaSizeSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Window sizing for images, video, and Office documents" />
                                 </StackPanel>
                             </Grid>
@@ -792,10 +792,22 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="MediaComponentsLabel" x:Uid="MediaComponentsLabel" Text="Media information components" />
+                                    <TextBlock x:Name="MediaComponentsLabel" x:Uid="MediaComponentsLabel" Text="Media information availability" />
                                     <TextBlock x:Name="MediaComponentsStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>
                                 <FontIcon x:Name="MediaComponentsStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="WebViewAvailabilityLabel" x:Uid="WebViewAvailabilityLabel" Text="WebView2 availability" />
+                                    <TextBlock x:Name="WebViewAvailabilityStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
+                                </StackPanel>
+                                <FontIcon x:Name="WebViewAvailabilityStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
@@ -821,14 +833,17 @@
                                 </StackPanel>
                                 <FontIcon x:Name="AdministratorAccessStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="DiagnosticsTitle" x:Uid="DiagnosticsTitle" Text="Diagnostics" />
+                                    <TextBlock x:Name="DiagnosticsTitle" x:Uid="DiagnosticsTitle" Text="Save diagnostic information" />
                                     <TextBlock x:Name="DiagnosticsDescription" x:Uid="DiagnosticsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Save diagnostic logs and crash dumps" />
                                 </StackPanel>
                                 <ToggleSwitch
@@ -847,7 +862,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="DiagnosticBundleLabel" x:Uid="DiagnosticBundleLabel" Text="Diagnostic package" />
+                                    <TextBlock x:Name="DiagnosticBundleLabel" x:Uid="DiagnosticBundleLabel" Text="Export diagnostic package" />
                                     <TextBlock x:Name="DiagnosticBundleStatusText" Style="{StaticResource SettingsDescriptionStyle}" TextWrapping="Wrap" />
                                 </StackPanel>
                                 <Button
@@ -860,28 +875,27 @@
                                     Click="ExportDiagnosticBundleButton_Click"
                                     Content="Export" />
                             </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="ResetAllSettingsLabel" x:Uid="ResetAllSettingsLabel" Text="Reset all settings" />
+                                    <TextBlock x:Name="ResetAllSettingsDescription" x:Uid="ResetAllSettingsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Clear saved preferences and exit Glance" />
+                                </StackPanel>
+                                <Button
+                                    x:Name="ResetAllSettingsButton"
+                                    x:Uid="ResetAllSettingsButton"
+                                    Grid.Column="1"
+                                    MinWidth="88"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="ResetAllSettingsButton_Click"
+                                    Content="Reset" />
+                            </Grid>
                         </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
-                        <Grid Style="{StaticResource SettingsRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center" Spacing="3">
-                                <TextBlock x:Name="ResetAllSettingsLabel" x:Uid="ResetAllSettingsLabel" Text="Reset all settings" />
-                                <TextBlock x:Name="ResetAllSettingsDescription" x:Uid="ResetAllSettingsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Clear saved preferences and exit Glance" />
-                            </StackPanel>
-                            <Button
-                                x:Name="ResetAllSettingsButton"
-                                x:Uid="ResetAllSettingsButton"
-                                Grid.Column="1"
-                                MinWidth="88"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Click="ResetAllSettingsButton_Click"
-                                Content="Reset" />
-                        </Grid>
                     </Border>
                 </StackPanel>
             </ScrollViewer>

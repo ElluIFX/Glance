@@ -1,6 +1,7 @@
 /.*/
 /*.md
 !/README.md
+!/README.en.md
 /artifacts/
 bin/
 obj/

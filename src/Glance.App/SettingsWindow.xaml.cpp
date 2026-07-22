@@ -17,6 +17,7 @@
 #endif
 
 #include <microsoft.ui.xaml.window.h>
+#include <winrt/Microsoft.Web.WebView2.Core.h>
 
 #include <algorithm>
 #include <array>
@@ -193,6 +194,19 @@ namespace
         }
         CloseHandle(mutex);
         return true;
+    }
+
+    bool webview_runtime_available() noexcept
+    {
+        try
+        {
+            return !Microsoft::Web::WebView2::Core::CoreWebView2Environment::
+                GetAvailableBrowserVersionString().empty();
+        }
+        catch (...)
+        {
+            return false;
+        }
     }
 
     void set_status_indicator(
@@ -540,6 +554,7 @@ namespace winrt::Glance::App::implementation
         set_text(MaintenancePageDescription(), L"MaintenancePageDescription.Text");
         set_text(InputCoreLabel(), L"InputCoreLabel.Text");
         set_text(MediaComponentsLabel(), L"MediaComponentsLabel.Text");
+        set_text(WebViewAvailabilityLabel(), L"WebViewAvailabilityLabel.Text");
         set_text(OfficeAvailabilityLabel(), L"OfficeAvailabilityLabel.Text");
         set_text(AdministratorAccessLabel(), L"AdministratorAccessLabel.Text");
         set_text(DiagnosticBundleLabel(), L"DiagnosticBundleLabel.Text");
@@ -592,6 +607,12 @@ namespace winrt::Glance::App::implementation
             glance::app::media_probe_available(),
             L"MediaComponentsAvailable",
             L"MediaComponentsUnavailable");
+        set_status_indicator(
+            WebViewAvailabilityStatusIcon(),
+            WebViewAvailabilityStatusText(),
+            webview_runtime_available(),
+            L"WebViewAvailable",
+            L"WebViewUnavailable");
         set_status_indicator(
             OfficeAvailabilityStatusIcon(),
             OfficeAvailabilityStatusText(),

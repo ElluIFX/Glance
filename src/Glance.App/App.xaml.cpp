@@ -5,12 +5,14 @@
 #include "MainWindow.xaml.h"
 #include "office_availability.h"
 #include "pdf_render_client.h"
+#include "resource.h"
 #include "SettingsWindow.xaml.h"
 #include "startup_registration.h"
 #include "glance/contracts/diagnostics.h"
 
 #include <shellapi.h>
 #include <tlhelp32.h>
+#include <microsoft.ui.xaml.window.h>
 
 #include <algorithm>
 #include <chrono>
@@ -18,6 +20,8 @@
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
+namespace Controls = Microsoft::UI::Xaml::Controls;
+namespace Media = Microsoft::UI::Xaml::Media;
 
 namespace
 {
@@ -203,9 +207,19 @@ namespace winrt::Glance::App::implementation
 
         glance::contracts::initialize_diagnostics(L"Glance.App");
         instance_mutex_ = CreateMutexW(nullptr, FALSE, L"Local\\Glance.App");
-        if (instance_mutex_ == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
+        if (instance_mutex_ == nullptr)
         {
             Microsoft::UI::Xaml::Application::Current().Exit();
+            return;
+        }
+        const bool duplicate_instance = GetLastError() == ERROR_ALREADY_EXISTS;
+        dispatcher_ = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        const auto appearance = glance::app::load_appearance_preferences();
+        glance::app::apply_ui_language(appearance.language);
+        glance::app::apply_accent_resources(appearance);
+        if (duplicate_instance)
+        {
+            show_duplicate_instance_notice();
             return;
         }
         shutdown_event_ = CreateEventW(nullptr, TRUE, FALSE, L"Local\\Glance.Shutdown");
@@ -214,10 +228,6 @@ namespace winrt::Glance::App::implementation
             ResetEvent(shutdown_event_);
         }
 
-        dispatcher_ = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
-        const auto appearance = glance::app::load_appearance_preferences();
-        glance::app::apply_ui_language(appearance.language);
-        glance::app::apply_accent_resources(appearance);
         glance::app::initialize_office_availability();
         glance::app::prewarm_pdf_render_client();
         glance::contracts::log_event(L"Creating the initial preview window.");
@@ -268,6 +278,92 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"Starting the Core pipe client.");
         static_cast<void>(pipe_client_.start());
         start_core_watchdog();
+    }
+
+    void App::show_duplicate_instance_notice()
+    {
+        try
+        {
+            duplicate_instance_window_ = Window();
+            duplicate_instance_window_.Title(L"Glance");
+            const auto root = Controls::Grid();
+            root.RequestedTheme(glance::app::element_theme(
+                glance::app::load_appearance_preferences().theme));
+            root.Background(Application::Current().Resources()
+                .Lookup(box_value(L"ApplicationPageBackgroundThemeBrush"))
+                .as<Media::Brush>());
+            const auto content = Controls::StackPanel();
+            content.Margin(Thickness{ 24, 24, 24, 20 });
+            content.Spacing(20);
+            content.VerticalAlignment(VerticalAlignment::Center);
+
+            const auto message = Controls::TextBlock();
+            message.Text(glance::app::localize(L"DuplicateInstanceMessage"));
+            message.FontSize(15);
+            message.TextWrapping(TextWrapping::NoWrap);
+            content.Children().Append(message);
+
+            const auto confirm = Controls::Button();
+            confirm.Content(box_value(glance::app::localize(L"OK")));
+            confirm.HorizontalAlignment(HorizontalAlignment::Right);
+            confirm.Click([this](IInspectable const&, RoutedEventArgs const&) {
+                if (duplicate_instance_window_ != nullptr)
+                {
+                    duplicate_instance_window_.Close();
+                }
+            });
+            content.Children().Append(confirm);
+            root.Children().Append(content);
+            duplicate_instance_window_.Content(root);
+
+            HWND window{};
+            check_hresult(duplicate_instance_window_.try_as<::IWindowNative>()->get_WindowHandle(&window));
+            if (const HICON icon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_GLANCE_APP)))
+            {
+                SendMessageW(window, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon));
+                SendMessageW(window, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon));
+            }
+            if (const auto presenter = duplicate_instance_window_.AppWindow().Presenter()
+                    .try_as<Microsoft::UI::Windowing::OverlappedPresenter>())
+            {
+                presenter.IsResizable(false);
+                presenter.IsMinimizable(false);
+                presenter.IsMaximizable(false);
+            }
+
+            constexpr int logical_width = 480;
+            constexpr int logical_height = 160;
+            const UINT dpi = GetDpiForWindow(window);
+            const int width = MulDiv(logical_width, dpi, 96);
+            const int height = MulDiv(logical_height, dpi, 96);
+            MONITORINFO monitor_info{ sizeof(monitor_info) };
+            GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info);
+            const int x = monitor_info.rcWork.left +
+                ((monitor_info.rcWork.right - monitor_info.rcWork.left) - width) / 2;
+            const int y = monitor_info.rcWork.top +
+                ((monitor_info.rcWork.bottom - monitor_info.rcWork.top) - height) / 2;
+            SetWindowPos(window, nullptr, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
+
+            duplicate_instance_window_.Closed([this](IInspectable const&, WindowEventArgs const&) {
+                duplicate_instance_window_ = nullptr;
+                Microsoft::UI::Xaml::Application::Current().Exit();
+            });
+            duplicate_instance_window_.Activate();
+            static_cast<void>(confirm.Focus(FocusState::Programmatic));
+        }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(
+                L"Duplicate instance notice failed: " + std::wstring(error.message()));
+            if (duplicate_instance_window_ != nullptr)
+            {
+                duplicate_instance_window_.Close();
+            }
+            else
+            {
+                Microsoft::UI::Xaml::Application::Current().Exit();
+            }
+        }
     }
 
     void App::ensure_core_started()

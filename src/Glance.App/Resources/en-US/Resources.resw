@@ -126,7 +126,7 @@
   <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>Permissions (RWXD)</value></data>
   <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>Move up</value></data>
   <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>Move down</value></data>
-  <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>Diagnostics</value></data>
+  <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>Save diagnostic information</value></data>
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>Save diagnostic logs and crash dumps</value></data>
   <data name="WindowPageTitle.Text" xml:space="preserve"><value>Window</value></data>
   <data name="WindowPageDescription.Text" xml:space="preserve"><value>Preview window size, position, and appearance</value></data>
@@ -136,7 +136,7 @@
   <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>Width and height used when no saved size applies</value></data>
   <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>Remember window size</value></data>
   <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>Store the last size separately for each preview type</value></data>
-  <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>Adaptive media size</value></data>
+  <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>Media auto fit</value></data>
   <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>Window sizing for images, video, and Office documents</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Fit the window to the media dimensions</value></data>
@@ -196,10 +196,13 @@
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>Maintenance</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>Runtime status, diagnostics, and saved application state</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>Input core</value></data>
-  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Media information components</value></data>
+  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Media information availability</value></data>
+  <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 availability</value></data>
+  <data name="WebViewAvailable" xml:space="preserve"><value>Runtime available</value></data>
+  <data name="WebViewUnavailable" xml:space="preserve"><value>Runtime not found</value></data>
   <data name="OfficeAvailabilityLabel.Text" xml:space="preserve"><value>Office availability</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>Administrator access</value></data>
-  <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>Diagnostic package</value></data>
+  <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>Export diagnostic package</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>Export</value></data>
   <data name="DiagnosticBundleDescription" xml:space="preserve"><value>Package all diagnostic logs and crash dumps</value></data>
   <data name="DiagnosticBundlePickerTitle" xml:space="preserve"><value>Select diagnostic package output folder</value></data>
@@ -215,6 +218,7 @@
   <data name="ResetAllSettingsFailedTitle" xml:space="preserve"><value>Could not reset settings</value></data>
   <data name="ResetAllSettingsFailedMessage" xml:space="preserve"><value>Some settings could not be cleared. Glance will remain open.</value></data>
   <data name="OK" xml:space="preserve"><value>OK</value></data>
+  <data name="DuplicateInstanceMessage" xml:space="preserve"><value>Glance is already running, press Space to preview files.</value></data>
   <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>Reset</value></data>
   <data name="AboutPageTitle.Text" xml:space="preserve"><value>About</value></data>
   <data name="AboutPageDescription.Text" xml:space="preserve"><value>Application information</value></data>

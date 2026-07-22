@@ -28,6 +28,7 @@ namespace winrt::Glance::App::implementation
 
     private:
         void ensure_core_started();
+        void show_duplicate_instance_notice();
         void start_core_watchdog();
         void supervise_core();
         void refresh_core_process(DWORD process_id = 0);
@@ -52,6 +53,7 @@ namespace winrt::Glance::App::implementation
         HANDLE instance_mutex_{};
         HANDLE shutdown_event_{};
         std::atomic_bool shutting_down_{};
+        Microsoft::UI::Xaml::Window duplicate_instance_window_{ nullptr };
         Microsoft::UI::Dispatching::DispatcherQueue dispatcher_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer core_watchdog_timer_{ nullptr };
         glance::app::PipeClient pipe_client_;
