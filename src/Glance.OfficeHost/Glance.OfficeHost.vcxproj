@@ -18,6 +18,11 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\Glance.Contracts\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>Ole32.lib;OleAut32.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>

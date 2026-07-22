@@ -838,12 +838,20 @@ namespace winrt::Glance::App::implementation
         pdf_password_.clear();
         pdf_outline_.clear();
         pdf_thumbnail_images_.clear();
+        office_thumbnail_background_active_ = false;
+        office_thumbnail_requested_.clear();
         pdf_wheel_delta_ = 0;
 
     }
 
     void MainWindow::cancel_office_conversion() noexcept
     {
+        office_emf_preview_ = false;
+        if (office_preview_client_ != nullptr)
+        {
+            office_preview_client_->cancel();
+            office_preview_client_.reset();
+        }
         if (office_conversion_ != nullptr)
         {
             office_conversion_->cancel();
@@ -1184,9 +1192,11 @@ namespace winrt::Glance::App::implementation
             break;
         case glance::app::PreviewKind::pdf:
             show_content_panel(kind);
+            PdfPageImage().Source(nullptr);
             pdf_wheel_delta_ = 0;
             PdfPageText().Text(glance::app::localize(L"Loading"));
             PdfLoadingText().Text(glance::app::localize(L"LoadingPdf"));
+            PdfLoadingText().Visibility(Visibility::Visible);
             PdfLoadingOverlay().Visibility(Visibility::Visible);
             load_pdf_async(file.path, generation);
             break;
@@ -1204,6 +1214,7 @@ namespace winrt::Glance::App::implementation
             pdf_wheel_delta_ = 0;
             PdfPageText().Text(L"1 / 1");
             PdfLoadingText().Text(glance::app::localize(L"ConvertingOffice"));
+            PdfLoadingText().Visibility(Visibility::Visible);
             PdfLoadingOverlay().Visibility(Visibility::Visible);
             load_office_async(file.path, generation, file.size, file.last_write_time);
             break;
@@ -1732,6 +1743,7 @@ namespace winrt::Glance::App::implementation
         pdf_render_client_ = session;
         pdf_source_path_ = path;
         pdf_password_ = password;
+        PdfLoadingText().Visibility(Visibility::Visible);
         co_await resume_background();
         auto result = session->open(path, password);
         static_cast<void>(dispatcher.TryEnqueue([
@@ -1810,6 +1822,10 @@ namespace winrt::Glance::App::implementation
         if (session == nullptr || page_index >= pdf_page_count_)
         {
             co_return;
+        }
+        if (PdfPageImage().Source() != nullptr)
+        {
+            PdfLoadingText().Visibility(Visibility::Collapsed);
         }
         PdfLoadingOverlay().Visibility(Visibility::Visible);
         const auto width = static_cast<std::uint32_t>(std::clamp(
@@ -2276,12 +2292,309 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    fire_and_forget MainWindow::load_word_emf_async(
+        std::wstring path,
+        std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        auto office_session = std::make_shared<glance::app::OfficePreviewClient>();
+        auto render_session = glance::app::acquire_pdf_render_client();
+        office_preview_client_ = office_session;
+        pdf_render_client_ = render_session;
+        office_emf_preview_ = true;
+        office_thumbnail_background_active_ = false;
+        pdf_page_count_ = 1;
+        pdf_page_index_ = 0;
+        pdf_outline_.clear();
+        office_thumbnail_requested_.clear();
+        const auto width = static_cast<std::uint32_t>(std::clamp(
+            std::lround(std::max(512.0, PdfScroller().ActualWidth()) * 2.0),
+            1024L,
+            4096L));
+        const auto height = static_cast<std::uint32_t>(std::clamp(
+            std::lround(std::max(512.0, PdfScroller().ActualHeight()) * 2.0),
+            1024L,
+            4096L));
+
+        co_await resume_background();
+        glance::app::OfficePageResult page;
+        glance::app::PdfRenderResult rendered;
+        bool opened{};
+        try
+        {
+            opened = office_session->open_word(path);
+            if (opened)
+            {
+                page = office_session->render_page(0);
+                if (page.status == glance::contracts::office::Status::success)
+                {
+                    rendered = render_session->render_emf(page.emf_path, 0, width, height);
+                }
+            }
+        }
+        catch (...)
+        {
+            opened = false;
+        }
+        if (!opened || page.status != glance::contracts::office::Status::success ||
+            rendered.status != glance::contracts::pdf::Status::success)
+        {
+            office_session->cancel();
+            render_session->cancel();
+            static_cast<void>(dispatcher.TryEnqueue([lifetime, office_session, render_session, generation] {
+                if (generation != lifetime->content_generation_ ||
+                    office_session != lifetime->office_preview_client_ ||
+                    render_session != lifetime->pdf_render_client_)
+                {
+                    return;
+                }
+                lifetime->show_provider_error(
+                    glance::app::localize(L"OfficeConvertError"),
+                    generation);
+            }));
+            co_return;
+        }
+
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            office_session,
+            render_session,
+            rendered = std::move(rendered),
+            generation]() mutable {
+            if (generation != lifetime->content_generation_ ||
+                office_session != lifetime->office_preview_client_ ||
+                render_session != lifetime->pdf_render_client_)
+            {
+                return;
+            }
+            try
+            {
+                lifetime->PdfPageImage().Source(create_pdf_bitmap(rendered));
+                lifetime->PdfLoadingOverlay().Visibility(Visibility::Collapsed);
+                lifetime->PdfPageText().Text(L"1 / ?");
+                lifetime->auto_fit_window_to_content(
+                    rendered.page_width_points,
+                    rendered.page_height_points);
+            }
+            catch (const hresult_error&)
+            {
+                lifetime->show_provider_error(
+                    glance::app::localize(L"OfficeConvertError"),
+                    generation);
+            }
+        }));
+
+        auto count = office_session->page_count();
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            office_session,
+            render_session,
+            count,
+            generation] {
+            if (generation != lifetime->content_generation_ ||
+                office_session != lifetime->office_preview_client_ ||
+                render_session != lifetime->pdf_render_client_)
+            {
+                return;
+            }
+            lifetime->pdf_page_count_ =
+                count.status == glance::contracts::office::Status::success && count.page_count > 0
+                    ? count.page_count
+                    : 1U;
+            lifetime->office_thumbnail_requested_.assign(lifetime->pdf_page_count_, false);
+            lifetime->PdfPageText().Text(
+                L"1 / " + std::to_wstring(lifetime->pdf_page_count_));
+            lifetime->build_pdf_navigation(generation);
+        }));
+    }
+
+    fire_and_forget MainWindow::render_office_page_async(
+        std::uint32_t page_index,
+        std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        const auto office_session = office_preview_client_;
+        const auto render_session = pdf_render_client_;
+        const auto request = pdf_render_request_.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (office_session == nullptr || render_session == nullptr || page_index >= pdf_page_count_)
+        {
+            co_return;
+        }
+        PdfLoadingText().Visibility(Visibility::Collapsed);
+        PdfLoadingOverlay().Visibility(Visibility::Visible);
+        const auto width = static_cast<std::uint32_t>(std::clamp(
+            std::lround(std::max(512.0, PdfScroller().ActualWidth()) * 2.0),
+            1024L,
+            4096L));
+        const auto height = static_cast<std::uint32_t>(std::clamp(
+            std::lround(std::max(512.0, PdfScroller().ActualHeight()) * 2.0),
+            1024L,
+            4096L));
+
+        co_await resume_background();
+        if (request != pdf_render_request_.load(std::memory_order_relaxed))
+        {
+            co_return;
+        }
+        auto page = office_session->render_page(page_index);
+        if (request != pdf_render_request_.load(std::memory_order_relaxed) ||
+            page.status != glance::contracts::office::Status::success)
+        {
+            co_return;
+        }
+        auto rendered = render_session->render_emf(page.emf_path, page_index, width, height);
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            office_session,
+            render_session,
+            rendered = std::move(rendered),
+            page_index,
+            request,
+            generation]() mutable {
+            if (generation != lifetime->content_generation_ ||
+                office_session != lifetime->office_preview_client_ ||
+                render_session != lifetime->pdf_render_client_ ||
+                page_index != lifetime->pdf_page_index_ ||
+                request != lifetime->pdf_render_request_.load(std::memory_order_relaxed))
+            {
+                return;
+            }
+            if (rendered.status != glance::contracts::pdf::Status::success)
+            {
+                lifetime->show_provider_error(
+                    glance::app::localize(L"OfficeConvertError"),
+                    generation);
+                return;
+            }
+            try
+            {
+                lifetime->PdfPageImage().Source(create_pdf_bitmap(rendered));
+                lifetime->PdfLoadingOverlay().Visibility(Visibility::Collapsed);
+                lifetime->PdfPageText().Text(
+                    std::to_wstring(page_index + 1U) + L" / " +
+                    std::to_wstring(lifetime->pdf_page_count_));
+                lifetime->sync_pdf_thumbnail_selection();
+                lifetime->auto_fit_window_to_content(
+                    rendered.page_width_points,
+                    rendered.page_height_points);
+                lifetime->load_office_thumbnail_async(page_index, generation);
+            }
+            catch (const hresult_error&)
+            {
+                lifetime->show_provider_error(
+                    glance::app::localize(L"OfficeConvertError"),
+                    generation);
+            }
+        }));
+    }
+
+    fire_and_forget MainWindow::load_office_thumbnail_async(
+        std::uint32_t page_index,
+        std::uint64_t generation,
+        bool continue_background)
+    {
+        if (page_index >= office_thumbnail_requested_.size() ||
+            office_thumbnail_requested_[page_index])
+        {
+            co_return;
+        }
+        office_thumbnail_requested_[page_index] = true;
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        const auto office_session = office_preview_client_;
+        const auto render_session = pdf_render_client_;
+        if (office_session == nullptr || render_session == nullptr)
+        {
+            co_return;
+        }
+        co_await resume_background();
+        auto page = office_session->render_page(page_index);
+        glance::app::PdfRenderResult rendered;
+        if (page.status == glance::contracts::office::Status::success)
+        {
+            rendered = render_session->render_emf(page.emf_path, page_index, 176, 132);
+        }
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            office_session,
+            render_session,
+            rendered = std::move(rendered),
+            page_index,
+            generation,
+            continue_background]() mutable {
+            if (generation != lifetime->content_generation_ ||
+                office_session != lifetime->office_preview_client_ ||
+                render_session != lifetime->pdf_render_client_ ||
+                page_index >= lifetime->office_thumbnail_requested_.size())
+            {
+                return;
+            }
+            if (rendered.status != glance::contracts::pdf::Status::success)
+            {
+                if (continue_background)
+                {
+                    lifetime->office_thumbnail_background_active_ = false;
+                    lifetime->continue_office_thumbnail_generation(generation);
+                }
+                return;
+            }
+            try
+            {
+                if (page_index < lifetime->pdf_thumbnail_images_.size())
+                {
+                    if (auto image = lifetime->pdf_thumbnail_images_[page_index].get())
+                    {
+                        image.Source(create_pdf_bitmap(rendered));
+                    }
+                }
+            }
+            catch (...)
+            {
+            }
+            if (continue_background)
+            {
+                lifetime->office_thumbnail_background_active_ = false;
+                lifetime->continue_office_thumbnail_generation(generation);
+            }
+        }));
+    }
+
+    void MainWindow::continue_office_thumbnail_generation(std::uint64_t generation)
+    {
+        if (generation != content_generation_ || !office_emf_preview_ ||
+            office_thumbnail_background_active_)
+        {
+            return;
+        }
+        for (std::size_t index = 0; index < office_thumbnail_requested_.size(); ++index)
+        {
+            if (!office_thumbnail_requested_[index])
+            {
+                office_thumbnail_background_active_ = true;
+                load_office_thumbnail_async(
+                    static_cast<std::uint32_t>(index),
+                    generation,
+                    true);
+                return;
+            }
+        }
+    }
+
     fire_and_forget MainWindow::load_office_async(
         std::wstring path,
         std::uint64_t generation,
         std::uint64_t source_size,
         std::uint64_t source_modified_time)
     {
+        const auto extension = std::filesystem::path(path).extension().wstring();
+        if (_wcsicmp(extension.c_str(), L".doc") == 0 ||
+            _wcsicmp(extension.c_str(), L".docx") == 0)
+        {
+            load_word_emf_async(std::move(path), generation);
+            co_return;
+        }
         std::error_code cache_error;
         if (path == office_cache_source_path_ &&
             source_size == office_cache_source_size_ &&
@@ -4452,14 +4765,23 @@ namespace winrt::Glance::App::implementation
         {
             StackPanel content;
             content.Spacing(4);
+            Grid preview;
+            FontIcon placeholder;
+            placeholder.Glyph(L"\xE8A5");
+            placeholder.FontSize(32);
+            placeholder.Opacity(0.35);
+            placeholder.HorizontalAlignment(HorizontalAlignment::Center);
+            placeholder.VerticalAlignment(VerticalAlignment::Center);
             Image image;
             image.Width(176);
             image.Height(132);
             image.Stretch(Microsoft::UI::Xaml::Media::Stretch::Uniform);
+            preview.Children().Append(placeholder);
+            preview.Children().Append(image);
             Border frame;
             frame.Height(136);
             frame.Padding(Thickness{ 2 });
-            frame.Child(image);
+            frame.Child(preview);
             TextBlock label;
             label.Text(std::to_wstring(page + 1));
             label.FontSize(11);
@@ -4485,7 +4807,14 @@ namespace winrt::Glance::App::implementation
             return;
         }
         sync_pdf_thumbnail_selection();
-        load_pdf_thumbnails_async(generation);
+        if (office_emf_preview_)
+        {
+            continue_office_thumbnail_generation(generation);
+        }
+        else
+        {
+            load_pdf_thumbnails_async(generation);
+        }
     }
 
     void MainWindow::navigate_to_pdf_page(std::uint32_t page_index)
@@ -4497,7 +4826,14 @@ namespace winrt::Glance::App::implementation
         }
         pdf_page_index_ = page_index;
         static_cast<void>(PdfScroller().ChangeView(nullptr, nullptr, 1.0F, true));
-        render_pdf_page_async(page_index, content_generation_);
+        if (office_emf_preview_)
+        {
+            render_office_page_async(page_index, content_generation_);
+        }
+        else
+        {
+            render_pdf_page_async(page_index, content_generation_);
+        }
     }
 
     void MainWindow::show_password_prompt(

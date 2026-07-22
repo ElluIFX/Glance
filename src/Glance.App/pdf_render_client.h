@@ -55,6 +55,11 @@ namespace glance::app
             std::uint32_t page_index,
             std::uint32_t maximum_width,
             std::uint32_t maximum_height);
+        [[nodiscard]] PdfRenderResult render_emf(
+            const std::wstring& path,
+            std::uint32_t page_index,
+            std::uint32_t maximum_width,
+            std::uint32_t maximum_height);
         void cancel() noexcept;
         [[nodiscard]] bool prewarm();
 
@@ -66,6 +71,9 @@ namespace glance::app
             const std::vector<std::byte>& request,
             glance::contracts::pdf::Status& status,
             std::vector<std::byte>& response);
+        [[nodiscard]] PdfRenderResult consume_render_response(
+            glance::contracts::pdf::Status status,
+            const std::vector<std::byte>& response);
 
         std::mutex mutex_;
         std::mutex process_handle_mutex_;

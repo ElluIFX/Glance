@@ -7,6 +7,7 @@
 #include "folder_preview_preferences.h"
 #include "generic_preview_preferences.h"
 #include "media_preview_preferences.h"
+#include "office_preview_client.h"
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
@@ -228,6 +229,17 @@ namespace winrt::Glance::App::implementation
             std::uint64_t generation,
             std::uint64_t source_size,
             std::uint64_t source_modified_time);
+        winrt::fire_and_forget load_word_emf_async(
+            std::wstring path,
+            std::uint64_t generation);
+        winrt::fire_and_forget render_office_page_async(
+            std::uint32_t page_index,
+            std::uint64_t generation);
+        winrt::fire_and_forget load_office_thumbnail_async(
+            std::uint32_t page_index,
+            std::uint64_t generation,
+            bool continue_background = false);
+        void continue_office_thumbnail_generation(std::uint64_t generation);
         struct ArchiveIconTarget
         {
             std::wstring path;
@@ -406,6 +418,10 @@ namespace winrt::Glance::App::implementation
             HANDLE process{};
         };
         std::shared_ptr<OfficeConversionOperation> office_conversion_;
+        std::shared_ptr<glance::app::OfficePreviewClient> office_preview_client_;
+        bool office_emf_preview_{};
+        bool office_thumbnail_background_active_{};
+        std::vector<bool> office_thumbnail_requested_;
         std::wstring office_temp_pdf_;
         std::wstring office_cache_source_path_;
         std::uint64_t office_cache_source_size_{};
