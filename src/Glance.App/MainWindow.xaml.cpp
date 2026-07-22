@@ -41,6 +41,8 @@ using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
+    constexpr std::uint64_t maximum_preview_as_text_file_size = 8ULL * 1024ULL * 1024ULL;
+
     std::filesystem::path executable_directory()
     {
         std::wstring path(32768, L'\0');
@@ -191,7 +193,12 @@ namespace winrt::Glance::App::implementation
         set_tooltip(TopmostButton(), L"TopmostButton.ToolTipService.ToolTip");
         set_tooltip(PinButton(), L"PinButton.ToolTipService.ToolTip");
         set_tooltip(ClosePreviewButton(), L"ClosePreviewButton.ToolTipService.ToolTip");
+        set_tooltip(
+            GenericAdvancedInfoButton(),
+            L"GenericAdvancedInfoButton.ToolTipService.ToolTip");
         LoadCloudFileText().Text(glance::app::localize(L"LoadCloudFileText.Text"));
+        PreviewAsTextText().Text(glance::app::localize(L"PreviewAsTextText.Text"));
+        PreviewErrorInfoBar().Title(glance::app::localize(L"PreviewErrorInfoBar.Title"));
         set_tooltip(MediaPlayPauseButton(), L"MediaPlayPauseButton.ToolTipService.ToolTip");
         set_tooltip(MediaMuteButton(), L"MediaMuteButton.ToolTipService.ToolTip");
         set_tooltip(PreviousPdfButton(), L"PreviousPdfButton.ToolTipService.ToolTip");
@@ -425,6 +432,7 @@ namespace winrt::Glance::App::implementation
         TextContentRichText().Blocks().Clear();
         LineNumberText().Text(L"");
         TextEncodingText().Text(L"");
+        PreviewErrorInfoBar().IsOpen(false);
         if (font_size_overlay_timer_ != nullptr)
         {
             font_size_overlay_timer_.Stop();
@@ -447,6 +455,8 @@ namespace winrt::Glance::App::implementation
         GenericAdvancedInfoText().Text(L"");
         GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
         LoadCloudFileButton().Visibility(Visibility::Collapsed);
+        PreviewAsTextButton().Visibility(Visibility::Collapsed);
+        GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
         ErrorText().Text(L"");
         ErrorText().Visibility(Visibility::Collapsed);
         GenericPanel().Visibility(Visibility::Visible);
@@ -649,6 +659,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
         current_index_ = index;
+        PreviewErrorInfoBar().IsOpen(false);
         const auto& file = files_[index];
         const auto generation = ++content_generation_;
         TitleText().Text(file.display_name);
@@ -745,24 +756,44 @@ namespace winrt::Glance::App::implementation
             load_office_async(file.path, generation, file.size, file.last_write_time);
             break;
         default:
-            present_generic(file);
+            present_generic(file, true);
             break;
         }
     }
 
-    void MainWindow::present_generic(const glance::app::PreviewFile& file)
+    void MainWindow::present_generic(
+        const glance::app::PreviewFile& file,
+        bool allow_text_preview)
     {
         current_kind_ = glance::app::PreviewKind::generic;
         show_content_panel(glance::app::PreviewKind::generic);
         FileNameText().Text(file.display_name);
         FilePathText().Text(!file.path.empty() ? file.path : file.parsing_name);
-        FileMetadataText().Text(formatted_size(file.size) + L"  |  " + formatted_time(file.last_write_time));
+        FileMetadataText().Text(
+            formatted_size(file.size) + L"  |  " +
+            glance::app::localize_format(
+                L"GenericModifiedAt",
+                { formatted_time(file.last_write_time) }));
         GenericFileIconImage().Source(nullptr);
         GenericFileIconImage().Visibility(Visibility::Collapsed);
         GenericFileFallbackIcon().Visibility(Visibility::Visible);
         GenericAdvancedInfoText().Text(L"");
         GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
+        generic_preview_preferences_ = glance::app::load_generic_preview_preferences();
+        GenericAdvancedInfoButton().IsChecked(generic_preview_preferences_.show_advanced_info);
         LoadCloudFileButton().Visibility(file.is_cloud_placeholder ? Visibility::Visible : Visibility::Collapsed);
+        PreviewAsTextButton().Visibility(
+            allow_text_preview && !file.path.empty() && !file.is_cloud_placeholder &&
+                (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
+                file.size < maximum_preview_as_text_file_size
+            ? Visibility::Visible
+            : Visibility::Collapsed);
+        PreviewAsTextButton().IsEnabled(true);
+        const bool advanced_info_available =
+            allow_text_preview && !file.path.empty() && !file.is_cloud_placeholder &&
+            (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+        GenericAdvancedInfoButton().Visibility(
+            advanced_info_available ? Visibility::Visible : Visibility::Collapsed);
         ErrorText().Visibility(Visibility::Collapsed);
         const auto icon_path = !file.path.empty() ? file.path : file.parsing_name;
         if (!icon_path.empty())
@@ -773,8 +804,7 @@ namespace winrt::Glance::App::implementation
                 file.is_cloud_placeholder || file.path.empty(),
                 content_generation_);
         }
-        if (!file.path.empty() && !file.is_cloud_placeholder &&
-            (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+        if (advanced_info_available && generic_preview_preferences_.show_advanced_info)
         {
             load_generic_file_info_async(file.path, content_generation_);
         }
@@ -824,7 +854,10 @@ namespace winrt::Glance::App::implementation
         co_await resume_background();
         auto info = glance::app::load_generic_file_info(path);
         static_cast<void>(dispatcher.TryEnqueue([lifetime, generation, info = std::move(info)]() mutable {
-            if (generation != lifetime->content_generation_ || info.empty())
+            if (generation != lifetime->content_generation_ ||
+                lifetime->current_kind_ != glance::app::PreviewKind::generic ||
+                !lifetime->generic_preview_preferences_.show_advanced_info ||
+                info.empty())
             {
                 return;
             }
@@ -833,7 +866,7 @@ namespace winrt::Glance::App::implementation
         }));
     }
 
-    void MainWindow::present_text(const glance::app::PreviewFile& file, bool markdown)
+    void MainWindow::prepare_text_preview(const glance::app::PreviewFile& file, bool markdown)
     {
         current_kind_ = markdown ? glance::app::PreviewKind::markdown : glance::app::PreviewKind::text;
         show_content_panel(markdown ? glance::app::PreviewKind::markdown : glance::app::PreviewKind::text);
@@ -853,6 +886,11 @@ namespace winrt::Glance::App::implementation
         {
             MarkdownPreviewWebView().Opacity(0.0);
         }
+    }
+
+    void MainWindow::present_text(const glance::app::PreviewFile& file, bool markdown)
+    {
+        prepare_text_preview(file, markdown);
         load_text_async(file.path, markdown, content_generation_, current_text_encoding_);
     }
 
@@ -860,15 +898,20 @@ namespace winrt::Glance::App::implementation
         std::wstring path,
         bool markdown,
         std::uint64_t generation,
-        glance::app::TextEncoding encoding)
+        glance::app::TextEncoding encoding,
+        bool preview_as_text_attempt)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
         auto preview = glance::app::load_text_preview(path, 8U * 1024U * 1024U, encoding);
         static_cast<void>(dispatcher.TryEnqueue(
-            [lifetime, preview = std::move(preview), markdown, generation]() mutable {
-                lifetime->apply_text_preview(std::move(preview), markdown, generation);
+            [lifetime, preview = std::move(preview), markdown, generation, preview_as_text_attempt]() mutable {
+                lifetime->apply_text_preview(
+                    std::move(preview),
+                    markdown,
+                    generation,
+                    preview_as_text_attempt);
             }));
     }
 
@@ -1468,7 +1511,8 @@ namespace winrt::Glance::App::implementation
     void MainWindow::apply_text_preview(
         glance::app::TextPreview preview,
         bool markdown,
-        std::uint64_t generation)
+        std::uint64_t generation,
+        bool preview_as_text_attempt)
     {
         if (generation != content_generation_)
         {
@@ -1476,16 +1520,25 @@ namespace winrt::Glance::App::implementation
         }
         if (!preview.error.empty())
         {
-            if (current_text_encoding_ == glance::app::TextEncoding::automatic)
+            if (preview_as_text_attempt)
             {
-                EncodingSelector().Content(box_value(glance::app::localize(L"EncodingUnknown")));
+                PreviewAsTextButton().IsEnabled(true);
             }
-            current_text_ = std::move(preview.error);
-            render_text_content();
-            LineNumberText().Text(L"");
-            TextPreviewScroller().Visibility(Visibility::Visible);
-            MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
+            else if (current_index_ < files_.size())
+            {
+                present_generic(files_[current_index_], true);
+            }
+            show_text_preview_error(std::move(preview.error));
             return;
+        }
+
+        if (preview_as_text_attempt)
+        {
+            if (current_index_ >= files_.size())
+            {
+                return;
+            }
+            prepare_text_preview(files_[current_index_], false);
         }
 
         current_text_ = std::move(preview.content);
@@ -1757,6 +1810,10 @@ namespace winrt::Glance::App::implementation
         LineNumbersButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         SyntaxHighlightButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         WordWrapButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
+        if (kind != glance::app::PreviewKind::generic)
+        {
+            GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
+        }
         if (kind != glance::app::PreviewKind::image)
         {
             ImagePreview().Source(nullptr);
@@ -1774,6 +1831,12 @@ namespace winrt::Glance::App::implementation
             pdf_document_ = nullptr;
             PdfPageImage().Source(nullptr);
         }
+    }
+
+    void MainWindow::show_text_preview_error(std::wstring message)
+    {
+        PreviewErrorInfoBar().Message(std::move(message));
+        PreviewErrorInfoBar().IsOpen(true);
     }
 
     void MainWindow::show_provider_error(std::wstring message, std::uint64_t generation)
@@ -2574,6 +2637,60 @@ namespace winrt::Glance::App::implementation
         LoadCloudFileButton().Visibility(Visibility::Collapsed);
         ErrorText().Visibility(Visibility::Collapsed);
         present_file(current_index_);
+    }
+
+    void MainWindow::PreviewAsTextButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (current_kind_ != glance::app::PreviewKind::generic ||
+            current_index_ >= files_.size())
+        {
+            return;
+        }
+
+        const auto& file = files_[current_index_];
+        if (file.path.empty() || file.is_cloud_placeholder ||
+            (file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
+            file.size >= maximum_preview_as_text_file_size)
+        {
+            return;
+        }
+
+        ++content_generation_;
+        PreviewErrorInfoBar().IsOpen(false);
+        PreviewAsTextButton().IsEnabled(false);
+        ErrorText().Visibility(Visibility::Collapsed);
+        load_text_async(
+            file.path,
+            false,
+            content_generation_,
+            glance::app::TextEncoding::automatic,
+            true);
+    }
+
+    void MainWindow::GenericAdvancedInfoButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (current_kind_ != glance::app::PreviewKind::generic ||
+            current_index_ >= files_.size())
+        {
+            return;
+        }
+
+        generic_preview_preferences_.show_advanced_info =
+            GenericAdvancedInfoButton().IsChecked().Value();
+        glance::app::save_generic_preview_preferences(generic_preview_preferences_);
+        if (!generic_preview_preferences_.show_advanced_info)
+        {
+            GenericAdvancedInfoText().Text(L"");
+            GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
+            return;
+        }
+
+        const auto& file = files_[current_index_];
+        if (!file.path.empty() && !file.is_cloud_placeholder &&
+            (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+        {
+            load_generic_file_info_async(file.path, content_generation_);
+        }
     }
 
     std::wstring MainWindow::formatted_size(std::uint64_t size) const

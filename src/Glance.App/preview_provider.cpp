@@ -99,6 +99,124 @@ namespace
         return true;
     }
 
+    bool likely_utf16_without_bom(const std::span<const std::byte> bytes)
+    {
+        const std::size_t pair_count = bytes.size() / 2;
+        if (pair_count < 4)
+        {
+            return false;
+        }
+
+        std::size_t even_zero_count{};
+        std::size_t odd_zero_count{};
+        for (std::size_t index = 0; index < pair_count; ++index)
+        {
+            even_zero_count += bytes[index * 2] == std::byte{} ? 1U : 0U;
+            odd_zero_count += bytes[index * 2 + 1] == std::byte{} ? 1U : 0U;
+        }
+        const auto likely_lane = [pair_count](std::size_t zero_lane, std::size_t text_lane) {
+            return zero_lane * 100U >= pair_count * 60U &&
+                text_lane * 100U <= pair_count * 10U;
+        };
+        return likely_lane(even_zero_count, odd_zero_count) ||
+            likely_lane(odd_zero_count, even_zero_count);
+    }
+
+    bool looks_like_binary_payload(
+        std::span<const std::byte> bytes,
+        bool utf8_bom,
+        bool unicode_bom)
+    {
+        constexpr std::size_t maximum_sample_bytes = 64U * 1024U;
+        if (bytes.size() >= 2 &&
+            std::to_integer<unsigned char>(bytes[0]) == 0x4DU &&
+            std::to_integer<unsigned char>(bytes[1]) == 0x5AU)
+        {
+            return true;
+        }
+        if (bytes.size() >= 4)
+        {
+            const std::array signature{
+                std::to_integer<unsigned char>(bytes[0]),
+                std::to_integer<unsigned char>(bytes[1]),
+                std::to_integer<unsigned char>(bytes[2]),
+                std::to_integer<unsigned char>(bytes[3]) };
+            if (signature == std::array<unsigned char, 4>{ 0x7F, 0x45, 0x4C, 0x46 } ||
+                signature == std::array<unsigned char, 4>{ 0x00, 0x61, 0x73, 0x6D } ||
+                signature == std::array<unsigned char, 4>{ 0xCA, 0xFE, 0xBA, 0xBE } ||
+                signature == std::array<unsigned char, 4>{ 0xFE, 0xED, 0xFA, 0xCE } ||
+                signature == std::array<unsigned char, 4>{ 0xCE, 0xFA, 0xED, 0xFE } ||
+                signature == std::array<unsigned char, 4>{ 0xFE, 0xED, 0xFA, 0xCF } ||
+                signature == std::array<unsigned char, 4>{ 0xCF, 0xFA, 0xED, 0xFE })
+            {
+                return true;
+            }
+        }
+        if (unicode_bom)
+        {
+            return false;
+        }
+        if (utf8_bom && bytes.size() >= 3)
+        {
+            bytes = bytes.subspan(3);
+        }
+        bytes = bytes.first(std::min(bytes.size(), maximum_sample_bytes));
+        if (bytes.empty() || likely_utf16_without_bom(bytes))
+        {
+            return false;
+        }
+
+        std::size_t control_count{};
+        for (const std::byte value : bytes)
+        {
+            const auto character = std::to_integer<unsigned char>(value);
+            if (character == 0)
+            {
+                return true;
+            }
+            control_count +=
+                (character < 0x20U && character != '\t' && character != '\n' &&
+                 character != '\f' && character != '\r') || character == 0x7FU
+                ? 1U
+                : 0U;
+        }
+        return control_count * 100U > bytes.size();
+    }
+
+    bool looks_like_non_text_content(std::wstring_view content)
+    {
+        std::size_t invalid_count{};
+        for (std::size_t index = 0; index < content.size(); ++index)
+        {
+            const wchar_t character = content[index];
+            if (character == L'\0')
+            {
+                return true;
+            }
+            if (character >= 0xD800 && character <= 0xDBFF)
+            {
+                if (index + 1 >= content.size() ||
+                    content[index + 1] < 0xDC00 || content[index + 1] > 0xDFFF)
+                {
+                    ++invalid_count;
+                }
+                else
+                {
+                    ++index;
+                }
+                continue;
+            }
+            if ((character >= 0xDC00 && character <= 0xDFFF) ||
+                character == 0xFFFD || character == 0xFFFE || character == 0xFFFF ||
+                (character < 0x20 && character != L'\t' && character != L'\n' &&
+                 character != L'\f' && character != L'\r') || character == 0x7F)
+            {
+                ++invalid_count;
+            }
+        }
+        return !content.empty() && invalid_count * 100U > content.size();
+    }
+
     glance::app::PreviewKind sniff_unknown_file(const std::wstring& path)
     {
         std::ifstream stream(std::filesystem::path(path), std::ios::binary);
@@ -226,6 +344,14 @@ namespace
         }
     };
 
+    struct ConverterCloser
+    {
+        void operator()(UConverter* converter) const noexcept
+        {
+            ucnv_close(converter);
+        }
+    };
+
     std::wstring chinese_encoding_name(const std::span<const std::byte> bytes)
     {
         bool requires_gbk{};
@@ -331,10 +457,12 @@ namespace
         {
             return std::nullopt;
         }
+        constexpr std::size_t maximum_detection_bytes = 256U * 1024U;
+        const auto detection_sample = bytes.first(std::min(bytes.size(), maximum_detection_bytes));
         ucsdet_setText(
             detector.get(),
-            reinterpret_cast<const char*>(bytes.data()),
-            static_cast<std::int32_t>(bytes.size()),
+            reinterpret_cast<const char*>(detection_sample.data()),
+            static_cast<std::int32_t>(detection_sample.size()),
             &status);
         const UCharsetMatch* match = U_FAILURE(status) ? nullptr : ucsdet_detect(detector.get(), &status);
         if (U_FAILURE(status) || match == nullptr)
@@ -354,17 +482,32 @@ namespace
         }
 
         status = U_ZERO_ERROR;
-        const std::int32_t required = ucsdet_getUChars(match, nullptr, 0, &status);
+        std::unique_ptr<UConverter, ConverterCloser> converter(ucnv_open(name, &status));
+        if (U_FAILURE(status) || converter == nullptr)
+        {
+            return std::nullopt;
+        }
+
+        status = U_ZERO_ERROR;
+        const std::int32_t required = ucnv_toUChars(
+            converter.get(),
+            nullptr,
+            0,
+            reinterpret_cast<const char*>(bytes.data()),
+            static_cast<std::int32_t>(bytes.size()),
+            &status);
         if (required < 0 || (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status)))
         {
             return std::nullopt;
         }
         status = U_ZERO_ERROR;
         std::vector<UChar> converted(static_cast<std::size_t>(required) + 1U);
-        const std::int32_t written = ucsdet_getUChars(
-            match,
+        const std::int32_t written = ucnv_toUChars(
+            converter.get(),
             converted.data(),
             static_cast<std::int32_t>(converted.size()),
+            reinterpret_cast<const char*>(bytes.data()),
+            static_cast<std::int32_t>(bytes.size()),
             &status);
         if (U_FAILURE(status) || written < 0)
         {
@@ -493,6 +636,11 @@ namespace glance::app
             std::to_integer<unsigned char>(payload[1]) == 0xFE &&
             std::to_integer<unsigned char>(payload[2]) == 0x00 &&
             std::to_integer<unsigned char>(payload[3]) == 0x00;
+        const bool utf32_be_bom = payload.size() >= 4 &&
+            std::to_integer<unsigned char>(payload[0]) == 0x00 &&
+            std::to_integer<unsigned char>(payload[1]) == 0x00 &&
+            std::to_integer<unsigned char>(payload[2]) == 0xFE &&
+            std::to_integer<unsigned char>(payload[3]) == 0xFF;
         const bool utf16_le_bom = payload.size() >= 2 &&
             std::to_integer<unsigned char>(payload[0]) == 0xFF &&
             std::to_integer<unsigned char>(payload[1]) == 0xFE &&
@@ -500,6 +648,15 @@ namespace glance::app
         const bool utf16_be_bom = payload.size() >= 2 &&
             std::to_integer<unsigned char>(payload[0]) == 0xFE &&
             std::to_integer<unsigned char>(payload[1]) == 0xFF;
+
+        if (looks_like_binary_payload(
+                payload,
+                utf8_bom,
+                utf16_le_bom || utf16_be_bom || utf32_le_bom || utf32_be_bom))
+        {
+            result.error = localize(L"TextBinaryError");
+            return result;
+        }
 
         if (encoding == TextEncoding::utf8 ||
             (encoding == TextEncoding::automatic && utf8_bom))
@@ -597,9 +754,14 @@ namespace glance::app
             result.content = decode_multibyte(payload, CP_ACP);
         }
 
-        if (!payload.empty() && result.content.empty())
+        if (result.error.empty() && !payload.empty() && result.content.empty())
         {
             result.error = localize(L"TextDecodeError");
+        }
+        else if (result.error.empty() && looks_like_non_text_content(result.content))
+        {
+            result.content.clear();
+            result.error = localize(L"TextBinaryError");
         }
         return result;
     }

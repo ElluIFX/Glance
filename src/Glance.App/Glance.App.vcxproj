@@ -57,6 +57,7 @@
   <ItemGroup>
     <ClInclude Include="archive_provider.h" />
     <ClInclude Include="generic_file_info.h" />
+    <ClInclude Include="generic_preview_preferences.h" />
     <ClInclude Include="appearance_preferences.h" />
     <ClInclude Include="image_metadata_provider.h" />
     <ClInclude Include="localization.h" />
@@ -89,6 +90,7 @@
   <ItemGroup>
     <ClCompile Include="archive_provider.cpp" />
     <ClCompile Include="generic_file_info.cpp" />
+    <ClCompile Include="generic_preview_preferences.cpp" />
     <ClCompile Include="appearance_preferences.cpp" />
     <ClCompile Include="image_metadata_provider.cpp" />
     <ClCompile Include="localization.cpp" />

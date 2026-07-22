@@ -3,6 +3,7 @@
 #include "MainWindow.g.h"
 #include "appearance_preferences.h"
 #include "archive_provider.h"
+#include "generic_preview_preferences.h"
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
@@ -104,6 +105,8 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void LoadCloudFileButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void PreviewAsTextButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void GenericAdvancedInfoButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
         static LRESULT CALLBACK window_subclass(
@@ -121,19 +124,21 @@ namespace winrt::Glance::App::implementation
         void clear_preview_content();
         void reset_hidden_window_size() noexcept;
         void present_file(std::uint32_t index);
-        void present_generic(const glance::app::PreviewFile& file);
+        void present_generic(const glance::app::PreviewFile& file, bool allow_text_preview = false);
         winrt::fire_and_forget load_generic_icon_async(
             std::wstring path,
             bool is_folder,
             bool use_file_attributes,
             std::uint64_t generation);
         winrt::fire_and_forget load_generic_file_info_async(std::wstring path, std::uint64_t generation);
+        void prepare_text_preview(const glance::app::PreviewFile& file, bool markdown);
         void present_text(const glance::app::PreviewFile& file, bool markdown);
         winrt::fire_and_forget load_text_async(
             std::wstring path,
             bool markdown,
             std::uint64_t generation,
-            glance::app::TextEncoding encoding);
+            glance::app::TextEncoding encoding,
+            bool preview_as_text_attempt = false);
         winrt::fire_and_forget load_image_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_image_metadata_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_media_async(std::wstring path, std::uint64_t generation);
@@ -163,7 +168,11 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget load_archive_icons_async(
             std::vector<ArchiveIconTarget> targets,
             std::uint64_t generation);
-        void apply_text_preview(glance::app::TextPreview preview, bool markdown, std::uint64_t generation);
+        void apply_text_preview(
+            glance::app::TextPreview preview,
+            bool markdown,
+            std::uint64_t generation,
+            bool preview_as_text_attempt);
         void render_markdown();
         winrt::fire_and_forget render_markdown_async(std::wstring html, std::uint64_t generation);
         void render_text_content();
@@ -175,6 +184,7 @@ namespace winrt::Glance::App::implementation
         void set_markdown_preview_mode(bool preview);
         void update_line_number_visibility();
         void show_content_panel(glance::app::PreviewKind kind);
+        void show_text_preview_error(std::wstring message);
         void show_provider_error(std::wstring message, std::uint64_t generation);
         void update_image_fit_surface();
         void fit_image_to_viewport();
@@ -227,6 +237,7 @@ namespace winrt::Glance::App::implementation
         bool current_text_markdown_{};
         glance::app::TextEncoding current_text_encoding_{ glance::app::TextEncoding::automatic };
         glance::app::TextPreferences text_preferences_{};
+        glance::app::GenericPreviewPreferences generic_preview_preferences_{};
         std::wstring image_metadata_;
         std::wstring media_dimensions_;
         std::wstring media_technical_info_;

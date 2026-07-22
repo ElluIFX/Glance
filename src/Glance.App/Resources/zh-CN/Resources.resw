@@ -36,6 +36,7 @@
   <data name="TextFileOpenError" xml:space="preserve"><value>无法打开文件。</value></data>
   <data name="TextFileSizeError" xml:space="preserve"><value>无法读取文件大小。</value></data>
   <data name="TextDecodeError" xml:space="preserve"><value>无法解码文本编码。</value></data>
+  <data name="TextBinaryError" xml:space="preserve"><value>该文件不是可识别的文本格式。</value></data>
   <data name="ArchiveReadError" xml:space="preserve"><value>Windows ZIP 处理程序无法读取压缩包目录。</value></data>
   <data name="FolderReadError" xml:space="preserve"><value>无法读取文件夹。</value></data>
   <data name="FolderType" xml:space="preserve"><value>文件夹</value></data>
@@ -59,6 +60,9 @@
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>钉住文件</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭预览</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>加载文件</value></data>
+  <data name="PreviewAsTextText.Text" xml:space="preserve"><value>尝试以文本预览</value></data>
+  <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>无法以文本预览</value></data>
+  <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示高级信息</value></data>
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>系统 ANSI</value></data>
   <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>预览</value></data>
   <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>代码</value></data>
@@ -86,7 +90,7 @@
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>维护</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>关于</value></data>
   <data name="GeneralPageTitle.Text" xml:space="preserve"><value>常规</value></data>
-  <data name="GeneralPageDescription.Text" xml:space="preserve"><value>外观、应用启动和诊断</value></data>
+  <data name="GeneralPageDescription.Text" xml:space="preserve"><value>外观和应用启动</value></data>
   <data name="LaunchTitle.Text" xml:space="preserve"><value>登录时启动</value></data>
   <data name="LaunchDescription.Text" xml:space="preserve"><value>登录 Windows 时自动启动 Glance</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>诊断</value></data>
@@ -118,7 +122,7 @@
   <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix 路径分隔符</value></data>
   <data name="UnixPathSeparatorsDescription.Text" xml:space="preserve"><value>将反斜杠替换为正斜杠</value></data>
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>维护</value></data>
-  <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态和已保存的应用状态</value></data>
+  <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态、诊断和已保存的应用状态</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>输入核心</value></data>
   <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>媒体组件</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>管理员权限</value></data>
@@ -164,6 +168,7 @@
   <data name="AccessDelete" xml:space="preserve"><value>删除</value></data>
   <data name="GenericAccess" xml:space="preserve"><value>访问权限：{0}</value></data>
   <data name="GenericAttributes" xml:space="preserve"><value>属性：{0}</value></data>
+  <data name="GenericModifiedAt" xml:space="preserve"><value>修改于 {0}</value></data>
   <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance 设置</value></data>
   <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭设置</value></data>
   <data name="LanguageLabel.Text" xml:space="preserve"><value>语言</value></data>

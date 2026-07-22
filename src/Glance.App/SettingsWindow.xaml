@@ -152,7 +152,7 @@
                 <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="GeneralPageTitle" x:Uid="GeneralPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="General" />
-                        <TextBlock x:Name="GeneralPageDescription" x:Uid="GeneralPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Appearance, application startup, and diagnostics" />
+                        <TextBlock x:Name="GeneralPageDescription" x:Uid="GeneralPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Appearance and application startup" />
                     </StackPanel>
                     <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
@@ -279,25 +279,6 @@
                                     OnContent="{x:Null}"
                                     VerticalAlignment="Center"
                                     Toggled="LaunchAtSignInToggle_Toggled" />
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="DiagnosticsTitle" x:Uid="DiagnosticsTitle" Text="Diagnostics" />
-                                    <TextBlock x:Name="DiagnosticsDescription" x:Uid="DiagnosticsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Save diagnostic logs and crash dumps" />
-                                </StackPanel>
-                                <ToggleSwitch
-                                    x:Name="DiagnosticsToggle"
-                                    Grid.Column="1"
-                                    HorizontalAlignment="Right"
-                                    OffContent="{x:Null}"
-                                    OnContent="{x:Null}"
-                                    VerticalAlignment="Center"
-                                    Toggled="DiagnosticsToggle_Toggled" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -475,7 +456,7 @@
                 <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="MaintenancePageTitle" x:Uid="MaintenancePageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Maintenance" />
-                        <TextBlock x:Name="MaintenancePageDescription" x:Uid="MaintenancePageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Runtime status and saved application state" />
+                        <TextBlock x:Name="MaintenancePageDescription" x:Uid="MaintenancePageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Runtime status, diagnostics, and saved application state" />
                     </StackPanel>
                     <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
@@ -513,6 +494,25 @@
                                     <TextBlock x:Name="AdministratorAccessStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>
                                 <FontIcon x:Name="AdministratorAccessStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="DiagnosticsTitle" x:Uid="DiagnosticsTitle" Text="Diagnostics" />
+                                    <TextBlock x:Name="DiagnosticsDescription" x:Uid="DiagnosticsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Save diagnostic logs and crash dumps" />
+                                </StackPanel>
+                                <ToggleSwitch
+                                    x:Name="DiagnosticsToggle"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    OffContent="{x:Null}"
+                                    OnContent="{x:Null}"
+                                    VerticalAlignment="Center"
+                                    Toggled="DiagnosticsToggle_Toggled" />
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">

@@ -36,6 +36,7 @@
   <data name="TextFileOpenError" xml:space="preserve"><value>The file could not be opened.</value></data>
   <data name="TextFileSizeError" xml:space="preserve"><value>The file size could not be read.</value></data>
   <data name="TextDecodeError" xml:space="preserve"><value>The text encoding could not be decoded.</value></data>
+  <data name="TextBinaryError" xml:space="preserve"><value>The file does not appear to contain text.</value></data>
   <data name="ArchiveReadError" xml:space="preserve"><value>The archive directory could not be read by the Windows ZIP handler.</value></data>
   <data name="FolderReadError" xml:space="preserve"><value>The folder could not be read.</value></data>
   <data name="FolderType" xml:space="preserve"><value>Folder</value></data>
@@ -59,6 +60,9 @@
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>Pin file</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close preview</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>Load file</value></data>
+  <data name="PreviewAsTextText.Text" xml:space="preserve"><value>Try preview as text</value></data>
+  <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>Unable to preview as text</value></data>
+  <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show advanced information</value></data>
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
   <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>Preview</value></data>
   <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>Code</value></data>
@@ -86,7 +90,7 @@
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>Maintenance</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>About</value></data>
   <data name="GeneralPageTitle.Text" xml:space="preserve"><value>General</value></data>
-  <data name="GeneralPageDescription.Text" xml:space="preserve"><value>Application startup and diagnostics</value></data>
+  <data name="GeneralPageDescription.Text" xml:space="preserve"><value>Appearance and application startup</value></data>
   <data name="LaunchTitle.Text" xml:space="preserve"><value>Launch at sign-in</value></data>
   <data name="LaunchDescription.Text" xml:space="preserve"><value>Start Glance automatically when you sign in to Windows</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>Diagnostics</value></data>
@@ -118,7 +122,7 @@
   <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix separators</value></data>
   <data name="UnixPathSeparatorsDescription.Text" xml:space="preserve"><value>Replace backslashes with forward slashes</value></data>
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>Maintenance</value></data>
-  <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>Runtime status and saved application state</value></data>
+  <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>Runtime status, diagnostics, and saved application state</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>Input core</value></data>
   <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Media components</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>Administrator access</value></data>
@@ -164,6 +168,7 @@
   <data name="AccessDelete" xml:space="preserve"><value>Delete</value></data>
   <data name="GenericAccess" xml:space="preserve"><value>Access: {0}</value></data>
   <data name="GenericAttributes" xml:space="preserve"><value>Attributes: {0}</value></data>
+  <data name="GenericModifiedAt" xml:space="preserve"><value>Modified at {0}</value></data>
   <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance Settings</value></data>
   <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close settings</value></data>
   <data name="LanguageLabel.Text" xml:space="preserve"><value>Language</value></data>
