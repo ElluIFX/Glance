@@ -99,7 +99,9 @@ Remove-GlanceWorkspaceItem -Path $ffmpegExtractDirectory
 $requiredFiles = @(
     "Glance.exe",
     "Glance.Core.exe",
+    "Glance.DialogBroker32.exe",
     "Glance.DialogHook.dll",
+    "Glance.DialogHook32.dll",
     "Glance.OfficeHost.exe",
     "ffprobe.exe",
     "Glance.pri",

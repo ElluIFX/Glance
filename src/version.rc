@@ -16,6 +16,10 @@ IDI_GLANCE_APP ICON "Glance.App\\Assets\\AppIcon.ico"
 #define GLANCE_FILE_DESCRIPTION "Glance Office Preview Host"
 #define GLANCE_INTERNAL_NAME "Glance.OfficeHost"
 #define GLANCE_ORIGINAL_FILENAME "Glance.OfficeHost.exe"
+#elif GLANCE_BINARY_KIND == 4
+#define GLANCE_FILE_DESCRIPTION "Glance 32-bit Dialog Broker"
+#define GLANCE_INTERNAL_NAME "Glance.DialogBroker32"
+#define GLANCE_ORIGINAL_FILENAME "Glance.DialogBroker32.exe"
 #else
 #error GLANCE_BINARY_KIND must identify the target executable.
 #endif

@@ -63,7 +63,7 @@ function Remove-GlanceWorkspaceItem {
 }
 
 function Stop-GlanceProcesses {
-    $processes = Get-Process Glance, Glance.Core, Glance.OfficeHost -ErrorAction SilentlyContinue
+    $processes = Get-Process Glance, Glance.Core, Glance.DialogBroker32, Glance.OfficeHost -ErrorAction SilentlyContinue
     if (-not $processes) {
         return
     }

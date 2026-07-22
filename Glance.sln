@@ -5,8 +5,18 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Contracts", "src\Glance.Contracts\Glance.Contracts.vcxproj", "{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Core", "src\Glance.Core\Glance.Core.vcxproj", "{C983019A-36F7-4901-A188-1A3DB8BAEF8B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{BCFDCDE8-47F0-4FD1-B120-A6D634EECE99} = {BCFDCDE8-47F0-4FD1-B120-A6D634EECE99}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.DialogHook", "src\Glance.DialogHook\Glance.DialogHook.vcxproj", "{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.DialogHook32", "src\Glance.DialogHook\Glance.DialogHook32.vcxproj", "{9307B84C-F25C-4D52-BE2D-19437EBADCD8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.DialogBroker32", "src\Glance.DialogBroker32\Glance.DialogBroker32.vcxproj", "{BCFDCDE8-47F0-4FD1-B120-A6D634EECE99}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9307B84C-F25C-4D52-BE2D-19437EBADCD8} = {9307B84C-F25C-4D52-BE2D-19437EBADCD8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.App", "src\Glance.App\Glance.App.vcxproj", "{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}"
 EndProject
@@ -32,6 +42,14 @@ Global
 		{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}.Debug|x64.Build.0 = Debug|x64
 		{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}.Release|x64.ActiveCfg = Release|x64
 		{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}.Release|x64.Build.0 = Release|x64
+		{9307B84C-F25C-4D52-BE2D-19437EBADCD8}.Debug|x64.ActiveCfg = Debug|Win32
+		{9307B84C-F25C-4D52-BE2D-19437EBADCD8}.Debug|x64.Build.0 = Debug|Win32
+		{9307B84C-F25C-4D52-BE2D-19437EBADCD8}.Release|x64.ActiveCfg = Release|Win32
+		{9307B84C-F25C-4D52-BE2D-19437EBADCD8}.Release|x64.Build.0 = Release|Win32
+		{BCFDCDE8-47F0-4FD1-B120-A6D634EECE99}.Debug|x64.ActiveCfg = Debug|Win32
+		{BCFDCDE8-47F0-4FD1-B120-A6D634EECE99}.Debug|x64.Build.0 = Debug|Win32
+		{BCFDCDE8-47F0-4FD1-B120-A6D634EECE99}.Release|x64.ActiveCfg = Release|Win32
+		{BCFDCDE8-47F0-4FD1-B120-A6D634EECE99}.Release|x64.Build.0 = Release|Win32
 		{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}.Debug|x64.ActiveCfg = Debug|x64
 		{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}.Debug|x64.Build.0 = Debug|x64
 		{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}.Release|x64.ActiveCfg = Release|x64
