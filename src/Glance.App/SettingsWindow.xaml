@@ -146,7 +146,7 @@
                     BorderThickness="0"
                     Click="ExitButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="12">
-                        <FontIcon FontSize="16" Glyph="&#xE8BB;" />
+                        <FontIcon FontSize="12" Glyph="&#xE8BB;" />
                         <TextBlock x:Name="ExitButtonText" x:Uid="ExitButtonText" Text="Exit Glance" />
                     </StackPanel>
                 </Button>
