@@ -140,6 +140,15 @@
   <data name="DiagnosticBundlePackaging" xml:space="preserve"><value>正在创建诊断包...</value></data>
   <data name="DiagnosticBundleCreated" xml:space="preserve"><value>已保存至 {0}</value></data>
   <data name="DiagnosticBundleFailed" xml:space="preserve"><value>无法创建诊断包</value></data>
+  <data name="ResetAllSettingsLabel.Text" xml:space="preserve"><value>重置所有设置</value></data>
+  <data name="ResetAllSettingsDescription.Text" xml:space="preserve"><value>清除已保存的设置并退出 Glance</value></data>
+  <data name="ResetAllSettingsButton.Content" xml:space="preserve"><value>重置</value></data>
+  <data name="ResetAllSettingsConfirmationTitle" xml:space="preserve"><value>重置所有设置？</value></data>
+  <data name="ResetAllSettingsConfirmationMessage" xml:space="preserve"><value>所有已保存的 Glance 偏好将被清空，应用随后退出。你需要手动重新启动 Glance。</value></data>
+  <data name="ResetAllSettingsConfirmationPrimary" xml:space="preserve"><value>重置并退出</value></data>
+  <data name="ResetAllSettingsFailedTitle" xml:space="preserve"><value>无法重置设置</value></data>
+  <data name="ResetAllSettingsFailedMessage" xml:space="preserve"><value>部分设置无法清除，Glance 将保持运行。</value></data>
+  <data name="OK" xml:space="preserve"><value>确定</value></data>
   <data name="WindowSizesLabel.Text" xml:space="preserve"><value>预览窗口尺寸</value></data>
   <data name="WindowSizeResetStatusText.Text" xml:space="preserve"><value>按预览类型分别保存</value></data>
   <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>重置</value></data>

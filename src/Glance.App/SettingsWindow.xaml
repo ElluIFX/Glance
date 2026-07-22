@@ -605,6 +605,27 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Spacing="3">
+                                <TextBlock x:Name="ResetAllSettingsLabel" x:Uid="ResetAllSettingsLabel" Text="Reset all settings" />
+                                <TextBlock x:Name="ResetAllSettingsDescription" x:Uid="ResetAllSettingsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Clear saved preferences and exit Glance" />
+                            </StackPanel>
+                            <Button
+                                x:Name="ResetAllSettingsButton"
+                                x:Uid="ResetAllSettingsButton"
+                                Grid.Column="1"
+                                MinWidth="88"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Click="ResetAllSettingsButton_Click"
+                                Content="Reset" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
 

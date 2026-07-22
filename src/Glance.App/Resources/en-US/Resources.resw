@@ -140,6 +140,15 @@
   <data name="DiagnosticBundlePackaging" xml:space="preserve"><value>Creating diagnostic package...</value></data>
   <data name="DiagnosticBundleCreated" xml:space="preserve"><value>Saved to {0}</value></data>
   <data name="DiagnosticBundleFailed" xml:space="preserve"><value>Could not create the diagnostic package</value></data>
+  <data name="ResetAllSettingsLabel.Text" xml:space="preserve"><value>Reset all settings</value></data>
+  <data name="ResetAllSettingsDescription.Text" xml:space="preserve"><value>Clear saved preferences and exit Glance</value></data>
+  <data name="ResetAllSettingsButton.Content" xml:space="preserve"><value>Reset</value></data>
+  <data name="ResetAllSettingsConfirmationTitle" xml:space="preserve"><value>Reset all settings?</value></data>
+  <data name="ResetAllSettingsConfirmationMessage" xml:space="preserve"><value>All saved Glance preferences will be cleared and the app will exit. You must start Glance manually afterward.</value></data>
+  <data name="ResetAllSettingsConfirmationPrimary" xml:space="preserve"><value>Reset and exit</value></data>
+  <data name="ResetAllSettingsFailedTitle" xml:space="preserve"><value>Could not reset settings</value></data>
+  <data name="ResetAllSettingsFailedMessage" xml:space="preserve"><value>Some settings could not be cleared. Glance will remain open.</value></data>
+  <data name="OK" xml:space="preserve"><value>OK</value></data>
   <data name="WindowSizesLabel.Text" xml:space="preserve"><value>Preview window sizes</value></data>
   <data name="WindowSizeResetStatusText.Text" xml:space="preserve"><value>Stored separately by preview type</value></data>
   <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>Reset</value></data>

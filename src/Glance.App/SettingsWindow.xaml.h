@@ -43,6 +43,9 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget ExportDiagnosticBundleButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        winrt::fire_and_forget ResetAllSettingsButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ResetWindowSizesButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -82,6 +85,7 @@ namespace winrt::Glance::App::implementation
         void configure_window();
         void refresh_runtime_statuses();
         void refresh_diagnostic_bundle_status();
+        void refresh_launch_at_sign_in();
         [[nodiscard]] bool launch_at_sign_in_enabled() const;
         void set_launch_at_sign_in(bool enabled);
         void save_text_preferences();
@@ -93,6 +97,7 @@ namespace winrt::Glance::App::implementation
 
         bool initializing_{};
         bool exit_confirmation_open_{};
+        bool reset_confirmation_open_{};
         DiagnosticBundleState diagnostic_bundle_state_{};
         std::wstring diagnostic_bundle_path_;
         glance::app::TextPreferences text_preferences_{};

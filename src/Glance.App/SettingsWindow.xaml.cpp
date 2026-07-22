@@ -240,6 +240,12 @@ namespace winrt::Glance::App::implementation
         UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
         initializing_ = false;
         refresh_diagnostic_bundle_status();
+        Activated([this](IInspectable const&, WindowActivatedEventArgs const& args) {
+            if (args.WindowActivationState() != WindowActivationState::Deactivated)
+            {
+                refresh_launch_at_sign_in();
+            }
+        });
     }
 
     void SettingsWindow::InitializeSession(
@@ -399,6 +405,9 @@ namespace winrt::Glance::App::implementation
         set_text(AdministratorAccessLabel(), L"AdministratorAccessLabel.Text");
         set_text(DiagnosticBundleLabel(), L"DiagnosticBundleLabel.Text");
         set_content(ExportDiagnosticBundleButton(), L"ExportDiagnosticBundleButton.Content");
+        set_text(ResetAllSettingsLabel(), L"ResetAllSettingsLabel.Text");
+        set_text(ResetAllSettingsDescription(), L"ResetAllSettingsDescription.Text");
+        set_content(ResetAllSettingsButton(), L"ResetAllSettingsButton.Content");
         refresh_diagnostic_bundle_status();
         set_text(AboutPageTitle(), L"AboutPageTitle.Text");
         set_text(AboutPageDescription(), L"AboutPageDescription.Text");
@@ -415,15 +424,18 @@ namespace winrt::Glance::App::implementation
         return glance::app::launch_at_sign_in_enabled();
     }
 
-    void SettingsWindow::set_launch_at_sign_in(bool enabled)
+    void SettingsWindow::refresh_launch_at_sign_in()
     {
-        if (glance::app::set_launch_at_sign_in(enabled))
-        {
-            return;
-        }
+        const bool was_initializing = initializing_;
         initializing_ = true;
         LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
-        initializing_ = false;
+        initializing_ = was_initializing;
+    }
+
+    void SettingsWindow::set_launch_at_sign_in(bool enabled)
+    {
+        static_cast<void>(glance::app::set_launch_at_sign_in(enabled));
+        refresh_launch_at_sign_in();
     }
 
     void SettingsWindow::refresh_runtime_statuses()
@@ -596,6 +608,53 @@ namespace winrt::Glance::App::implementation
         }));
     }
 
+    fire_and_forget SettingsWindow::ResetAllSettingsButton_Click(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        const auto lifetime = get_strong();
+        if (reset_confirmation_open_ || !exit_callback_)
+        {
+            co_return;
+        }
+
+        reset_confirmation_open_ = true;
+        Controls::ContentDialog dialog;
+        dialog.XamlRoot(RootGrid().XamlRoot());
+        dialog.Title(box_value(glance::app::localize(L"ResetAllSettingsConfirmationTitle")));
+        dialog.Content(box_value(glance::app::localize(L"ResetAllSettingsConfirmationMessage")));
+        dialog.PrimaryButtonText(glance::app::localize(L"ResetAllSettingsConfirmationPrimary"));
+        dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+        dialog.DefaultButton(Controls::ContentDialogButton::Close);
+        const auto result = co_await dialog.ShowAsync();
+        if (result != Controls::ContentDialogResult::Primary)
+        {
+            lifetime->reset_confirmation_open_ = false;
+            co_return;
+        }
+
+        const LSTATUS registry_result = RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\Glance");
+        const bool registry_cleared = registry_result == ERROR_SUCCESS ||
+            registry_result == ERROR_FILE_NOT_FOUND ||
+            registry_result == ERROR_PATH_NOT_FOUND;
+        if (registry_cleared)
+        {
+            lifetime->reset_confirmation_open_ = false;
+            const auto callback = lifetime->exit_callback_;
+            static_cast<void>(Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue(
+                [callback] { callback(); }));
+            co_return;
+        }
+
+        Controls::ContentDialog failure_dialog;
+        failure_dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
+        failure_dialog.Title(box_value(glance::app::localize(L"ResetAllSettingsFailedTitle")));
+        failure_dialog.Content(box_value(glance::app::localize(L"ResetAllSettingsFailedMessage")));
+        failure_dialog.CloseButtonText(glance::app::localize(L"OK"));
+        co_await failure_dialog.ShowAsync();
+        lifetime->reset_confirmation_open_ = false;
+    }
+
     void SettingsWindow::ResetWindowSizesButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         WindowSizeResetStatusText().Text(
@@ -732,6 +791,10 @@ namespace winrt::Glance::App::implementation
         PathCopySettingsPanel().Visibility(tag == L"path" ? Visibility::Visible : Visibility::Collapsed);
         MaintenanceSettingsPanel().Visibility(tag == L"maintenance" ? Visibility::Visible : Visibility::Collapsed);
         AboutSettingsPanel().Visibility(tag == L"about" ? Visibility::Visible : Visibility::Collapsed);
+        if (tag == L"general")
+        {
+            refresh_launch_at_sign_in();
+        }
         if (tag == L"maintenance")
         {
             refresh_runtime_statuses();
