@@ -86,6 +86,7 @@
 
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>General</value></data>
   <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>Text preview</value></data>
+  <data name="MediaPreviewNavigationItem.Content" xml:space="preserve"><value>Media preview</value></data>
   <data name="PathCopyNavigationItem.Content" xml:space="preserve"><value>Path copy</value></data>
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>Maintenance</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>About</value></data>
@@ -97,6 +98,12 @@
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>Save diagnostic logs and crash dumps</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Automatically fit the preview window to media file dimensions</value></data>
+  <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>Media preview</value></data>
+  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Playback defaults and window behavior</value></data>
+  <data name="DefaultAudioVolumeLabel.Text" xml:space="preserve"><value>Default audio volume</value></data>
+  <data name="DefaultAudioVolumeDescription.Text" xml:space="preserve"><value>Initial volume for audio previews</value></data>
+  <data name="DefaultVideoVolumeLabel.Text" xml:space="preserve"><value>Default video volume</value></data>
+  <data name="DefaultVideoVolumeDescription.Text" xml:space="preserve"><value>Initial volume for video previews</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Text preview</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Editor appearance and layout</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>Font family</value></data>

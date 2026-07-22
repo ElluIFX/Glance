@@ -271,6 +271,7 @@
                     x:Name="MediaPanel"
                     Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                     PointerMoved="MediaPanel_PointerMoved"
+                    PointerWheelChanged="MediaPanel_PointerWheelChanged"
                     Visibility="Collapsed">
                     <MediaPlayerElement
                         x:Name="MediaPreview"

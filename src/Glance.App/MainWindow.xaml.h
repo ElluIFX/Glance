@@ -4,6 +4,7 @@
 #include "appearance_preferences.h"
 #include "archive_provider.h"
 #include "generic_preview_preferences.h"
+#include "media_preview_preferences.h"
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
@@ -83,6 +84,9 @@ namespace winrt::Glance::App::implementation
         void ZoomInButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void RotateButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MediaPanel_PointerMoved(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void MediaPanel_PointerWheelChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void MediaPlayPauseButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -249,6 +253,8 @@ namespace winrt::Glance::App::implementation
         std::uint32_t pdf_page_index_{};
         int pdf_wheel_delta_{};
         int text_font_wheel_delta_{};
+        int media_seek_wheel_delta_{};
+        int media_volume_wheel_delta_{};
         Microsoft::UI::Xaml::DispatcherTimer focus_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer media_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer copy_feedback_timer_{ nullptr };

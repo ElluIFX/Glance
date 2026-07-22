@@ -214,6 +214,9 @@ namespace winrt::Glance::App::implementation
         LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
         DiagnosticsToggle().IsOn(glance::contracts::diagnostics_enabled());
         AutoFitWindowSizeToggle().IsOn(glance::app::auto_fit_window_size_enabled());
+        media_preview_preferences_ = glance::app::load_media_preview_preferences();
+        DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
+        DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
         text_preferences_ = glance::app::load_text_preferences();
         const auto font_families = glance::app::system_font_families();
         int selected_font{};
@@ -301,6 +304,7 @@ namespace winrt::Glance::App::implementation
             box_value(glance::app::localize(L"CloseSettingsButton.ToolTipService.ToolTip")));
         set_content(GeneralNavigationItem(), L"GeneralNavigationItem.Content");
         set_content(TextPreviewNavigationItem(), L"TextPreviewNavigationItem.Content");
+        set_content(MediaPreviewNavigationItem(), L"MediaPreviewNavigationItem.Content");
         set_content(PathCopyNavigationItem(), L"PathCopyNavigationItem.Content");
         set_content(MaintenanceNavigationItem(), L"MaintenanceNavigationItem.Content");
         set_content(AboutNavigationItem(), L"AboutNavigationItem.Content");
@@ -341,6 +345,12 @@ namespace winrt::Glance::App::implementation
         set_text(WindowSizesLabel(), L"WindowSizesLabel.Text");
         set_text(WindowSizeResetStatusText(), L"WindowSizeResetStatusText.Text");
         set_content(ResetWindowSizesButton(), L"ResetWindowSizesButton.Content");
+        set_text(MediaPreviewPageTitle(), L"MediaPreviewPageTitle.Text");
+        set_text(MediaPreviewPageDescription(), L"MediaPreviewPageDescription.Text");
+        set_text(DefaultAudioVolumeLabel(), L"DefaultAudioVolumeLabel.Text");
+        set_text(DefaultAudioVolumeDescription(), L"DefaultAudioVolumeDescription.Text");
+        set_text(DefaultVideoVolumeLabel(), L"DefaultVideoVolumeLabel.Text");
+        set_text(DefaultVideoVolumeDescription(), L"DefaultVideoVolumeDescription.Text");
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
@@ -481,6 +491,56 @@ namespace winrt::Glance::App::implementation
         {
             glance::app::set_auto_fit_window_size_enabled(AutoFitWindowSizeToggle().IsOn());
         }
+    }
+
+    void SettingsWindow::set_media_volume(
+        Controls::NumberBox const& control,
+        double value,
+        std::uint32_t& destination)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+
+        if (!std::isfinite(value))
+        {
+            initializing_ = true;
+            control.Value(destination);
+            initializing_ = false;
+            return;
+        }
+
+        const auto volume = static_cast<std::uint32_t>(std::clamp(std::lround(value), 0L, 100L));
+        destination = volume;
+        if (std::abs(value - volume) > 0.001)
+        {
+            const bool was_initializing = initializing_;
+            initializing_ = true;
+            control.Value(volume);
+            initializing_ = was_initializing;
+        }
+        glance::app::save_media_preview_preferences(media_preview_preferences_);
+    }
+
+    void SettingsWindow::DefaultAudioVolumeNumberBox_ValueChanged(
+        IInspectable const&,
+        Controls::NumberBoxValueChangedEventArgs const& args)
+    {
+        set_media_volume(
+            DefaultAudioVolumeNumberBox(),
+            args.NewValue(),
+            media_preview_preferences_.audio_volume_percent);
+    }
+
+    void SettingsWindow::DefaultVideoVolumeNumberBox_ValueChanged(
+        IInspectable const&,
+        Controls::NumberBoxValueChangedEventArgs const& args)
+    {
+        set_media_volume(
+            DefaultVideoVolumeNumberBox(),
+            args.NewValue(),
+            media_preview_preferences_.video_volume_percent);
     }
 
     fire_and_forget SettingsWindow::ExportDiagnosticBundleButton_Click(
@@ -658,6 +718,7 @@ namespace winrt::Glance::App::implementation
             : unbox_value_or<hstring>(selected.Tag(), L"general");
         GeneralSettingsPanel().Visibility(tag == L"general" ? Visibility::Visible : Visibility::Collapsed);
         TextPreviewSettingsPanel().Visibility(tag == L"text" ? Visibility::Visible : Visibility::Collapsed);
+        MediaPreviewSettingsPanel().Visibility(tag == L"media" ? Visibility::Visible : Visibility::Collapsed);
         PathCopySettingsPanel().Visibility(tag == L"path" ? Visibility::Visible : Visibility::Collapsed);
         MaintenanceSettingsPanel().Visibility(tag == L"maintenance" ? Visibility::Visible : Visibility::Collapsed);
         AboutSettingsPanel().Visibility(tag == L"about" ? Visibility::Visible : Visibility::Collapsed);

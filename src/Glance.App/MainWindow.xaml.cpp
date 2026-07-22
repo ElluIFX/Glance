@@ -719,6 +719,15 @@ namespace winrt::Glance::App::implementation
         case glance::app::PreviewKind::media:
             show_content_panel(kind);
             media_is_audio_ = is_audio_path(file.path);
+            media_seek_wheel_delta_ = 0;
+            media_volume_wheel_delta_ = 0;
+            {
+                const auto preferences = glance::app::load_media_preview_preferences();
+                MediaVolumeSlider().Value(
+                    media_is_audio_
+                        ? preferences.audio_volume_percent
+                        : preferences.video_volume_percent);
+            }
             MediaCoverImage().Source(nullptr);
             MediaCoverImage().Visibility(Visibility::Collapsed);
             MediaCoverPlaceholder().Visibility(Visibility::Visible);
@@ -1013,6 +1022,7 @@ namespace winrt::Glance::App::implementation
                 MediaTimeText().Foreground(white);
             }
             MediaPreview().Source(source);
+            MediaPreview().MediaPlayer().IsMuted(false);
             MediaPreview().MediaPlayer().Volume(MediaVolumeSlider().Value() / 100.0);
             MediaPreview().MediaPlayer().Play();
             media_timer_.Start();
@@ -2311,6 +2321,71 @@ namespace winrt::Glance::App::implementation
     void MainWindow::MediaPanel_PointerMoved(IInspectable const&, PointerRoutedEventArgs const&)
     {
         show_media_controls();
+    }
+
+    void MainWindow::MediaPanel_PointerWheelChanged(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        if (current_kind_ != glance::app::PreviewKind::media ||
+            MediaPreview().MediaPlayer() == nullptr)
+        {
+            return;
+        }
+
+        const int delta = args.GetCurrentPoint(MediaPanel()).Properties().MouseWheelDelta();
+        if (delta == 0)
+        {
+            return;
+        }
+
+        args.Handled(true);
+        const auto player = MediaPreview().MediaPlayer();
+        if ((GetKeyState(VK_CONTROL) & 0x8000) != 0)
+        {
+            media_volume_wheel_delta_ += delta;
+            const int steps = media_volume_wheel_delta_ / WHEEL_DELTA;
+            media_volume_wheel_delta_ %= WHEEL_DELTA;
+            if (steps != 0)
+            {
+                const double volume = std::clamp(
+                    MediaVolumeSlider().Value() + steps * 5.0,
+                    0.0,
+                    100.0);
+                MediaVolumeSlider().Value(volume);
+                if (volume > 0.0)
+                {
+                    player.IsMuted(false);
+                }
+            }
+        }
+        else
+        {
+            media_seek_wheel_delta_ += delta;
+            const int steps = media_seek_wheel_delta_ / WHEEL_DELTA;
+            media_seek_wheel_delta_ %= WHEEL_DELTA;
+            if (steps != 0)
+            {
+                const auto session = player.PlaybackSession();
+                const double duration = std::max(
+                    0.0,
+                    session.NaturalDuration().count() / 10000000.0);
+                if (duration > 0.0)
+                {
+                    const double position = std::clamp(
+                        session.Position().count() / 10000000.0 + steps * 5.0,
+                        0.0,
+                        duration);
+                    session.Position(std::chrono::duration_cast<Windows::Foundation::TimeSpan>(
+                        std::chrono::duration<double>(position)));
+                    updating_media_position_ = true;
+                    MediaSeekSlider().Value(position);
+                    updating_media_position_ = false;
+                }
+            }
+        }
+        show_media_controls();
+        update_media_controls();
     }
 
     void MainWindow::MediaPlayPauseButton_Click(IInspectable const&, RoutedEventArgs const&)

@@ -86,6 +86,7 @@
 
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>常规</value></data>
   <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>文本预览</value></data>
+  <data name="MediaPreviewNavigationItem.Content" xml:space="preserve"><value>媒体预览</value></data>
   <data name="PathCopyNavigationItem.Content" xml:space="preserve"><value>路径复制</value></data>
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>维护</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>关于</value></data>
@@ -97,6 +98,12 @@
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>保存诊断日志和崩溃转储</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体文件尺寸自动调整预览窗口</value></data>
+  <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>媒体预览</value></data>
+  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>播放默认值和窗口行为</value></data>
+  <data name="DefaultAudioVolumeLabel.Text" xml:space="preserve"><value>默认音频音量</value></data>
+  <data name="DefaultAudioVolumeDescription.Text" xml:space="preserve"><value>音频预览的初始音量</value></data>
+  <data name="DefaultVideoVolumeLabel.Text" xml:space="preserve"><value>默认视频音量</value></data>
+  <data name="DefaultVideoVolumeDescription.Text" xml:space="preserve"><value>视频预览的初始音量</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文本预览</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>编辑器外观和布局</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>字体</value></data>

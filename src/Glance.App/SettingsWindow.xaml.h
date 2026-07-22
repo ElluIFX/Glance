@@ -2,6 +2,7 @@
 
 #include "SettingsWindow.g.h"
 #include "appearance_preferences.h"
+#include "media_preview_preferences.h"
 #include "path_copy_preferences.h"
 #include "text_preferences.h"
 
@@ -33,6 +34,12 @@ namespace winrt::Glance::App::implementation
         void AutoFitWindowSizeToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void DefaultAudioVolumeNumberBox_ValueChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
+        void DefaultVideoVolumeNumberBox_ValueChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
         winrt::fire_and_forget ExportDiagnosticBundleButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -79,6 +86,10 @@ namespace winrt::Glance::App::implementation
         void set_launch_at_sign_in(bool enabled);
         void save_text_preferences();
         void save_appearance_preferences();
+        void set_media_volume(
+            Microsoft::UI::Xaml::Controls::NumberBox const& control,
+            double value,
+            std::uint32_t& destination);
 
         bool initializing_{};
         bool exit_confirmation_open_{};
@@ -87,6 +98,7 @@ namespace winrt::Glance::App::implementation
         glance::app::TextPreferences text_preferences_{};
         glance::app::PathCopyPreferences path_copy_preferences_{};
         glance::app::AppearancePreferences appearance_preferences_{};
+        glance::app::MediaPreviewPreferences media_preview_preferences_{};
         ExitCallback exit_callback_;
         AppearanceChangedCallback appearance_changed_callback_;
         TextPreferencesChangedCallback text_preferences_changed_callback_;
