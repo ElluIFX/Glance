@@ -41,6 +41,7 @@ namespace winrt::Glance::App::implementation
             HWND source_window);
         void HidePreview();
         void ApplyAppearancePreferences();
+        void ApplyWindowPreferences();
         void ApplyLocalizedResources();
         void ApplyTextPreferences();
         void ApplyFooterPreferences();
@@ -139,7 +140,7 @@ namespace winrt::Glance::App::implementation
         void position_initial_window(bool ignore_saved_size = false);
         void auto_fit_window_to_content(double width, double height) noexcept;
         [[nodiscard]] bool auto_fit_applies() const noexcept;
-        void save_current_window_size() const noexcept;
+        void save_current_window_placement() const noexcept;
         void clear_preview_content();
         void reset_hidden_window_size() noexcept;
         void present_file(std::uint32_t index);
@@ -257,6 +258,8 @@ namespace winrt::Glance::App::implementation
         bool pinned_{};
         bool detached_{};
         bool user_sized_{};
+        bool tracking_move_size_{};
+        RECT move_size_start_bounds_{};
         bool line_numbers_visible_{ true };
         bool syntax_highlighting_{ true };
         bool word_wrap_{ true };

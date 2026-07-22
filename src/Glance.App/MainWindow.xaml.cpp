@@ -12,6 +12,7 @@
 #include "shell_icon_provider.h"
 #include "syntax_highlighter.h"
 #include "window_size_store.h"
+#include "window_preferences.h"
 #include "glance/contracts/diagnostics.h"
 #if __has_include("MainWindow.g.cpp")
 #include "MainWindow.g.cpp"
@@ -159,6 +160,7 @@ namespace winrt::Glance::App::implementation
         text_preferences_ = glance::app::load_text_preferences();
         footer_preferences_ = glance::app::load_footer_preferences();
         configure_window();
+        ApplyWindowPreferences();
         glance::contracts::log_event(L"MainWindow native configuration complete.");
         media_timer_ = DispatcherTimer();
         media_timer_.Interval(std::chrono::milliseconds(250));
@@ -188,6 +190,31 @@ namespace winrt::Glance::App::implementation
             {
                 render_markdown();
             }
+        }
+    }
+
+    void MainWindow::ApplyWindowPreferences()
+    {
+        if (window_ == nullptr)
+        {
+            return;
+        }
+
+        const auto preferences = glance::app::load_window_preferences();
+        LONG_PTR extended_style = GetWindowLongPtrW(window_, GWL_EXSTYLE);
+        if (preferences.opacity_percent < 100)
+        {
+            extended_style |= WS_EX_LAYERED;
+            SetWindowLongPtrW(window_, GWL_EXSTYLE, extended_style);
+            const BYTE alpha = static_cast<BYTE>(MulDiv(
+                static_cast<int>(preferences.opacity_percent),
+                255,
+                100));
+            SetLayeredWindowAttributes(window_, 0, alpha, LWA_ALPHA);
+        }
+        else if ((extended_style & WS_EX_LAYERED) != 0)
+        {
+            SetWindowLongPtrW(window_, GWL_EXSTYLE, extended_style & ~WS_EX_LAYERED);
         }
     }
 
@@ -334,10 +361,23 @@ namespace winrt::Glance::App::implementation
             limits->ptMinTrackSize.y = MulDiv(320, static_cast<int>(dpi), 96);
             return 0;
         }
+        if (message == WM_ENTERSIZEMOVE && self != nullptr)
+        {
+            self->tracking_move_size_ = GetWindowRect(window, &self->move_size_start_bounds_) != FALSE;
+        }
         if (message == WM_EXITSIZEMOVE && self != nullptr)
         {
-            self->user_sized_ = true;
-            self->save_current_window_size();
+            RECT bounds{};
+            if (self->tracking_move_size_ && GetWindowRect(window, &bounds))
+            {
+                self->user_sized_ = self->user_sized_ ||
+                    bounds.right - bounds.left !=
+                        self->move_size_start_bounds_.right - self->move_size_start_bounds_.left ||
+                    bounds.bottom - bounds.top !=
+                        self->move_size_start_bounds_.bottom - self->move_size_start_bounds_.top;
+            }
+            self->tracking_move_size_ = false;
+            self->save_current_window_placement();
         }
         if (message == WM_SYSCOMMAND && self != nullptr &&
             (wparam & 0xFFF0U) == SC_MAXIMIZE)
@@ -549,28 +589,38 @@ namespace winrt::Glance::App::implementation
             return;
         }
         const UINT dpi = GetDpiForWindow(window_);
+        const auto preferences = glance::app::load_window_preferences();
         SetWindowPos(
             window_,
             nullptr,
             0,
             0,
-            MulDiv(720, static_cast<int>(dpi), 96),
-            MulDiv(520, static_cast<int>(dpi), 96),
+            MulDiv(static_cast<int>(preferences.default_width), static_cast<int>(dpi), 96),
+            MulDiv(static_cast<int>(preferences.default_height), static_cast<int>(dpi), 96),
             SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
     void MainWindow::position_initial_window(bool ignore_saved_size)
     {
-        HMONITOR monitor = MonitorFromWindow(source_window_ != nullptr ? source_window_ : GetForegroundWindow(), MONITOR_DEFAULTTONEAREST);
+        const auto preferences = glance::app::load_window_preferences();
+        const auto storage_kind = basic_info_mode_ ? content_preview_kind_ : current_kind_;
+        const auto saved_position = preferences.remember_position
+            ? glance::app::load_window_position(storage_kind, media_is_audio_)
+            : std::nullopt;
+        HMONITOR monitor = saved_position
+            ? MonitorFromPoint(*saved_position, MONITOR_DEFAULTTONEAREST)
+            : MonitorFromWindow(
+                  source_window_ != nullptr ? source_window_ : GetForegroundWindow(),
+                  MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{ sizeof(MONITORINFO) };
         GetMonitorInfoW(monitor, &info);
 
         const UINT dpi = source_window_ != nullptr ? GetDpiForWindow(source_window_) : 96;
-        int desired_width = MulDiv(files_.size() > 1 ? 920 : 720, static_cast<int>(dpi), 96);
-        int desired_height = MulDiv(520, static_cast<int>(dpi), 96);
-        if (!ignore_saved_size && !auto_fit_applies())
+        int desired_width = MulDiv(static_cast<int>(preferences.default_width), static_cast<int>(dpi), 96);
+        int desired_height = MulDiv(static_cast<int>(preferences.default_height), static_cast<int>(dpi), 96);
+        if (preferences.remember_size && !ignore_saved_size && !auto_fit_applies())
         {
-            if (const auto saved_size = glance::app::load_window_size(current_kind_, media_is_audio_))
+            if (const auto saved_size = glance::app::load_window_size(storage_kind, media_is_audio_))
             {
                 desired_width = MulDiv(saved_size->cx, static_cast<int>(dpi), 96);
                 desired_height = MulDiv(saved_size->cy, static_cast<int>(dpi), 96);
@@ -582,8 +632,12 @@ namespace winrt::Glance::App::implementation
         const int minimum_height = MulDiv(320, static_cast<int>(dpi), 96);
         const int width = std::clamp(desired_width, std::min(minimum_width, work_width), work_width);
         const int height = std::clamp(desired_height, std::min(minimum_height, work_height), work_height);
-        const int x = info.rcWork.left + (work_width - width) / 2;
-        const int y = info.rcWork.top + (work_height - height) / 2;
+        const int x = saved_position
+            ? std::clamp(saved_position->x, info.rcWork.left, std::max(info.rcWork.left, info.rcWork.right - width))
+            : info.rcWork.left + (work_width - width) / 2;
+        const int y = saved_position
+            ? std::clamp(saved_position->y, info.rcWork.top, std::max(info.rcWork.top, info.rcWork.bottom - height))
+            : info.rcWork.top + (work_height - height) / 2;
 
         SetWindowPos(
             window_,
@@ -608,7 +662,7 @@ namespace winrt::Glance::App::implementation
 
     bool MainWindow::auto_fit_applies() const noexcept
     {
-        if (!glance::app::auto_fit_window_size_enabled())
+        if (user_sized_ || !glance::app::load_window_preferences().auto_fit_media)
         {
             return false;
         }
@@ -676,14 +730,25 @@ namespace winrt::Glance::App::implementation
             static_cast<int>(std::lround(content_height * scale)) + vertical_chrome,
             minimum_height,
             maximum_height);
-        const int x = info.rcWork.left + (work_width - width) / 2;
-        const int y = info.rcWork.top + (work_height - height) / 2;
+        const bool preserve_position = glance::app::load_window_preferences().remember_position;
+        const int x = preserve_position
+            ? std::clamp(bounds.left, info.rcWork.left, std::max(info.rcWork.left, info.rcWork.right - width))
+            : info.rcWork.left + (work_width - width) / 2;
+        const int y = preserve_position
+            ? std::clamp(bounds.top, info.rcWork.top, std::max(info.rcWork.top, info.rcWork.bottom - height))
+            : info.rcWork.top + (work_height - height) / 2;
         SetWindowPos(window_, nullptr, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
     }
 
-    void MainWindow::save_current_window_size() const noexcept
+    void MainWindow::save_current_window_placement() const noexcept
     {
-        if (!visible_ || window_ == nullptr || IsZoomed(window_) || auto_fit_applies())
+        if (!visible_ || window_ == nullptr || IsZoomed(window_) || detached_ ||
+            (pinned_ && topmost_))
+        {
+            return;
+        }
+        const auto preferences = glance::app::load_window_preferences();
+        if (!preferences.remember_size && !preferences.remember_position)
         {
             return;
         }
@@ -692,13 +757,24 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
-        const UINT dpi = GetDpiForWindow(window_);
-        glance::app::save_window_size(
-            basic_info_mode_ ? content_preview_kind_ : current_kind_,
-            SIZE{
-                MulDiv(bounds.right - bounds.left, 96, static_cast<int>(dpi)),
-                MulDiv(bounds.bottom - bounds.top, 96, static_cast<int>(dpi)) },
-            media_is_audio_);
+        const auto storage_kind = basic_info_mode_ ? content_preview_kind_ : current_kind_;
+        if (preferences.remember_size && user_sized_)
+        {
+            const UINT dpi = GetDpiForWindow(window_);
+            glance::app::save_window_size(
+                storage_kind,
+                SIZE{
+                    MulDiv(bounds.right - bounds.left, 96, static_cast<int>(dpi)),
+                    MulDiv(bounds.bottom - bounds.top, 96, static_cast<int>(dpi)) },
+                media_is_audio_);
+        }
+        if (preferences.remember_position)
+        {
+            glance::app::save_window_position(
+                storage_kind,
+                POINT{ bounds.left, bounds.top },
+                media_is_audio_);
+        }
     }
 
     void MainWindow::present_file(std::uint32_t index)
@@ -1114,7 +1190,11 @@ namespace winrt::Glance::App::implementation
             MediaPreview().Source(source);
             MediaPreview().MediaPlayer().IsMuted(false);
             MediaPreview().MediaPlayer().Volume(MediaVolumeSlider().Value() / 100.0);
-            MediaPreview().MediaPlayer().Play();
+            const auto preferences = glance::app::load_media_preview_preferences();
+            if (media_is_audio_ ? preferences.autoplay_audio : preferences.autoplay_video)
+            {
+                MediaPreview().MediaPlayer().Play();
+            }
             media_timer_.Start();
 
             std::uint64_t native_bitrate{};

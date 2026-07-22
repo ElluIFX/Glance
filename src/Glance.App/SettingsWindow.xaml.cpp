@@ -32,6 +32,32 @@ namespace Media = Microsoft::UI::Xaml::Media;
 
 namespace
 {
+    void disable_number_box_clear_button(DependencyObject const& root)
+    {
+        const int count = Media::VisualTreeHelper::GetChildrenCount(root);
+        for (int index = 0; index < count; ++index)
+        {
+            const auto child = Media::VisualTreeHelper::GetChild(root, index);
+            if (const auto control = child.try_as<Controls::Control>())
+            {
+                control.ApplyTemplate();
+            }
+            if (const auto button = child.try_as<Controls::Button>();
+                button != nullptr && button.Name() == L"DeleteButton")
+            {
+                button.MinWidth(0);
+                button.MaxWidth(0);
+                button.Width(0);
+                button.Padding(Thickness{});
+                button.Margin(Thickness{});
+                button.IsHitTestVisible(false);
+                button.Opacity(0);
+                continue;
+            }
+            disable_number_box_clear_button(child);
+        }
+    }
+
     std::wstring quote_argument(std::wstring_view value)
     {
         std::wstring quoted(1, L'"');
@@ -199,6 +225,13 @@ namespace
 
 namespace winrt::Glance::App::implementation
 {
+    void SettingsWindow::NumberBox_Loaded(IInspectable const& sender, RoutedEventArgs const&)
+    {
+        const auto number_box = sender.as<Controls::NumberBox>();
+        number_box.ApplyTemplate();
+        disable_number_box_clear_button(number_box);
+    }
+
     SettingsWindow::SettingsWindow()
     {
         InitializeComponent();
@@ -225,10 +258,18 @@ namespace winrt::Glance::App::implementation
         AccentComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.accent));
         LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
         DiagnosticsToggle().IsOn(glance::contracts::diagnostics_enabled());
-        AutoFitWindowSizeToggle().IsOn(glance::app::auto_fit_window_size_enabled());
+        window_preferences_ = glance::app::load_window_preferences();
+        DefaultWindowWidthNumberBox().Value(window_preferences_.default_width);
+        DefaultWindowHeightNumberBox().Value(window_preferences_.default_height);
+        RememberWindowSizeToggle().IsOn(window_preferences_.remember_size);
+        AutoFitWindowSizeToggle().IsOn(window_preferences_.auto_fit_media);
+        RememberWindowPositionToggle().IsOn(window_preferences_.remember_position);
+        WindowOpacityNumberBox().Value(window_preferences_.opacity_percent);
         media_preview_preferences_ = glance::app::load_media_preview_preferences();
         DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
         DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
+        AutoplayAudioToggle().IsOn(media_preview_preferences_.autoplay_audio);
+        AutoplayVideoToggle().IsOn(media_preview_preferences_.autoplay_video);
         text_preferences_ = glance::app::load_text_preferences();
         const auto font_families = glance::app::system_font_families();
         int selected_font{};
@@ -266,12 +307,14 @@ namespace winrt::Glance::App::implementation
         ExitCallback exit_callback,
         AppearanceChangedCallback appearance_changed_callback,
         TextPreferencesChangedCallback text_preferences_changed_callback,
-        FooterPreferencesChangedCallback footer_preferences_changed_callback)
+        FooterPreferencesChangedCallback footer_preferences_changed_callback,
+        WindowPreferencesChangedCallback window_preferences_changed_callback)
     {
         exit_callback_ = std::move(exit_callback);
         appearance_changed_callback_ = std::move(appearance_changed_callback);
         text_preferences_changed_callback_ = std::move(text_preferences_changed_callback);
         footer_preferences_changed_callback_ = std::move(footer_preferences_changed_callback);
+        window_preferences_changed_callback_ = std::move(window_preferences_changed_callback);
     }
 
     void SettingsWindow::configure_window()
@@ -310,6 +353,28 @@ namespace winrt::Glance::App::implementation
             glance::app::load_appearance_preferences().theme));
     }
 
+    void SettingsWindow::ShowAndActivate()
+    {
+        Activate();
+
+        HWND window{};
+        if (FAILED(this->try_as<::IWindowNative>()->get_WindowHandle(&window)) || window == nullptr)
+        {
+            return;
+        }
+        ShowWindow(window, IsIconic(window) ? SW_RESTORE : SW_SHOW);
+        SetWindowPos(
+            window,
+            HWND_TOP,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        SetForegroundWindow(window);
+        SetActiveWindow(window);
+    }
+
     void SettingsWindow::ApplyLocalizedResources()
     {
         const auto set_text = [](const auto& control, wchar_t const* key) {
@@ -328,6 +393,7 @@ namespace winrt::Glance::App::implementation
             CloseSettingsButton(),
             box_value(glance::app::localize(L"CloseSettingsButton.ToolTipService.ToolTip")));
         set_content(GeneralNavigationItem(), L"GeneralNavigationItem.Content");
+        set_content(WindowNavigationItem(), L"WindowNavigationItem.Content");
         set_content(FooterNavigationItem(), L"FooterNavigationItem.Content");
         set_content(TextPreviewNavigationItem(), L"TextPreviewNavigationItem.Content");
         set_content(MediaPreviewNavigationItem(), L"MediaPreviewNavigationItem.Content");
@@ -379,23 +445,40 @@ namespace winrt::Glance::App::implementation
         }
         set_text(DiagnosticsTitle(), L"DiagnosticsTitle.Text");
         set_text(DiagnosticsDescription(), L"DiagnosticsDescription.Text");
+        set_text(WindowPageTitle(), L"WindowPageTitle.Text");
+        set_text(WindowPageDescription(), L"WindowPageDescription.Text");
+        set_text(DefaultWindowSizeLabel(), L"DefaultWindowSizeLabel.Text");
+        set_text(DefaultWindowSizeDescription(), L"DefaultWindowSizeDescription.Text");
+        set_text(RememberWindowSizeLabel(), L"RememberWindowSizeLabel.Text");
+        set_text(RememberWindowSizeDescription(), L"RememberWindowSizeDescription.Text");
         set_text(AutoFitWindowSizeLabel(), L"AutoFitWindowSizeLabel.Text");
         set_text(AutoFitWindowSizeDescription(), L"AutoFitWindowSizeDescription.Text");
-        set_text(WindowSizesLabel(), L"WindowSizesLabel.Text");
-        set_text(WindowSizeResetStatusText(), L"WindowSizeResetStatusText.Text");
         set_content(ResetWindowSizesButton(), L"ResetWindowSizesButton.Content");
+        set_text(RememberWindowPositionLabel(), L"RememberWindowPositionLabel.Text");
+        set_text(RememberWindowPositionDescription(), L"RememberWindowPositionDescription.Text");
+        set_content(ResetWindowPositionsButton(), L"ResetWindowPositionsButton.Content");
+        set_text(WindowOpacityLabel(), L"WindowOpacityLabel.Text");
+        set_text(WindowOpacityDescription(), L"WindowOpacityDescription.Text");
         set_text(MediaPreviewPageTitle(), L"MediaPreviewPageTitle.Text");
         set_text(MediaPreviewPageDescription(), L"MediaPreviewPageDescription.Text");
         set_text(DefaultAudioVolumeLabel(), L"DefaultAudioVolumeLabel.Text");
         set_text(DefaultAudioVolumeDescription(), L"DefaultAudioVolumeDescription.Text");
         set_text(DefaultVideoVolumeLabel(), L"DefaultVideoVolumeLabel.Text");
         set_text(DefaultVideoVolumeDescription(), L"DefaultVideoVolumeDescription.Text");
+        set_text(AutoplayAudioLabel(), L"AutoplayAudioLabel.Text");
+        set_text(AutoplayAudioDescription(), L"AutoplayAudioDescription.Text");
+        set_text(AutoplayVideoLabel(), L"AutoplayVideoLabel.Text");
+        set_text(AutoplayVideoDescription(), L"AutoplayVideoDescription.Text");
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
+        set_text(FontFamilyDescription(), L"FontFamilyDescription.Text");
         set_text(FontSizeLabel(), L"FontSizeLabel.Text");
+        set_text(FontSizeDescription(), L"FontSizeDescription.Text");
         set_text(SyntaxHighlightingLabel(), L"SyntaxHighlightingLabel.Text");
+        set_text(SyntaxHighlightingDescription(), L"SyntaxHighlightingDescription.Text");
         set_text(SyntaxThemeLabel(), L"SyntaxThemeLabel.Text");
+        set_text(SyntaxThemeDescription(), L"SyntaxThemeDescription.Text");
         const int selected_syntax_theme = SyntaxThemeComboBox().SelectedIndex();
         const bool was_initializing_syntax_theme = initializing_;
         initializing_ = true;
@@ -424,7 +507,9 @@ namespace winrt::Glance::App::implementation
         }
         initializing_ = was_initializing_syntax_theme;
         set_text(LineNumbersLabel(), L"LineNumbersLabel.Text");
+        set_text(LineNumbersDescription(), L"LineNumbersDescription.Text");
         set_text(WordWrapLabel(), L"WordWrapLabel.Text");
+        set_text(WordWrapDescription(), L"WordWrapDescription.Text");
         set_text(PathCopyGroupLabel(), L"PathCopyGroupLabel.Text");
         set_text(QuoteCopiedPathLabel(), L"QuoteCopiedPathLabel.Text");
         set_text(QuoteCopiedPathDescription(), L"QuoteCopiedPathDescription.Text");
@@ -529,11 +614,53 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void SettingsWindow::AutoFitWindowSizeToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
+    void SettingsWindow::WindowPreferenceToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
     {
         if (!initializing_)
         {
-            glance::app::set_auto_fit_window_size_enabled(AutoFitWindowSizeToggle().IsOn());
+            window_preferences_.remember_size = RememberWindowSizeToggle().IsOn();
+            window_preferences_.auto_fit_media = AutoFitWindowSizeToggle().IsOn();
+            window_preferences_.remember_position = RememberWindowPositionToggle().IsOn();
+            glance::app::save_window_preferences(window_preferences_);
+            if (window_preferences_changed_callback_)
+            {
+                window_preferences_changed_callback_();
+            }
+        }
+    }
+
+    void SettingsWindow::WindowNumberBox_ValueChanged(
+        IInspectable const&,
+        Controls::NumberBoxValueChangedEventArgs const&)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+
+        const double width = DefaultWindowWidthNumberBox().Value();
+        const double height = DefaultWindowHeightNumberBox().Value();
+        const double opacity = WindowOpacityNumberBox().Value();
+        if (!std::isfinite(width) || !std::isfinite(height) || !std::isfinite(opacity))
+        {
+            initializing_ = true;
+            DefaultWindowWidthNumberBox().Value(window_preferences_.default_width);
+            DefaultWindowHeightNumberBox().Value(window_preferences_.default_height);
+            WindowOpacityNumberBox().Value(window_preferences_.opacity_percent);
+            initializing_ = false;
+            return;
+        }
+
+        window_preferences_.default_width = static_cast<std::uint32_t>(
+            std::clamp(std::lround(width), 480L, 7680L));
+        window_preferences_.default_height = static_cast<std::uint32_t>(
+            std::clamp(std::lround(height), 320L, 4320L));
+        window_preferences_.opacity_percent = static_cast<std::uint32_t>(
+            std::clamp(std::lround(opacity), 10L, 100L));
+        glance::app::save_window_preferences(window_preferences_);
+        if (window_preferences_changed_callback_)
+        {
+            window_preferences_changed_callback_();
         }
     }
 
@@ -585,6 +712,17 @@ namespace winrt::Glance::App::implementation
             DefaultVideoVolumeNumberBox(),
             args.NewValue(),
             media_preview_preferences_.video_volume_percent);
+    }
+
+    void SettingsWindow::MediaPreferenceToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+        media_preview_preferences_.autoplay_audio = AutoplayAudioToggle().IsOn();
+        media_preview_preferences_.autoplay_video = AutoplayVideoToggle().IsOn();
+        glance::app::save_media_preview_preferences(media_preview_preferences_);
     }
 
     fire_and_forget SettingsWindow::ExportDiagnosticBundleButton_Click(
@@ -689,10 +827,18 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::ResetWindowSizesButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        WindowSizeResetStatusText().Text(
+        WindowResetStatusText().Text(
             glance::app::clear_window_sizes()
                 ? glance::app::localize(L"SizesReset")
                 : glance::app::localize(L"SizesResetFailed"));
+    }
+
+    void SettingsWindow::ResetWindowPositionsButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        WindowResetStatusText().Text(
+            glance::app::clear_window_positions()
+                ? glance::app::localize(L"PositionsReset")
+                : glance::app::localize(L"PositionsResetFailed"));
     }
 
     void SettingsWindow::save_text_preferences()
@@ -941,6 +1087,7 @@ namespace winrt::Glance::App::implementation
             ? L"general"
             : unbox_value_or<hstring>(selected.Tag(), L"general");
         GeneralSettingsPanel().Visibility(tag == L"general" ? Visibility::Visible : Visibility::Collapsed);
+        WindowSettingsPanel().Visibility(tag == L"window" ? Visibility::Visible : Visibility::Collapsed);
         FooterSettingsPanel().Visibility(tag == L"footer" ? Visibility::Visible : Visibility::Collapsed);
         TextPreviewSettingsPanel().Visibility(tag == L"text" ? Visibility::Visible : Visibility::Collapsed);
         MediaPreviewSettingsPanel().Visibility(tag == L"media" ? Visibility::Visible : Visibility::Collapsed);

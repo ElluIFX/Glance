@@ -54,6 +54,8 @@
   <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>Not acquired</value></data>
   <data name="SizesReset" xml:space="preserve"><value>Saved sizes reset</value></data>
   <data name="SizesResetFailed" xml:space="preserve"><value>Could not reset saved sizes</value></data>
+  <data name="PositionsReset" xml:space="preserve"><value>Saved positions reset</value></data>
+  <data name="PositionsResetFailed" xml:space="preserve"><value>Could not reset saved positions</value></data>
 
   <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>Always on top</value></data>
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>Pin file</value></data>
@@ -87,6 +89,7 @@
   <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open with default application</value></data>
 
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>General</value></data>
+  <data name="WindowNavigationItem.Content" xml:space="preserve"><value>Window</value></data>
   <data name="FooterNavigationItem.Content" xml:space="preserve"><value>Footer</value></data>
   <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>Text preview</value></data>
   <data name="MediaPreviewNavigationItem.Content" xml:space="preserve"><value>Media preview</value></data>
@@ -108,20 +111,39 @@
   <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>Move down</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>Diagnostics</value></data>
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>Save diagnostic logs and crash dumps</value></data>
-  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
-  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Automatically fit the preview window to media file dimensions</value></data>
+  <data name="WindowPageTitle.Text" xml:space="preserve"><value>Window</value></data>
+  <data name="WindowPageDescription.Text" xml:space="preserve"><value>Preview window size, position, and appearance</value></data>
+  <data name="DefaultWindowSizeLabel.Text" xml:space="preserve"><value>Default window size</value></data>
+  <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>Width and height used when no saved size applies</value></data>
+  <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>Remember window size</value></data>
+  <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>Store the last size separately for each preview type</value></data>
+  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit media window size</value></data>
+  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Fit the initial window size to media dimensions</value></data>
+  <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>Remember window position</value></data>
+  <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>Store the last position separately for each preview type</value></data>
+  <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>Reset</value></data>
+  <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>Window opacity</value></data>
+  <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>Set the opacity of all preview windows</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>Media preview</value></data>
-  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Playback defaults and window behavior</value></data>
+  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Playback defaults</value></data>
   <data name="DefaultAudioVolumeLabel.Text" xml:space="preserve"><value>Default audio volume</value></data>
   <data name="DefaultAudioVolumeDescription.Text" xml:space="preserve"><value>Initial volume for audio previews</value></data>
   <data name="DefaultVideoVolumeLabel.Text" xml:space="preserve"><value>Default video volume</value></data>
   <data name="DefaultVideoVolumeDescription.Text" xml:space="preserve"><value>Initial volume for video previews</value></data>
+  <data name="AutoplayAudioLabel.Text" xml:space="preserve"><value>Autoplay audio</value></data>
+  <data name="AutoplayAudioDescription.Text" xml:space="preserve"><value>Start audio playback when a preview opens</value></data>
+  <data name="AutoplayVideoLabel.Text" xml:space="preserve"><value>Autoplay video</value></data>
+  <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>Start video playback when a preview opens</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Text preview</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Editor appearance and layout</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>Font family</value></data>
+  <data name="FontFamilyDescription.Text" xml:space="preserve"><value>Font used for plain text and code</value></data>
   <data name="FontSizeLabel.Text" xml:space="preserve"><value>Font size</value></data>
+  <data name="FontSizeDescription.Text" xml:space="preserve"><value>Default text size in pixels</value></data>
   <data name="SyntaxHighlightingLabel.Text" xml:space="preserve"><value>Syntax highlighting</value></data>
+  <data name="SyntaxHighlightingDescription.Text" xml:space="preserve"><value>Color recognized code elements</value></data>
   <data name="SyntaxThemeLabel.Text" xml:space="preserve"><value>Highlighting style</value></data>
+  <data name="SyntaxThemeDescription.Text" xml:space="preserve"><value>Color palette used for syntax highlighting</value></data>
   <data name="SyntaxThemeGlance" xml:space="preserve"><value>Glance</value></data>
   <data name="SyntaxThemeVisualStudio" xml:space="preserve"><value>Visual Studio</value></data>
   <data name="SyntaxThemeMonokai" xml:space="preserve"><value>Monokai</value></data>
@@ -133,7 +155,9 @@
   <data name="SyntaxThemeGruvbox" xml:space="preserve"><value>Gruvbox</value></data>
   <data name="SyntaxThemeTomorrowNight" xml:space="preserve"><value>Tomorrow Night</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>Line numbers</value></data>
+  <data name="LineNumbersDescription.Text" xml:space="preserve"><value>Show a non-selectable line number column</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>Wrap long lines</value></data>
+  <data name="WordWrapDescription.Text" xml:space="preserve"><value>Wrap text to the available viewport width</value></data>
   <data name="PathCopyGroupLabel.Text" xml:space="preserve"><value>Path copying</value></data>
   <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>Quote copied paths</value></data>
   <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>Wrap copied paths in double quotes</value></data>
@@ -160,8 +184,6 @@
   <data name="ResetAllSettingsFailedTitle" xml:space="preserve"><value>Could not reset settings</value></data>
   <data name="ResetAllSettingsFailedMessage" xml:space="preserve"><value>Some settings could not be cleared. Glance will remain open.</value></data>
   <data name="OK" xml:space="preserve"><value>OK</value></data>
-  <data name="WindowSizesLabel.Text" xml:space="preserve"><value>Preview window sizes</value></data>
-  <data name="WindowSizeResetStatusText.Text" xml:space="preserve"><value>Stored separately by preview type</value></data>
   <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>Reset</value></data>
   <data name="AboutPageTitle.Text" xml:space="preserve"><value>About</value></data>
   <data name="AboutPageDescription.Text" xml:space="preserve"><value>Application information</value></data>

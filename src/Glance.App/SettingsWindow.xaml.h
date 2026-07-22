@@ -6,6 +6,7 @@
 #include "media_preview_preferences.h"
 #include "path_copy_preferences.h"
 #include "text_preferences.h"
+#include "window_preferences.h"
 
 #include <functional>
 
@@ -17,16 +18,23 @@ namespace winrt::Glance::App::implementation
         using AppearanceChangedCallback = std::function<void()>;
         using TextPreferencesChangedCallback = std::function<void()>;
         using FooterPreferencesChangedCallback = std::function<void()>;
+        using WindowPreferencesChangedCallback = std::function<void()>;
 
         SettingsWindow();
         void InitializeSession(
             ExitCallback exit_callback,
             AppearanceChangedCallback appearance_changed_callback,
             TextPreferencesChangedCallback text_preferences_changed_callback,
-            FooterPreferencesChangedCallback footer_preferences_changed_callback);
+            FooterPreferencesChangedCallback footer_preferences_changed_callback,
+            WindowPreferencesChangedCallback window_preferences_changed_callback);
         void ApplyAppearancePreferences();
         void ApplyLocalizedResources();
+        void ShowAndActivate();
         winrt::fire_and_forget ConfirmExit();
+
+        void NumberBox_Loaded(
+            IInspectable const& sender,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
 
         void LaunchAtSignInToggle_Toggled(
             IInspectable const&,
@@ -34,15 +42,21 @@ namespace winrt::Glance::App::implementation
         void DiagnosticsToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void AutoFitWindowSizeToggle_Toggled(
+        void WindowPreferenceToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void WindowNumberBox_ValueChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
         void DefaultAudioVolumeNumberBox_ValueChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
         void DefaultVideoVolumeNumberBox_ValueChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
+        void MediaPreferenceToggle_Toggled(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
         winrt::fire_and_forget ExportDiagnosticBundleButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -50,6 +64,9 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ResetWindowSizesButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void ResetWindowPositionsButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         void FontFamilyComboBox_SelectionChanged(
@@ -127,11 +144,13 @@ namespace winrt::Glance::App::implementation
         glance::app::PathCopyPreferences path_copy_preferences_{};
         glance::app::AppearancePreferences appearance_preferences_{};
         glance::app::MediaPreviewPreferences media_preview_preferences_{};
+        glance::app::WindowPreferences window_preferences_{};
         glance::app::FooterPreferences footer_preferences_{};
         ExitCallback exit_callback_;
         AppearanceChangedCallback appearance_changed_callback_;
         TextPreferencesChangedCallback text_preferences_changed_callback_;
         FooterPreferencesChangedCallback footer_preferences_changed_callback_;
+        WindowPreferencesChangedCallback window_preferences_changed_callback_;
     };
 }
 

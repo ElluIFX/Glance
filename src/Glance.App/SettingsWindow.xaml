@@ -88,12 +88,21 @@
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
             <NavigationViewItem
+                x:Name="WindowNavigationItem"
+                x:Uid="WindowNavigationItem"
+                Content="Window"
+                Tag="window">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE7F4;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
                 x:Name="FooterNavigationItem"
                 x:Uid="FooterNavigationItem"
                 Content="Footer"
                 Tag="footer">
                 <NavigationViewItem.Icon>
-                    <FontIcon Glyph="&#xE8A7;" />
+                    <FontIcon Glyph="&#xe90e;" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
             <NavigationViewItem
@@ -295,6 +304,96 @@
             </ScrollViewer>
 
             <ScrollViewer
+                x:Name="WindowSettingsPanel"
+                HorizontalContentAlignment="Stretch"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="WindowPageTitle" x:Uid="WindowPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Window" />
+                        <TextBlock x:Name="WindowPageDescription" x:Uid="WindowPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Preview window size, position, and appearance" />
+                    </StackPanel>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="DefaultWindowSizeLabel" x:Uid="DefaultWindowSizeLabel" Text="Default window size" />
+                                    <TextBlock x:Name="DefaultWindowSizeDescription" x:Uid="DefaultWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Width and height used when no saved size applies" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <NumberBox x:Name="DefaultWindowWidthNumberBox" Width="96" Minimum="480" Maximum="7680" SmallChange="10" SpinButtonPlacementMode="Compact" Loaded="NumberBox_Loaded" ValueChanged="WindowNumberBox_ValueChanged" />
+                                    <TextBlock VerticalAlignment="Center" Text="×" />
+                                    <NumberBox x:Name="DefaultWindowHeightNumberBox" Width="96" Minimum="320" Maximum="4320" SmallChange="10" SpinButtonPlacementMode="Compact" Loaded="NumberBox_Loaded" ValueChanged="WindowNumberBox_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="RememberWindowSizeLabel" x:Uid="RememberWindowSizeLabel" Text="Remember window size" />
+                                    <TextBlock x:Name="RememberWindowSizeDescription" x:Uid="RememberWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Store the last size separately for each preview type" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="12">
+                                    <Button x:Name="ResetWindowSizesButton" x:Uid="ResetWindowSizesButton" Click="ResetWindowSizesButton_Click" Content="Reset" />
+                                    <ToggleSwitch x:Name="RememberWindowSizeToggle" Toggled="WindowPreferenceToggle_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="RememberWindowPositionLabel" x:Uid="RememberWindowPositionLabel" Text="Remember window position" />
+                                    <TextBlock x:Name="RememberWindowPositionDescription" x:Uid="RememberWindowPositionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Store the last position separately for each preview type" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="12">
+                                    <Button x:Name="ResetWindowPositionsButton" x:Uid="ResetWindowPositionsButton" Click="ResetWindowPositionsButton_Click" Content="Reset" />
+                                    <ToggleSwitch x:Name="RememberWindowPositionToggle" Toggled="WindowPreferenceToggle_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="AutoFitWindowSizeLabel" x:Uid="AutoFitWindowSizeLabel" Text="Auto fit media window size" />
+                                    <TextBlock x:Name="AutoFitWindowSizeDescription" x:Uid="AutoFitWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Fit the initial window size to media dimensions" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="AutoFitWindowSizeToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="WindowOpacityLabel" x:Uid="WindowOpacityLabel" Text="Window opacity" />
+                                    <TextBlock x:Name="WindowOpacityDescription" x:Uid="WindowOpacityDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Set the opacity of all preview windows" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <NumberBox x:Name="WindowOpacityNumberBox" Width="184" Minimum="10" Maximum="100" SmallChange="5" SpinButtonPlacementMode="Inline" Loaded="NumberBox_Loaded" ValueChanged="WindowNumberBox_ValueChanged" />
+                                    <TextBlock VerticalAlignment="Center" Text="%" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock x:Name="WindowResetStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer
                 x:Name="FooterSettingsPanel"
                 HorizontalContentAlignment="Stretch"
                 VerticalScrollBarVisibility="Auto"
@@ -416,7 +515,10 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="220" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="FontFamilyLabel" x:Uid="FontFamilyLabel" VerticalAlignment="Center" Text="Font family" />
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="FontFamilyLabel" x:Uid="FontFamilyLabel" Text="Font family" />
+                                    <TextBlock x:Name="FontFamilyDescription" x:Uid="FontFamilyDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Font used for plain text and code" />
+                                </StackPanel>
                                 <ComboBox
                                     x:Name="FontFamilyComboBox"
                                     Grid.Column="1"
@@ -430,7 +532,10 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="220" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="FontSizeLabel" x:Uid="FontSizeLabel" VerticalAlignment="Center" Text="Font size" />
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="FontSizeLabel" x:Uid="FontSizeLabel" Text="Font size" />
+                                    <TextBlock x:Name="FontSizeDescription" x:Uid="FontSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Default text size in pixels" />
+                                </StackPanel>
                                 <NumberBox
                                     x:Name="FontSizeNumberBox"
                                     Grid.Column="1"
@@ -440,6 +545,7 @@
                                     Minimum="7"
                                     SmallChange="1"
                                     SpinButtonPlacementMode="Inline"
+                                    Loaded="NumberBox_Loaded"
                                     ValueChanged="FontSizeNumberBox_ValueChanged" />
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
@@ -448,7 +554,10 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="SyntaxHighlightingLabel" x:Uid="SyntaxHighlightingLabel" VerticalAlignment="Center" Text="Syntax highlighting" />
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="SyntaxHighlightingLabel" x:Uid="SyntaxHighlightingLabel" Text="Syntax highlighting" />
+                                    <TextBlock x:Name="SyntaxHighlightingDescription" x:Uid="SyntaxHighlightingDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Color recognized code elements" />
+                                </StackPanel>
                                 <ToggleSwitch x:Name="SyntaxHighlightingToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
@@ -457,7 +566,10 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="220" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="SyntaxThemeLabel" x:Uid="SyntaxThemeLabel" VerticalAlignment="Center" Text="Highlighting style" />
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="SyntaxThemeLabel" x:Uid="SyntaxThemeLabel" Text="Highlighting style" />
+                                    <TextBlock x:Name="SyntaxThemeDescription" x:Uid="SyntaxThemeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Color palette used for syntax highlighting" />
+                                </StackPanel>
                                 <ComboBox
                                     x:Name="SyntaxThemeComboBox"
                                     Grid.Column="1"
@@ -471,7 +583,10 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="LineNumbersLabel" x:Uid="LineNumbersLabel" VerticalAlignment="Center" Text="Line numbers" />
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="LineNumbersLabel" x:Uid="LineNumbersLabel" Text="Line numbers" />
+                                    <TextBlock x:Name="LineNumbersDescription" x:Uid="LineNumbersDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Show a non-selectable line number column" />
+                                </StackPanel>
                                 <ToggleSwitch x:Name="LineNumbersToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
@@ -480,7 +595,10 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="WordWrapLabel" x:Uid="WordWrapLabel" VerticalAlignment="Center" Text="Wrap long lines" />
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="WordWrapLabel" x:Uid="WordWrapLabel" Text="Wrap long lines" />
+                                    <TextBlock x:Name="WordWrapDescription" x:Uid="WordWrapDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Wrap text to the available viewport width" />
+                                </StackPanel>
                                 <ToggleSwitch x:Name="WordWrapToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
                         </StackPanel>
@@ -517,6 +635,7 @@
                                         Minimum="0"
                                         SmallChange="5"
                                         SpinButtonPlacementMode="Inline"
+                                        Loaded="NumberBox_Loaded"
                                         ValueChanged="DefaultAudioVolumeNumberBox_ValueChanged" />
                                     <TextBlock VerticalAlignment="Center" Text="%" />
                                 </StackPanel>
@@ -539,31 +658,10 @@
                                         Minimum="0"
                                         SmallChange="5"
                                         SpinButtonPlacementMode="Inline"
+                                        Loaded="NumberBox_Loaded"
                                         ValueChanged="DefaultVideoVolumeNumberBox_ValueChanged" />
                                     <TextBlock VerticalAlignment="Center" Text="%" />
                                 </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
-                        <StackPanel>
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="AutoFitWindowSizeLabel" x:Uid="AutoFitWindowSizeLabel" Text="Auto fit window size" />
-                                    <TextBlock x:Name="AutoFitWindowSizeDescription" x:Uid="AutoFitWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Automatically fit the preview window to media file dimensions" />
-                                </StackPanel>
-                                <ToggleSwitch
-                                    x:Name="AutoFitWindowSizeToggle"
-                                    Grid.Column="1"
-                                    HorizontalAlignment="Right"
-                                    OffContent="{x:Null}"
-                                    OnContent="{x:Null}"
-                                    VerticalAlignment="Center"
-                                    Toggled="AutoFitWindowSizeToggle_Toggled" />
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
@@ -572,10 +670,22 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="WindowSizesLabel" x:Uid="WindowSizesLabel" Text="Preview window sizes" />
-                                    <TextBlock x:Name="WindowSizeResetStatusText" x:Uid="WindowSizeResetStatusText" Style="{StaticResource SettingsDescriptionStyle}" Text="Stored separately by preview type" />
+                                    <TextBlock x:Name="AutoplayAudioLabel" x:Uid="AutoplayAudioLabel" Text="Autoplay audio" />
+                                    <TextBlock x:Name="AutoplayAudioDescription" x:Uid="AutoplayAudioDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start audio playback when a preview opens" />
                                 </StackPanel>
-                                <Button x:Name="ResetWindowSizesButton" x:Uid="ResetWindowSizesButton" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ResetWindowSizesButton_Click" Content="Reset" />
+                                <ToggleSwitch x:Name="AutoplayAudioToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="AutoplayVideoLabel" x:Uid="AutoplayVideoLabel" Text="Autoplay video" />
+                                    <TextBlock x:Name="AutoplayVideoDescription" x:Uid="AutoplayVideoDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start video playback when a preview opens" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="AutoplayVideoToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                             </Grid>
                         </StackPanel>
                     </Border>

@@ -5,7 +5,8 @@
 
 namespace
 {
-    constexpr wchar_t registry_path[] = L"Software\\Glance\\WindowSizes";
+    constexpr wchar_t size_registry_path[] = L"Software\\Glance\\WindowSizes";
+    constexpr wchar_t position_registry_path[] = L"Software\\Glance\\WindowPositions";
 
     const wchar_t* value_name(glance::app::PreviewKind kind, bool media_is_audio) noexcept
     {
@@ -40,7 +41,7 @@ namespace glance::app
         DWORD size = sizeof(packed);
         if (RegGetValueW(
                 HKEY_CURRENT_USER,
-                registry_path,
+                size_registry_path,
                 value_name(kind, media_is_audio),
                 RRF_RT_REG_QWORD,
                 nullptr,
@@ -70,7 +71,7 @@ namespace glance::app
         HKEY key{};
         if (RegCreateKeyExW(
                 HKEY_CURRENT_USER,
-                registry_path,
+                size_registry_path,
                 0,
                 nullptr,
                 0,
@@ -97,31 +98,36 @@ namespace glance::app
 
     bool clear_window_sizes() noexcept
     {
-        const LSTATUS result = RegDeleteTreeW(HKEY_CURRENT_USER, registry_path);
+        const LSTATUS result = RegDeleteTreeW(HKEY_CURRENT_USER, size_registry_path);
         return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
     }
 
-    bool auto_fit_window_size_enabled() noexcept
+    std::optional<POINT> load_window_position(PreviewKind kind, bool media_is_audio)
     {
-        DWORD value{};
-        DWORD size = sizeof(value);
-        const LSTATUS status = RegGetValueW(
+        std::uint64_t packed{};
+        DWORD size = sizeof(packed);
+        if (RegGetValueW(
             HKEY_CURRENT_USER,
-            L"Software\\Glance",
-            L"AutoFitWindowSize",
-            RRF_RT_REG_DWORD,
+            position_registry_path,
+            value_name(kind, media_is_audio),
+            RRF_RT_REG_QWORD,
             nullptr,
-            &value,
-            &size);
-        return status == ERROR_SUCCESS ? value != 0 : true;
+            &packed,
+            &size) != ERROR_SUCCESS)
+        {
+            return std::nullopt;
+        }
+        return POINT{
+            static_cast<LONG>(static_cast<std::int32_t>(packed >> 32U)),
+            static_cast<LONG>(static_cast<std::int32_t>(packed & 0xFFFFFFFFU)) };
     }
 
-    void set_auto_fit_window_size_enabled(bool enabled) noexcept
+    void save_window_position(PreviewKind kind, POINT position, bool media_is_audio) noexcept
     {
         HKEY key{};
         if (RegCreateKeyExW(
                 HKEY_CURRENT_USER,
-                L"Software\\Glance",
+                position_registry_path,
                 0,
                 nullptr,
                 0,
@@ -132,14 +138,23 @@ namespace glance::app
         {
             return;
         }
-        const DWORD value = enabled ? 1U : 0U;
+
+        const std::uint64_t packed =
+            (static_cast<std::uint64_t>(static_cast<std::uint32_t>(position.x)) << 32U) |
+            static_cast<std::uint32_t>(position.y);
         RegSetValueExW(
             key,
-            L"AutoFitWindowSize",
+            value_name(kind, media_is_audio),
             0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&value),
-            sizeof(value));
+            REG_QWORD,
+            reinterpret_cast<const BYTE*>(&packed),
+            sizeof(packed));
         RegCloseKey(key);
+    }
+
+    bool clear_window_positions() noexcept
+    {
+        const LSTATUS result = RegDeleteTreeW(HKEY_CURRENT_USER, position_registry_path);
+        return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
     }
 }

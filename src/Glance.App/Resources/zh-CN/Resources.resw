@@ -54,6 +54,8 @@
   <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>未获取</value></data>
   <data name="SizesReset" xml:space="preserve"><value>已重置保存的窗口尺寸</value></data>
   <data name="SizesResetFailed" xml:space="preserve"><value>无法重置保存的窗口尺寸</value></data>
+  <data name="PositionsReset" xml:space="preserve"><value>已重置保存的窗口位置</value></data>
+  <data name="PositionsResetFailed" xml:space="preserve"><value>无法重置保存的窗口位置</value></data>
 
   <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>始终置顶</value></data>
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>钉住文件</value></data>
@@ -87,6 +89,7 @@
   <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>使用默认应用打开</value></data>
 
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>常规</value></data>
+  <data name="WindowNavigationItem.Content" xml:space="preserve"><value>窗口</value></data>
   <data name="FooterNavigationItem.Content" xml:space="preserve"><value>底栏</value></data>
   <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>文本预览</value></data>
   <data name="MediaPreviewNavigationItem.Content" xml:space="preserve"><value>媒体预览</value></data>
@@ -108,20 +111,39 @@
   <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>下移</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>诊断</value></data>
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>保存诊断日志和崩溃转储</value></data>
-  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
-  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体文件尺寸自动调整预览窗口</value></data>
+  <data name="WindowPageTitle.Text" xml:space="preserve"><value>窗口</value></data>
+  <data name="WindowPageDescription.Text" xml:space="preserve"><value>预览窗口的尺寸、位置和外观</value></data>
+  <data name="DefaultWindowSizeLabel.Text" xml:space="preserve"><value>默认窗口尺寸</value></data>
+  <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>没有可用记忆尺寸时使用的宽度和高度</value></data>
+  <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>记忆窗口尺寸</value></data>
+  <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口尺寸</value></data>
+  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应媒体窗口尺寸</value></data>
+  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体固有尺寸调整初始窗口尺寸</value></data>
+  <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>记忆窗口位置</value></data>
+  <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口位置</value></data>
+  <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>重置</value></data>
+  <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>窗口不透明度</value></data>
+  <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>设置所有预览窗口的不透明度</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>媒体预览</value></data>
-  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>播放默认值和窗口行为</value></data>
+  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>播放默认值</value></data>
   <data name="DefaultAudioVolumeLabel.Text" xml:space="preserve"><value>默认音频音量</value></data>
   <data name="DefaultAudioVolumeDescription.Text" xml:space="preserve"><value>音频预览的初始音量</value></data>
   <data name="DefaultVideoVolumeLabel.Text" xml:space="preserve"><value>默认视频音量</value></data>
   <data name="DefaultVideoVolumeDescription.Text" xml:space="preserve"><value>视频预览的初始音量</value></data>
+  <data name="AutoplayAudioLabel.Text" xml:space="preserve"><value>自动播放音频</value></data>
+  <data name="AutoplayAudioDescription.Text" xml:space="preserve"><value>打开音频预览时自动开始播放</value></data>
+  <data name="AutoplayVideoLabel.Text" xml:space="preserve"><value>自动播放视频</value></data>
+  <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>打开视频预览时自动开始播放</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文本预览</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>编辑器外观和布局</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>字体</value></data>
+  <data name="FontFamilyDescription.Text" xml:space="preserve"><value>纯文本和代码使用的字体</value></data>
   <data name="FontSizeLabel.Text" xml:space="preserve"><value>字号</value></data>
+  <data name="FontSizeDescription.Text" xml:space="preserve"><value>文本的默认像素字号</value></data>
   <data name="SyntaxHighlightingLabel.Text" xml:space="preserve"><value>语法高亮</value></data>
+  <data name="SyntaxHighlightingDescription.Text" xml:space="preserve"><value>为识别出的代码元素着色</value></data>
   <data name="SyntaxThemeLabel.Text" xml:space="preserve"><value>高亮风格</value></data>
+  <data name="SyntaxThemeDescription.Text" xml:space="preserve"><value>语法高亮使用的颜色方案</value></data>
   <data name="SyntaxThemeGlance" xml:space="preserve"><value>Glance</value></data>
   <data name="SyntaxThemeVisualStudio" xml:space="preserve"><value>Visual Studio</value></data>
   <data name="SyntaxThemeMonokai" xml:space="preserve"><value>Monokai</value></data>
@@ -133,7 +155,9 @@
   <data name="SyntaxThemeGruvbox" xml:space="preserve"><value>Gruvbox</value></data>
   <data name="SyntaxThemeTomorrowNight" xml:space="preserve"><value>Tomorrow Night</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>行号</value></data>
+  <data name="LineNumbersDescription.Text" xml:space="preserve"><value>显示不可选中的行号栏</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>自动换行</value></data>
+  <data name="WordWrapDescription.Text" xml:space="preserve"><value>按可用视口宽度换行</value></data>
   <data name="PathCopyGroupLabel.Text" xml:space="preserve"><value>路径复制</value></data>
   <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>为复制的路径添加引号</value></data>
   <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>使用双引号包裹复制的路径</value></data>
@@ -160,8 +184,6 @@
   <data name="ResetAllSettingsFailedTitle" xml:space="preserve"><value>无法重置设置</value></data>
   <data name="ResetAllSettingsFailedMessage" xml:space="preserve"><value>部分设置无法清除，Glance 将保持运行。</value></data>
   <data name="OK" xml:space="preserve"><value>确定</value></data>
-  <data name="WindowSizesLabel.Text" xml:space="preserve"><value>预览窗口尺寸</value></data>
-  <data name="WindowSizeResetStatusText.Text" xml:space="preserve"><value>按预览类型分别保存</value></data>
   <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>重置</value></data>
   <data name="AboutPageTitle.Text" xml:space="preserve"><value>关于</value></data>
   <data name="AboutPageDescription.Text" xml:space="preserve"><value>应用信息</value></data>

@@ -337,7 +337,7 @@
                     <MediaPlayerElement
                         x:Name="MediaPreview"
                         AreTransportControlsEnabled="False"
-                        AutoPlay="True"
+                        AutoPlay="False"
                         Stretch="Uniform" />
                     <Grid
                         x:Name="AudioMetadataPanel"
