@@ -160,6 +160,7 @@ namespace winrt::Glance::App::implementation
         void show_content_panel(glance::app::PreviewKind kind);
         void show_provider_error(std::wstring message, std::uint64_t generation);
         void update_image_fit_surface();
+        void fit_image_to_viewport();
         void update_pdf_fit_surface();
         void stop_media_playback();
         void show_media_controls();
@@ -198,6 +199,8 @@ namespace winrt::Glance::App::implementation
         bool image_metadata_visible_{};
         bool image_panning_{};
         double image_rotation_{};
+        std::uint32_t image_pixel_width_{};
+        std::uint32_t image_pixel_height_{};
         double image_pan_horizontal_offset_{};
         double image_pan_vertical_offset_{};
         Windows::Foundation::Point image_pan_start_{};

@@ -208,8 +208,10 @@
                             PointerWheelChanged="ImageScroller_PointerWheelChanged">
                             <Image
                                 x:Name="ImagePreview"
+                                HorizontalAlignment="Center"
                                 RenderTransformOrigin="0.5,0.5"
-                                Stretch="Uniform">
+                                Stretch="Uniform"
+                                VerticalAlignment="Center">
                                 <Image.RenderTransform>
                                     <CompositeTransform x:Name="ImageTransform" />
                                 </Image.RenderTransform>

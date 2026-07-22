@@ -471,6 +471,8 @@ namespace winrt::Glance::App::implementation
         media_is_audio_ = false;
         image_metadata_visible_ = false;
         image_panning_ = false;
+        image_pixel_width_ = 0;
+        image_pixel_height_ = 0;
         pdf_page_index_ = 0;
         pdf_wheel_delta_ = 0;
 
@@ -685,6 +687,8 @@ namespace winrt::Glance::App::implementation
             show_content_panel(kind);
             image_rotation_ = 0;
             image_panning_ = false;
+            image_pixel_width_ = 0;
+            image_pixel_height_ = 0;
             image_metadata_.clear();
             image_metadata_visible_ = false;
             ImageTransform().Rotation(image_rotation_);
@@ -832,8 +836,10 @@ namespace winrt::Glance::App::implementation
                 {
                     return;
                 }
+                lifetime->image_pixel_width_ = width;
+                lifetime->image_pixel_height_ = height;
                 lifetime->ImagePreview().Source(bitmap);
-                lifetime->update_image_fit_surface();
+                lifetime->fit_image_to_viewport();
                 if (lifetime->current_index_ < lifetime->files_.size())
                 {
                     const auto& current = lifetime->files_[lifetime->current_index_];
@@ -1629,8 +1635,32 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_image_fit_surface()
     {
-        ImageFitSurface().Width(std::max(1.0, ImagePanel().ActualWidth()));
-        ImageFitSurface().Height(std::max(1.0, ImagePanel().ActualHeight()));
+        const double viewport_width = std::max(1.0, ImagePanel().ActualWidth());
+        const double viewport_height = std::max(1.0, ImagePanel().ActualHeight());
+        ImageFitSurface().Width(viewport_width);
+        ImageFitSurface().Height(viewport_height);
+
+        if (image_pixel_width_ == 0 || image_pixel_height_ == 0)
+        {
+            return;
+        }
+
+        const bool swaps_dimensions =
+            static_cast<int>(std::lround(image_rotation_)) % 180 != 0;
+        const double rotated_width = swaps_dimensions ? image_pixel_height_ : image_pixel_width_;
+        const double rotated_height = swaps_dimensions ? image_pixel_width_ : image_pixel_height_;
+        const double fit_scale = std::min(
+            viewport_width / rotated_width,
+            viewport_height / rotated_height);
+        ImagePreview().Width(std::max(1.0, image_pixel_width_ * fit_scale));
+        ImagePreview().Height(std::max(1.0, image_pixel_height_ * fit_scale));
+    }
+
+    void MainWindow::fit_image_to_viewport()
+    {
+        image_panning_ = false;
+        update_image_fit_surface();
+        static_cast<void>(ImageScroller().ChangeView(0.0, 0.0, 1.0F, true));
     }
 
     void MainWindow::update_pdf_fit_surface()
@@ -1993,6 +2023,7 @@ namespace winrt::Glance::App::implementation
     {
         image_rotation_ = std::fmod(image_rotation_ + 90.0, 360.0);
         ImageTransform().Rotation(image_rotation_);
+        fit_image_to_viewport();
     }
 
     void MainWindow::show_media_controls()
