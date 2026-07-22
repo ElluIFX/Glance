@@ -31,6 +31,11 @@ namespace
             return L"Generic";
         }
     }
+
+    std::wstring position_value_name(glance::app::PreviewKind kind, bool media_is_audio)
+    {
+        return L"CenterOffset." + std::wstring(value_name(kind, media_is_audio));
+    }
 }
 
 namespace glance::app
@@ -102,14 +107,15 @@ namespace glance::app
         return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
     }
 
-    std::optional<POINT> load_window_position(PreviewKind kind, bool media_is_audio)
+    std::optional<POINT> load_window_center_offset(PreviewKind kind, bool media_is_audio)
     {
         std::uint64_t packed{};
         DWORD size = sizeof(packed);
+        const auto name = position_value_name(kind, media_is_audio);
         if (RegGetValueW(
             HKEY_CURRENT_USER,
             position_registry_path,
-            value_name(kind, media_is_audio),
+            name.c_str(),
             RRF_RT_REG_QWORD,
             nullptr,
             &packed,
@@ -122,7 +128,7 @@ namespace glance::app
             static_cast<LONG>(static_cast<std::int32_t>(packed & 0xFFFFFFFFU)) };
     }
 
-    void save_window_position(PreviewKind kind, POINT position, bool media_is_audio) noexcept
+    void save_window_center_offset(PreviewKind kind, POINT offset, bool media_is_audio) noexcept
     {
         HKEY key{};
         if (RegCreateKeyExW(
@@ -140,11 +146,12 @@ namespace glance::app
         }
 
         const std::uint64_t packed =
-            (static_cast<std::uint64_t>(static_cast<std::uint32_t>(position.x)) << 32U) |
-            static_cast<std::uint32_t>(position.y);
+            (static_cast<std::uint64_t>(static_cast<std::uint32_t>(offset.x)) << 32U) |
+            static_cast<std::uint32_t>(offset.y);
+        const auto name = position_value_name(kind, media_is_audio);
         RegSetValueExW(
             key,
-            value_name(kind, media_is_audio),
+            name.c_str(),
             0,
             REG_QWORD,
             reinterpret_cast<const BYTE*>(&packed),

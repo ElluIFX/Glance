@@ -55,6 +55,26 @@ namespace
     constexpr std::uint64_t automatic_syntax_highlight_limit_bytes = 64ULL * 1024ULL;
     constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
 
+    POINT window_position_for_center_offset(
+        const RECT& monitor_area,
+        const RECT& work_area,
+        int width,
+        int height,
+        POINT center_offset) noexcept
+    {
+        const int centered_x = monitor_area.left + (monitor_area.right - monitor_area.left - width) / 2;
+        const int centered_y = monitor_area.top + (monitor_area.bottom - monitor_area.top - height) / 2;
+        return {
+            std::clamp(
+                centered_x + center_offset.x,
+                work_area.left,
+                std::max(work_area.left, work_area.right - width)),
+            std::clamp(
+                centered_y + center_offset.y,
+                work_area.top,
+                std::max(work_area.top, work_area.bottom - height)) };
+    }
+
     enum class ArchiveColumnKind
     {
         name,
@@ -890,18 +910,20 @@ namespace winrt::Glance::App::implementation
     {
         const auto preferences = glance::app::load_window_preferences();
         const auto storage_kind = basic_info_mode_ ? content_preview_kind_ : current_kind_;
-        const auto saved_position = preferences.remember_position
-            ? glance::app::load_window_position(storage_kind, media_is_audio_)
-            : std::nullopt;
-        HMONITOR monitor = saved_position
-            ? MonitorFromPoint(*saved_position, MONITOR_DEFAULTTONEAREST)
-            : MonitorFromWindow(
-                  source_window_ != nullptr ? source_window_ : GetForegroundWindow(),
-                  MONITOR_DEFAULTTONEAREST);
+        const HWND reference_window = source_window_ != nullptr
+            ? source_window_
+            : GetForegroundWindow();
+        HMONITOR monitor = MonitorFromWindow(reference_window, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{ sizeof(MONITORINFO) };
         GetMonitorInfoW(monitor, &info);
 
-        const UINT dpi = source_window_ != nullptr ? GetDpiForWindow(source_window_) : 96;
+        const UINT dpi = reference_window != nullptr ? GetDpiForWindow(reference_window) : 96;
+        const POINT saved_center_offset = preferences.remember_position
+            ? glance::app::load_window_center_offset(storage_kind, media_is_audio_).value_or(POINT{})
+            : POINT{};
+        const POINT center_offset{
+            MulDiv(saved_center_offset.x, static_cast<int>(dpi), 96),
+            MulDiv(saved_center_offset.y, static_cast<int>(dpi), 96) };
         int desired_width = MulDiv(static_cast<int>(preferences.default_width), static_cast<int>(dpi), 96);
         int desired_height = MulDiv(static_cast<int>(preferences.default_height), static_cast<int>(dpi), 96);
         if (preferences.remember_size && !ignore_saved_size && !auto_fit_applies())
@@ -918,18 +940,18 @@ namespace winrt::Glance::App::implementation
         const int minimum_height = MulDiv(320, static_cast<int>(dpi), 96);
         const int width = std::clamp(desired_width, std::min(minimum_width, work_width), work_width);
         const int height = std::clamp(desired_height, std::min(minimum_height, work_height), work_height);
-        const int x = saved_position
-            ? std::clamp(saved_position->x, info.rcWork.left, std::max(info.rcWork.left, info.rcWork.right - width))
-            : info.rcWork.left + (work_width - width) / 2;
-        const int y = saved_position
-            ? std::clamp(saved_position->y, info.rcWork.top, std::max(info.rcWork.top, info.rcWork.bottom - height))
-            : info.rcWork.top + (work_height - height) / 2;
+        const auto position = window_position_for_center_offset(
+            info.rcMonitor,
+            info.rcWork,
+            width,
+            height,
+            center_offset);
 
         SetWindowPos(
             window_,
             HWND_TOPMOST,
-            x,
-            y,
+            position.x,
+            position.y,
             width,
             height,
             SWP_NOACTIVATE | SWP_SHOWWINDOW);
@@ -1047,14 +1069,27 @@ namespace winrt::Glance::App::implementation
             static_cast<int>(std::lround(content_height * scale)) + vertical_chrome,
             minimum_height,
             maximum_height);
-        const bool preserve_position = preferences.remember_position;
-        const int x = preserve_position
-            ? std::clamp(bounds.left, info.rcWork.left, std::max(info.rcWork.left, info.rcWork.right - width))
-            : info.rcWork.left + (work_width - width) / 2;
-        const int y = preserve_position
-            ? std::clamp(bounds.top, info.rcWork.top, std::max(info.rcWork.top, info.rcWork.bottom - height))
-            : info.rcWork.top + (work_height - height) / 2;
-        SetWindowPos(window_, nullptr, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
+        const auto storage_kind = basic_info_mode_ ? content_preview_kind_ : current_kind_;
+        const POINT saved_center_offset = preferences.remember_position
+            ? glance::app::load_window_center_offset(storage_kind, media_is_audio_).value_or(POINT{})
+            : POINT{};
+        const POINT center_offset{
+            MulDiv(saved_center_offset.x, static_cast<int>(dpi), 96),
+            MulDiv(saved_center_offset.y, static_cast<int>(dpi), 96) };
+        const auto position = window_position_for_center_offset(
+            info.rcMonitor,
+            info.rcWork,
+            width,
+            height,
+            center_offset);
+        SetWindowPos(
+            window_,
+            nullptr,
+            position.x,
+            position.y,
+            width,
+            height,
+            SWP_NOACTIVATE | SWP_NOZORDER);
     }
 
     void MainWindow::save_current_window_placement() const noexcept
@@ -1087,9 +1122,24 @@ namespace winrt::Glance::App::implementation
         }
         if (preferences.remember_position)
         {
-            glance::app::save_window_position(
+            HMONITOR monitor = MonitorFromWindow(window_, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO info{ sizeof(MONITORINFO) };
+            if (!GetMonitorInfoW(monitor, &info))
+            {
+                return;
+            }
+            const int window_center_x = bounds.left + (bounds.right - bounds.left) / 2;
+            const int window_center_y = bounds.top + (bounds.bottom - bounds.top) / 2;
+            const int monitor_center_x =
+                info.rcMonitor.left + (info.rcMonitor.right - info.rcMonitor.left) / 2;
+            const int monitor_center_y =
+                info.rcMonitor.top + (info.rcMonitor.bottom - info.rcMonitor.top) / 2;
+            const UINT dpi = GetDpiForWindow(window_);
+            glance::app::save_window_center_offset(
                 storage_kind,
-                POINT{ bounds.left, bounds.top },
+                POINT{
+                    MulDiv(window_center_x - monitor_center_x, 96, static_cast<int>(dpi)),
+                    MulDiv(window_center_y - monitor_center_y, 96, static_cast<int>(dpi)) },
                 media_is_audio_);
         }
     }

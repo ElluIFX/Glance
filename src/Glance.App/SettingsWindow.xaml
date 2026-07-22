@@ -360,7 +360,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="RememberWindowPositionLabel" x:Uid="RememberWindowPositionLabel" Text="Remember window position" />
-                                    <TextBlock x:Name="RememberWindowPositionDescription" x:Uid="RememberWindowPositionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Store the last position separately for each preview type" />
+                                    <TextBlock x:Name="RememberWindowPositionDescription" x:Uid="RememberWindowPositionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Remember the window center offset for each preview type" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="12">
                                     <Button x:Name="ResetWindowPositionsButton" x:Uid="ResetWindowPositionsButton" Click="ResetWindowPositionsButton_Click" Content="Reset" />

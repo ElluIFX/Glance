@@ -148,7 +148,7 @@
   <data name="AutoFitIgnoredExtensionsDescription.Text" xml:space="preserve"><value>使用分号分隔，后缀开头的点可省略</value></data>
   <data name="AutoFitIgnoredExtensionsTextBox.PlaceholderText" xml:space="preserve"><value>.gif; webp; mp4</value></data>
   <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>记忆窗口位置</value></data>
-  <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口位置</value></data>
+  <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>按预览类型保存窗口中心相对屏幕中心的偏移</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>重置</value></data>
   <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>窗口不透明度</value></data>
   <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>设置所有预览窗口的不透明度</value></data>

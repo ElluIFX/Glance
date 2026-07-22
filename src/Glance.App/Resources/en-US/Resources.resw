@@ -148,7 +148,7 @@
   <data name="AutoFitIgnoredExtensionsDescription.Text" xml:space="preserve"><value>Separate extensions with semicolons; leading dots are optional</value></data>
   <data name="AutoFitIgnoredExtensionsTextBox.PlaceholderText" xml:space="preserve"><value>.gif; webp; mp4</value></data>
   <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>Remember window position</value></data>
-  <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>Store the last position separately for each preview type</value></data>
+  <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>Remember the window center offset for each preview type</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>Reset</value></data>
   <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>Window opacity</value></data>
   <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>Set the opacity of all preview windows</value></data>
