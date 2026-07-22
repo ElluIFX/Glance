@@ -691,7 +691,7 @@ namespace winrt::Glance::App::implementation
         }
 
         present_file(current_index_);
-        if (new_session || !user_sized_)
+        if (!topmost_ && (new_session || !user_sized_))
         {
             position_initial_window();
         }
@@ -948,7 +948,7 @@ namespace winrt::Glance::App::implementation
 
     bool MainWindow::auto_fit_applies() const noexcept
     {
-        if (user_sized_ || !glance::app::load_window_preferences().auto_fit_media)
+        if (topmost_ || user_sized_ || !glance::app::load_window_preferences().auto_fit_media)
         {
             return false;
         }
