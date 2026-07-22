@@ -57,7 +57,11 @@ Compared with similar tools, Glance prioritizes stability and reliability — <b
 
 Download and install Glance from [Releases](https://github.com/ElluIFX/Glance/releases). After launch, select a file and press Space to preview. Settings and Exit are available from the system tray.
 
-> Glance targets Windows 11. To stay lightweight, some format previews depend on the Edge WebView2 Runtime. If your system is older or components have been stripped, get the runtime [here](https://developer.microsoft.com/en-us/microsoft-edge/webview2) and install it.
+#### Optional dependencies
+
+- **Microsoft Edge WebView2 Runtime** — Required for some formats such as Markdown. Usually included with Windows 11; if missing, install it from the [Microsoft site](https://developer.microsoft.com/en-us/microsoft-edge/webview2)
+- **Microsoft Office** — Required for Word / Excel / PowerPoint preview; the corresponding components must be installed
+- **ffprobe.exe** — Used for extended media metadata. Get it from the [FFmpeg download page](https://ffmpeg.org/download.html), then place it in the Glance install directory or add it to `PATH`; basic audio/video preview still works without it
 
 ## 🛠️ Development
 

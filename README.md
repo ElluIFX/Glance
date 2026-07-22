@@ -55,9 +55,13 @@
 
 ## 🚀 使用
 
-从 [Releases](https://github.com/ElluIFX/Glance/releases) 下载并安装 Glance。运行后，选中文件并按下空格即可预览；设置与退出入口位于系统托盘。
+从 [Releases](https://github.com/ElluIFX/Glance/releases) 下载并安装 Glance。运行后，选中文件并按下空格即可预览；设置与退出入口位于系统托盘
 
-> Glance 面向 Windows 11 开发。为保持轻量，部分格式预览依赖 Edge WebView2 运行时；若系统版本较低或手动精简了组件，可从[这里](https://developer.microsoft.com/en-us/microsoft-edge/webview2)获取并安装。
+#### 可选依赖
+
+- **Microsoft Edge WebView2 Runtime** — Markdown 等部分格式预览所需，Windows 11 通常已内置，若缺失可从[此处](https://developer.microsoft.com/en-us/microsoft-edge/webview2)下载安装
+- **Microsoft Office** — 预览 Word / Excel / PowerPoint 时，需已安装对应组件
+- **ffprobe.exe** — 用于显示扩展媒体元数据，可从 [FFmpeg 官网](https://ffmpeg.org/download.html) 获取，放入 Glance 安装目录或加入 `PATH`，缺失不影响基础音视频预览
 
 ## 🛠️ 开发
 
