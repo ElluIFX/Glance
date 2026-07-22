@@ -24,6 +24,7 @@
 #include <shellapi.h>
 #include <shlobj_core.h>
 #include <shlwapi.h>
+#include <winrt/Microsoft.Web.WebView2.Core.h>
 
 #include <algorithm>
 #include <array>
@@ -54,6 +55,35 @@ namespace
     constexpr std::size_t long_text_render_threshold = 256U * 1024U;
     constexpr std::uint64_t automatic_syntax_highlight_limit_bytes = 64ULL * 1024ULL;
     constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
+
+    std::optional<std::wstring> file_url_from_path(const std::wstring& path)
+    {
+        const auto initial_capacity = std::max<std::size_t>(512, path.size() * 3 + 16);
+        if (initial_capacity > std::numeric_limits<DWORD>::max())
+        {
+            return std::nullopt;
+        }
+
+        std::wstring url(initial_capacity, L'\0');
+        DWORD length = static_cast<DWORD>(url.size());
+        HRESULT result = UrlCreateFromPathW(path.c_str(), url.data(), &length, 0);
+        if (result == E_POINTER && length > url.size())
+        {
+            url.resize(length);
+            result = UrlCreateFromPathW(path.c_str(), url.data(), &length, 0);
+        }
+        if (FAILED(result))
+        {
+            return std::nullopt;
+        }
+
+        url.resize(length);
+        while (!url.empty() && url.back() == L'\0')
+        {
+            url.pop_back();
+        }
+        return url;
+    }
 
     POINT window_position_for_center_offset(
         const RECT& monitor_area,
@@ -443,8 +473,6 @@ namespace winrt::Glance::App::implementation
         PasswordPromptSubmitButton().Content(
             box_value(glance::app::localize(L"PasswordPromptSubmitButton.Content")));
         update_archive_header_state();
-        MarkdownPreviewButton().Content(box_value(glance::app::localize(L"MarkdownPreviewButton.Content")));
-        MarkdownCodeButton().Content(box_value(glance::app::localize(L"MarkdownCodeButton.Content")));
         SystemAnsiItem().Text(glance::app::localize(L"SystemAnsiItem.Text"));
         set_tooltip(SyntaxHighlightButton(), L"SyntaxHighlightButton.ToolTipService.ToolTip");
         set_tooltip(ZoomOutButton(), L"ZoomOutButton.ToolTipService.ToolTip");
@@ -468,7 +496,8 @@ namespace winrt::Glance::App::implementation
     {
         apply_text_preferences();
         if (current_kind_ == glance::app::PreviewKind::text ||
-            current_kind_ == glance::app::PreviewKind::markdown)
+            current_kind_ == glance::app::PreviewKind::markdown ||
+            current_kind_ == glance::app::PreviewKind::web)
         {
             render_text_content();
             update_text_layout();
@@ -763,6 +792,7 @@ namespace winrt::Glance::App::implementation
         hide_password_prompt();
         MarkdownPreviewWebView().Opacity(0.0);
         MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
+        clear_web_view_content();
         TextContentRichText().Blocks().Clear();
         LongTextList().Items().Clear();
         LongTextList().Visibility(Visibility::Collapsed);
@@ -819,6 +849,8 @@ namespace winrt::Glance::App::implementation
         current_text_.clear();
         current_text_path_.clear();
         current_text_markdown_ = false;
+        current_text_web_ = false;
+        web_preview_available_ = false;
         current_text_reader_.reset();
         syntax_highlight_state_ = {};
         text_syntax_ranges_.clear();
@@ -1289,6 +1321,9 @@ namespace winrt::Glance::App::implementation
         case glance::app::PreviewKind::markdown:
             present_text(file, true);
             break;
+        case glance::app::PreviewKind::web:
+            present_text(file, false, true);
+            break;
         case glance::app::PreviewKind::image:
             show_content_panel(kind);
             image_rotation_ = 0;
@@ -1482,13 +1517,27 @@ namespace winrt::Glance::App::implementation
             }));
     }
 
-    void MainWindow::prepare_text_preview(const glance::app::PreviewFile& file, bool markdown)
+    void MainWindow::prepare_text_preview(
+        const glance::app::PreviewFile& file,
+        bool markdown,
+        bool web)
     {
-        current_kind_ = markdown ? glance::app::PreviewKind::markdown : glance::app::PreviewKind::text;
-        show_content_panel(markdown ? glance::app::PreviewKind::markdown : glance::app::PreviewKind::text);
+        clear_web_view_content();
+        current_kind_ = web
+            ? glance::app::PreviewKind::web
+            : markdown
+                ? glance::app::PreviewKind::markdown
+                : glance::app::PreviewKind::text;
+        show_content_panel(current_kind_);
         current_text_.clear();
         current_text_path_ = file.path;
         current_text_markdown_ = markdown;
+        current_text_web_ = web;
+        web_preview_available_ = web;
+        MarkdownPreviewWebView().DefaultBackgroundColor(
+            web
+                ? Windows::UI::Color{ 255, 255, 255, 255 }
+                : Windows::UI::Color{ 0, 0, 0, 0 });
         current_text_reader_.reset();
         syntax_highlight_state_ = {};
         text_syntax_ranges_.clear();
@@ -1502,7 +1551,7 @@ namespace winrt::Glance::App::implementation
         line_numbers_simple_ = false;
         virtual_line_numbers_ = false;
         current_text_encoding_ = glance::app::TextEncoding::automatic;
-        markdown_preview_ = markdown;
+        markdown_preview_ = markdown || web;
         EncodingSelector().Content(box_value(glance::app::localize(L"EncodingDetecting")));
         apply_text_preferences();
         syntax_highlight_notice_pending_ =
@@ -1515,23 +1564,33 @@ namespace winrt::Glance::App::implementation
         current_text_ = glance::app::localize(L"Loading");
         render_text_content();
         set_line_number_text(L"");
-        MarkdownModeButtons().Visibility(markdown ? Visibility::Visible : Visibility::Collapsed);
-        set_markdown_preview_mode(markdown);
-        if (markdown)
+        MarkdownModeButtons().Visibility(markdown || web ? Visibility::Visible : Visibility::Collapsed);
+        MarkdownPreviewButton().IsEnabled(true);
+        MarkdownCodeButton().IsEnabled(true);
+        set_markdown_preview_mode(markdown || web);
+        if (markdown || web)
         {
             MarkdownPreviewWebView().Opacity(0.0);
         }
     }
 
-    void MainWindow::present_text(const glance::app::PreviewFile& file, bool markdown)
+    void MainWindow::present_text(
+        const glance::app::PreviewFile& file,
+        bool markdown,
+        bool web)
     {
-        prepare_text_preview(file, markdown);
-        load_text_async(file.path, markdown, content_generation_, current_text_encoding_);
+        prepare_text_preview(file, markdown, web);
+        if (web)
+        {
+            render_web_document_async(file.path, content_generation_);
+        }
+        load_text_async(file.path, markdown, web, content_generation_, current_text_encoding_);
     }
 
     fire_and_forget MainWindow::load_text_async(
         std::wstring path,
         bool markdown,
+        bool web,
         std::uint64_t generation,
         glance::app::TextEncoding encoding,
         bool preview_as_text_attempt)
@@ -1544,10 +1603,11 @@ namespace winrt::Glance::App::implementation
         co_await resume_background();
         auto preview = glance::app::load_text_preview(path, text_chunk_bytes, encoding);
         static_cast<void>(dispatcher.TryEnqueue(
-            [lifetime, preview = std::move(preview), markdown, generation, preview_as_text_attempt]() mutable {
+            [lifetime, preview = std::move(preview), markdown, web, generation, preview_as_text_attempt]() mutable {
                 lifetime->apply_text_preview(
                     std::move(preview),
                     markdown,
+                    web,
                     generation,
                     preview_as_text_attempt);
             }));
@@ -2864,6 +2924,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::apply_text_preview(
         glance::app::TextPreview preview,
         bool markdown,
+        bool web,
         std::uint64_t generation,
         bool preview_as_text_attempt)
     {
@@ -2877,6 +2938,12 @@ namespace winrt::Glance::App::implementation
             if (preview_as_text_attempt)
             {
                 PreviewAsTextButton().IsEnabled(true);
+            }
+            else if (web)
+            {
+                MarkdownCodeButton().IsEnabled(false);
+                MarkdownPreviewButton().IsEnabled(web_preview_available_);
+                set_markdown_preview_mode(web_preview_available_);
             }
             else if (current_index_ < files_.size())
             {
@@ -2922,6 +2989,12 @@ namespace winrt::Glance::App::implementation
             render_markdown();
             MarkdownPreviewButton().IsEnabled(!current_text_has_more_);
             set_markdown_preview_mode(current_text_has_more_ ? false : markdown_preview_);
+        }
+        else if (web)
+        {
+            MarkdownPreviewButton().IsEnabled(web_preview_available_);
+            MarkdownCodeButton().IsEnabled(true);
+            set_markdown_preview_mode(web_preview_available_ && markdown_preview_);
         }
     }
 
@@ -3020,6 +3093,68 @@ namespace winrt::Glance::App::implementation
                 set_markdown_preview_mode(false);
             }
         }
+    }
+
+    fire_and_forget MainWindow::render_web_document_async(
+        std::wstring path,
+        std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        try
+        {
+            const auto url = file_url_from_path(path);
+            if (!url.has_value())
+            {
+                throw hresult_error(E_INVALIDARG, L"Unable to create a file URL.");
+            }
+
+            co_await MarkdownPreviewWebView().EnsureCoreWebView2Async();
+            if (generation != content_generation_ ||
+                current_kind_ != glance::app::PreviewKind::web)
+            {
+                co_return;
+            }
+
+            const auto core = MarkdownPreviewWebView().CoreWebView2();
+            const auto settings = core.Settings();
+            settings.AreDefaultContextMenusEnabled(false);
+            settings.AreDevToolsEnabled(false);
+            settings.IsStatusBarEnabled(false);
+            core.Navigate(*url);
+            web_preview_available_ = true;
+            MarkdownPreviewButton().IsEnabled(true);
+            MarkdownPreviewWebView().Opacity(1.0);
+        }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(
+                L"Web document initialization failed: " + std::wstring(error.message()));
+            if (generation == content_generation_ &&
+                current_kind_ == glance::app::PreviewKind::web)
+            {
+                web_preview_available_ = false;
+                MarkdownPreviewButton().IsEnabled(false);
+                set_markdown_preview_mode(false);
+            }
+        }
+    }
+
+    void MainWindow::clear_web_view_content() noexcept
+    {
+        web_preview_available_ = false;
+        try
+        {
+            if (const auto core = MarkdownPreviewWebView().CoreWebView2())
+            {
+                core.Stop();
+                core.Navigate(L"about:blank");
+            }
+        }
+        catch (...)
+        {
+        }
+        MarkdownPreviewWebView().Opacity(0.0);
+        MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
     }
 
     void MainWindow::render_text_content()
@@ -3777,7 +3912,9 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::show_content_panel(glance::app::PreviewKind kind)
     {
-        const bool text = kind == glance::app::PreviewKind::text || kind == glance::app::PreviewKind::markdown;
+        const bool text = kind == glance::app::PreviewKind::text ||
+            kind == glance::app::PreviewKind::markdown ||
+            kind == glance::app::PreviewKind::web;
         GenericPanel().Visibility(kind == glance::app::PreviewKind::generic ? Visibility::Visible : Visibility::Collapsed);
         TextPanel().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         ImagePanel().Visibility(kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
@@ -3811,6 +3948,10 @@ namespace winrt::Glance::App::implementation
             cancel_pdf_render();
             PdfPageImage().Source(nullptr);
             hide_password_prompt();
+        }
+        if (!text)
+        {
+            clear_web_view_content();
         }
     }
 
@@ -4259,7 +4400,12 @@ namespace winrt::Glance::App::implementation
         render_text_content();
         set_line_number_text(L"");
         const auto generation = ++content_generation_;
-        load_text_async(current_text_path_, current_text_markdown_, generation, current_text_encoding_);
+        load_text_async(
+            current_text_path_,
+            current_text_markdown_,
+            current_text_web_,
+            generation,
+            current_text_encoding_);
     }
 
     void MainWindow::TextPreviewScroller_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
@@ -5430,6 +5576,7 @@ namespace winrt::Glance::App::implementation
         ErrorText().Visibility(Visibility::Collapsed);
         load_text_async(
             file.path,
+            false,
             false,
             content_generation_,
             glance::app::TextEncoding::automatic,

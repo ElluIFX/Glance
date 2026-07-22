@@ -180,11 +180,12 @@ namespace winrt::Glance::App::implementation
             std::uint64_t generation);
         winrt::fire_and_forget load_generic_file_info_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_footer_access_async(std::wstring path, std::uint64_t generation);
-        void prepare_text_preview(const glance::app::PreviewFile& file, bool markdown);
-        void present_text(const glance::app::PreviewFile& file, bool markdown);
+        void prepare_text_preview(const glance::app::PreviewFile& file, bool markdown, bool web = false);
+        void present_text(const glance::app::PreviewFile& file, bool markdown, bool web = false);
         winrt::fire_and_forget load_text_async(
             std::wstring path,
             bool markdown,
+            bool web,
             std::uint64_t generation,
             glance::app::TextEncoding encoding,
             bool preview_as_text_attempt = false);
@@ -279,10 +280,13 @@ namespace winrt::Glance::App::implementation
         void apply_text_preview(
             glance::app::TextPreview preview,
             bool markdown,
+            bool web,
             std::uint64_t generation,
             bool preview_as_text_attempt);
         void render_markdown();
         winrt::fire_and_forget render_markdown_async(std::wstring html, std::uint64_t generation);
+        winrt::fire_and_forget render_web_document_async(std::wstring path, std::uint64_t generation);
+        void clear_web_view_content() noexcept;
         void render_text_content();
         void append_syntax_ranges(std::wstring_view content);
         void append_text_content(std::wstring_view content);
@@ -354,6 +358,7 @@ namespace winrt::Glance::App::implementation
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};
         bool markdown_preview_{};
+        bool web_preview_available_{};
         bool image_metadata_visible_{};
         bool image_panning_{};
         double image_rotation_{};
@@ -367,6 +372,7 @@ namespace winrt::Glance::App::implementation
         std::wstring line_number_text_;
         std::wstring current_text_path_;
         bool current_text_markdown_{};
+        bool current_text_web_{};
         std::shared_ptr<glance::app::IncrementalTextReader> current_text_reader_;
         glance::app::SyntaxHighlightState syntax_highlight_state_{};
         struct TextSyntaxRange

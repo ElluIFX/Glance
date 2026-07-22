@@ -13,6 +13,7 @@ namespace glance::app
         generic,
         text,
         markdown,
+        web,
         image,
         media,
         pdf,

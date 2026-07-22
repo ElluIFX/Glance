@@ -800,7 +800,7 @@ namespace glance::app
             std::wstring_view(L".hpp"), std::wstring_view(L".cc"), std::wstring_view(L".py"),
             std::wstring_view(L".rs"), std::wstring_view(L".go"), std::wstring_view(L".java"),
             std::wstring_view(L".js"), std::wstring_view(L".ts"), std::wstring_view(L".tsx"),
-            std::wstring_view(L".jsx"), std::wstring_view(L".html"), std::wstring_view(L".css"),
+            std::wstring_view(L".jsx"), std::wstring_view(L".css"),
             std::wstring_view(L".scss"), std::wstring_view(L".sql"), std::wstring_view(L".sh"),
             std::wstring_view(L".ps1"), std::wstring_view(L".bat"), std::wstring_view(L".cmd"),
             std::wstring_view(L".cmake"), std::wstring_view(L".vcxproj"), std::wstring_view(L".sln") };
@@ -827,6 +827,16 @@ namespace glance::app
         if (extension == L".md" || extension == L".markdown")
         {
             return PreviewKind::markdown;
+        }
+        static constexpr std::array web_extensions{
+            std::wstring_view(L".html"), std::wstring_view(L".htm"),
+            std::wstring_view(L".xhtml"), std::wstring_view(L".xht"),
+            std::wstring_view(L".shtml"), std::wstring_view(L".shtm"),
+            std::wstring_view(L".mhtml"), std::wstring_view(L".mht"),
+            std::wstring_view(L".svg") };
+        if (contains(extension, web_extensions))
+        {
+            return PreviewKind::web;
         }
         if (contains(extension, text_extensions))
         {

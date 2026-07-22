@@ -175,6 +175,10 @@ namespace glance::app
             std::wstring_view(L".hpp"), std::wstring_view(L".cc") };
         static constexpr std::array markup_extensions{
             std::wstring_view(L".xml"), std::wstring_view(L".html"), std::wstring_view(L".htm"),
+            std::wstring_view(L".xhtml"), std::wstring_view(L".xht"),
+            std::wstring_view(L".shtml"), std::wstring_view(L".shtm"),
+            std::wstring_view(L".mhtml"), std::wstring_view(L".mht"),
+            std::wstring_view(L".svg"),
             std::wstring_view(L".xaml"), std::wstring_view(L".vcxproj") };
 
         const bool slash_comments = has_extension(extension, slash_comment_extensions);

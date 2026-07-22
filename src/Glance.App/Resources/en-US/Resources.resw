@@ -79,8 +79,6 @@
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>Unable to preview as text</value></data>
   <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show advanced information</value></data>
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
-  <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>Preview</value></data>
-  <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>Code</value></data>
   <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>Play or pause</value></data>
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mute or unmute</value></data>
   <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Previous page</value></data>

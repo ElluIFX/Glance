@@ -17,6 +17,8 @@ namespace
             return L"Text";
         case PreviewKind::markdown:
             return L"Markdown";
+        case PreviewKind::web:
+            return L"Web";
         case PreviewKind::image:
             return L"Image";
         case PreviewKind::media:

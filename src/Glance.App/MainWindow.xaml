@@ -740,36 +740,6 @@
                 Orientation="Horizontal"
                 Spacing="6"
                 Visibility="Collapsed">
-                <StackPanel
-                    x:Name="MarkdownModeButtons"
-                    Orientation="Horizontal"
-                    Spacing="2"
-                    Visibility="Collapsed">
-                    <ToggleButton
-                        x:Name="MarkdownPreviewButton"
-                        x:Uid="MarkdownPreviewButton"
-                        Height="24"
-                        MinWidth="54"
-                        Padding="8,0"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
-                        BorderThickness="0"
-                        Click="MarkdownPreviewButton_Click"
-                        Content="Preview"
-                        FontSize="11" />
-                    <ToggleButton
-                        x:Name="MarkdownCodeButton"
-                        x:Uid="MarkdownCodeButton"
-                        Height="24"
-                        MinWidth="42"
-                        Padding="8,0"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
-                        BorderThickness="0"
-                        Click="MarkdownCodeButton_Click"
-                        Content="Code"
-                        FontSize="11" />
-                </StackPanel>
                 <DropDownButton
                     x:Name="EncodingSelector"
                     x:Uid="EncodingSelector"
@@ -807,6 +777,34 @@
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     FontSize="11"
                     TextTrimming="CharacterEllipsis" />
+                <StackPanel
+                    x:Name="MarkdownModeButtons"
+                    Orientation="Horizontal"
+                    Spacing="2"
+                    Visibility="Collapsed">
+                    <ToggleButton
+                        x:Name="MarkdownPreviewButton"
+                        Height="24"
+                        MinWidth="54"
+                        Padding="8,0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Click="MarkdownPreviewButton_Click"
+                        Content="Preview"
+                        FontSize="11" />
+                    <ToggleButton
+                        x:Name="MarkdownCodeButton"
+                        Height="24"
+                        MinWidth="42"
+                        Padding="8,0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Click="MarkdownCodeButton_Click"
+                        Content="Code"
+                        FontSize="11" />
+                </StackPanel>
             </StackPanel>
             <ToggleButton
                 x:Name="SyntaxHighlightButton"
