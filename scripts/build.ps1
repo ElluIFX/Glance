@@ -34,6 +34,7 @@ $arguments = @(
     "/t:$target"
     "/p:Configuration=$Configuration"
     "/p:Platform=$Platform"
+    "/nr:false"
     "/v:minimal"
 )
 

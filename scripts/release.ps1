@@ -23,8 +23,8 @@ $stagingDirectory = Join-Path $artifactsDirectory "release-staging"
 $payloadDirectory = Join-Path $artifactsDirectory "package\payload"
 $symbolsDirectory = Join-Path $artifactsDirectory "package\symbols"
 
-Remove-GlanceWorkspaceItem -Path $releaseDirectory
 Remove-GlanceWorkspaceItem -Path $stagingDirectory
+Remove-GlanceWorkspaceItem -Path $releaseDirectory
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
 
@@ -67,7 +67,12 @@ $checksumLines = Get-ChildItem -LiteralPath $releaseDirectory -File |
     }
 [System.IO.File]::WriteAllLines($checksumPath, $checksumLines, [System.Text.UTF8Encoding]::new($false))
 
-Remove-GlanceWorkspaceItem -Path $stagingDirectory
+try {
+    Remove-GlanceWorkspaceItem -Path $stagingDirectory
+}
+catch {
+    Write-Warning "Release assets are complete, but temporary files could not be removed: $($_.Exception.Message)"
+}
 
 Write-Host "Release assets:"
 Get-ChildItem -LiteralPath $releaseDirectory -File | Sort-Object Name | ForEach-Object {

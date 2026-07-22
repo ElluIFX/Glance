@@ -57,8 +57,21 @@ function Remove-GlanceWorkspaceItem {
     )
 
     $resolved = Resolve-GlanceWorkspacePath -Path $Path
-    if (Test-Path -LiteralPath $resolved) {
-        Remove-Item -LiteralPath $resolved -Recurse -Force
+    if (-not (Test-Path -LiteralPath $resolved)) {
+        return
+    }
+
+    for ($attempt = 1; $attempt -le 8; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $resolved -Recurse -Force -ErrorAction Stop
+            return
+        }
+        catch {
+            if ($attempt -eq 8) {
+                throw
+            }
+            Start-Sleep -Milliseconds (250 * $attempt)
+        }
     }
 }
 
