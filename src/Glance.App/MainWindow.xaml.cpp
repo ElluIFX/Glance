@@ -998,6 +998,8 @@ namespace winrt::Glance::App::implementation
         const int work_height = info.rcWork.bottom - info.rcWork.top;
         const int maximum_width = std::max(1, static_cast<int>(std::floor(work_width * 0.75)));
         const int maximum_height = std::max(1, static_cast<int>(std::floor(work_height * 0.75)));
+        const int adaptive_minimum_width = std::max(1, static_cast<int>(std::ceil(work_width * 0.40)));
+        const int adaptive_minimum_height = std::max(1, static_cast<int>(std::ceil(work_height * 0.40)));
         const UINT dpi = GetDpiForWindow(window_);
         const int minimum_width = std::min(maximum_width, MulDiv(480, static_cast<int>(dpi), 96));
         const int minimum_height = std::min(maximum_height, MulDiv(320, static_cast<int>(dpi), 96));
@@ -1006,9 +1008,13 @@ namespace winrt::Glance::App::implementation
         const double maximum_content_height = std::max(1, maximum_height - vertical_chrome);
         const double minimum_content_width = std::max(1, minimum_width - horizontal_chrome);
         const double minimum_content_height = std::max(1, minimum_height - vertical_chrome);
-        const double lower_scale = std::max(
+        const double interface_lower_scale = std::max(
             minimum_content_width / content_width,
             minimum_content_height / content_height);
+        const double adaptive_lower_scale = std::min(
+            std::max(0, adaptive_minimum_width - horizontal_chrome) / content_width,
+            std::max(0, adaptive_minimum_height - vertical_chrome) / content_height);
+        const double lower_scale = std::max(interface_lower_scale, adaptive_lower_scale);
         const double upper_scale = std::min(
             maximum_content_width / content_width,
             maximum_content_height / content_height);
