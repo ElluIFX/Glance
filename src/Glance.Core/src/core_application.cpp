@@ -10,6 +10,8 @@
 #include <chrono>
 #include <filesystem>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <ranges>
 #include <tlhelp32.h>
 #include <wtsapi32.h>
@@ -153,6 +155,20 @@ namespace
 
 namespace glance::core
 {
+    struct SelectionWorkerContext
+    {
+        unique_handle stop_event;
+        std::atomic<HWND> window{};
+        UINT result_message{};
+        std::atomic_uint64_t generation{ 1 };
+        std::atomic_uint64_t progress_ms{};
+        std::atomic_uint64_t completed_generation{};
+        std::mutex pending_mutex;
+        std::optional<glance::contracts::SelectionSnapshot> pending_selection;
+        std::uint64_t pending_generation{};
+        std::atomic_bool message_pending{};
+    };
+
     CoreApplication::CoreApplication()
         : pipe_server_(
               [this](auto type, auto flags, auto payload) { handle_pipe_message(type, flags, payload); },
@@ -299,6 +315,7 @@ namespace glance::core
                 {
                     self->input_state_.eligible_selection.store(false, std::memory_order_release);
                 }
+                self->monitor_selection_worker();
                 return 0;
             }
             if (wparam == hook_refresh_timer_id && self->keyboard_hook_ != nullptr)
@@ -348,10 +365,13 @@ namespace glance::core
             self->apply_pending_selection();
             return 0;
         case heartbeat_message:
-            static_cast<void>(self->pipe_server_.send(
-                glance::contracts::MessageType::heartbeat_ack,
-                {},
-                static_cast<std::uint32_t>(wparam)));
+            if (self->selection_worker_healthy())
+            {
+                static_cast<void>(self->pipe_server_.send(
+                    glance::contracts::MessageType::heartbeat_ack,
+                    {},
+                    static_cast<std::uint32_t>(wparam)));
+            }
             return 0;
         case connection_changed_message:
             self->reset_app_health();
@@ -657,120 +677,231 @@ namespace glance::core
 
     bool CoreApplication::start_selection_worker()
     {
-        selection_stop_event_.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
-        if (!selection_stop_event_)
+        auto context = std::make_shared<SelectionWorkerContext>();
+        context->stop_event.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+        if (!context->stop_event)
         {
             return false;
         }
+        context->window.store(window_, std::memory_order_release);
+        context->result_message = selection_result_message;
+        context->progress_ms.store(GetTickCount64(), std::memory_order_release);
+        context->completed_generation.store(1, std::memory_order_release);
+        selection_worker_context_ = std::move(context);
+        selection_worker_last_restart_ms_ = GetTickCount64();
+        return start_selection_worker_generation();
+    }
 
+    bool CoreApplication::start_selection_worker_generation()
+    {
+        const auto context = selection_worker_context_;
+        if (!context)
+        {
+            return false;
+        }
+        const auto generation = context->generation.load(std::memory_order_acquire);
         try
         {
-            selection_worker_ = std::thread([this] {
-                const HRESULT apartment_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-                if (FAILED(apartment_result))
-                {
-                    glance::contracts::log_event(
-                        L"Selection worker COM initialization failed with HRESULT " +
-                        std::to_wstring(static_cast<unsigned long>(apartment_result)) + L".");
-                    return;
-                }
-
-                try
-                {
-                    ExplorerSelectionService selection_service;
-                    while (WaitForSingleObject(selection_stop_event_.get(), 0) == WAIT_TIMEOUT)
-                    {
-                        const auto query_started = std::chrono::steady_clock::now();
-                        auto next = selection_service.query_foreground();
-                        const auto query_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::steady_clock::now() - query_started);
-                        next.timestamp_ms = GetTickCount64();
-                        if (query_duration >= std::chrono::milliseconds(100))
-                        {
-                            glance::contracts::log_event(
-                                L"Explorer selection query took " +
-                                std::to_wstring(query_duration.count()) + L" ms.");
-                        }
-                        publish_selection(std::move(next));
-
-                        const HANDLE stop_event = selection_stop_event_.get();
-                        const DWORD wait_result = MsgWaitForMultipleObjectsEx(
-                            1,
-                            &stop_event,
-                            selection_interval_ms,
-                            QS_ALLINPUT,
-                            MWMO_INPUTAVAILABLE);
-                        if (wait_result == WAIT_OBJECT_0)
-                        {
-                            break;
-                        }
-                        if (wait_result == WAIT_OBJECT_0 + 1)
-                        {
-                            MSG message{};
-                            while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
-                            {
-                                TranslateMessage(&message);
-                                DispatchMessageW(&message);
-                            }
-                        }
-                    }
-                }
-                catch (const std::exception&)
-                {
-                    glance::contracts::log_event(L"Selection worker stopped after a standard exception.");
-                }
-                catch (...)
-                {
-                    glance::contracts::log_event(L"Selection worker stopped after an unknown exception.");
-                }
-
-                CoUninitialize();
-            });
+            selection_worker_ = std::thread(
+                &CoreApplication::run_selection_worker,
+                context,
+                generation);
         }
         catch (...)
         {
-            selection_stop_event_.reset();
             return false;
         }
         return true;
     }
 
+    void CoreApplication::run_selection_worker(
+        std::shared_ptr<SelectionWorkerContext> context,
+        std::uint64_t generation)
+    {
+        const HRESULT apartment_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        if (FAILED(apartment_result))
+        {
+            glance::contracts::log_event(
+                L"Selection worker COM initialization failed with HRESULT " +
+                std::to_wstring(static_cast<unsigned long>(apartment_result)) + L".");
+            return;
+        }
+
+        try
+        {
+            ExplorerSelectionService selection_service;
+            while (WaitForSingleObject(context->stop_event.get(), 0) == WAIT_TIMEOUT &&
+                   context->generation.load(std::memory_order_acquire) == generation)
+            {
+                const auto query_started = std::chrono::steady_clock::now();
+                auto next = selection_service.query_foreground();
+                const auto query_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - query_started);
+                if (context->generation.load(std::memory_order_acquire) != generation ||
+                    WaitForSingleObject(context->stop_event.get(), 0) != WAIT_TIMEOUT)
+                {
+                    break;
+                }
+
+                next.timestamp_ms = GetTickCount64();
+                context->progress_ms.store(next.timestamp_ms, std::memory_order_release);
+                context->completed_generation.store(generation, std::memory_order_release);
+                if (query_duration >= std::chrono::milliseconds(100))
+                {
+                    glance::contracts::log_event(
+                        L"Explorer selection query took " +
+                        std::to_wstring(query_duration.count()) + L" ms.");
+                }
+                publish_selection(context, generation, std::move(next));
+
+                const HANDLE stop_event = context->stop_event.get();
+                const DWORD wait_result = MsgWaitForMultipleObjectsEx(
+                    1,
+                    &stop_event,
+                    selection_interval_ms,
+                    QS_ALLINPUT,
+                    MWMO_INPUTAVAILABLE);
+                if (wait_result == WAIT_OBJECT_0)
+                {
+                    break;
+                }
+                if (wait_result == WAIT_OBJECT_0 + 1)
+                {
+                    MSG message{};
+                    while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+                    {
+                        TranslateMessage(&message);
+                        DispatchMessageW(&message);
+                    }
+                }
+            }
+        }
+        catch (const std::exception&)
+        {
+            if (context->generation.load(std::memory_order_acquire) == generation)
+            {
+                glance::contracts::log_event(L"Selection worker stopped after a standard exception.");
+            }
+        }
+        catch (...)
+        {
+            if (context->generation.load(std::memory_order_acquire) == generation)
+            {
+                glance::contracts::log_event(L"Selection worker stopped after an unknown exception.");
+            }
+        }
+
+        CoUninitialize();
+    }
+
+    void CoreApplication::publish_selection(
+        const std::shared_ptr<SelectionWorkerContext>& context,
+        std::uint64_t generation,
+        glance::contracts::SelectionSnapshot next)
+    {
+        {
+            const std::scoped_lock lock(context->pending_mutex);
+            if (context->generation.load(std::memory_order_acquire) != generation)
+            {
+                return;
+            }
+            context->pending_selection = std::move(next);
+            context->pending_generation = generation;
+        }
+        const HWND window = context->window.load(std::memory_order_acquire);
+        if (!context->message_pending.exchange(true, std::memory_order_acq_rel) &&
+            (window == nullptr || !PostMessageW(window, context->result_message, 0, 0)))
+        {
+            context->message_pending.store(false, std::memory_order_release);
+        }
+    }
+
     void CoreApplication::stop_selection_worker() noexcept
     {
-        if (selection_stop_event_)
+        const auto context = selection_worker_context_;
+        if (context)
         {
-            SetEvent(selection_stop_event_.get());
+            context->generation.fetch_add(1, std::memory_order_acq_rel);
+            context->window.store(nullptr, std::memory_order_release);
+            SetEvent(context->stop_event.get());
         }
         if (selection_worker_.joinable())
         {
-            selection_worker_.join();
+            selection_worker_.detach();
         }
-        selection_stop_event_.reset();
+        selection_worker_context_.reset();
     }
 
-    void CoreApplication::publish_selection(glance::contracts::SelectionSnapshot next)
+    void CoreApplication::monitor_selection_worker()
     {
+        const auto context = selection_worker_context_;
+        if (!context)
         {
-            const std::scoped_lock lock(pending_selection_mutex_);
-            pending_selection_ = std::move(next);
+            return;
         }
-        if (!selection_message_pending_.exchange(true, std::memory_order_acq_rel) &&
-            !PostMessageW(window_, selection_result_message, 0, 0))
+        const auto now = GetTickCount64();
+        const auto generation = context->generation.load(std::memory_order_acquire);
+        const auto completed_generation = context->completed_generation.load(std::memory_order_acquire);
+        const auto progress_ms = context->progress_ms.load(std::memory_order_acquire);
+        if (completed_generation == generation &&
+            progress_ms != 0 &&
+            now - progress_ms <= selection_worker_stall_after_ms)
         {
-            selection_message_pending_.store(false, std::memory_order_release);
+            return;
         }
+        if (now - selection_worker_last_restart_ms_ <= selection_worker_stall_after_ms)
+        {
+            return;
+        }
+
+        input_state_.eligible_selection.store(false, std::memory_order_release);
+        const auto replacement_generation = context->generation.fetch_add(1, std::memory_order_acq_rel) + 1;
+        if (selection_worker_.joinable())
+        {
+            selection_worker_.detach();
+        }
+        selection_worker_last_restart_ms_ = now;
+        glance::contracts::log_event(
+            L"Selection worker stalled; starting replacement generation " +
+            std::to_wstring(replacement_generation) + L".");
+        if (!start_selection_worker_generation())
+        {
+            glance::contracts::log_event(L"Failed to start the replacement selection worker.");
+        }
+    }
+
+    bool CoreApplication::selection_worker_healthy() const noexcept
+    {
+        const auto context = selection_worker_context_;
+        if (!context)
+        {
+            return false;
+        }
+        const auto generation = context->generation.load(std::memory_order_acquire);
+        const auto completed_generation = context->completed_generation.load(std::memory_order_acquire);
+        const auto progress_ms = context->progress_ms.load(std::memory_order_acquire);
+        return completed_generation == generation &&
+            progress_ms != 0 &&
+            GetTickCount64() - progress_ms <= selection_worker_stall_after_ms;
     }
 
     void CoreApplication::apply_pending_selection()
     {
-        std::optional<glance::contracts::SelectionSnapshot> next;
+        const auto context = selection_worker_context_;
+        if (!context)
         {
-            const std::scoped_lock lock(pending_selection_mutex_);
-            next = std::move(pending_selection_);
-            pending_selection_.reset();
-            selection_message_pending_.store(false, std::memory_order_release);
+            return;
         }
-        if (next)
+        std::optional<glance::contracts::SelectionSnapshot> next;
+        std::uint64_t generation{};
+        {
+            const std::scoped_lock lock(context->pending_mutex);
+            next = std::move(context->pending_selection);
+            context->pending_selection.reset();
+            generation = context->pending_generation;
+            context->message_pending.store(false, std::memory_order_release);
+        }
+        if (next && generation == context->generation.load(std::memory_order_acquire))
         {
             apply_selection(std::move(*next));
         }
