@@ -5,12 +5,13 @@
     <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</ProjectGuid>
-    <RootNamespace>Glance.Contracts</RootNamespace>
+    <ProjectGuid>{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}</ProjectGuid>
+    <RootNamespace>Glance.RenderHost</RootNamespace>
+    <ProjectName>Glance.RenderHost</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
     <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
@@ -18,19 +19,23 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\Glance.Contracts\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="include\glance\contracts\file_descriptor.h" />
-    <ClInclude Include="include\glance\contracts\diagnostics.h" />
-    <ClInclude Include="include\glance\contracts\ipc_protocol.h" />
-    <ClInclude Include="include\glance\contracts\pdf_render_protocol.h" />
-    <ClInclude Include="include\glance\contracts\preview_state.h" />
+    <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\contracts.cpp" />
-    <ClCompile Include="src\diagnostics.cpp" />
+    <Manifest Include="app.manifest" />
+    <ResourceCompile Include="..\version.rc">
+      <PreprocessorDefinitions>GLANCE_BINARY_KIND=5;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="bblanchon.PDFium.Win32" Version="152.0.7961" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

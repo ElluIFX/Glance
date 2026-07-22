@@ -28,8 +28,12 @@
   <data name="ImageDecodeError" xml:space="preserve"><value>无法解码图像。{0}</value></data>
   <data name="MediaOpenError" xml:space="preserve"><value>无法打开媒体文件。{0}</value></data>
   <data name="PdfEmptyError" xml:space="preserve"><value>PDF 中没有页面。</value></data>
-  <data name="PdfOpenError" xml:space="preserve"><value>无法打开 PDF。不支持受保护的 PDF 文件。</value></data>
-  <data name="PdfRenderError" xml:space="preserve"><value>无法渲染 PDF 页面。{0}</value></data>
+  <data name="PdfOpenError" xml:space="preserve"><value>无法打开 PDF。</value></data>
+  <data name="PdfComponentMissingError" xml:space="preserve"><value>PDF 渲染组件不可用。</value></data>
+  <data name="PdfRenderError" xml:space="preserve"><value>无法渲染 PDF 页面。</value></data>
+  <data name="PdfRenderErrorDetail" xml:space="preserve"><value>无法渲染 PDF 页面。{0}</value></data>
+  <data name="PasswordPromptTitle" xml:space="preserve"><value>输入文件密码</value></data>
+  <data name="PasswordIncorrect" xml:space="preserve"><value>密码错误。</value></data>
   <data name="OfficeConvertError" xml:space="preserve"><value>Microsoft Office 无法将此文档转换为 PDF。</value></data>
   <data name="CloudLoadError" xml:space="preserve"><value>无法加载文件。错误 {0}。</value></data>
   <data name="TextFileOpenError" xml:space="preserve"><value>无法打开文件。</value></data>
@@ -80,6 +84,10 @@
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>静音或取消静音</value></data>
   <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>上一页</value></data>
   <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>下一页</value></data>
+  <data name="PdfThumbnailsButton.ToolTipService.ToolTip" xml:space="preserve"><value>缩略图</value></data>
+  <data name="PdfOutlineButton.ToolTipService.ToolTip" xml:space="preserve"><value>章节目录</value></data>
+  <data name="PasswordPromptInput.PlaceholderText" xml:space="preserve"><value>密码</value></data>
+  <data name="PasswordPromptSubmitButton.Content" xml:space="preserve"><value>打开</value></data>
   <data name="ArchiveNameHeader.Text" xml:space="preserve"><value>名称</value></data>
   <data name="ArchiveTypeHeader.Text" xml:space="preserve"><value>类型</value></data>
   <data name="ArchiveModifiedHeader.Text" xml:space="preserve"><value>修改日期</value></data>

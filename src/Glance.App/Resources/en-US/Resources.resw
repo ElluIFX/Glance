@@ -28,8 +28,12 @@
   <data name="ImageDecodeError" xml:space="preserve"><value>The image could not be decoded. {0}</value></data>
   <data name="MediaOpenError" xml:space="preserve"><value>The media file could not be opened. {0}</value></data>
   <data name="PdfEmptyError" xml:space="preserve"><value>The PDF contains no pages.</value></data>
-  <data name="PdfOpenError" xml:space="preserve"><value>The PDF could not be opened. Protected PDF files are not supported.</value></data>
-  <data name="PdfRenderError" xml:space="preserve"><value>The PDF page could not be rendered. {0}</value></data>
+  <data name="PdfOpenError" xml:space="preserve"><value>The PDF could not be opened.</value></data>
+  <data name="PdfComponentMissingError" xml:space="preserve"><value>The PDF rendering component is unavailable.</value></data>
+  <data name="PdfRenderError" xml:space="preserve"><value>The PDF page could not be rendered.</value></data>
+  <data name="PdfRenderErrorDetail" xml:space="preserve"><value>The PDF page could not be rendered. {0}</value></data>
+  <data name="PasswordPromptTitle" xml:space="preserve"><value>Enter the file password</value></data>
+  <data name="PasswordIncorrect" xml:space="preserve"><value>Incorrect password.</value></data>
   <data name="OfficeConvertError" xml:space="preserve"><value>Microsoft Office could not convert this document to PDF.</value></data>
   <data name="CloudLoadError" xml:space="preserve"><value>The file could not be loaded. Error {0}.</value></data>
   <data name="TextFileOpenError" xml:space="preserve"><value>The file could not be opened.</value></data>
@@ -80,6 +84,10 @@
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mute or unmute</value></data>
   <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Previous page</value></data>
   <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Next page</value></data>
+  <data name="PdfThumbnailsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Thumbnails</value></data>
+  <data name="PdfOutlineButton.ToolTipService.ToolTip" xml:space="preserve"><value>Outline</value></data>
+  <data name="PasswordPromptInput.PlaceholderText" xml:space="preserve"><value>Password</value></data>
+  <data name="PasswordPromptSubmitButton.Content" xml:space="preserve"><value>Open</value></data>
   <data name="ArchiveNameHeader.Text" xml:space="preserve"><value>Name</value></data>
   <data name="ArchiveTypeHeader.Text" xml:space="preserve"><value>Type</value></data>
   <data name="ArchiveModifiedHeader.Text" xml:space="preserve"><value>Modified</value></data>

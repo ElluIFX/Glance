@@ -4,6 +4,7 @@
 #include "localization.h"
 #include "MainWindow.xaml.h"
 #include "office_availability.h"
+#include "pdf_render_client.h"
 #include "SettingsWindow.xaml.h"
 #include "startup_registration.h"
 #include "glance/contracts/diagnostics.h"
@@ -173,6 +174,9 @@ namespace winrt::Glance::App::implementation
 
     void App::OnLaunched(LaunchActivatedEventArgs const&)
     {
+#if defined _DEBUG
+        std::wstring debug_preview_path;
+#endif
         for (const auto& argument : command_line_arguments())
         {
             if (argument == L"--set-startup=enabled")
@@ -188,6 +192,13 @@ namespace winrt::Glance::App::implementation
                 const auto path = executable_path();
                 ExitProcess(!path.empty() && glance::app::cleanup_launch_at_sign_in(path) ? 0 : 1);
             }
+#if defined _DEBUG
+            constexpr std::wstring_view debug_preview_prefix = L"--debug-preview=";
+            if (argument.starts_with(debug_preview_prefix))
+            {
+                debug_preview_path = argument.substr(debug_preview_prefix.size());
+            }
+#endif
         }
 
         glance::contracts::initialize_diagnostics(L"Glance.App");
@@ -208,8 +219,41 @@ namespace winrt::Glance::App::implementation
         glance::app::apply_ui_language(appearance.language);
         glance::app::apply_accent_resources(appearance);
         glance::app::initialize_office_availability();
+        glance::app::prewarm_pdf_render_client();
         glance::contracts::log_event(L"Creating the initial preview window.");
         create_active_window();
+#if defined _DEBUG
+        if (!debug_preview_path.empty())
+        {
+            WIN32_FILE_ATTRIBUTE_DATA data{};
+            if (GetFileAttributesExW(
+                    debug_preview_path.c_str(),
+                    GetFileExInfoStandard,
+                    &data))
+            {
+                glance::app::PreviewFile file;
+                file.path = debug_preview_path;
+                file.parsing_name = debug_preview_path;
+                file.display_name = std::filesystem::path(debug_preview_path).filename().wstring();
+                file.size =
+                    (static_cast<std::uint64_t>(data.nFileSizeHigh) << 32U) |
+                    data.nFileSizeLow;
+                file.creation_time =
+                    (static_cast<std::uint64_t>(data.ftCreationTime.dwHighDateTime) << 32U) |
+                    data.ftCreationTime.dwLowDateTime;
+                file.last_write_time =
+                    (static_cast<std::uint64_t>(data.ftLastWriteTime.dwHighDateTime) << 32U) |
+                    data.ftLastWriteTime.dwLowDateTime;
+                file.attributes = data.dwFileAttributes;
+                file.is_filesystem = true;
+                get_self<implementation::MainWindow>(active_window_)->ShowPreview(
+                    { std::move(file) },
+                    0,
+                    0,
+                    nullptr);
+            }
+        }
+#endif
         glance::contracts::log_event(L"Creating the notification area icon.");
         tray_icon_ = std::make_unique<glance::app::TrayIcon>();
         if (!tray_icon_->create(

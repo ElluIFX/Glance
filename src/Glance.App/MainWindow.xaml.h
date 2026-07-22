@@ -10,6 +10,7 @@
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
+#include "pdf_render_client.h"
 #include "shell_icon_provider.h"
 #include "syntax_highlighter.h"
 #include "text_preferences.h"
@@ -121,6 +122,16 @@ namespace winrt::Glance::App::implementation
             Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const&);
         void PreviousPdfPageButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void NextPdfPageButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void PdfThumbnailsButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void PdfOutlineButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void PdfThumbnailList_SelectionChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+        void PdfOutlineEntry_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void PasswordPromptSubmitButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void PasswordPromptInput_KeyDown(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const&);
         void FileList_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
@@ -149,6 +160,7 @@ namespace winrt::Glance::App::implementation
         void save_current_window_placement() const noexcept;
         void clear_preview_content();
         void cancel_office_conversion() noexcept;
+        void cancel_pdf_render() noexcept;
         void reset_hidden_window_size() noexcept;
         void present_file(std::uint32_t index);
         void present_generic(
@@ -179,9 +191,37 @@ namespace winrt::Glance::App::implementation
             std::uint64_t generation,
             bool audio,
             std::uint64_t fallback_bitrate);
-        winrt::fire_and_forget load_pdf_async(std::wstring path, std::uint64_t generation);
+        winrt::fire_and_forget load_pdf_async(
+            std::wstring path,
+            std::uint64_t generation,
+            std::wstring password = {});
         winrt::fire_and_forget render_pdf_page_async(std::uint32_t page_index, std::uint64_t generation);
-        winrt::fire_and_forget load_archive_async(std::wstring path, std::uint64_t generation);
+        winrt::fire_and_forget load_pdf_thumbnails_async(std::uint64_t generation);
+        void apply_pdf_open_result(
+            std::shared_ptr<glance::app::PdfRenderClient> session,
+            glance::app::PdfOpenResult result,
+            std::wstring path,
+            std::wstring password,
+            std::uint64_t generation);
+        void build_pdf_navigation(std::uint64_t generation);
+        void append_pdf_thumbnail_batch(std::uint64_t generation);
+        void show_pdf_navigation(bool thumbnails);
+        void sync_pdf_thumbnail_selection();
+        void navigate_to_pdf_page(std::uint32_t page_index);
+        enum class PasswordPromptTarget
+        {
+            none,
+            pdf,
+            archive,
+        };
+        void show_password_prompt(PasswordPromptTarget target, bool invalid_password);
+        void hide_password_prompt();
+        void set_password_prompt_activation(bool enabled) noexcept;
+        void submit_password();
+        winrt::fire_and_forget load_archive_async(
+            std::wstring path,
+            std::uint64_t generation,
+            std::wstring password = {});
         winrt::fire_and_forget load_directory_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_office_async(
             std::wstring path,
@@ -344,6 +384,10 @@ namespace winrt::Glance::App::implementation
         std::shared_ptr<ArchiveRenderState> archive_render_state_;
         bool archive_preview_is_directory_{};
         bool archive_entry_compressed_size_available_{};
+        std::wstring archive_source_path_;
+        std::wstring archive_password_;
+        PasswordPromptTarget password_prompt_target_{ PasswordPromptTarget::none };
+        bool password_prompt_activation_enabled_{};
         std::wstring footer_access_mode_;
         bool footer_access_loaded_{};
         bool footer_access_requested_{};
@@ -366,8 +410,16 @@ namespace winrt::Glance::App::implementation
         std::wstring office_cache_source_path_;
         std::uint64_t office_cache_source_size_{};
         std::uint64_t office_cache_source_modified_time_{};
-        Windows::Data::Pdf::PdfDocument pdf_document_{ nullptr };
+        std::shared_ptr<glance::app::PdfRenderClient> pdf_render_client_;
+        std::wstring pdf_source_path_;
+        std::wstring pdf_password_;
+        std::vector<glance::app::PdfOutlineEntry> pdf_outline_;
+        std::vector<winrt::weak_ref<Microsoft::UI::Xaml::Controls::Image>> pdf_thumbnail_images_;
+        std::uint32_t pdf_page_count_{};
+        std::uint32_t pdf_thumbnail_items_built_{};
+        bool pdf_thumbnail_selection_updating_{};
         std::uint32_t pdf_page_index_{};
+        std::atomic_uint64_t pdf_render_request_{};
         int pdf_wheel_delta_{};
         int text_font_wheel_delta_{};
         int media_seek_wheel_delta_{};

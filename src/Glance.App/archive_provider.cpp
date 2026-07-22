@@ -429,8 +429,14 @@ namespace glance::app
             return !needs_original_size && !needs_compressed_size;
         }
 
+        bool verify_zip_password(
+            const std::wstring& path,
+            const std::wstring& entry_name,
+            const std::wstring& password);
+
         ArchivePreview load_zip_archive_preview(
             const std::wstring& path,
+            const std::wstring& password,
             std::size_t maximum_entries)
         {
             ArchivePreview result;
@@ -550,6 +556,7 @@ namespace glance::app
 
             std::size_t cursor = static_cast<std::size_t>(central_offset);
             const std::size_t central_end = cursor + static_cast<std::size_t>(central_size);
+            std::wstring encrypted_entry;
             for (std::uint64_t index = 0; index < entry_count; ++index)
             {
                 if (cursor + 46 > central_end || read_uint32(data + cursor) != central_entry_signature)
@@ -600,6 +607,14 @@ namespace glance::app
                 {
                     name.pop_back();
                 }
+                if (!is_folder && (flags & 1U) != 0)
+                {
+                    result.encrypted = true;
+                    if (encrypted_entry.empty())
+                    {
+                        encrypted_entry = name;
+                    }
+                }
                 if (!is_folder)
                 {
                     record_archive_file(result, original_size, true);
@@ -615,6 +630,22 @@ namespace glance::app
                     original_size,
                     !is_folder));
                 cursor += record_size;
+            }
+
+            if (result.encrypted)
+            {
+                if (password.empty())
+                {
+                    result.password_required = true;
+                    result.entries.clear();
+                    return result;
+                }
+                if (encrypted_entry.empty() || !verify_zip_password(path, encrypted_entry, password))
+                {
+                    result.invalid_password = true;
+                    result.entries.clear();
+                    return result;
+                }
             }
 
             sort_archive_tree(result.entries);
@@ -709,6 +740,73 @@ namespace glance::app
                        nullptr) != 0
                 ? std::wstring(executable)
                 : std::wstring{};
+        }
+
+        bool verify_zip_password(
+            const std::wstring& path,
+            const std::wstring& entry_name,
+            const std::wstring& password)
+        {
+            const auto executable = find_tar_executable();
+            if (executable.empty())
+            {
+                return false;
+            }
+            SECURITY_ATTRIBUTES security{ sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
+            unique_handle null_input(CreateFileW(
+                L"NUL",
+                GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                &security,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                nullptr));
+            unique_handle null_output(CreateFileW(
+                L"NUL",
+                GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                &security,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                nullptr));
+            if (!null_input.valid() || !null_output.valid())
+            {
+                return false;
+            }
+            std::wstring command = quote_argument(executable) + L" --passphrase " +
+                quote_argument(password) + L" -xOf " + quote_argument(path) + L" " +
+                quote_argument(entry_name);
+            STARTUPINFOW startup{ sizeof(STARTUPINFOW) };
+            startup.dwFlags = STARTF_USESTDHANDLES;
+            startup.hStdInput = null_input.get();
+            startup.hStdOutput = null_output.get();
+            startup.hStdError = null_output.get();
+            PROCESS_INFORMATION process{};
+            if (!CreateProcessW(
+                    executable.c_str(),
+                    command.data(),
+                    nullptr,
+                    nullptr,
+                    TRUE,
+                    CREATE_NO_WINDOW,
+                    nullptr,
+                    nullptr,
+                    &startup,
+                    &process))
+            {
+                return false;
+            }
+            CloseHandle(process.hThread);
+            const DWORD wait = WaitForSingleObject(process.hProcess, 5000);
+            if (wait == WAIT_TIMEOUT)
+            {
+                TerminateProcess(process.hProcess, ERROR_TIMEOUT);
+                WaitForSingleObject(process.hProcess, 1000);
+            }
+            DWORD exit_code{ ERROR_GEN_FAILURE };
+            static_cast<void>(GetExitCodeProcess(process.hProcess, &exit_code));
+            CloseHandle(process.hProcess);
+            return wait == WAIT_OBJECT_0 && exit_code == ERROR_SUCCESS;
         }
 
         ProcessOutput run_tar_listing(std::wstring_view path)
@@ -1078,7 +1176,10 @@ namespace glance::app
         }
     }
 
-    ArchivePreview load_archive_preview(const std::wstring& path, std::size_t maximum_entries)
+    ArchivePreview load_archive_preview(
+        const std::wstring& path,
+        const std::wstring& password,
+        std::size_t maximum_entries)
     {
         auto extension = std::filesystem::path(path).extension().wstring();
         std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
@@ -1086,8 +1187,8 @@ namespace glance::app
         });
         if (extension == L".zip")
         {
-            auto zip_preview = load_zip_archive_preview(path, maximum_entries);
-            if (zip_preview.error.empty())
+            auto zip_preview = load_zip_archive_preview(path, password, maximum_entries);
+            if (zip_preview.error.empty() || zip_preview.password_required || zip_preview.invalid_password)
             {
                 return zip_preview;
             }

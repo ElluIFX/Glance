@@ -46,6 +46,10 @@ using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
+    struct __declspec(uuid("905a0fef-bc53-11df-8c49-001e4fc686da")) BufferByteAccess : IUnknown
+    {
+        virtual HRESULT STDMETHODCALLTYPE Buffer(byte** value) = 0;
+    };
     constexpr std::size_t text_chunk_bytes = 256U * 1024U;
     constexpr std::size_t long_text_render_threshold = 256U * 1024U;
     constexpr std::uint64_t automatic_syntax_highlight_limit_bytes = 64ULL * 1024ULL;
@@ -164,6 +168,28 @@ namespace
         const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
         path.resize(length);
         return std::filesystem::path(path).parent_path();
+    }
+
+    Microsoft::UI::Xaml::Media::Imaging::WriteableBitmap create_pdf_bitmap(
+        const glance::app::PdfRenderResult& rendered)
+    {
+        Microsoft::UI::Xaml::Media::Imaging::WriteableBitmap bitmap(
+            static_cast<std::int32_t>(rendered.pixel_width),
+            static_cast<std::int32_t>(rendered.pixel_height));
+        auto access = bitmap.PixelBuffer().as<BufferByteAccess>();
+        byte* destination{};
+        winrt::check_hresult(access->Buffer(&destination));
+        const std::size_t destination_stride =
+            static_cast<std::size_t>(rendered.pixel_width) * 4U;
+        for (std::uint32_t row = 0; row < rendered.pixel_height; ++row)
+        {
+            std::memcpy(
+                destination + static_cast<std::size_t>(row) * destination_stride,
+                rendered.pixels.data() + static_cast<std::size_t>(row) * rendered.stride,
+                destination_stride);
+        }
+        bitmap.Invalidate();
+        return bitmap;
     }
 
     std::wstring quote_command_line_argument(std::wstring_view value)
@@ -390,6 +416,13 @@ namespace winrt::Glance::App::implementation
         set_tooltip(MediaMuteButton(), L"MediaMuteButton.ToolTipService.ToolTip");
         set_tooltip(PreviousPdfButton(), L"PreviousPdfButton.ToolTipService.ToolTip");
         set_tooltip(NextPdfButton(), L"NextPdfButton.ToolTipService.ToolTip");
+        set_tooltip(PdfThumbnailsButton(), L"PdfThumbnailsButton.ToolTipService.ToolTip");
+        set_tooltip(PdfOutlineButton(), L"PdfOutlineButton.ToolTipService.ToolTip");
+        PasswordPromptTitle().Text(glance::app::localize(L"PasswordPromptTitle"));
+        PasswordPromptInput().PlaceholderText(
+            glance::app::localize(L"PasswordPromptInput.PlaceholderText"));
+        PasswordPromptSubmitButton().Content(
+            box_value(glance::app::localize(L"PasswordPromptSubmitButton.Content")));
         update_archive_header_state();
         MarkdownPreviewButton().Content(box_value(glance::app::localize(L"MarkdownPreviewButton.Content")));
         MarkdownCodeButton().Content(box_value(glance::app::localize(L"MarkdownCodeButton.Content")));
@@ -557,7 +590,10 @@ namespace winrt::Glance::App::implementation
         auto* self = reinterpret_cast<MainWindow*>(reference_data);
         if (message == WM_MOUSEACTIVATE)
         {
-            return MA_NOACTIVATE;
+            if (self == nullptr || !self->password_prompt_activation_enabled_)
+            {
+                return MA_NOACTIVATE;
+            }
         }
         if (message == WM_GETMINMAXINFO)
         {
@@ -682,6 +718,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::clear_preview_content()
     {
         cancel_office_conversion();
+        cancel_pdf_render();
         ++content_generation_;
         stop_media_playback();
 
@@ -696,7 +733,9 @@ namespace winrt::Glance::App::implementation
         PdfPageImage().Source(nullptr);
         PdfLoadingOverlay().Visibility(Visibility::Collapsed);
         PdfPageText().Text(L"");
-        pdf_document_ = nullptr;
+        PdfThumbnailList().Items().Clear();
+        PdfOutlineTree().RootNodes().Clear();
+        hide_password_prompt();
         MarkdownPreviewWebView().Opacity(0.0);
         MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
         TextContentRichText().Blocks().Clear();
@@ -713,6 +752,8 @@ namespace winrt::Glance::App::implementation
         archive_render_state_.reset();
         archive_preview_is_directory_ = false;
         archive_entry_compressed_size_available_ = false;
+        archive_source_path_.clear();
+        archive_password_.clear();
         update_archive_header_state();
         ArchiveEntryTree().RootNodes().Clear();
         FolderEntryList().Items().Clear();
@@ -791,6 +832,12 @@ namespace winrt::Glance::App::implementation
         image_pixel_width_ = 0;
         image_pixel_height_ = 0;
         pdf_page_index_ = 0;
+        pdf_page_count_ = 0;
+        pdf_thumbnail_items_built_ = 0;
+        pdf_source_path_.clear();
+        pdf_password_.clear();
+        pdf_outline_.clear();
+        pdf_thumbnail_images_.clear();
         pdf_wheel_delta_ = 0;
 
     }
@@ -801,6 +848,15 @@ namespace winrt::Glance::App::implementation
         {
             office_conversion_->cancel();
             office_conversion_.reset();
+        }
+    }
+
+    void MainWindow::cancel_pdf_render() noexcept
+    {
+        if (pdf_render_client_ != nullptr)
+        {
+            pdf_render_client_->cancel();
+            pdf_render_client_.reset();
         }
     }
 
@@ -921,7 +977,14 @@ namespace winrt::Glance::App::implementation
                 : PdfPanel().as<FrameworkElement>();
         const int current_width = bounds.right - bounds.left;
         const int current_height = bounds.bottom - bounds.top;
-        const int horizontal_chrome = std::max(0, current_width - static_cast<int>(std::lround(panel.ActualWidth())));
+        int horizontal_chrome = std::max(
+            0,
+            current_width - static_cast<int>(std::lround(panel.ActualWidth())));
+        if (current_kind_ == glance::app::PreviewKind::pdf ||
+            current_kind_ == glance::app::PreviewKind::office)
+        {
+            horizontal_chrome += static_cast<int>(std::lround(PdfNavigationColumn().ActualWidth()));
+        }
         const int vertical_chrome = std::max(0, current_height - static_cast<int>(std::lround(panel.ActualHeight())));
         const int work_width = info.rcWork.right - info.rcWork.left;
         const int work_height = info.rcWork.bottom - info.rcWork.top;
@@ -1006,6 +1069,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
         cancel_office_conversion();
+        hide_password_prompt();
         current_index_ = index;
         basic_info_mode_ = false;
         content_preview_kind_ = glance::app::PreviewKind::generic;
@@ -1135,7 +1199,7 @@ namespace winrt::Glance::App::implementation
             break;
         case glance::app::PreviewKind::office:
             show_content_panel(glance::app::PreviewKind::pdf);
-            pdf_document_ = nullptr;
+            cancel_pdf_render();
             PdfPageImage().Source(nullptr);
             pdf_wheel_delta_ = 0;
             PdfPageText().Text(L"1 / 1");
@@ -1656,32 +1720,83 @@ namespace winrt::Glance::App::implementation
         load_footer_access_async(file.path, content_generation_);
     }
 
-    fire_and_forget MainWindow::load_pdf_async(std::wstring path, std::uint64_t generation)
+    fire_and_forget MainWindow::load_pdf_async(
+        std::wstring path,
+        std::uint64_t generation,
+        std::wstring password)
     {
         const auto lifetime = get_strong();
-        try
+        const auto dispatcher = DispatcherQueue();
+        cancel_pdf_render();
+        auto session = glance::app::acquire_pdf_render_client();
+        pdf_render_client_ = session;
+        pdf_source_path_ = path;
+        pdf_password_ = password;
+        co_await resume_background();
+        auto result = session->open(path, password);
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            session,
+            result = std::move(result),
+            path = std::move(path),
+            password = std::move(password),
+            generation]() mutable {
+            lifetime->apply_pdf_open_result(
+                std::move(session),
+                std::move(result),
+                std::move(path),
+                std::move(password),
+                generation);
+        }));
+    }
+
+    void MainWindow::apply_pdf_open_result(
+        std::shared_ptr<glance::app::PdfRenderClient> session,
+        glance::app::PdfOpenResult result,
+        std::wstring path,
+        std::wstring password,
+        std::uint64_t generation)
+    {
+        using glance::contracts::pdf::Status;
+        glance::contracts::log_event(
+            L"PDF open completed: status=" +
+            std::to_wstring(static_cast<std::uint32_t>(result.status)) +
+            L", pages=" + std::to_wstring(result.page_count));
+        if (generation != content_generation_ || session != pdf_render_client_)
         {
-            const auto file = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
-            const auto document = co_await Windows::Data::Pdf::PdfDocument::LoadFromFileAsync(file);
-            if (generation != content_generation_)
-            {
-                co_return;
-            }
-            pdf_document_ = document;
-            pdf_page_index_ = 0;
-            if (document.PageCount() == 0)
-            {
-                show_provider_error(glance::app::localize(L"PdfEmptyError"), generation);
-                co_return;
-            }
-            render_pdf_page_async(pdf_page_index_, generation);
+            session->cancel();
+            return;
         }
-        catch (const hresult_error&)
+        if (result.status == Status::password_required || result.status == Status::invalid_password)
+        {
+            PdfLoadingOverlay().Visibility(Visibility::Collapsed);
+            pdf_source_path_ = std::move(path);
+            pdf_password_ = std::move(password);
+            show_password_prompt(
+                PasswordPromptTarget::pdf,
+                result.status == Status::invalid_password);
+            return;
+        }
+        if (result.status != Status::success)
         {
             show_provider_error(
-                glance::app::localize(L"PdfOpenError"),
+                result.status == Status::dependency_missing
+                    ? glance::app::localize(L"PdfComponentMissingError")
+                    : glance::app::localize(L"PdfOpenError"),
                 generation);
+            return;
         }
+        if (result.page_count == 0)
+        {
+            show_provider_error(glance::app::localize(L"PdfEmptyError"), generation);
+            return;
+        }
+        hide_password_prompt();
+        pdf_page_count_ = result.page_count;
+        pdf_outline_ = std::move(result.outline);
+        pdf_page_index_ = 0;
+        render_pdf_page_async(pdf_page_index_, generation);
+        build_pdf_navigation(generation);
     }
 
     fire_and_forget MainWindow::render_pdf_page_async(
@@ -1689,45 +1804,138 @@ namespace winrt::Glance::App::implementation
         std::uint64_t generation)
     {
         const auto lifetime = get_strong();
-        try
+        const auto dispatcher = DispatcherQueue();
+        const auto session = pdf_render_client_;
+        const auto request = pdf_render_request_.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (session == nullptr || page_index >= pdf_page_count_)
         {
-            if (pdf_document_ == nullptr || page_index >= pdf_document_.PageCount())
-            {
-                co_return;
-            }
-            const auto page = pdf_document_.GetPage(page_index);
-            const auto dimensions = page.Dimensions().CropBox();
-            Windows::Storage::Streams::InMemoryRandomAccessStream stream;
-            co_await page.RenderToStreamAsync(stream);
-            stream.Seek(0);
-            Microsoft::UI::Xaml::Media::Imaging::BitmapImage bitmap;
-            co_await bitmap.SetSourceAsync(stream);
-            if (generation != content_generation_ || page_index != pdf_page_index_)
-            {
-                co_return;
-            }
-            PdfPageImage().Source(bitmap);
-            PdfLoadingOverlay().Visibility(Visibility::Collapsed);
-            PdfPageText().Text(
-                std::to_wstring(page_index + 1) + L" / " + std::to_wstring(pdf_document_.PageCount()));
-            auto_fit_window_to_content(dimensions.Width, dimensions.Height);
+            co_return;
         }
-        catch (const hresult_error& error)
+        PdfLoadingOverlay().Visibility(Visibility::Visible);
+        const auto width = static_cast<std::uint32_t>(std::clamp(
+            std::lround(std::max(512.0, PdfScroller().ActualWidth()) * 2.0),
+            1024L,
+            4096L));
+        const auto height = static_cast<std::uint32_t>(std::clamp(
+            std::lround(std::max(512.0, PdfScroller().ActualHeight()) * 2.0),
+            1024L,
+            4096L));
+        co_await resume_background();
+        if (request != pdf_render_request_.load(std::memory_order_relaxed))
         {
-            show_provider_error(
-                glance::app::localize_format(L"PdfRenderError", { error.message() }),
-                generation);
+            co_return;
         }
+        auto rendered = session->render(page_index, width, height);
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            session,
+            rendered = std::move(rendered),
+            page_index,
+            request,
+            generation]() mutable {
+            using glance::contracts::pdf::Status;
+            if (generation != lifetime->content_generation_ ||
+                session != lifetime->pdf_render_client_ ||
+                page_index != lifetime->pdf_page_index_ ||
+                request != lifetime->pdf_render_request_.load(std::memory_order_relaxed))
+            {
+                return;
+            }
+            if (rendered.status != Status::success)
+            {
+                lifetime->show_provider_error(
+                    glance::app::localize(L"PdfRenderError"),
+                    generation);
+                return;
+            }
+            try
+            {
+                lifetime->PdfPageImage().Source(create_pdf_bitmap(rendered));
+                lifetime->PdfLoadingOverlay().Visibility(Visibility::Collapsed);
+                lifetime->PdfPageText().Text(
+                    std::to_wstring(page_index + 1) + L" / " +
+                    std::to_wstring(lifetime->pdf_page_count_));
+                lifetime->sync_pdf_thumbnail_selection();
+                lifetime->auto_fit_window_to_content(
+                    rendered.page_width_points,
+                    rendered.page_height_points);
+            }
+            catch (const hresult_error& error)
+            {
+                lifetime->show_provider_error(
+                    glance::app::localize_format(L"PdfRenderErrorDetail", { error.message() }),
+                    generation);
+            }
+        }));
     }
 
-    fire_and_forget MainWindow::load_archive_async(std::wstring path, std::uint64_t generation)
+    fire_and_forget MainWindow::load_pdf_thumbnails_async(std::uint64_t generation)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
+        const auto session = pdf_render_client_;
+        const auto page_count = pdf_page_count_;
         co_await resume_background();
-        auto preview = glance::app::load_archive_preview(path);
-        static_cast<void>(dispatcher.TryEnqueue(
-            [lifetime, preview = std::move(preview), generation]() mutable {
+        for (std::uint32_t page = 0; page < page_count; ++page)
+        {
+            auto rendered = session->render(page, 176, 132);
+            if (rendered.status != glance::contracts::pdf::Status::success)
+            {
+                co_return;
+            }
+            if (!dispatcher.TryEnqueue([
+                    lifetime,
+                    session,
+                    rendered = std::move(rendered),
+                    page,
+                    generation]() mutable {
+                    if (generation != lifetime->content_generation_ ||
+                        session != lifetime->pdf_render_client_ ||
+                        page >= lifetime->pdf_thumbnail_images_.size())
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        if (auto image = lifetime->pdf_thumbnail_images_[page].get())
+                        {
+                            image.Source(create_pdf_bitmap(rendered));
+                        }
+                    }
+                    catch (...)
+                    {
+                    }
+                }))
+            {
+                co_return;
+            }
+            co_await resume_after(std::chrono::milliseconds(8));
+        }
+    }
+
+    fire_and_forget MainWindow::load_archive_async(
+        std::wstring path,
+        std::uint64_t generation,
+        std::wstring password)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        archive_source_path_ = path;
+        archive_password_ = password;
+        co_await resume_background();
+        auto preview = glance::app::load_archive_preview(path, password);
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            preview = std::move(preview),
+            path = std::move(path),
+            password = std::move(password),
+            generation]() mutable {
+                if (generation != lifetime->content_generation_)
+                {
+                    return;
+                }
+                lifetime->archive_source_path_ = std::move(path);
+                lifetime->archive_password_ = std::move(password);
                 lifetime->apply_archive_preview(std::move(preview), generation);
             }));
     }
@@ -1750,6 +1958,13 @@ namespace winrt::Glance::App::implementation
     {
         if (generation != content_generation_)
         {
+            return;
+        }
+        if (preview.password_required || preview.invalid_password)
+        {
+            show_password_prompt(
+                PasswordPromptTarget::archive,
+                preview.invalid_password);
             return;
         }
         if (!preview.error.empty())
@@ -3132,8 +3347,9 @@ namespace winrt::Glance::App::implementation
         }
         if (kind != glance::app::PreviewKind::pdf)
         {
-            pdf_document_ = nullptr;
+            cancel_pdf_render();
             PdfPageImage().Source(nullptr);
+            hide_password_prompt();
         }
     }
 
@@ -4084,22 +4300,290 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::PreviousPdfPageButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        if (pdf_document_ == nullptr || pdf_page_index_ == 0)
+        if (pdf_render_client_ == nullptr || pdf_page_index_ == 0)
         {
             return;
         }
-        --pdf_page_index_;
-        render_pdf_page_async(pdf_page_index_, content_generation_);
+        navigate_to_pdf_page(pdf_page_index_ - 1);
     }
 
     void MainWindow::NextPdfPageButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        if (pdf_document_ == nullptr || pdf_page_index_ + 1 >= pdf_document_.PageCount())
+        if (pdf_render_client_ == nullptr || pdf_page_index_ + 1 >= pdf_page_count_)
         {
             return;
         }
-        ++pdf_page_index_;
-        render_pdf_page_async(pdf_page_index_, content_generation_);
+        navigate_to_pdf_page(pdf_page_index_ + 1);
+    }
+
+    void MainWindow::PdfThumbnailsButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        show_pdf_navigation(true);
+    }
+
+    void MainWindow::PdfOutlineButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        show_pdf_navigation(false);
+    }
+
+    void MainWindow::PdfThumbnailList_SelectionChanged(
+        IInspectable const&,
+        SelectionChangedEventArgs const&)
+    {
+        if (pdf_thumbnail_selection_updating_ || PdfThumbnailList().SelectedIndex() < 0)
+        {
+            return;
+        }
+        navigate_to_pdf_page(static_cast<std::uint32_t>(PdfThumbnailList().SelectedIndex()));
+    }
+
+    void MainWindow::PdfOutlineEntry_Click(IInspectable const& sender, RoutedEventArgs const&)
+    {
+        const auto button = sender.try_as<Button>();
+        if (button == nullptr || button.Tag() == nullptr)
+        {
+            return;
+        }
+        navigate_to_pdf_page(unbox_value<std::uint32_t>(button.Tag()));
+    }
+
+    void MainWindow::PasswordPromptSubmitButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        submit_password();
+    }
+
+    void MainWindow::PasswordPromptInput_KeyDown(IInspectable const&, KeyRoutedEventArgs const& args)
+    {
+        if (args.Key() == Windows::System::VirtualKey::Enter)
+        {
+            args.Handled(true);
+            submit_password();
+        }
+    }
+
+    void MainWindow::show_pdf_navigation(bool thumbnails)
+    {
+        const bool show_outline = !thumbnails && !pdf_outline_.empty();
+        PdfThumbnailsButton().IsChecked(!show_outline);
+        PdfOutlineButton().IsChecked(show_outline);
+        PdfThumbnailList().Visibility(show_outline ? Visibility::Collapsed : Visibility::Visible);
+        PdfOutlineTree().Visibility(show_outline ? Visibility::Visible : Visibility::Collapsed);
+        if (!show_outline)
+        {
+            sync_pdf_thumbnail_selection();
+        }
+    }
+
+    void MainWindow::sync_pdf_thumbnail_selection()
+    {
+        const auto items = PdfThumbnailList().Items();
+        if (pdf_page_index_ >= items.Size())
+        {
+            return;
+        }
+        pdf_thumbnail_selection_updating_ = true;
+        PdfThumbnailList().SelectedIndex(static_cast<std::int32_t>(pdf_page_index_));
+        pdf_thumbnail_selection_updating_ = false;
+        PdfThumbnailList().ScrollIntoView(items.GetAt(pdf_page_index_));
+    }
+
+    void MainWindow::build_pdf_navigation(std::uint64_t generation)
+    {
+        pdf_thumbnail_selection_updating_ = true;
+        PdfThumbnailList().Items().Clear();
+        PdfOutlineTree().RootNodes().Clear();
+        pdf_thumbnail_images_.clear();
+        pdf_thumbnail_images_.reserve(pdf_page_count_);
+        pdf_thumbnail_items_built_ = 0;
+        pdf_thumbnail_selection_updating_ = false;
+
+        std::vector<TreeViewNode> parents;
+        for (const auto& outline : pdf_outline_)
+        {
+            Button button;
+            button.HorizontalAlignment(HorizontalAlignment::Stretch);
+            button.HorizontalContentAlignment(HorizontalAlignment::Left);
+            button.Background(nullptr);
+            button.BorderThickness(Thickness{ 0 });
+            button.Padding(Thickness{ 4, 2, 4, 2 });
+            button.IsEnabled(outline.page_index >= 0 &&
+                static_cast<std::uint32_t>(outline.page_index) < pdf_page_count_);
+            if (button.IsEnabled())
+            {
+                button.Tag(box_value(static_cast<std::uint32_t>(outline.page_index)));
+                button.Click({ this, &MainWindow::PdfOutlineEntry_Click });
+            }
+            TextBlock text;
+            text.Text(outline.title);
+            text.TextTrimming(TextTrimming::CharacterEllipsis);
+            button.Content(text);
+            TreeViewNode node;
+            node.Content(button);
+            const std::size_t depth = std::min<std::size_t>(outline.depth, parents.size());
+            if (depth == 0)
+            {
+                PdfOutlineTree().RootNodes().Append(node);
+            }
+            else
+            {
+                parents[depth - 1].Children().Append(node);
+            }
+            if (parents.size() > depth)
+            {
+                parents.resize(depth);
+            }
+            parents.push_back(node);
+        }
+        PdfOutlineButton().IsEnabled(!pdf_outline_.empty());
+        show_pdf_navigation(true);
+        append_pdf_thumbnail_batch(generation);
+    }
+
+    void MainWindow::append_pdf_thumbnail_batch(std::uint64_t generation)
+    {
+        if (generation != content_generation_ || pdf_render_client_ == nullptr)
+        {
+            return;
+        }
+        constexpr std::uint32_t batch_size = 64;
+        const auto end = pdf_thumbnail_items_built_ +
+            std::min(batch_size, pdf_page_count_ - pdf_thumbnail_items_built_);
+        for (std::uint32_t page = pdf_thumbnail_items_built_; page < end; ++page)
+        {
+            StackPanel content;
+            content.Spacing(4);
+            Image image;
+            image.Width(176);
+            image.Height(132);
+            image.Stretch(Microsoft::UI::Xaml::Media::Stretch::Uniform);
+            Border frame;
+            frame.Height(136);
+            frame.Padding(Thickness{ 2 });
+            frame.Child(image);
+            TextBlock label;
+            label.Text(std::to_wstring(page + 1));
+            label.FontSize(11);
+            label.TextAlignment(TextAlignment::Center);
+            content.Children().Append(frame);
+            content.Children().Append(label);
+            ListViewItem item;
+            item.Tag(box_value(page));
+            item.Content(content);
+            PdfThumbnailList().Items().Append(item);
+            pdf_thumbnail_images_.push_back(make_weak(image));
+        }
+        pdf_thumbnail_items_built_ = end;
+        if (end < pdf_page_count_)
+        {
+            const auto weak = get_weak();
+            static_cast<void>(DispatcherQueue().TryEnqueue([weak, generation] {
+                if (const auto self = weak.get())
+                {
+                    self->append_pdf_thumbnail_batch(generation);
+                }
+            }));
+            return;
+        }
+        sync_pdf_thumbnail_selection();
+        load_pdf_thumbnails_async(generation);
+    }
+
+    void MainWindow::navigate_to_pdf_page(std::uint32_t page_index)
+    {
+        if (pdf_render_client_ == nullptr || page_index >= pdf_page_count_ ||
+            page_index == pdf_page_index_)
+        {
+            return;
+        }
+        pdf_page_index_ = page_index;
+        static_cast<void>(PdfScroller().ChangeView(nullptr, nullptr, 1.0F, true));
+        render_pdf_page_async(page_index, content_generation_);
+    }
+
+    void MainWindow::show_password_prompt(
+        PasswordPromptTarget target,
+        bool invalid_password)
+    {
+        password_prompt_target_ = target;
+        PasswordPromptTitle().Text(glance::app::localize(L"PasswordPromptTitle"));
+        PasswordPromptError().Text(
+            invalid_password ? glance::app::localize(L"PasswordIncorrect") : L"");
+        PasswordPromptError().Visibility(
+            invalid_password ? Visibility::Visible : Visibility::Collapsed);
+        PasswordPromptInput().Password(L"");
+        set_password_prompt_activation(true);
+        PasswordPromptOverlay().Visibility(Visibility::Visible);
+        if (GetForegroundWindow() == window_)
+        {
+            PasswordPromptInput().Focus(FocusState::Programmatic);
+        }
+    }
+
+    void MainWindow::hide_password_prompt()
+    {
+        password_prompt_target_ = PasswordPromptTarget::none;
+        PasswordPromptInput().Password(L"");
+        PasswordPromptError().Text(L"");
+        PasswordPromptError().Visibility(Visibility::Collapsed);
+        PasswordPromptOverlay().Visibility(Visibility::Collapsed);
+        set_password_prompt_activation(false);
+        if (GetForegroundWindow() == window_ && IsWindow(source_window_))
+        {
+            SetForegroundWindow(source_window_);
+        }
+    }
+
+    void MainWindow::set_password_prompt_activation(bool enabled) noexcept
+    {
+        if (window_ == nullptr || password_prompt_activation_enabled_ == enabled)
+        {
+            return;
+        }
+        auto extended_style = GetWindowLongPtrW(window_, GWL_EXSTYLE);
+        if (enabled)
+        {
+            extended_style &= ~static_cast<LONG_PTR>(WS_EX_NOACTIVATE);
+        }
+        else
+        {
+            extended_style |= WS_EX_NOACTIVATE;
+        }
+        SetWindowLongPtrW(window_, GWL_EXSTYLE, extended_style);
+        SetWindowPos(
+            window_,
+            nullptr,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER |
+                SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        password_prompt_activation_enabled_ = enabled;
+    }
+
+    void MainWindow::submit_password()
+    {
+        if (PasswordPromptOverlay().Visibility() != Visibility::Visible)
+        {
+            return;
+        }
+        const auto target = password_prompt_target_;
+        const std::wstring password = PasswordPromptInput().Password().c_str();
+        PasswordPromptSubmitButton().IsEnabled(false);
+        PasswordPromptError().Visibility(Visibility::Collapsed);
+        hide_password_prompt();
+        PasswordPromptSubmitButton().IsEnabled(true);
+        if (target == PasswordPromptTarget::pdf && !pdf_source_path_.empty())
+        {
+            PdfLoadingText().Text(glance::app::localize(L"LoadingPdf"));
+            PdfLoadingOverlay().Visibility(Visibility::Visible);
+            load_pdf_async(pdf_source_path_, content_generation_, password);
+        }
+        else if (target == PasswordPromptTarget::archive && !archive_source_path_.empty())
+        {
+            ArchiveStatusText().Text(glance::app::localize(L"LoadingArchive"));
+            load_archive_async(archive_source_path_, content_generation_, password);
+        }
     }
 
     void MainWindow::PdfScroller_PointerWheelChanged(
@@ -4111,7 +4595,7 @@ namespace winrt::Glance::App::implementation
             pdf_wheel_delta_ = 0;
             return;
         }
-        if (PdfScroller().ZoomFactor() > 1.001F || pdf_document_ == nullptr)
+        if (PdfScroller().ZoomFactor() > 1.001F || pdf_render_client_ == nullptr)
         {
             pdf_wheel_delta_ = 0;
             return;
@@ -4122,13 +4606,11 @@ namespace winrt::Glance::App::implementation
         {
             if (pdf_wheel_delta_ > 0 && pdf_page_index_ > 0)
             {
-                --pdf_page_index_;
-                render_pdf_page_async(pdf_page_index_, content_generation_);
+                navigate_to_pdf_page(pdf_page_index_ - 1);
             }
-            else if (pdf_wheel_delta_ < 0 && pdf_page_index_ + 1 < pdf_document_.PageCount())
+            else if (pdf_wheel_delta_ < 0 && pdf_page_index_ + 1 < pdf_page_count_)
             {
-                ++pdf_page_index_;
-                render_pdf_page_async(pdf_page_index_, content_generation_);
+                navigate_to_pdf_page(pdf_page_index_ + 1);
             }
             pdf_wheel_delta_ = 0;
         }

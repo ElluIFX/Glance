@@ -34,6 +34,9 @@ namespace glance::app
         bool compressed_size_known{};
         bool original_size_known{};
         bool entry_compressed_size_available{};
+        bool encrypted{};
+        bool password_required{};
+        bool invalid_password{};
         bool truncated{};
         bool entry_limit_reached{};
         bool depth_limited{};
@@ -41,6 +44,7 @@ namespace glance::app
 
     [[nodiscard]] ArchivePreview load_archive_preview(
         const std::wstring& path,
+        const std::wstring& password = {},
         std::size_t maximum_entries = maximum_preview_entries);
     [[nodiscard]] ArchivePreview load_shell_archive_preview(
         const std::wstring& path,

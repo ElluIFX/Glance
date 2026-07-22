@@ -1,0 +1,12 @@
+PDFium binary distribution notice
+
+Glance uses the PDFium native library for PDF parsing and rendering.
+
+Package: bblanchon.PDFium.Win32
+Package version: 152.0.7961
+Upstream binary revision: Chromium 7961
+Binary distribution source: https://github.com/bblanchon/pdfium-binaries
+PDFium source: https://pdfium.googlesource.com/pdfium/
+
+The binary distribution license and the licenses for PDFium and its bundled
+third-party components are installed in the licenses/PDFium directory.

@@ -456,8 +456,74 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="38" />
                     </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="PdfNavigationColumn" Width="220" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid
+                        x:Name="PdfNavigationPanel"
+                        Grid.RowSpan="2"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,0,1,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="40" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel
+                            Margin="8,6"
+                            HorizontalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="2">
+                            <ToggleButton
+                                x:Name="PdfThumbnailsButton"
+                                x:Uid="PdfThumbnailsButton"
+                                Style="{StaticResource IconToggleButtonStyle}"
+                                IsChecked="True"
+                                Click="PdfThumbnailsButton_Click"
+                                ToolTipService.ToolTip="Thumbnails">
+                                <FontIcon FontSize="14" Glyph="&#xE8A9;" />
+                            </ToggleButton>
+                            <ToggleButton
+                                x:Name="PdfOutlineButton"
+                                x:Uid="PdfOutlineButton"
+                                Style="{StaticResource IconToggleButtonStyle}"
+                                Click="PdfOutlineButton_Click"
+                                ToolTipService.ToolTip="Outline">
+                                <FontIcon FontSize="14" Glyph="&#xE8FD;" />
+                            </ToggleButton>
+                        </StackPanel>
+                        <ListView
+                            x:Name="PdfThumbnailList"
+                            Grid.Row="1"
+                            Padding="6"
+                            SelectionChanged="PdfThumbnailList_SelectionChanged"
+                            SelectionMode="Single">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="4" />
+                                    <Setter Property="Margin" Value="0,0,0,4" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                        </ListView>
+                        <TreeView
+                            x:Name="PdfOutlineTree"
+                            Grid.Row="1"
+                            Margin="4"
+                            CanDragItems="False"
+                            CanReorderItems="False"
+                            SelectionMode="None"
+                            Visibility="Collapsed">
+                            <TreeView.ItemTemplate>
+                                <DataTemplate>
+                                    <ContentPresenter Content="{Binding Content}" />
+                                </DataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </Grid>
                     <ScrollViewer
                         x:Name="PdfScroller"
+                        Grid.Column="1"
                         Grid.Row="0"
                         HorizontalScrollBarVisibility="Auto"
                         HorizontalScrollMode="Enabled"
@@ -475,6 +541,7 @@
                     </ScrollViewer>
                     <StackPanel
                         x:Name="PdfLoadingOverlay"
+                        Grid.Column="1"
                         Grid.Row="0"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
@@ -487,6 +554,7 @@
                             TextAlignment="Center" />
                     </StackPanel>
                     <StackPanel
+                        Grid.Column="1"
                         Grid.Row="1"
                         HorizontalAlignment="Center"
                         Orientation="Horizontal"
@@ -607,6 +675,44 @@
                             </Style>
                         </TreeView.ItemContainerStyle>
                     </TreeView>
+                </Grid>
+
+                <Grid
+                    x:Name="PasswordPromptOverlay"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                    Visibility="Collapsed">
+                    <StackPanel
+                        Width="320"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="10">
+                        <FontIcon
+                            HorizontalAlignment="Center"
+                            FontSize="32"
+                            Glyph="&#xE72E;" />
+                        <TextBlock
+                            x:Name="PasswordPromptTitle"
+                            FontSize="16"
+                            FontWeight="SemiBold"
+                            TextAlignment="Center" />
+                        <PasswordBox
+                            x:Name="PasswordPromptInput"
+                            x:Uid="PasswordPromptInput"
+                            KeyDown="PasswordPromptInput_KeyDown"
+                            PlaceholderText="Password" />
+                        <TextBlock
+                            x:Name="PasswordPromptError"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
+                        <Button
+                            x:Name="PasswordPromptSubmitButton"
+                            x:Uid="PasswordPromptSubmitButton"
+                            HorizontalAlignment="Stretch"
+                            Click="PasswordPromptSubmitButton_Click"
+                            Content="Open" />
+                    </StackPanel>
                 </Grid>
             </Grid>
         </Grid>
@@ -793,25 +899,25 @@
                 <FontIcon x:Name="CopyPathIcon" FontSize="14" Glyph="&#xE8C8;" />
             </Button>
             <Button
+                x:Name="OpenFolderButton"
+                x:Uid="OpenFolderButton"
+                Grid.Column="6"
+                Style="{StaticResource IconButtonStyle}"
+                Margin="4,0,0,0"
+                Click="OpenFolderButton_Click"
+                ToolTipService.ToolTip="Open containing folder">
+                <FontIcon FontSize="14" Glyph="&#xE838;" />
+            </Button>
+            <Button
                 x:Name="OpenDefaultButton"
                 x:Uid="OpenDefaultButton"
-                Grid.Column="6"
+                Grid.Column="7"
                 Style="{StaticResource IconButtonStyle}"
                 Margin="4,0,0,0"
                 Click="OpenDefaultButton_Click"
                 RightTapped="OpenDefaultButton_RightTapped"
                 ToolTipService.ToolTip="Open file">
                 <FontIcon FontSize="14" Glyph="&#xE7C3;" />
-            </Button>
-            <Button
-                x:Name="OpenFolderButton"
-                x:Uid="OpenFolderButton"
-                Grid.Column="7"
-                Style="{StaticResource IconButtonStyle}"
-                Margin="4,0,0,0"
-                Click="OpenFolderButton_Click"
-                ToolTipService.ToolTip="Open containing folder">
-                <FontIcon FontSize="14" Glyph="&#xE838;" />
             </Button>
         </Grid>
 

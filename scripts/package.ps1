@@ -60,6 +60,8 @@ $requiredFiles = @(
     "Glance.DialogHook.dll",
     "Glance.DialogHook32.dll",
     "Glance.OfficeHost.exe",
+    "Glance.RenderHost.exe",
+    "pdfium.dll",
     "Glance.pri",
     "App.xbf",
     "MainWindow.xbf",
@@ -78,6 +80,14 @@ $developmentArtifacts = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -F
 foreach ($artifact in $developmentArtifacts) {
     Remove-GlanceWorkspaceItem -Path $artifact.FullName
 }
+
+$pdfiumLicenseSource = Join-Path $repositoryRoot "licenses\PDFium"
+$pdfiumLicenseDestination = Join-Path $payloadDirectory "licenses\PDFium"
+New-Item -ItemType Directory -Path $pdfiumLicenseDestination -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\PDFium-NOTICE.txt") `
+    -Destination (Join-Path $payloadDirectory "licenses\PDFium-NOTICE.txt") -Force
+Copy-Item -Path (Join-Path $pdfiumLicenseSource "*") `
+    -Destination $pdfiumLicenseDestination -Force
 
 $forbiddenRuntimeFiles = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File | Where-Object {
     $_.Name -in @(
