@@ -47,6 +47,10 @@
   <data name="UnknownTime" xml:space="preserve"><value>Unknown time</value></data>
   <data name="CoreRunning" xml:space="preserve"><value>Running</value></data>
   <data name="CoreNotRunning" xml:space="preserve"><value>Not running</value></data>
+  <data name="MediaComponentsAvailable" xml:space="preserve"><value>ffprobe available</value></data>
+  <data name="MediaComponentsUnavailable" xml:space="preserve"><value>ffprobe not found</value></data>
+  <data name="AdministratorAccessAvailable" xml:space="preserve"><value>Acquired</value></data>
+  <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>Not acquired</value></data>
   <data name="SizesReset" xml:space="preserve"><value>Saved sizes reset</value></data>
   <data name="SizesResetFailed" xml:space="preserve"><value>Could not reset saved sizes</value></data>
 
@@ -104,7 +108,8 @@
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>Maintenance</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>Runtime status and saved application state</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>Input core</value></data>
-  <data name="RefreshCoreButton.ToolTipService.ToolTip" xml:space="preserve"><value>Refresh status</value></data>
+  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Media components</value></data>
+  <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>Administrator access</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>Diagnostic package</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>Export</value></data>
   <data name="DiagnosticBundleDescription" xml:space="preserve"><value>Package all diagnostic logs and crash dumps</value></data>

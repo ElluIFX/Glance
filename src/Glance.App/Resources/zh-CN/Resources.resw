@@ -47,6 +47,10 @@
   <data name="UnknownTime" xml:space="preserve"><value>未知时间</value></data>
   <data name="CoreRunning" xml:space="preserve"><value>正在运行</value></data>
   <data name="CoreNotRunning" xml:space="preserve"><value>未运行</value></data>
+  <data name="MediaComponentsAvailable" xml:space="preserve"><value>ffprobe 可用</value></data>
+  <data name="MediaComponentsUnavailable" xml:space="preserve"><value>未检测到 ffprobe</value></data>
+  <data name="AdministratorAccessAvailable" xml:space="preserve"><value>已获取</value></data>
+  <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>未获取</value></data>
   <data name="SizesReset" xml:space="preserve"><value>已重置保存的窗口尺寸</value></data>
   <data name="SizesResetFailed" xml:space="preserve"><value>无法重置保存的窗口尺寸</value></data>
 
@@ -104,7 +108,8 @@
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>维护</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态和已保存的应用状态</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>输入核心</value></data>
-  <data name="RefreshCoreButton.ToolTipService.ToolTip" xml:space="preserve"><value>刷新状态</value></data>
+  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>媒体组件</value></data>
+  <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>管理员权限</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>诊断包</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>导出</value></data>
   <data name="DiagnosticBundleDescription" xml:space="preserve"><value>打包全部诊断日志和崩溃转储</value></data>

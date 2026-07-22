@@ -18,6 +18,7 @@ namespace glance::app
     [[nodiscard]] MediaTechnicalMetadata probe_media_metadata(
         std::wstring_view path,
         bool audio) noexcept;
+    [[nodiscard]] bool media_probe_available() noexcept;
     [[nodiscard]] std::wstring format_media_metadata(
         const MediaTechnicalMetadata& metadata,
         bool audio);

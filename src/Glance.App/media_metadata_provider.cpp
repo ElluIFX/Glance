@@ -220,6 +220,18 @@ namespace
 
 namespace glance::app
 {
+    bool media_probe_available() noexcept
+    {
+        try
+        {
+            return !ffprobe_candidates().empty();
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+
     MediaTechnicalMetadata probe_media_metadata(std::wstring_view path, bool audio) noexcept
     {
         MediaTechnicalMetadata result;

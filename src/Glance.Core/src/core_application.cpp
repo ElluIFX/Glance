@@ -12,6 +12,28 @@
 #include <ranges>
 #include <wtsapi32.h>
 
+namespace
+{
+    bool process_is_elevated() noexcept
+    {
+        HANDLE raw_token{};
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &raw_token))
+        {
+            return false;
+        }
+        glance::core::unique_handle token(raw_token);
+        TOKEN_ELEVATION elevation{};
+        DWORD returned_size{};
+        return GetTokenInformation(
+                   token.get(),
+                   TokenElevation,
+                   &elevation,
+                   sizeof(elevation),
+                   &returned_size) != FALSE &&
+            elevation.TokenIsElevated != 0;
+    }
+}
+
 namespace glance::core
 {
     CoreApplication::CoreApplication()
@@ -43,6 +65,13 @@ namespace glance::core
         if (!single_instance_mutex_ || GetLastError() == ERROR_ALREADY_EXISTS)
         {
             return 0;
+        }
+        if (process_is_elevated())
+        {
+            elevated_status_mutex_.reset(CreateMutexW(
+                nullptr,
+                FALSE,
+                L"Local\\Glance.Core.Elevated"));
         }
 
         winrt::init_apartment(winrt::apartment_type::single_threaded);

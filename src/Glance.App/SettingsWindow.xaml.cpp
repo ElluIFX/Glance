@@ -2,6 +2,7 @@
 #include "SettingsWindow.xaml.h"
 #include "appearance_preferences.h"
 #include "localization.h"
+#include "media_metadata_provider.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "startup_registration.h"
@@ -26,6 +27,7 @@
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
 namespace Controls = Microsoft::UI::Xaml::Controls;
+namespace Media = Microsoft::UI::Xaml::Media;
 
 namespace
 {
@@ -153,6 +155,34 @@ namespace
         }
         return { true, output_path.wstring() };
     }
+
+    bool named_mutex_exists(const wchar_t* name) noexcept
+    {
+        const HANDLE mutex = OpenMutexW(SYNCHRONIZE, FALSE, name);
+        if (mutex == nullptr)
+        {
+            return false;
+        }
+        CloseHandle(mutex);
+        return true;
+    }
+
+    void set_status_indicator(
+        const Controls::FontIcon& icon,
+        const Controls::TextBlock& text,
+        bool available,
+        const wchar_t* available_resource,
+        const wchar_t* unavailable_resource)
+    {
+        const auto status = glance::app::localize(
+            available ? available_resource : unavailable_resource);
+        text.Text(status);
+        icon.Glyph(available ? L"\xE8FB" : L"\xE711");
+        icon.Foreground(Media::SolidColorBrush(available
+            ? Windows::UI::Color{ 255, 16, 124, 16 }
+            : Windows::UI::Color{ 255, 196, 43, 28 }));
+        Controls::ToolTipService::SetToolTip(icon, box_value(status));
+    }
 }
 
 namespace winrt::Glance::App::implementation
@@ -204,7 +234,6 @@ namespace winrt::Glance::App::implementation
         QuoteCopiedPathToggle().IsOn(path_copy_preferences_.quote_path);
         UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
         initializing_ = false;
-        refresh_core_status();
         refresh_diagnostic_bundle_status();
     }
 
@@ -326,9 +355,8 @@ namespace winrt::Glance::App::implementation
         set_text(MaintenancePageTitle(), L"MaintenancePageTitle.Text");
         set_text(MaintenancePageDescription(), L"MaintenancePageDescription.Text");
         set_text(InputCoreLabel(), L"InputCoreLabel.Text");
-        Controls::ToolTipService::SetToolTip(
-            RefreshCoreButton(),
-            box_value(glance::app::localize(L"RefreshCoreButton.ToolTipService.ToolTip")));
+        set_text(MediaComponentsLabel(), L"MediaComponentsLabel.Text");
+        set_text(AdministratorAccessLabel(), L"AdministratorAccessLabel.Text");
         set_text(DiagnosticBundleLabel(), L"DiagnosticBundleLabel.Text");
         set_content(ExportDiagnosticBundleButton(), L"ExportDiagnosticBundleButton.Content");
         refresh_diagnostic_bundle_status();
@@ -339,7 +367,7 @@ namespace winrt::Glance::App::implementation
         set_content(AboutProjectLink(), L"AboutProjectLink.Content");
         AboutVersionText().Text(glance::app::localize_format(
             L"VersionFormat", { GLANCE_VERSION_WSTRING }));
-        refresh_core_status();
+        refresh_runtime_statuses();
     }
 
     bool SettingsWindow::launch_at_sign_in_enabled() const
@@ -358,15 +386,27 @@ namespace winrt::Glance::App::implementation
         initializing_ = false;
     }
 
-    void SettingsWindow::refresh_core_status()
+    void SettingsWindow::refresh_runtime_statuses()
     {
-        HANDLE mutex = OpenMutexW(SYNCHRONIZE, FALSE, L"Local\\Glance.Core");
-        CoreStatusText().Text(glance::app::localize(
-            mutex != nullptr ? L"CoreRunning" : L"CoreNotRunning"));
-        if (mutex != nullptr)
-        {
-            CloseHandle(mutex);
-        }
+        const bool core_running = named_mutex_exists(L"Local\\Glance.Core");
+        set_status_indicator(
+            CoreStatusIcon(),
+            CoreStatusText(),
+            core_running,
+            L"CoreRunning",
+            L"CoreNotRunning");
+        set_status_indicator(
+            MediaComponentsStatusIcon(),
+            MediaComponentsStatusText(),
+            glance::app::media_probe_available(),
+            L"MediaComponentsAvailable",
+            L"MediaComponentsUnavailable");
+        set_status_indicator(
+            AdministratorAccessStatusIcon(),
+            AdministratorAccessStatusText(),
+            core_running && named_mutex_exists(L"Local\\Glance.Core.Elevated"),
+            L"AdministratorAccessAvailable",
+            L"AdministratorAccessUnavailable");
     }
 
     void SettingsWindow::refresh_diagnostic_bundle_status()
@@ -411,11 +451,6 @@ namespace winrt::Glance::App::implementation
         {
             glance::app::set_auto_fit_window_size_enabled(AutoFitWindowSizeToggle().IsOn());
         }
-    }
-
-    void SettingsWindow::RefreshCoreStatusButton_Click(IInspectable const&, RoutedEventArgs const&)
-    {
-        refresh_core_status();
     }
 
     fire_and_forget SettingsWindow::ExportDiagnosticBundleButton_Click(
@@ -583,6 +618,10 @@ namespace winrt::Glance::App::implementation
         PathCopySettingsPanel().Visibility(tag == L"path" ? Visibility::Visible : Visibility::Collapsed);
         MaintenanceSettingsPanel().Visibility(tag == L"maintenance" ? Visibility::Visible : Visibility::Collapsed);
         AboutSettingsPanel().Visibility(tag == L"about" ? Visibility::Visible : Visibility::Collapsed);
+        if (tag == L"maintenance")
+        {
+            refresh_runtime_statuses();
+        }
     }
 
     fire_and_forget SettingsWindow::ExitButton_Click(IInspectable const&, RoutedEventArgs const&)

@@ -57,6 +57,7 @@ namespace glance::core
 
         HWND window_{};
         unique_handle single_instance_mutex_;
+        unique_handle elevated_status_mutex_;
         unique_handle parent_process_;
         InputDecisionState input_state_;
         glance::contracts::SelectionSnapshot selection_;

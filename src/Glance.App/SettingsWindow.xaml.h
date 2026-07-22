@@ -33,9 +33,6 @@ namespace winrt::Glance::App::implementation
         void AutoFitWindowSizeToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void RefreshCoreStatusButton_Click(
-            IInspectable const&,
-            Microsoft::UI::Xaml::RoutedEventArgs const&);
         winrt::fire_and_forget ExportDiagnosticBundleButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -73,7 +70,7 @@ namespace winrt::Glance::App::implementation
         };
 
         void configure_window();
-        void refresh_core_status();
+        void refresh_runtime_statuses();
         void refresh_diagnostic_bundle_status();
         [[nodiscard]] bool launch_at_sign_in_enabled() const;
         void set_launch_at_sign_in(bool enabled);
