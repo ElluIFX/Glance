@@ -301,6 +301,8 @@ namespace winrt::Glance::App::implementation
         void update_line_number_visibility();
         void show_content_panel(glance::app::PreviewKind kind);
         void dismiss_preview_info_bar();
+        void show_preview_notice(std::wstring resource_key);
+        void animate_preview_info_bar(bool opening);
         void show_syntax_highlight_disabled_notice();
         void show_text_preview_error(std::wstring message);
         void show_provider_error(std::wstring message, std::uint64_t generation);
@@ -453,8 +455,11 @@ namespace winrt::Glance::App::implementation
         Microsoft::UI::Xaml::DispatcherTimer copy_feedback_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer font_size_overlay_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_timer_{ nullptr };
+        Microsoft::UI::Xaml::DispatcherTimer preview_notice_hide_timer_{ nullptr };
         bool syntax_highlight_notice_pending_{};
         bool preview_notice_active_{};
+        bool preview_notice_hiding_{};
+        std::wstring preview_notice_resource_key_;
         glance::app::PreviewKind current_kind_{ glance::app::PreviewKind::generic };
         glance::app::PreviewKind content_preview_kind_{ glance::app::PreviewKind::generic };
         bool basic_info_mode_{};

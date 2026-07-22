@@ -405,8 +405,7 @@ namespace winrt::Glance::App::implementation
         PreviewAsTextText().Text(glance::app::localize(L"PreviewAsTextText.Text"));
         if (preview_notice_active_)
         {
-            PreviewErrorInfoBar().Message(
-                glance::app::localize(L"SyntaxHighlightDisabledLargeFile"));
+            PreviewErrorInfoBar().Message(glance::app::localize(preview_notice_resource_key_));
         }
         else
         {
@@ -3701,42 +3700,108 @@ namespace winrt::Glance::App::implementation
     {
         syntax_highlight_notice_pending_ = false;
         preview_notice_active_ = false;
+        preview_notice_hiding_ = false;
+        preview_notice_resource_key_.clear();
         if (preview_notice_timer_ != nullptr)
         {
             preview_notice_timer_.Stop();
         }
+        if (preview_notice_hide_timer_ != nullptr)
+        {
+            preview_notice_hide_timer_.Stop();
+        }
+        const auto visual = Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
+            PreviewErrorInfoBar());
+        visual.StopAnimation(L"Opacity");
+        visual.Opacity(1.0F);
         PreviewErrorInfoBar().IsOpen(false);
     }
 
-    void MainWindow::show_syntax_highlight_disabled_notice()
+    void MainWindow::show_preview_notice(std::wstring resource_key)
     {
-        if (preview_notice_timer_ != nullptr)
-        {
-            preview_notice_timer_.Stop();
-        }
-        PreviewErrorInfoBar().IsOpen(false);
+        dismiss_preview_info_bar();
         preview_notice_active_ = true;
+        preview_notice_resource_key_ = std::move(resource_key);
         PreviewErrorInfoBar().Title(L"");
-        PreviewErrorInfoBar().Message(
-            glance::app::localize(L"SyntaxHighlightDisabledLargeFile"));
+        PreviewErrorInfoBar().Message(glance::app::localize(preview_notice_resource_key_));
         PreviewErrorInfoBar().Severity(InfoBarSeverity::Informational);
         PreviewErrorInfoBar().IsClosable(false);
         PreviewErrorInfoBar().IsOpen(true);
+        animate_preview_info_bar(true);
         if (preview_notice_timer_ == nullptr)
         {
             preview_notice_timer_ = DispatcherTimer();
-            preview_notice_timer_.Interval(std::chrono::seconds(3));
+            preview_notice_timer_.Interval(std::chrono::milliseconds(2880));
             const auto weak = get_weak();
             preview_notice_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
                 if (const auto self = weak.get())
                 {
                     self->preview_notice_timer_.Stop();
+                    if (!self->preview_notice_active_)
+                    {
+                        return;
+                    }
+                    self->preview_notice_hiding_ = true;
+                    self->animate_preview_info_bar(false);
+                    self->preview_notice_hide_timer_.Start();
+                }
+            });
+        }
+        if (preview_notice_hide_timer_ == nullptr)
+        {
+            preview_notice_hide_timer_ = DispatcherTimer();
+            preview_notice_hide_timer_.Interval(std::chrono::milliseconds(120));
+            const auto weak = get_weak();
+            preview_notice_hide_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+                if (const auto self = weak.get())
+                {
+                    self->preview_notice_hide_timer_.Stop();
+                    if (!self->preview_notice_hiding_)
+                    {
+                        return;
+                    }
                     self->preview_notice_active_ = false;
+                    self->preview_notice_hiding_ = false;
+                    self->preview_notice_resource_key_.clear();
                     self->PreviewErrorInfoBar().IsOpen(false);
+                    const auto visual =
+                        Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
+                            self->PreviewErrorInfoBar());
+                    visual.StopAnimation(L"Opacity");
+                    visual.Opacity(1.0F);
                 }
             });
         }
         preview_notice_timer_.Start();
+    }
+
+    void MainWindow::animate_preview_info_bar(bool opening)
+    {
+        const auto visual = Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
+            PreviewErrorInfoBar());
+        const auto compositor = visual.Compositor();
+        visual.StopAnimation(L"Opacity");
+        visual.Opacity(opening ? 1.0F : 0.0F);
+
+        const auto animation = compositor.CreateScalarKeyFrameAnimation();
+        animation.Duration(opening
+            ? std::chrono::milliseconds(140)
+            : std::chrono::milliseconds(120));
+        const auto easing = compositor.CreateCubicBezierEasingFunction(
+            opening
+                ? Windows::Foundation::Numerics::float2{ 0.16F, 1.0F }
+                : Windows::Foundation::Numerics::float2{ 0.70F, 0.0F },
+            opening
+                ? Windows::Foundation::Numerics::float2{ 0.30F, 1.0F }
+                : Windows::Foundation::Numerics::float2{ 0.84F, 0.0F });
+        animation.InsertKeyFrame(0.0F, opening ? 0.0F : 1.0F);
+        animation.InsertKeyFrame(1.0F, opening ? 1.0F : 0.0F, easing);
+        visual.StartAnimation(L"Opacity", animation);
+    }
+
+    void MainWindow::show_syntax_highlight_disabled_notice()
+    {
+        show_preview_notice(L"SyntaxHighlightDisabledLargeFile");
     }
 
     void MainWindow::show_text_preview_error(std::wstring message)
@@ -3747,6 +3812,7 @@ namespace winrt::Glance::App::implementation
         PreviewErrorInfoBar().Severity(InfoBarSeverity::Error);
         PreviewErrorInfoBar().IsClosable(true);
         PreviewErrorInfoBar().IsOpen(true);
+        animate_preview_info_bar(true);
     }
 
     void MainWindow::update_preview_mode_button()
@@ -3831,9 +3897,14 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::TopmostButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
+        const bool was_topmost = topmost_;
         topmost_ = TopmostButton().IsChecked().Value();
         set_topmost(topmost_);
         update_state();
+        if (!was_topmost && topmost_ && glance::app::load_window_preferences().auto_fit_media)
+        {
+            show_preview_notice(L"AutoFitPausedNotice");
+        }
     }
 
     void MainWindow::PreviewModeButton_Click(IInspectable const&, RoutedEventArgs const&)
