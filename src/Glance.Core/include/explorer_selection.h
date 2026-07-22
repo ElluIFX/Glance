@@ -4,6 +4,7 @@
 #include <wrl/client.h>
 
 #include "dialog_hook_client.h"
+#include "external_host_provider.h"
 #include "glance/contracts/file_descriptor.h"
 
 #include <string>
@@ -21,9 +22,9 @@ namespace glance::core
         [[nodiscard]] glance::contracts::SelectionSnapshot query_foreground();
 
     private:
-        [[nodiscard]] static bool is_explorer_window(HWND window, DWORD& process_id);
         [[nodiscard]] bool is_text_input_focused() const;
 
+        ExternalHostProviderRegistry external_hosts_;
         mutable Microsoft::WRL::ComPtr<IUIAutomation2> automation_;
         DialogHookClient dialog_hook_;
         HWND dialog_cache_window_{};

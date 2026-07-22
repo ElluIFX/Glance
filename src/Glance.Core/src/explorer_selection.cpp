@@ -16,7 +16,6 @@
 
 #include <algorithm>
 #include <cwctype>
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -24,7 +23,7 @@ namespace
 {
     using Microsoft::WRL::ComPtr;
 
-    std::wstring process_image_name(DWORD process_id)
+    std::wstring process_executable_name(DWORD process_id)
     {
         const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
         if (process == nullptr)
@@ -41,6 +40,12 @@ namespace
         }
         CloseHandle(process);
         path.resize(size);
+        const auto separator = path.find_last_of(L"\\/");
+        if (separator != std::wstring::npos)
+        {
+            path.erase(0, separator + 1);
+        }
+        std::ranges::transform(path, path.begin(), [](wchar_t value) { return std::towlower(value); });
         return path;
     }
 
@@ -450,19 +455,6 @@ namespace glance::core
         return control_type == UIA_EditControlTypeId || control_type == UIA_DocumentControlTypeId;
     }
 
-    bool ExplorerSelectionService::is_explorer_window(HWND window, DWORD& process_id)
-    {
-        GetWindowThreadProcessId(window, &process_id);
-        auto path = process_image_name(process_id);
-        if (path.empty())
-        {
-            return false;
-        }
-        auto name = std::filesystem::path(path).filename().wstring();
-        std::ranges::transform(name, name.begin(), [](wchar_t value) { return std::towlower(value); });
-        return name == L"explorer.exe";
-    }
-
     glance::contracts::SelectionSnapshot ExplorerSelectionService::query_foreground()
     {
         glance::contracts::SelectionSnapshot snapshot;
@@ -487,11 +479,20 @@ namespace glance::core
             return snapshot;
         }
 
-        const bool explorer = is_explorer_window(root, process_id);
+        const auto process_name = process_executable_name(process_id);
+        const bool explorer = process_name == L"explorer.exe";
         const HWND dialog_view = explorer
             ? nullptr
             : find_descendant_window(root, L"SHELLDLL_DefView", thread_info.hwndFocus);
         const bool common_dialog = dialog_view != nullptr;
+        const auto external_selection = external_hosts_.query(ExternalHostContext{
+            root,
+            process_id,
+            foreground_thread_id,
+            thread_info,
+            process_name,
+            root_class,
+        });
         if (!common_dialog)
         {
             dialog_hook_.detach();
@@ -499,16 +500,32 @@ namespace glance::core
             dialog_cache_timestamp_ = 0;
             dialog_cache_path_.clear();
         }
-        if (!common_dialog && !explorer)
+        if (!common_dialog && !explorer && !external_selection)
         {
             return snapshot;
         }
 
         snapshot.source_window = reinterpret_cast<std::uintptr_t>(root);
         snapshot.source_process_id = process_id;
-        snapshot.host_kind = common_dialog
-            ? glance::contracts::HostKind::common_dialog
-            : glance::contracts::HostKind::explorer;
+        snapshot.host_kind = external_selection
+            ? external_selection->host_kind
+            : (common_dialog
+                ? glance::contracts::HostKind::common_dialog
+                : glance::contracts::HostKind::explorer);
+
+        if (external_selection)
+        {
+            if (!external_selection->filesystem_path.empty())
+            {
+                auto descriptor = describe_path(external_selection->filesystem_path);
+                if (descriptor.is_filesystem)
+                {
+                    snapshot.items.push_back(std::move(descriptor));
+                }
+            }
+            snapshot.accepts_hotkey = external_selection->accepts_hotkey && !snapshot.items.empty();
+            return snapshot;
+        }
 
         if (common_dialog)
         {

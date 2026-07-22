@@ -30,6 +30,7 @@
     <ClInclude Include="include\core_application.h" />
     <ClInclude Include="include\dialog_hook_client.h" />
     <ClInclude Include="include\explorer_selection.h" />
+    <ClInclude Include="include\external_host_provider.h" />
     <ClInclude Include="include\input_decision.h" />
     <ClInclude Include="include\keyboard_hook.h" />
     <ClInclude Include="include\pipe_server.h" />
@@ -39,6 +40,7 @@
     <ClCompile Include="src\core_application.cpp" />
     <ClCompile Include="src\dialog_hook_client.cpp" />
     <ClCompile Include="src\explorer_selection.cpp" />
+    <ClCompile Include="src\external_host_provider.cpp" />
     <ClCompile Include="src\keyboard_hook.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\pipe_server.cpp" />
