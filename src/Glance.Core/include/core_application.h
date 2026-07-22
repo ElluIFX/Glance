@@ -28,18 +28,20 @@ namespace glance::core
         CoreApplication(const CoreApplication&) = delete;
         CoreApplication& operator=(const CoreApplication&) = delete;
 
-        [[nodiscard]] int run(HINSTANCE instance, DWORD parent_process_id);
+        [[nodiscard]] int run(HINSTANCE instance, DWORD app_process_id);
 
     private:
         static constexpr UINT hook_action_message = WM_APP + 1;
         static constexpr UINT selection_result_message = WM_APP + 2;
+        static constexpr UINT heartbeat_message = WM_APP + 3;
+        static constexpr UINT connection_changed_message = WM_APP + 4;
         static constexpr UINT selection_timer_id = 1;
         static constexpr UINT hook_refresh_timer_id = 2;
-        static constexpr UINT parent_process_timer_id = 3;
+        static constexpr UINT app_watchdog_timer_id = 3;
         static constexpr UINT selection_interval_ms = 25;
         static constexpr UINT selection_stale_after_ms = 500;
         static constexpr UINT hook_refresh_interval_ms = 1000;
-        static constexpr UINT parent_process_interval_ms = 1000;
+        static constexpr UINT app_watchdog_interval_ms = 500;
 
         static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
         [[nodiscard]] bool create_message_window(HINSTANCE instance);
@@ -52,13 +54,30 @@ namespace glance::core
         void handle_pipe_message(glance::contracts::MessageType type, std::uint32_t flags, std::string_view payload);
         void handle_connection_changed(bool connected);
         void recover_keyboard_hook(std::wstring_view reason);
+        void supervise_app();
+        void capture_app_process(DWORD process_id);
+        void close_app_process() noexcept;
+        void reset_app_health() noexcept;
+        void terminate_unresponsive_app();
+        [[nodiscard]] bool launch_app();
         [[nodiscard]] std::string make_open_payload(const glance::contracts::SelectionSnapshot& selection) const;
         [[nodiscard]] bool selection_changed(const glance::contracts::SelectionSnapshot& next) const;
 
         HWND window_{};
         unique_handle single_instance_mutex_;
         unique_handle elevated_status_mutex_;
-        unique_handle parent_process_;
+        unique_handle shutdown_event_;
+        unique_handle app_process_;
+        unique_handle app_token_;
+        DWORD app_process_id_{};
+        bool elevated_{};
+        std::atomic_bool shutting_down_{};
+        std::uint32_t heartbeat_sequence_{};
+        std::uint32_t pending_heartbeat_{};
+        std::uint32_t missed_heartbeats_{};
+        std::atomic_uint32_t last_heartbeat_ack_{};
+        std::uint64_t app_connection_grace_until_ms_{};
+        std::uint64_t last_app_launch_attempt_ms_{};
         InputDecisionState input_state_;
         glance::contracts::SelectionSnapshot selection_;
         unique_handle selection_stop_event_;

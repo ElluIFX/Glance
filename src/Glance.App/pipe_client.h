@@ -35,6 +35,11 @@ namespace glance::app
             glance::contracts::MessageType type,
             std::string_view payload = {},
             std::uint32_t flags = 0);
+        [[nodiscard]] bool connected() const noexcept { return connected_.load(std::memory_order_acquire); }
+        [[nodiscard]] DWORD peer_process_id() const noexcept
+        {
+            return peer_process_id_.load(std::memory_order_acquire);
+        }
 
     private:
         void run() noexcept;
@@ -47,8 +52,8 @@ namespace glance::app
         std::atomic_bool stopping_{};
         std::atomic_bool connected_{};
         std::atomic<HANDLE> pipe_{};
+        std::atomic<DWORD> peer_process_id_{};
         std::mutex write_mutex_;
         std::atomic_uint64_t correlation_id_{};
     };
 }
-

@@ -16,11 +16,13 @@ namespace glance::contracts
         hello = 1,
         hello_ack = 2,
         heartbeat = 3,
+        heartbeat_ack = 4,
         open_active_preview = 10,
         close_active_preview = 11,
         preview_state_changed = 12,
         detach_preview = 13,
         shutdown = 20,
+        terminate_unresponsive = 21,
     };
 
     struct FrameHeader

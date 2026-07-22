@@ -9,6 +9,7 @@
 #include "glance/contracts/diagnostics.h"
 
 #include <shellapi.h>
+#include <tlhelp32.h>
 
 #include <algorithm>
 #include <chrono>
@@ -56,6 +57,74 @@ namespace
         path.resize(length);
         return path;
     }
+
+    bool paths_equal(std::wstring_view left, std::wstring_view right) noexcept
+    {
+        return CompareStringOrdinal(
+                   left.data(),
+                   static_cast<int>(left.size()),
+                   right.data(),
+                   static_cast<int>(right.size()),
+                   TRUE) == CSTR_EQUAL;
+    }
+
+    HANDLE open_supervised_process(DWORD process_id) noexcept
+    {
+        HANDLE process = OpenProcess(
+            SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE,
+            FALSE,
+            process_id);
+        if (process == nullptr)
+        {
+            process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+        }
+        return process;
+    }
+
+    HANDLE find_process_by_path(const std::filesystem::path& expected_path, DWORD& process_id) noexcept
+    {
+        const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE)
+        {
+            return nullptr;
+        }
+
+        DWORD current_session{};
+        static_cast<void>(ProcessIdToSessionId(GetCurrentProcessId(), &current_session));
+        PROCESSENTRY32W entry{ sizeof(PROCESSENTRY32W) };
+        HANDLE result{};
+        if (Process32FirstW(snapshot, &entry))
+        {
+            do
+            {
+                DWORD session{};
+                if (!ProcessIdToSessionId(entry.th32ProcessID, &session) || session != current_session)
+                {
+                    continue;
+                }
+                HANDLE process = open_supervised_process(entry.th32ProcessID);
+                if (process == nullptr)
+                {
+                    continue;
+                }
+                std::wstring path(32768, L'\0');
+                DWORD length = static_cast<DWORD>(path.size());
+                if (QueryFullProcessImageNameW(process, 0, path.data(), &length))
+                {
+                    path.resize(length);
+                    if (paths_equal(path, expected_path.wstring()))
+                    {
+                        result = process;
+                        process_id = entry.th32ProcessID;
+                        break;
+                    }
+                }
+                CloseHandle(process);
+            } while (Process32NextW(snapshot, &entry));
+        }
+        CloseHandle(snapshot);
+        return result;
+    }
 }
 
 namespace winrt::Glance::App::implementation
@@ -89,6 +158,12 @@ namespace winrt::Glance::App::implementation
     {
         shutting_down_.store(true, std::memory_order_release);
         pipe_client_.stop();
+        close_core_process();
+        if (shutdown_event_ != nullptr)
+        {
+            CloseHandle(shutdown_event_);
+            shutdown_event_ = nullptr;
+        }
         if (instance_mutex_ != nullptr)
         {
             CloseHandle(instance_mutex_);
@@ -122,6 +197,11 @@ namespace winrt::Glance::App::implementation
             Microsoft::UI::Xaml::Application::Current().Exit();
             return;
         }
+        shutdown_event_ = CreateEventW(nullptr, TRUE, FALSE, L"Local\\Glance.Shutdown");
+        if (shutdown_event_ != nullptr)
+        {
+            ResetEvent(shutdown_event_);
+        }
 
         dispatcher_ = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
         const auto appearance = glance::app::load_appearance_preferences();
@@ -148,12 +228,26 @@ namespace winrt::Glance::App::implementation
 
     void App::ensure_core_started()
     {
+        refresh_core_process();
+        if (core_process_ != nullptr && WaitForSingleObject(core_process_, 0) == WAIT_TIMEOUT)
+        {
+            return;
+        }
+        close_core_process();
+
         HANDLE mutex = OpenMutexW(SYNCHRONIZE, FALSE, L"Local\\Glance.Core");
         if (mutex != nullptr)
         {
             CloseHandle(mutex);
             return;
         }
+
+        const auto now = GetTickCount64();
+        if (last_core_launch_attempt_ms_ != 0 && now - last_core_launch_attempt_ms_ < 2000)
+        {
+            return;
+        }
+        last_core_launch_attempt_ms_ = now;
 
         const auto core_path = executable_directory() / L"Glance.Core.exe";
         if (!std::filesystem::exists(core_path))
@@ -162,7 +256,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
-        const auto parameters = L"--parent-pid=" + std::to_wstring(GetCurrentProcessId());
+        const auto parameters = L"--app-pid=" + std::to_wstring(GetCurrentProcessId());
         SHELLEXECUTEINFOW execute{ sizeof(SHELLEXECUTEINFOW) };
         execute.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
         execute.lpVerb = L"runas";
@@ -174,7 +268,9 @@ namespace winrt::Glance::App::implementation
             glance::contracts::log_event(L"Core process launch requested with elevation.");
             if (execute.hProcess != nullptr)
             {
-                CloseHandle(execute.hProcess);
+                core_process_ = execute.hProcess;
+                core_process_id_ = GetProcessId(execute.hProcess);
+                core_connection_grace_until_ms_ = now + 5000;
             }
             return;
         }
@@ -183,7 +279,9 @@ namespace winrt::Glance::App::implementation
         if (ShellExecuteExW(&execute) && execute.hProcess != nullptr)
         {
             glance::contracts::log_event(L"Core process launch requested without elevation.");
-            CloseHandle(execute.hProcess);
+            core_process_ = execute.hProcess;
+            core_process_id_ = GetProcessId(execute.hProcess);
+            core_connection_grace_until_ms_ = now + 5000;
         }
     }
 
@@ -192,19 +290,141 @@ namespace winrt::Glance::App::implementation
         if (core_watchdog_timer_ == nullptr)
         {
             core_watchdog_timer_ = DispatcherTimer();
-            core_watchdog_timer_.Interval(std::chrono::seconds(3));
+            core_watchdog_timer_.Interval(std::chrono::milliseconds(500));
             core_watchdog_timer_.Tick([this](IInspectable const&, IInspectable const&) {
                 if (!shutting_down_.load(std::memory_order_acquire))
                 {
-                    ensure_core_started();
+                    supervise_core();
                 }
             });
         }
         core_watchdog_timer_.Start();
     }
 
+    void App::supervise_core()
+    {
+        refresh_core_process();
+        if (core_process_ == nullptr)
+        {
+            reset_core_health();
+            ensure_core_started();
+            return;
+        }
+        if (WaitForSingleObject(core_process_, 0) == WAIT_OBJECT_0)
+        {
+            glance::contracts::log_event(L"Core process exited unexpectedly; restarting it.");
+            close_core_process();
+            reset_core_health();
+            ensure_core_started();
+            return;
+        }
+
+        const auto now = GetTickCount64();
+        if (!pipe_client_.connected())
+        {
+            pending_heartbeat_ = 0;
+            if (now < core_connection_grace_until_ms_)
+            {
+                return;
+            }
+            if (++missed_heartbeats_ >= 3)
+            {
+                terminate_unresponsive_core();
+            }
+            return;
+        }
+
+        if (pending_heartbeat_ != 0)
+        {
+            if (last_heartbeat_ack_.load(std::memory_order_acquire) == pending_heartbeat_)
+            {
+                missed_heartbeats_ = 0;
+            }
+            else if (++missed_heartbeats_ >= 3)
+            {
+                terminate_unresponsive_core();
+                return;
+            }
+        }
+
+        const auto sequence = ++heartbeat_sequence_;
+        if (pipe_client_.send(glance::contracts::MessageType::heartbeat, {}, sequence))
+        {
+            pending_heartbeat_ = sequence;
+        }
+    }
+
+    void App::refresh_core_process(DWORD process_id)
+    {
+        if (process_id == 0)
+        {
+            process_id = pipe_client_.connected() ? pipe_client_.peer_process_id() : 0;
+        }
+        if (process_id == 0 && core_process_ != nullptr &&
+            WaitForSingleObject(core_process_, 0) == WAIT_TIMEOUT)
+        {
+            return;
+        }
+        if (process_id != 0 && process_id == core_process_id_ && core_process_ != nullptr)
+        {
+            return;
+        }
+
+        HANDLE process{};
+        if (process_id != 0)
+        {
+            process = open_supervised_process(process_id);
+        }
+        if (process == nullptr)
+        {
+            process_id = 0;
+            process = find_process_by_path(executable_directory() / L"Glance.Core.exe", process_id);
+        }
+        if (process == nullptr)
+        {
+            return;
+        }
+
+        close_core_process();
+        core_process_ = process;
+        core_process_id_ = process_id;
+        core_connection_grace_until_ms_ = GetTickCount64() + 5000;
+    }
+
+    void App::close_core_process() noexcept
+    {
+        if (core_process_ != nullptr)
+        {
+            CloseHandle(core_process_);
+            core_process_ = nullptr;
+        }
+        core_process_id_ = 0;
+    }
+
+    void App::reset_core_health() noexcept
+    {
+        pending_heartbeat_ = 0;
+        missed_heartbeats_ = 0;
+        last_heartbeat_ack_.store(0, std::memory_order_release);
+    }
+
+    void App::terminate_unresponsive_core()
+    {
+        glance::contracts::log_event(L"Core health check failed three times; terminating it for recovery.");
+        static_cast<void>(pipe_client_.send(glance::contracts::MessageType::terminate_unresponsive));
+        if (core_process_ != nullptr)
+        {
+            static_cast<void>(TerminateProcess(core_process_, ERROR_PROCESS_ABORTED));
+        }
+        reset_core_health();
+        core_connection_grace_until_ms_ = GetTickCount64() + 500;
+    }
+
     void App::create_active_window()
     {
+        active_window_state_.store(
+            glance::contracts::PreviewWindowState::hidden,
+            std::memory_order_release);
         active_window_ = make<MainWindow>();
         auto implementation = get_self<implementation::MainWindow>(active_window_);
         implementation->InitializeSession(
@@ -301,6 +521,10 @@ namespace winrt::Glance::App::implementation
         {
             core_watchdog_timer_.Stop();
         }
+        if (shutdown_event_ != nullptr)
+        {
+            SetEvent(shutdown_event_);
+        }
         const bool shutdown_sent = pipe_client_.send(glance::contracts::MessageType::shutdown);
         glance::contracts::log_event(
             shutdown_sent ? L"Core shutdown requested." : L"Core shutdown request could not be sent.");
@@ -326,19 +550,44 @@ namespace winrt::Glance::App::implementation
 
     void App::handle_pipe_message(
         glance::contracts::MessageType type,
-        std::uint32_t,
+        std::uint32_t flags,
         std::string payload)
     {
+        if (type == glance::contracts::MessageType::terminate_unresponsive)
+        {
+            glance::contracts::log_event(L"Core requested emergency UI termination.");
+            TerminateProcess(GetCurrentProcess(), ERROR_PROCESS_ABORTED);
+            return;
+        }
+        if (type == glance::contracts::MessageType::heartbeat_ack)
+        {
+            last_heartbeat_ack_.store(flags, std::memory_order_release);
+            return;
+        }
         if (shutting_down_.load(std::memory_order_acquire))
         {
             return;
         }
-        dispatcher_.TryEnqueue([this, type, payload = std::move(payload)]() mutable {
+        dispatcher_.TryEnqueue([this, type, flags, payload = std::move(payload)]() mutable {
             if (shutting_down_.load(std::memory_order_acquire))
             {
                 return;
             }
-            if (type == glance::contracts::MessageType::open_active_preview)
+            if (type == glance::contracts::MessageType::heartbeat)
+            {
+                static_cast<void>(pipe_client_.send(
+                    glance::contracts::MessageType::heartbeat_ack,
+                    {},
+                    flags));
+            }
+            else if (type == glance::contracts::MessageType::hello_ack)
+            {
+                static_cast<void>(pipe_client_.send(
+                    glance::contracts::MessageType::preview_state_changed,
+                    {},
+                    static_cast<std::uint32_t>(active_window_state_.load(std::memory_order_acquire))));
+            }
+            else if (type == glance::contracts::MessageType::open_active_preview)
             {
                 open_preview(payload);
             }
@@ -363,14 +612,13 @@ namespace winrt::Glance::App::implementation
             }
             if (connected)
             {
-                if (core_watchdog_timer_ != nullptr)
-                {
-                    core_watchdog_timer_.Stop();
-                }
+                refresh_core_process(pipe_client_.peer_process_id());
+                reset_core_health();
+                core_connection_grace_until_ms_ = 0;
                 return;
             }
-            close_active_preview();
-            start_core_watchdog();
+            reset_core_health();
+            core_connection_grace_until_ms_ = GetTickCount64();
         });
     }
 
@@ -386,6 +634,7 @@ namespace winrt::Glance::App::implementation
             && get_self<implementation::MainWindow>(active_window_)->InstanceId() == instance_id;
         if (is_active_window)
         {
+            active_window_state_.store(state, std::memory_order_release);
             static_cast<void>(pipe_client_.send(
                 glance::contracts::MessageType::preview_state_changed,
                 {},

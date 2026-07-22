@@ -180,6 +180,15 @@ namespace glance::app
                 continue;
             }
 
+            ULONG server_process_id{};
+            if (!GetNamedPipeServerProcessId(pipe, &server_process_id))
+            {
+                CloseHandle(pipe);
+                std::this_thread::sleep_for(100ms);
+                continue;
+            }
+
+            peer_process_id_.store(server_process_id, std::memory_order_release);
             pipe_.store(pipe, std::memory_order_release);
             connected_.store(true, std::memory_order_release);
             connection_handler_(true);

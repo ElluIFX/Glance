@@ -53,17 +53,18 @@ namespace
         return std::filesystem::path(module).parent_path() / L"Glance.exe";
     }
 
-    bool authorize_client(HANDLE pipe)
+    bool authorize_client(HANDLE pipe, DWORD& client_process_id)
     {
-        ULONG client_process_id{};
-        if (!GetNamedPipeClientProcessId(pipe, &client_process_id))
+        ULONG queried_process_id{};
+        if (!GetNamedPipeClientProcessId(pipe, &queried_process_id))
         {
             return false;
         }
+        client_process_id = queried_process_id;
         DWORD server_session{};
         DWORD client_session{};
         if (!ProcessIdToSessionId(GetCurrentProcessId(), &server_session) ||
-            !ProcessIdToSessionId(client_process_id, &client_session) ||
+            !ProcessIdToSessionId(queried_process_id, &client_session) ||
             server_session != client_session)
         {
             return false;
@@ -72,7 +73,7 @@ namespace
         glance::core::unique_handle client(OpenProcess(
             PROCESS_QUERY_LIMITED_INFORMATION,
             FALSE,
-            client_process_id));
+            queried_process_id));
         if (!client)
         {
             return false;
@@ -334,7 +335,9 @@ namespace glance::core
                 }
                 CloseHandle(connection.hEvent);
             }
-            if (!connected || stopping_.load(std::memory_order_acquire) || !authorize_client(pipe))
+            DWORD client_process_id{};
+            if (!connected || stopping_.load(std::memory_order_acquire) ||
+                !authorize_client(pipe, client_process_id))
             {
                 if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
                 {
@@ -343,6 +346,7 @@ namespace glance::core
                 continue;
             }
 
+            peer_process_id_.store(client_process_id, std::memory_order_release);
             connected_.store(true, std::memory_order_release);
             connection_handler_(true);
 

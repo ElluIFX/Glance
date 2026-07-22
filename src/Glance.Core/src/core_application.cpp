@@ -8,8 +8,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <ranges>
+#include <tlhelp32.h>
 #include <wtsapi32.h>
 
 namespace
@@ -31,6 +33,121 @@ namespace
                    sizeof(elevation),
                    &returned_size) != FALSE &&
             elevation.TokenIsElevated != 0;
+    }
+
+    std::filesystem::path executable_directory()
+    {
+        std::wstring path(32768, L'\0');
+        const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+        path.resize(length);
+        return std::filesystem::path(path).parent_path();
+    }
+
+    bool paths_equal(std::wstring_view left, std::wstring_view right) noexcept
+    {
+        return CompareStringOrdinal(
+                   left.data(),
+                   static_cast<int>(left.size()),
+                   right.data(),
+                   static_cast<int>(right.size()),
+                   TRUE) == CSTR_EQUAL;
+    }
+
+    HANDLE open_supervised_process(DWORD process_id) noexcept
+    {
+        HANDLE process = OpenProcess(
+            SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE,
+            FALSE,
+            process_id);
+        if (process == nullptr)
+        {
+            process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+        }
+        return process;
+    }
+
+    DWORD find_process_by_path(const std::filesystem::path& expected_path) noexcept
+    {
+        const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE)
+        {
+            return 0;
+        }
+
+        DWORD current_session{};
+        static_cast<void>(ProcessIdToSessionId(GetCurrentProcessId(), &current_session));
+        PROCESSENTRY32W entry{ sizeof(PROCESSENTRY32W) };
+        DWORD result{};
+        if (Process32FirstW(snapshot, &entry))
+        {
+            do
+            {
+                DWORD session{};
+                if (!ProcessIdToSessionId(entry.th32ProcessID, &session) || session != current_session)
+                {
+                    continue;
+                }
+                glance::core::unique_handle process(open_supervised_process(entry.th32ProcessID));
+                if (!process)
+                {
+                    continue;
+                }
+                std::wstring path(32768, L'\0');
+                DWORD length = static_cast<DWORD>(path.size());
+                if (QueryFullProcessImageNameW(process.get(), 0, path.data(), &length))
+                {
+                    path.resize(length);
+                    if (paths_equal(path, expected_path.wstring()))
+                    {
+                        result = entry.th32ProcessID;
+                        break;
+                    }
+                }
+            } while (Process32NextW(snapshot, &entry));
+        }
+        CloseHandle(snapshot);
+        return result;
+    }
+
+    HANDLE duplicate_primary_token(HANDLE process) noexcept
+    {
+        HANDLE raw_token{};
+        if (!OpenProcessToken(
+                process,
+                TOKEN_QUERY | TOKEN_DUPLICATE,
+                &raw_token))
+        {
+            return nullptr;
+        }
+        glance::core::unique_handle token(raw_token);
+        HANDLE primary_token{};
+        if (!DuplicateTokenEx(
+                token.get(),
+                TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY |
+                    TOKEN_ADJUST_DEFAULT | TOKEN_ADJUST_SESSIONID,
+                nullptr,
+                SecurityImpersonation,
+                TokenPrimary,
+                &primary_token))
+        {
+            return nullptr;
+        }
+        return primary_token;
+    }
+
+    HANDLE shell_primary_token() noexcept
+    {
+        const HWND shell_window = GetShellWindow();
+        DWORD shell_process_id{};
+        if (shell_window == nullptr || GetWindowThreadProcessId(shell_window, &shell_process_id) == 0)
+        {
+            return nullptr;
+        }
+        glance::core::unique_handle shell_process(OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION,
+            FALSE,
+            shell_process_id));
+        return shell_process ? duplicate_primary_token(shell_process.get()) : nullptr;
     }
 }
 
@@ -59,14 +176,16 @@ namespace glance::core
         pipe_server_.stop();
     }
 
-    int CoreApplication::run(HINSTANCE instance, DWORD parent_process_id)
+    int CoreApplication::run(HINSTANCE instance, DWORD app_process_id)
     {
         single_instance_mutex_.reset(CreateMutexW(nullptr, FALSE, L"Local\\Glance.Core"));
         if (!single_instance_mutex_ || GetLastError() == ERROR_ALREADY_EXISTS)
         {
             return 0;
         }
-        if (process_is_elevated())
+        shutdown_event_.reset(CreateEventW(nullptr, TRUE, FALSE, L"Local\\Glance.Shutdown"));
+        elevated_ = process_is_elevated();
+        if (elevated_)
         {
             elevated_status_mutex_.reset(CreateMutexW(
                 nullptr,
@@ -81,18 +200,9 @@ namespace glance::core
             return 1;
         }
 
-        if (parent_process_id != 0)
+        if (app_process_id != 0)
         {
-            parent_process_.reset(OpenProcess(SYNCHRONIZE, FALSE, parent_process_id));
-            if (parent_process_)
-            {
-                SetTimer(window_, parent_process_timer_id, parent_process_interval_ms, nullptr);
-            }
-            else
-            {
-                glance::contracts::log_event(
-                    L"Could not monitor the UI process " + std::to_wstring(parent_process_id) + L".");
-            }
+            capture_app_process(app_process_id);
         }
 
         RAWINPUTDEVICE keyboard{};
@@ -121,6 +231,7 @@ namespace glance::core
         }
         SetTimer(window_, selection_timer_id, 100, nullptr);
         SetTimer(window_, hook_refresh_timer_id, hook_refresh_interval_ms, nullptr);
+        SetTimer(window_, app_watchdog_timer_id, app_watchdog_interval_ms, nullptr);
         static_cast<void>(WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION));
         MSG message{};
         while (GetMessageW(&message, nullptr, 0, 0) > 0)
@@ -204,11 +315,9 @@ namespace glance::core
                 }
                 return 0;
             }
-            if (wparam == parent_process_timer_id && self->parent_process_ &&
-                WaitForSingleObject(self->parent_process_.get(), 0) == WAIT_OBJECT_0)
+            if (wparam == app_watchdog_timer_id)
             {
-                glance::contracts::log_event(L"UI process exited; Core is shutting down.");
-                DestroyWindow(window);
+                self->supervise_app();
                 return 0;
             }
             break;
@@ -237,6 +346,29 @@ namespace glance::core
             return 0;
         case selection_result_message:
             self->apply_pending_selection();
+            return 0;
+        case heartbeat_message:
+            static_cast<void>(self->pipe_server_.send(
+                glance::contracts::MessageType::heartbeat_ack,
+                {},
+                static_cast<std::uint32_t>(wparam)));
+            return 0;
+        case connection_changed_message:
+            self->reset_app_health();
+            if (wparam != 0)
+            {
+                self->capture_app_process(static_cast<DWORD>(lparam));
+                self->app_connection_grace_until_ms_ = 0;
+                if (self->keyboard_hook_ != nullptr)
+                {
+                    self->recover_keyboard_hook(L"UI connection restored");
+                }
+                self->input_state_.ui_connected.store(true, std::memory_order_release);
+            }
+            else
+            {
+                self->app_connection_grace_until_ms_ = GetTickCount64();
+            }
             return 0;
         case WM_DESTROY:
             self->stop_selection_worker();
@@ -269,6 +401,256 @@ namespace glance::core
         {
             glance::contracts::log_event(L"Keyboard hook service rebuild failed.");
         }
+    }
+
+    void CoreApplication::supervise_app()
+    {
+        if (shutting_down_.load(std::memory_order_acquire))
+        {
+            return;
+        }
+        if (shutdown_event_ && WaitForSingleObject(shutdown_event_.get(), 0) == WAIT_OBJECT_0)
+        {
+            shutting_down_.store(true, std::memory_order_release);
+            PostMessageW(window_, WM_CLOSE, 0, 0);
+            return;
+        }
+
+        const DWORD connected_process_id = pipe_server_.connected()
+            ? pipe_server_.peer_process_id()
+            : 0;
+        if (connected_process_id != 0 && connected_process_id != app_process_id_)
+        {
+            capture_app_process(connected_process_id);
+        }
+        if (!app_process_)
+        {
+            const DWORD process_id = find_process_by_path(executable_directory() / L"Glance.exe");
+            if (process_id != 0)
+            {
+                capture_app_process(process_id);
+            }
+        }
+        if (!app_process_)
+        {
+            reset_app_health();
+            static_cast<void>(launch_app());
+            return;
+        }
+        if (WaitForSingleObject(app_process_.get(), 0) == WAIT_OBJECT_0)
+        {
+            glance::contracts::log_event(L"UI process exited unexpectedly; restarting it.");
+            input_state_.ui_connected.store(false, std::memory_order_release);
+            preview_state_.store(
+                glance::contracts::PreviewWindowState::hidden,
+                std::memory_order_release);
+            input_state_.preview_active.store(false, std::memory_order_release);
+            close_app_process();
+            reset_app_health();
+            static_cast<void>(launch_app());
+            return;
+        }
+
+        const auto now = GetTickCount64();
+        if (!pipe_server_.connected())
+        {
+            pending_heartbeat_ = 0;
+            if (now < app_connection_grace_until_ms_)
+            {
+                return;
+            }
+            if (++missed_heartbeats_ >= 3)
+            {
+                terminate_unresponsive_app();
+            }
+            return;
+        }
+
+        if (pending_heartbeat_ != 0)
+        {
+            if (last_heartbeat_ack_.load(std::memory_order_acquire) == pending_heartbeat_)
+            {
+                missed_heartbeats_ = 0;
+            }
+            else if (++missed_heartbeats_ >= 3)
+            {
+                terminate_unresponsive_app();
+                return;
+            }
+        }
+
+        const auto sequence = ++heartbeat_sequence_;
+        if (pipe_server_.send(glance::contracts::MessageType::heartbeat, {}, sequence))
+        {
+            pending_heartbeat_ = sequence;
+        }
+    }
+
+    void CoreApplication::capture_app_process(DWORD process_id)
+    {
+        if (process_id == 0)
+        {
+            return;
+        }
+        if (process_id == app_process_id_ && app_process_ &&
+            WaitForSingleObject(app_process_.get(), 0) == WAIT_TIMEOUT)
+        {
+            if (!app_token_)
+            {
+                app_token_.reset(duplicate_primary_token(app_process_.get()));
+            }
+            return;
+        }
+
+        unique_handle process(open_supervised_process(process_id));
+        if (!process)
+        {
+            glance::contracts::log_event(
+                L"Could not open the UI process " + std::to_wstring(process_id) + L" for supervision.");
+            return;
+        }
+        std::wstring path(32768, L'\0');
+        DWORD length = static_cast<DWORD>(path.size());
+        const auto expected_path = (executable_directory() / L"Glance.exe").wstring();
+        if (!QueryFullProcessImageNameW(process.get(), 0, path.data(), &length))
+        {
+            return;
+        }
+        path.resize(length);
+        if (!paths_equal(path, expected_path))
+        {
+            glance::contracts::log_event(L"Rejected a UI supervision target with an unexpected path.");
+            return;
+        }
+
+        unique_handle token(duplicate_primary_token(process.get()));
+        close_app_process();
+        app_process_ = std::move(process);
+        app_process_id_ = process_id;
+        if (token)
+        {
+            app_token_ = std::move(token);
+        }
+        app_connection_grace_until_ms_ = GetTickCount64() + 5000;
+    }
+
+    void CoreApplication::close_app_process() noexcept
+    {
+        app_process_.reset();
+        app_process_id_ = 0;
+    }
+
+    void CoreApplication::reset_app_health() noexcept
+    {
+        pending_heartbeat_ = 0;
+        missed_heartbeats_ = 0;
+        last_heartbeat_ack_.store(0, std::memory_order_release);
+    }
+
+    void CoreApplication::terminate_unresponsive_app()
+    {
+        glance::contracts::log_event(L"UI health check failed three times; terminating it for recovery.");
+        input_state_.ui_connected.store(false, std::memory_order_release);
+        preview_state_.store(
+            glance::contracts::PreviewWindowState::hidden,
+            std::memory_order_release);
+        input_state_.preview_active.store(false, std::memory_order_release);
+        static_cast<void>(pipe_server_.send(glance::contracts::MessageType::terminate_unresponsive));
+        if (app_process_)
+        {
+            static_cast<void>(TerminateProcess(app_process_.get(), ERROR_PROCESS_ABORTED));
+        }
+        reset_app_health();
+        app_connection_grace_until_ms_ = GetTickCount64() + 500;
+    }
+
+    bool CoreApplication::launch_app()
+    {
+        if (shutting_down_.load(std::memory_order_acquire))
+        {
+            return false;
+        }
+        unique_handle app_mutex(OpenMutexW(SYNCHRONIZE, FALSE, L"Local\\Glance.App"));
+        if (app_mutex)
+        {
+            return false;
+        }
+
+        const auto now = GetTickCount64();
+        if (last_app_launch_attempt_ms_ != 0 && now - last_app_launch_attempt_ms_ < 2000)
+        {
+            return false;
+        }
+        last_app_launch_attempt_ms_ = now;
+
+        const auto app_path = executable_directory() / L"Glance.exe";
+        if (!std::filesystem::exists(app_path))
+        {
+            glance::contracts::log_event(L"Glance.exe was not found for UI recovery.");
+            return false;
+        }
+
+        std::wstring command_line = L"\"" + app_path.wstring() + L"\"";
+        const auto working_directory = app_path.parent_path().wstring();
+        STARTUPINFOW startup{ sizeof(STARTUPINFOW) };
+        PROCESS_INFORMATION process{};
+        BOOL created{};
+        if (elevated_)
+        {
+            unique_handle shell_token;
+            HANDLE launch_token = app_token_.get();
+            if (launch_token == nullptr)
+            {
+                shell_token.reset(shell_primary_token());
+                launch_token = shell_token.get();
+            }
+            if (launch_token != nullptr)
+            {
+                created = CreateProcessWithTokenW(
+                    launch_token,
+                    LOGON_WITH_PROFILE,
+                    app_path.c_str(),
+                    command_line.data(),
+                    0,
+                    nullptr,
+                    working_directory.c_str(),
+                    &startup,
+                    &process);
+            }
+        }
+        else
+        {
+            created = CreateProcessW(
+                app_path.c_str(),
+                command_line.data(),
+                nullptr,
+                nullptr,
+                FALSE,
+                0,
+                nullptr,
+                working_directory.c_str(),
+                &startup,
+                &process);
+        }
+        if (!created)
+        {
+            glance::contracts::log_event(
+                L"UI recovery launch failed with error " + std::to_wstring(GetLastError()) + L".");
+            return false;
+        }
+
+        CloseHandle(process.hThread);
+        close_app_process();
+        app_process_.reset(process.hProcess);
+        app_process_id_ = process.dwProcessId;
+        if (!app_token_)
+        {
+            app_token_.reset(duplicate_primary_token(process.hProcess));
+        }
+        app_connection_grace_until_ms_ = now + 5000;
+        reset_app_health();
+        glance::contracts::log_event(L"UI process recovery launch requested.");
+        return true;
     }
 
     bool CoreApplication::start_selection_worker()
@@ -530,6 +912,22 @@ namespace glance::core
         std::uint32_t flags,
         std::string_view)
     {
+        if (type == glance::contracts::MessageType::terminate_unresponsive)
+        {
+            glance::contracts::log_event(L"UI requested emergency Core termination.");
+            TerminateProcess(GetCurrentProcess(), ERROR_PROCESS_ABORTED);
+            return;
+        }
+        if (type == glance::contracts::MessageType::heartbeat_ack)
+        {
+            last_heartbeat_ack_.store(flags, std::memory_order_release);
+            return;
+        }
+        if (type == glance::contracts::MessageType::heartbeat)
+        {
+            PostMessageW(window_, heartbeat_message, static_cast<WPARAM>(flags), 0);
+            return;
+        }
         if (type == glance::contracts::MessageType::hello)
         {
             static_cast<void>(pipe_server_.send(glance::contracts::MessageType::hello_ack));
@@ -547,6 +945,7 @@ namespace glance::core
         }
         if (type == glance::contracts::MessageType::shutdown)
         {
+            shutting_down_.store(true, std::memory_order_release);
             PostMessageW(window_, WM_CLOSE, 0, 0);
         }
     }
@@ -554,15 +953,19 @@ namespace glance::core
     void CoreApplication::handle_connection_changed(bool connected)
     {
         glance::contracts::log_event(connected ? L"UI pipe connected." : L"UI pipe disconnected.");
-        input_state_.ui_connected.store(connected, std::memory_order_release);
+        input_state_.ui_connected.store(false, std::memory_order_release);
         if (!connected)
         {
             preview_state_.store(
                 glance::contracts::PreviewWindowState::hidden,
                 std::memory_order_release);
             input_state_.preview_active.store(false, std::memory_order_release);
-            PostMessageW(window_, WM_CLOSE, 0, 0);
         }
+        PostMessageW(
+            window_,
+            connection_changed_message,
+            connected ? 1U : 0U,
+            static_cast<LPARAM>(pipe_server_.peer_process_id()));
     }
 
     std::string CoreApplication::make_open_payload(
