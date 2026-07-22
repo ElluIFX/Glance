@@ -4956,6 +4956,9 @@ namespace winrt::Glance::App::implementation
     void MainWindow::PinButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         pinned_ = PinButton().IsChecked().Value();
+        topmost_ = pinned_;
+        TopmostButton().IsChecked(topmost_);
+        set_topmost(topmost_);
         if (detached_ && !pinned_)
         {
             state_ = glance::contracts::PreviewWindowState::detached_unpinned;
