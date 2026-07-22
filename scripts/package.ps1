@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [ValidateSet("x64")]
-    [string] $Platform = "x64"
+    [string] $Platform = "x64",
+
+    [switch] $RunTests
 )
 
 Set-StrictMode -Version Latest
@@ -38,6 +40,7 @@ function Get-InnoSetupCompiler {
 $repositoryRoot = Get-GlanceRepositoryRoot
 $artifactsDirectory = Join-Path $repositoryRoot "artifacts"
 $payloadDirectory = Join-Path $artifactsDirectory "package\payload"
+$symbolsDirectory = Join-Path $artifactsDirectory "package\symbols"
 $installerOutputDirectory = Join-Path $artifactsDirectory "installer"
 $installerScript = Join-Path $repositoryRoot "installer\Glance.iss"
 $version = Get-GlanceVersion
@@ -45,6 +48,7 @@ $version = Get-GlanceVersion
 Remove-GlanceWorkspaceItem -Path (Join-Path $artifactsDirectory "package")
 Remove-GlanceWorkspaceItem -Path $installerOutputDirectory
 New-Item -ItemType Directory -Path $payloadDirectory -Force | Out-Null
+New-Item -ItemType Directory -Path $symbolsDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $installerOutputDirectory -Force | Out-Null
 
 & (Join-Path $PSScriptRoot "build.ps1") `
@@ -72,6 +76,27 @@ foreach ($file in $requiredFiles) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Required package file is missing: $path"
     }
+}
+
+if ($RunTests) {
+    $tests = Join-Path $payloadDirectory "Glance.Tests.exe"
+    if (-not (Test-Path -LiteralPath $tests -PathType Leaf)) {
+        throw "Release tests were not built: $tests"
+    }
+    Write-Host "Running release regression tests..."
+    & $tests
+    if ($LASTEXITCODE -ne 0) {
+        throw "Release regression tests failed with exit code $LASTEXITCODE."
+    }
+}
+
+$symbolFiles = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File -Filter "*.pdb" |
+    Where-Object { $_.Name -ne "Glance.Tests.pdb" }
+foreach ($symbol in $symbolFiles) {
+    $relativePath = [System.IO.Path]::GetRelativePath($payloadDirectory, $symbol.FullName)
+    $destination = Join-Path $symbolsDirectory $relativePath
+    New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+    Copy-Item -LiteralPath $symbol.FullName -Destination $destination -Force
 }
 
 $developmentArtifacts = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File | Where-Object {

@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test x64
+    runs-on: windows-2025-vs2026
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build Release
+        shell: pwsh
+        run: .\scripts\build.ps1 -Configuration Release -Platform x64
+
+      - name: Run regression tests
+        shell: pwsh
+        run: .\bin\Release\x64\Glance.Tests.exe

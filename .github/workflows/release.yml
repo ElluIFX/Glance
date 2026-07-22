@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v20*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Package x64 release
+    runs-on: windows-2025-vs2026
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Build release assets
+        shell: pwsh
+        run: .\scripts\release.ps1 -Platform x64 -ExpectedTag $env:GITHUB_REF_NAME
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Glance-${{ github.ref_name }}-x64
+          path: artifacts/release/*
+          if-no-files-found: error
+
+      - name: Create draft GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = ".github/release-notes/$env:GITHUB_REF_NAME.md"
+          if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) {
+              throw "Release notes were not found: $notes"
+          }
+          $assets = Get-ChildItem -LiteralPath "artifacts/release" -File |
+              Sort-Object Name |
+              ForEach-Object FullName
+          gh release create $env:GITHUB_REF_NAME @assets `
+              --verify-tag `
+              --draft `
+              --latest `
+              --title "Glance $($env:GITHUB_REF_NAME.TrimStart('v'))" `
+              --notes-file $notes

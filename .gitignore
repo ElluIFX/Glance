@@ -1,7 +1,10 @@
 /.*/
+!/.github/
+!/.github/**
 /*.md
 !/README.md
 !/README.en.md
+!/CHANGELOG.md
 /artifacts/
 bin/
 obj/
