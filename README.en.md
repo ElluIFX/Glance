@@ -13,9 +13,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ElluIFX/glance/releases">Download</a>
+  <a href="https://github.com/ElluIFX/Glance/releases">Download</a>
   ·
-  <a href="https://github.com/ElluIFX/glance/issues">Issues</a>
+  <a href="https://github.com/ElluIFX/Glance/issues">Issues</a>
   ·
   <a href="LICENSE">GPL-3.0</a>
 </p>
@@ -55,12 +55,12 @@ Compared with similar tools, Glance prioritizes stability and reliability — <b
 
 ## 🚀 Usage
 
-Download and install Glance from [Releases](https://github.com/ElluIFX/glance/releases). After launch, select a file and press Space to preview. Settings and Exit are available from the system tray.
+Download and install Glance from [Releases](https://github.com/ElluIFX/Glance/releases). After launch, select a file and press Space to preview. Settings and Exit are available from the system tray.
 
 > Glance targets Windows 11. To stay lightweight, some format previews depend on the Edge WebView2 Runtime. If your system is older or components have been stripped, get the runtime [here](https://developer.microsoft.com/en-us/microsoft-edge/webview2) and install it.
 
 ## 🛠️ Development
 
-Released under the [GNU General Public License v3.0](LICENSE). Feature requests, format-support needs, and bug reports or suggestions are welcome at [Issues](https://github.com/ElluIFX/glance/issues).
+Released under the [GNU General Public License v3.0](LICENSE). Feature requests, format-support needs, and bug reports or suggestions are welcome at [Issues](https://github.com/ElluIFX/Glance/issues).
 
 > When filing an issue, please export full logs via Diagnostics on the Maintenance page in Settings. If you have privacy concerns, sanitize the logs before submitting.

@@ -13,9 +13,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ElluIFX/glance/releases">下载</a>
+  <a href="https://github.com/ElluIFX/Glance/releases">下载</a>
   ·
-  <a href="https://github.com/ElluIFX/glance/issues">反馈问题</a>
+  <a href="https://github.com/ElluIFX/Glance/issues">反馈问题</a>
   ·
   <a href="LICENSE">GPL-3.0</a>
 </p>
@@ -55,12 +55,12 @@
 
 ## 🚀 使用
 
-从 [Releases](https://github.com/ElluIFX/glance/releases) 下载并安装 Glance。运行后，选中文件并按下空格即可预览；设置与退出入口位于系统托盘。
+从 [Releases](https://github.com/ElluIFX/Glance/releases) 下载并安装 Glance。运行后，选中文件并按下空格即可预览；设置与退出入口位于系统托盘。
 
 > Glance 面向 Windows 11 开发。为保持轻量，部分格式预览依赖 Edge WebView2 运行时；若系统版本较低或手动精简了组件，可从[这里](https://developer.microsoft.com/en-us/microsoft-edge/webview2)获取并安装。
 
 ## 🛠️ 开发
 
-遵循 [GNU General Public License v3.0](LICENSE) 开源。功能请求、格式支持需求，以及问题与建议，请提交至 [Issues](https://github.com/ElluIFX/glance/issues)。
+遵循 [GNU General Public License v3.0](LICENSE) 开源。功能请求、格式支持需求，以及问题与建议，请提交至 [Issues](https://github.com/ElluIFX/Glance/issues)。
 
 > 提交问题时，请通过设置中的维护页使用诊断功能导出完整日志；如有隐私顾虑，请先脱敏后再提交。

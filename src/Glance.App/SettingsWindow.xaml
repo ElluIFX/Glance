@@ -923,7 +923,7 @@
                             <HyperlinkButton Padding="0" Content="@Ellu" NavigateUri="https://github.com/ElluIFX" />
                         </StackPanel>
                         <TextBlock x:Name="AboutLicenseText" x:Uid="AboutLicenseText" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="License: GPL-3.0" />
-                        <HyperlinkButton x:Name="AboutProjectLink" x:Uid="AboutProjectLink" HorizontalAlignment="Center" Content="GitHub repository" NavigateUri="https://github.com/ElluIFX/glance" />
+                        <HyperlinkButton x:Name="AboutProjectLink" x:Uid="AboutProjectLink" HorizontalAlignment="Center" Content="GitHub repository" NavigateUri="https://github.com/ElluIFX/Glance" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
