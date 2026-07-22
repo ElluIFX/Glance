@@ -316,6 +316,13 @@
                     <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="WindowBehaviorSectionTitle" x:Uid="WindowBehaviorSectionTitle" Text="Window behavior" />
+                                    <TextBlock x:Name="WindowBehaviorSectionDescription" x:Uid="WindowBehaviorSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Default size, remembered placement, and opacity" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="220" />
@@ -377,12 +384,15 @@
                             </Grid>
                         </StackPanel>
                     </Border>
-                    <StackPanel Spacing="4">
-                        <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" FontSize="14" FontWeight="SemiBold" Text="Adaptive media size" />
-                        <TextBlock x:Name="AdaptiveMediaSizeSectionDescription" x:Uid="AdaptiveMediaSizeSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Window sizing for images, video, PDF, and Office documents" />
-                    </StackPanel>
                     <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" Text="Adaptive media size" />
+                                    <TextBlock x:Name="AdaptiveMediaSizeSectionDescription" x:Uid="AdaptiveMediaSizeSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Window sizing for images, video, and Office documents" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />

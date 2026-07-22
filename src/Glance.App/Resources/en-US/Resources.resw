@@ -74,8 +74,8 @@
   <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>Show content preview</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>Load file</value></data>
   <data name="PreviewAsTextText.Text" xml:space="preserve"><value>Try preview as text</value></data>
-  <data name="SyntaxHighlightDisabledLargeFile" xml:space="preserve"><value>Large file: highlighting paused.</value></data>
-  <data name="AutoFitPausedNotice" xml:space="preserve"><value>Auto fit paused.</value></data>
+  <data name="SyntaxHighlightDisabledLargeFile" xml:space="preserve"><value>Large file: highlighting paused</value></data>
+  <data name="AutoFitPausedNotice" xml:space="preserve"><value>Auto fit paused</value></data>
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>Unable to preview as text</value></data>
   <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show advanced information</value></data>
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
@@ -130,12 +130,14 @@
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>Save diagnostic logs and crash dumps</value></data>
   <data name="WindowPageTitle.Text" xml:space="preserve"><value>Window</value></data>
   <data name="WindowPageDescription.Text" xml:space="preserve"><value>Preview window size, position, and appearance</value></data>
+  <data name="WindowBehaviorSectionTitle.Text" xml:space="preserve"><value>Window behavior</value></data>
+  <data name="WindowBehaviorSectionDescription.Text" xml:space="preserve"><value>Default size, remembered placement, and opacity</value></data>
   <data name="DefaultWindowSizeLabel.Text" xml:space="preserve"><value>Default window size</value></data>
   <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>Width and height used when no saved size applies</value></data>
   <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>Remember window size</value></data>
   <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>Store the last size separately for each preview type</value></data>
   <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>Adaptive media size</value></data>
-  <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>Window sizing for images, video, PDF, and Office documents</value></data>
+  <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>Window sizing for images, video, and Office documents</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Fit the window to the media dimensions</value></data>
   <data name="DynamicAutoFitLabel.Text" xml:space="preserve"><value>Adapt between pages</value></data>

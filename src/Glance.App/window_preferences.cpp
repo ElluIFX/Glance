@@ -103,7 +103,7 @@ namespace glance::app
             .default_height = std::clamp<DWORD>(read_dword(L"DefaultHeight", 520), 320, 4320),
             .remember_size = read_dword(L"RememberSize", 1) != 0,
             .auto_fit_media = read_dword(L"AutoFitMedia", read_legacy_auto_fit() ? 1U : 0U) != 0,
-            .dynamic_auto_fit = read_dword(L"DynamicAutoFit", 1) != 0,
+            .dynamic_auto_fit = read_dword(L"DynamicAutoFit", 0) != 0,
             .adaptive_minimum_percent = std::clamp<DWORD>(
                 read_dword(L"AdaptiveMinimumPercent", 40), 10, 100),
             .adaptive_maximum_percent = std::clamp<DWORD>(

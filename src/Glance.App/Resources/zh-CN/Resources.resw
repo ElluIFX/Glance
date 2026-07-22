@@ -74,8 +74,8 @@
   <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>显示内容预览</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>加载文件</value></data>
   <data name="PreviewAsTextText.Text" xml:space="preserve"><value>尝试以文本预览</value></data>
-  <data name="SyntaxHighlightDisabledLargeFile" xml:space="preserve"><value>文件较大，已暂停高亮。</value></data>
-  <data name="AutoFitPausedNotice" xml:space="preserve"><value>已暂停窗口自适应。</value></data>
+  <data name="SyntaxHighlightDisabledLargeFile" xml:space="preserve"><value>文件较大，已暂停高亮</value></data>
+  <data name="AutoFitPausedNotice" xml:space="preserve"><value>已暂停窗口自适应</value></data>
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>无法以文本预览</value></data>
   <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示高级信息</value></data>
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>系统 ANSI</value></data>
@@ -130,12 +130,14 @@
   <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>保存诊断日志和崩溃转储</value></data>
   <data name="WindowPageTitle.Text" xml:space="preserve"><value>窗口</value></data>
   <data name="WindowPageDescription.Text" xml:space="preserve"><value>预览窗口的尺寸、位置和外观</value></data>
+  <data name="WindowBehaviorSectionTitle.Text" xml:space="preserve"><value>窗口行为</value></data>
+  <data name="WindowBehaviorSectionDescription.Text" xml:space="preserve"><value>默认尺寸、位置记忆与不透明度</value></data>
   <data name="DefaultWindowSizeLabel.Text" xml:space="preserve"><value>默认窗口尺寸</value></data>
   <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>没有可用记忆尺寸时使用的宽度和高度</value></data>
   <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>记忆窗口尺寸</value></data>
   <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口尺寸</value></data>
   <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>自适应媒体尺寸</value></data>
-  <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>图片、视频、PDF 和 Office 文档的窗口尺寸策略</value></data>
+  <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>图片、视频、文档的窗口尺寸策略</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体固有尺寸调整窗口</value></data>
   <data name="DynamicAutoFitLabel.Text" xml:space="preserve"><value>动态适应页面</value></data>

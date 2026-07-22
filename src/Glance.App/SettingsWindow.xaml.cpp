@@ -453,6 +453,8 @@ namespace winrt::Glance::App::implementation
         set_text(DiagnosticsDescription(), L"DiagnosticsDescription.Text");
         set_text(WindowPageTitle(), L"WindowPageTitle.Text");
         set_text(WindowPageDescription(), L"WindowPageDescription.Text");
+        set_text(WindowBehaviorSectionTitle(), L"WindowBehaviorSectionTitle.Text");
+        set_text(WindowBehaviorSectionDescription(), L"WindowBehaviorSectionDescription.Text");
         set_text(DefaultWindowSizeLabel(), L"DefaultWindowSizeLabel.Text");
         set_text(DefaultWindowSizeDescription(), L"DefaultWindowSizeDescription.Text");
         set_text(RememberWindowSizeLabel(), L"RememberWindowSizeLabel.Text");
