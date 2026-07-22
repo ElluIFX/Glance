@@ -4,6 +4,7 @@
 #include "appearance_preferences.h"
 #include "archive_provider.h"
 #include "footer_preferences.h"
+#include "folder_preview_preferences.h"
 #include "generic_preview_preferences.h"
 #include "media_preview_preferences.h"
 #include "preview_file.h"
@@ -20,6 +21,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -59,6 +61,7 @@ namespace winrt::Glance::App::implementation
         void LineNumbersButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void SyntaxHighlightButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void WordWrapButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void ArchiveHeaderButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void EncodingOption_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void TextPreviewScroller_SizeChanged(
             IInspectable const&,
@@ -185,7 +188,6 @@ namespace winrt::Glance::App::implementation
             std::uint64_t generation,
             std::uint64_t source_size,
             std::uint64_t source_modified_time);
-        void apply_archive_preview(glance::app::ArchivePreview preview, std::uint64_t generation);
         struct ArchiveIconTarget
         {
             std::wstring path;
@@ -194,6 +196,22 @@ namespace winrt::Glance::App::implementation
             winrt::weak_ref<Microsoft::UI::Xaml::Controls::Image> image;
             winrt::weak_ref<Microsoft::UI::Xaml::Controls::FontIcon> fallback;
         };
+        struct PendingArchiveNode
+        {
+            const glance::app::ArchiveEntry* entry{};
+            Microsoft::UI::Xaml::Controls::TreeViewNode parent{ nullptr };
+        };
+        struct ArchiveRenderState
+        {
+            glance::app::ArchivePreview preview;
+            std::deque<PendingArchiveNode> pending;
+            std::vector<ArchiveIconTarget> icon_targets;
+            std::wstring status;
+            std::uint64_t generation{};
+        };
+        void apply_archive_preview(glance::app::ArchivePreview preview, std::uint64_t generation);
+        void render_archive_batch(const std::shared_ptr<ArchiveRenderState>& state);
+        void update_archive_header_state();
         winrt::fire_and_forget load_archive_icons_async(
             std::vector<ArchiveIconTarget> targets,
             std::uint64_t generation);
@@ -321,7 +339,11 @@ namespace winrt::Glance::App::implementation
         glance::app::TextEncoding current_text_encoding_{ glance::app::TextEncoding::automatic };
         glance::app::TextPreferences text_preferences_{};
         glance::app::FooterPreferences footer_preferences_{};
+        glance::app::FolderPreviewPreferences folder_preview_preferences_{};
         glance::app::GenericPreviewPreferences generic_preview_preferences_{};
+        std::shared_ptr<ArchiveRenderState> archive_render_state_;
+        bool archive_preview_is_directory_{};
+        bool archive_entry_compressed_size_available_{};
         std::wstring footer_access_mode_;
         bool footer_access_loaded_{};
         bool footer_access_requested_{};

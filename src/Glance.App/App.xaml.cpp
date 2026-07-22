@@ -290,7 +290,8 @@ namespace winrt::Glance::App::implementation
         if (core_watchdog_timer_ == nullptr)
         {
             core_watchdog_timer_ = DispatcherTimer();
-            core_watchdog_timer_.Interval(std::chrono::milliseconds(500));
+            core_watchdog_timer_.Interval(std::chrono::milliseconds(
+                glance::contracts::process_watchdog_interval_ms));
             core_watchdog_timer_.Tick([this](IInspectable const&, IInspectable const&) {
                 if (!shutting_down_.load(std::memory_order_acquire))
                 {
@@ -327,7 +328,7 @@ namespace winrt::Glance::App::implementation
             {
                 return;
             }
-            if (++missed_heartbeats_ >= 3)
+            if (++missed_heartbeats_ >= glance::contracts::process_watchdog_failure_limit)
             {
                 terminate_unresponsive_core();
             }
@@ -340,7 +341,7 @@ namespace winrt::Glance::App::implementation
             {
                 missed_heartbeats_ = 0;
             }
-            else if (++missed_heartbeats_ >= 3)
+            else if (++missed_heartbeats_ >= glance::contracts::process_watchdog_failure_limit)
             {
                 terminate_unresponsive_core();
                 return;
@@ -410,14 +411,16 @@ namespace winrt::Glance::App::implementation
 
     void App::terminate_unresponsive_core()
     {
-        glance::contracts::log_event(L"Core health check failed three times; terminating it for recovery.");
+        glance::contracts::log_event(
+            L"Core health check failed five consecutive times; terminating it for recovery.");
         static_cast<void>(pipe_client_.send(glance::contracts::MessageType::terminate_unresponsive));
         if (core_process_ != nullptr)
         {
             static_cast<void>(TerminateProcess(core_process_, ERROR_PROCESS_ABORTED));
         }
         reset_core_health();
-        core_connection_grace_until_ms_ = GetTickCount64() + 500;
+        core_connection_grace_until_ms_ =
+            GetTickCount64() + glance::contracts::process_watchdog_interval_ms;
     }
 
     void App::create_active_window()

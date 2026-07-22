@@ -36,15 +36,19 @@
   <data name="TextFileSizeError" xml:space="preserve"><value>无法读取文件大小。</value></data>
   <data name="TextDecodeError" xml:space="preserve"><value>无法解码文本编码。</value></data>
   <data name="TextBinaryError" xml:space="preserve"><value>该文件不是可识别的文本格式。</value></data>
-  <data name="ArchiveReadError" xml:space="preserve"><value>Windows ZIP 处理程序无法读取压缩包目录。</value></data>
+  <data name="ArchiveReadError" xml:space="preserve"><value>无法读取压缩包内容。</value></data>
   <data name="FolderReadError" xml:space="preserve"><value>无法读取文件夹。</value></data>
   <data name="FolderType" xml:space="preserve"><value>文件夹</value></data>
   <data name="FileType" xml:space="preserve"><value>文件</value></data>
   <data name="ExtensionFileType" xml:space="preserve"><value>{0} 文件</value></data>
-  <data name="EntryCount" xml:space="preserve"><value>{0} 个条目</value></data>
+  <data name="FileCount" xml:space="preserve"><value>{0} 个文件</value></data>
   <data name="TotalSize" xml:space="preserve"><value>总计 {0}</value></data>
   <data name="PartialTotalSize" xml:space="preserve"><value>总计超过 {0}</value></data>
+  <data name="ArchiveCompressedSize" xml:space="preserve"><value>压缩大小 {0}</value></data>
+  <data name="ArchiveOriginalSize" xml:space="preserve"><value>原始大小 {0}</value></data>
+  <data name="ArchiveCompressionRatio" xml:space="preserve"><value>压缩率 {0}</value></data>
   <data name="ListTruncated" xml:space="preserve"><value>列表已截断</value></data>
+  <data name="ArchiveDepthLimited" xml:space="preserve"><value>最多显示 6 层</value></data>
   <data name="UnknownTime" xml:space="preserve"><value>未知时间</value></data>
   <data name="CoreRunning" xml:space="preserve"><value>正在运行</value></data>
   <data name="CoreNotRunning" xml:space="preserve"><value>未运行</value></data>
@@ -80,6 +84,8 @@
   <data name="ArchiveTypeHeader.Text" xml:space="preserve"><value>类型</value></data>
   <data name="ArchiveModifiedHeader.Text" xml:space="preserve"><value>修改日期</value></data>
   <data name="ArchiveSizeHeader.Text" xml:space="preserve"><value>大小</value></data>
+  <data name="ArchiveCompressedSizeHeader" xml:space="preserve"><value>压缩大小</value></data>
+  <data name="ArchiveOriginalSizeHeader" xml:space="preserve"><value>原始大小</value></data>
   <data name="SyntaxHighlightButton.ToolTipService.ToolTip" xml:space="preserve"><value>语法高亮</value></data>
   <data name="ZoomOutButton.ToolTipService.ToolTip" xml:space="preserve"><value>缩小</value></data>
   <data name="ZoomInButton.ToolTipService.ToolTip" xml:space="preserve"><value>放大</value></data>

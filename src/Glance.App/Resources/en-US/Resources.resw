@@ -36,15 +36,19 @@
   <data name="TextFileSizeError" xml:space="preserve"><value>The file size could not be read.</value></data>
   <data name="TextDecodeError" xml:space="preserve"><value>The text encoding could not be decoded.</value></data>
   <data name="TextBinaryError" xml:space="preserve"><value>The file does not appear to contain text.</value></data>
-  <data name="ArchiveReadError" xml:space="preserve"><value>The archive directory could not be read by the Windows ZIP handler.</value></data>
+  <data name="ArchiveReadError" xml:space="preserve"><value>The archive contents could not be read.</value></data>
   <data name="FolderReadError" xml:space="preserve"><value>The folder could not be read.</value></data>
   <data name="FolderType" xml:space="preserve"><value>Folder</value></data>
   <data name="FileType" xml:space="preserve"><value>File</value></data>
   <data name="ExtensionFileType" xml:space="preserve"><value>{0} file</value></data>
-  <data name="EntryCount" xml:space="preserve"><value>{0} entries</value></data>
+  <data name="FileCount" xml:space="preserve"><value>{0} files</value></data>
   <data name="TotalSize" xml:space="preserve"><value>Total {0}</value></data>
   <data name="PartialTotalSize" xml:space="preserve"><value>Total &gt; {0}</value></data>
+  <data name="ArchiveCompressedSize" xml:space="preserve"><value>Compressed {0}</value></data>
+  <data name="ArchiveOriginalSize" xml:space="preserve"><value>Original {0}</value></data>
+  <data name="ArchiveCompressionRatio" xml:space="preserve"><value>Ratio {0}</value></data>
   <data name="ListTruncated" xml:space="preserve"><value>List truncated</value></data>
+  <data name="ArchiveDepthLimited" xml:space="preserve"><value>Showing up to 6 levels</value></data>
   <data name="UnknownTime" xml:space="preserve"><value>Unknown time</value></data>
   <data name="CoreRunning" xml:space="preserve"><value>Running</value></data>
   <data name="CoreNotRunning" xml:space="preserve"><value>Not running</value></data>
@@ -80,6 +84,8 @@
   <data name="ArchiveTypeHeader.Text" xml:space="preserve"><value>Type</value></data>
   <data name="ArchiveModifiedHeader.Text" xml:space="preserve"><value>Modified</value></data>
   <data name="ArchiveSizeHeader.Text" xml:space="preserve"><value>Size</value></data>
+  <data name="ArchiveCompressedSizeHeader" xml:space="preserve"><value>Compressed size</value></data>
+  <data name="ArchiveOriginalSizeHeader" xml:space="preserve"><value>Original size</value></data>
   <data name="SyntaxHighlightButton.ToolTipService.ToolTip" xml:space="preserve"><value>Syntax highlighting</value></data>
   <data name="ZoomOutButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom out</value></data>
   <data name="ZoomInButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom in</value></data>

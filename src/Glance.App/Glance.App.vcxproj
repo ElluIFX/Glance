@@ -57,6 +57,7 @@
   <ItemGroup>
     <ClInclude Include="archive_provider.h" />
     <ClInclude Include="footer_preferences.h" />
+    <ClInclude Include="folder_preview_preferences.h" />
     <ClInclude Include="generic_file_info.h" />
     <ClInclude Include="generic_preview_preferences.h" />
     <ClInclude Include="appearance_preferences.h" />
@@ -94,6 +95,7 @@
   <ItemGroup>
     <ClCompile Include="archive_provider.cpp" />
     <ClCompile Include="footer_preferences.cpp" />
+    <ClCompile Include="folder_preview_preferences.cpp" />
     <ClCompile Include="generic_file_info.cpp" />
     <ClCompile Include="generic_preview_preferences.cpp" />
     <ClCompile Include="appearance_preferences.cpp" />

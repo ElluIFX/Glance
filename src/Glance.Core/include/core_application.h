@@ -41,7 +41,8 @@ namespace glance::core
         static constexpr UINT selection_interval_ms = 25;
         static constexpr UINT selection_stale_after_ms = 500;
         static constexpr UINT hook_refresh_interval_ms = 1000;
-        static constexpr UINT app_watchdog_interval_ms = 500;
+        static constexpr UINT app_watchdog_interval_ms =
+            glance::contracts::process_watchdog_interval_ms;
 
         static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
         [[nodiscard]] bool create_message_window(HINSTANCE instance);

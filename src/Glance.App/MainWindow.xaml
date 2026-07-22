@@ -528,27 +528,55 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         FontSize="12" />
                     <Grid
+                        x:Name="ArchiveHeaderGrid"
                         Grid.Row="1"
                         Padding="12,0"
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="28" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="110" />
-                            <ColumnDefinition Width="150" />
-                            <ColumnDefinition Width="90" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="ArchiveNameHeader" x:Uid="ArchiveNameHeader" Grid.Column="1" VerticalAlignment="Center" FontSize="11" Text="Name" />
-                        <TextBlock x:Name="ArchiveTypeHeader" x:Uid="ArchiveTypeHeader" Grid.Column="2" VerticalAlignment="Center" FontSize="11" Text="Type" />
-                        <TextBlock x:Name="ArchiveModifiedHeader" x:Uid="ArchiveModifiedHeader" Grid.Column="3" VerticalAlignment="Center" FontSize="11" Text="Modified" />
-                        <TextBlock x:Name="ArchiveSizeHeader" x:Uid="ArchiveSizeHeader" Grid.Column="4" VerticalAlignment="Center" FontSize="11" Text="Size" TextAlignment="Right" />
+                        <Grid.Resources>
+                            <Style x:Key="ArchiveHeaderButtonStyle" TargetType="Button">
+                                <Setter Property="MinWidth" Value="0" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="Padding" Value="8,0" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="CornerRadius" Value="0" />
+                                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                <Setter Property="VerticalAlignment" Value="Stretch" />
+                                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                                <Setter Property="VerticalContentAlignment" Value="Center" />
+                            </Style>
+                        </Grid.Resources>
+                        <Button x:Name="ArchiveNameHeaderButton" Grid.Column="0" Style="{StaticResource ArchiveHeaderButtonStyle}" Tag="name" Click="ArchiveHeaderButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock x:Name="ArchiveNameHeader" x:Uid="ArchiveNameHeader" VerticalAlignment="Center" FontSize="11" Text="Name" />
+                                <FontIcon x:Name="ArchiveNameSortGlyph" FontSize="9" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ArchiveTypeHeaderButton" Grid.Column="1" Style="{StaticResource ArchiveHeaderButtonStyle}" Tag="type" Click="ArchiveHeaderButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock x:Name="ArchiveTypeHeader" x:Uid="ArchiveTypeHeader" VerticalAlignment="Center" FontSize="11" Text="Type" />
+                                <FontIcon x:Name="ArchiveTypeSortGlyph" FontSize="9" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ArchiveModifiedHeaderButton" Grid.Column="2" Style="{StaticResource ArchiveHeaderButtonStyle}" Tag="modified" Click="ArchiveHeaderButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock x:Name="ArchiveThirdHeader" VerticalAlignment="Center" FontSize="11" />
+                                <FontIcon x:Name="ArchiveModifiedSortGlyph" FontSize="9" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ArchiveSizeHeaderButton" Grid.Column="3" Style="{StaticResource ArchiveHeaderButtonStyle}" Tag="size" Click="ArchiveHeaderButton_Click" HorizontalContentAlignment="Right">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock x:Name="ArchiveFourthHeader" VerticalAlignment="Center" FontSize="11" />
+                                <FontIcon x:Name="ArchiveSizeSortGlyph" FontSize="9" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Button>
                     </Grid>
                     <ListView
-                        x:Name="ArchiveEntryList"
+                        x:Name="FolderEntryList"
                         Grid.Row="2"
                         Margin="6,2"
-                        IsItemClickEnabled="False"
-                        SelectionMode="None">
+                        SelectionMode="None"
+                        Visibility="Collapsed">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
                                 <Setter Property="MinHeight" Value="30" />
@@ -557,6 +585,28 @@
                             </Style>
                         </ListView.ItemContainerStyle>
                     </ListView>
+                    <TreeView
+                        x:Name="ArchiveEntryTree"
+                        Grid.Row="2"
+                        Margin="6,2"
+                        CanDragItems="False"
+                        CanReorderItems="False"
+                        SelectionMode="None">
+                        <TreeView.ItemTemplate>
+                            <DataTemplate>
+                                <ContentPresenter
+                                    HorizontalAlignment="Stretch"
+                                    Content="{Binding Content}" />
+                            </DataTemplate>
+                        </TreeView.ItemTemplate>
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem">
+                                <Setter Property="MinHeight" Value="30" />
+                                <Setter Property="Padding" Value="6,2" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                    </TreeView>
                 </Grid>
             </Grid>
         </Grid>

@@ -34,6 +34,7 @@
 #include <iomanip>
 #include <limits>
 #include <optional>
+#include <span>
 #include <sstream>
 #include <unordered_map>
 
@@ -49,6 +50,113 @@ namespace
     constexpr std::size_t long_text_render_threshold = 256U * 1024U;
     constexpr std::uint64_t automatic_syntax_highlight_limit_bytes = 64ULL * 1024ULL;
     constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
+
+    enum class ArchiveColumnKind
+    {
+        name,
+        type,
+        modified_time,
+        compressed_size,
+        original_size,
+    };
+
+    struct ArchiveColumnSpec
+    {
+        ArchiveColumnKind kind;
+        double width;
+    };
+
+    constexpr std::array folder_columns{
+        ArchiveColumnSpec{ ArchiveColumnKind::name, 0.0 },
+        ArchiveColumnSpec{ ArchiveColumnKind::type, 110.0 },
+        ArchiveColumnSpec{ ArchiveColumnKind::modified_time, 150.0 },
+        ArchiveColumnSpec{ ArchiveColumnKind::original_size, 90.0 },
+    };
+    constexpr std::array archive_columns_with_compressed_size{
+        ArchiveColumnSpec{ ArchiveColumnKind::name, 0.0 },
+        ArchiveColumnSpec{ ArchiveColumnKind::type, 90.0 },
+        ArchiveColumnSpec{ ArchiveColumnKind::compressed_size, 110.0 },
+        ArchiveColumnSpec{ ArchiveColumnKind::original_size, 110.0 },
+    };
+    constexpr std::array archive_columns_without_compressed_size{
+        ArchiveColumnSpec{ ArchiveColumnKind::name, 0.0 },
+        ArchiveColumnSpec{ ArchiveColumnKind::type, 100.0 },
+        ArchiveColumnSpec{ ArchiveColumnKind::original_size, 110.0 },
+    };
+
+    std::span<const ArchiveColumnSpec> archive_columns(
+        bool is_directory,
+        bool compressed_size_available) noexcept
+    {
+        if (is_directory)
+        {
+            return folder_columns;
+        }
+        return compressed_size_available
+            ? std::span<const ArchiveColumnSpec>(archive_columns_with_compressed_size)
+            : std::span<const ArchiveColumnSpec>(archive_columns_without_compressed_size);
+    }
+
+    void configure_archive_columns(
+        const Grid& grid,
+        std::span<const ArchiveColumnSpec> columns_to_add)
+    {
+        auto columns = grid.ColumnDefinitions();
+        columns.Clear();
+        for (const auto& spec : columns_to_add)
+        {
+            ColumnDefinition column;
+            column.Width(spec.width == 0.0
+                ? GridLength{ 1, GridUnitType::Star }
+                : GridLength{ spec.width, GridUnitType::Pixel });
+            columns.Append(column);
+        }
+    }
+
+    int compare_case_insensitive(const std::wstring& left, const std::wstring& right) noexcept
+    {
+        return _wcsicmp(left.c_str(), right.c_str());
+    }
+
+    int compare_unsigned(std::uint64_t left, std::uint64_t right) noexcept
+    {
+        return left < right ? -1 : left > right ? 1 : 0;
+    }
+
+    void sort_folder_entries(
+        std::vector<glance::app::ArchiveEntry>& entries,
+        const glance::app::FolderPreviewPreferences& preferences)
+    {
+        std::ranges::sort(entries, [&preferences](const auto& left, const auto& right) {
+            if (left.is_folder != right.is_folder)
+            {
+                return left.is_folder > right.is_folder;
+            }
+
+            int comparison{};
+            switch (preferences.sort_field)
+            {
+            case glance::app::FolderSortField::type:
+                comparison = compare_case_insensitive(left.type_name, right.type_name);
+                break;
+            case glance::app::FolderSortField::modified_time:
+                comparison = compare_unsigned(left.modified_time, right.modified_time);
+                break;
+            case glance::app::FolderSortField::size:
+                comparison = compare_unsigned(left.original_size, right.original_size);
+                break;
+            case glance::app::FolderSortField::name:
+            default:
+                comparison = compare_case_insensitive(left.name, right.name);
+                break;
+            }
+            if (comparison == 0)
+            {
+                comparison = compare_case_insensitive(left.name, right.name);
+            }
+            return preferences.ascending ? comparison < 0 : comparison > 0;
+        });
+    }
 
     std::filesystem::path executable_directory()
     {
@@ -190,6 +298,7 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"MainWindow InitializeComponent begin.");
         InitializeComponent();
         glance::contracts::log_event(L"MainWindow InitializeComponent complete.");
+        folder_preview_preferences_ = glance::app::load_folder_preview_preferences();
         ApplyLocalizedResources();
         ApplyAppearancePreferences();
         text_preferences_ = glance::app::load_text_preferences();
@@ -281,10 +390,7 @@ namespace winrt::Glance::App::implementation
         set_tooltip(MediaMuteButton(), L"MediaMuteButton.ToolTipService.ToolTip");
         set_tooltip(PreviousPdfButton(), L"PreviousPdfButton.ToolTipService.ToolTip");
         set_tooltip(NextPdfButton(), L"NextPdfButton.ToolTipService.ToolTip");
-        ArchiveNameHeader().Text(glance::app::localize(L"ArchiveNameHeader.Text"));
-        ArchiveTypeHeader().Text(glance::app::localize(L"ArchiveTypeHeader.Text"));
-        ArchiveModifiedHeader().Text(glance::app::localize(L"ArchiveModifiedHeader.Text"));
-        ArchiveSizeHeader().Text(glance::app::localize(L"ArchiveSizeHeader.Text"));
+        update_archive_header_state();
         MarkdownPreviewButton().Content(box_value(glance::app::localize(L"MarkdownPreviewButton.Content")));
         MarkdownCodeButton().Content(box_value(glance::app::localize(L"MarkdownCodeButton.Content")));
         SystemAnsiItem().Text(glance::app::localize(L"SystemAnsiItem.Text"));
@@ -316,6 +422,71 @@ namespace winrt::Glance::App::implementation
             update_text_layout();
         }
         update_preview_as_text_button();
+    }
+
+    void MainWindow::update_archive_header_state()
+    {
+        const auto columns = archive_columns(
+            archive_preview_is_directory_,
+            archive_entry_compressed_size_available_);
+        configure_archive_columns(ArchiveHeaderGrid(), columns);
+        ArchiveNameHeader().Text(glance::app::localize(L"ArchiveNameHeader.Text"));
+        ArchiveTypeHeader().Text(glance::app::localize(L"ArchiveTypeHeader.Text"));
+        ArchiveThirdHeader().Text(glance::app::localize(
+            archive_preview_is_directory_
+                ? L"ArchiveModifiedHeader.Text"
+                : archive_entry_compressed_size_available_
+                    ? L"ArchiveCompressedSizeHeader"
+                    : L"ArchiveOriginalSizeHeader"));
+        ArchiveFourthHeader().Text(glance::app::localize(
+            archive_preview_is_directory_
+                ? L"ArchiveSizeHeader.Text"
+                : L"ArchiveOriginalSizeHeader"));
+        ArchiveModifiedHeaderButton().HorizontalContentAlignment(
+            archive_preview_is_directory_
+                ? HorizontalAlignment::Left
+                : HorizontalAlignment::Right);
+        ArchiveSizeHeaderButton().Visibility(
+            columns.size() > 3 ? Visibility::Visible : Visibility::Collapsed);
+
+        const std::array buttons{
+            ArchiveNameHeaderButton(),
+            ArchiveTypeHeaderButton(),
+            ArchiveModifiedHeaderButton(),
+            ArchiveSizeHeaderButton(),
+        };
+        const std::array glyphs{
+            ArchiveNameSortGlyph(),
+            ArchiveTypeSortGlyph(),
+            ArchiveModifiedSortGlyph(),
+            ArchiveSizeSortGlyph(),
+        };
+        for (const auto& button : buttons)
+        {
+            const bool interactive =
+                archive_preview_is_directory_ && button.Visibility() == Visibility::Visible;
+            button.IsHitTestVisible(interactive);
+            button.IsTabStop(interactive);
+        }
+        for (const auto& glyph : glyphs)
+        {
+            glyph.Visibility(Visibility::Collapsed);
+        }
+        FolderEntryList().Visibility(
+            archive_preview_is_directory_ ? Visibility::Visible : Visibility::Collapsed);
+        ArchiveEntryTree().Visibility(
+            archive_preview_is_directory_ ? Visibility::Collapsed : Visibility::Visible);
+        if (!archive_preview_is_directory_)
+        {
+            return;
+        }
+
+        const auto field_index = static_cast<std::size_t>(folder_preview_preferences_.sort_field);
+        if (field_index < glyphs.size())
+        {
+            glyphs[field_index].Glyph(folder_preview_preferences_.ascending ? L"\xE70E" : L"\xE70D");
+            glyphs[field_index].Visibility(Visibility::Visible);
+        }
     }
 
     void MainWindow::ApplyFooterPreferences()
@@ -539,7 +710,12 @@ namespace winrt::Glance::App::implementation
             font_size_overlay_timer_.Stop();
         }
         TextFontSizeOverlay().Visibility(Visibility::Collapsed);
-        ArchiveEntryList().Items().Clear();
+        archive_render_state_.reset();
+        archive_preview_is_directory_ = false;
+        archive_entry_compressed_size_available_ = false;
+        update_archive_header_state();
+        ArchiveEntryTree().RootNodes().Clear();
+        FolderEntryList().Items().Clear();
         ArchiveStatusText().Text(L"");
         FileList().Items().Clear();
         FileList().Visibility(Visibility::Collapsed);
@@ -834,6 +1010,10 @@ namespace winrt::Glance::App::implementation
         basic_info_mode_ = false;
         content_preview_kind_ = glance::app::PreviewKind::generic;
         generic_text_preview_allowed_ = false;
+        archive_render_state_.reset();
+        archive_preview_is_directory_ = false;
+        archive_entry_compressed_size_available_ = false;
+        update_archive_header_state();
         update_preview_mode_button();
         dismiss_preview_info_bar();
         const auto& file = files_[index];
@@ -862,12 +1042,16 @@ namespace winrt::Glance::App::implementation
 
         if ((file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
         {
+            folder_preview_preferences_ = glance::app::load_folder_preview_preferences();
+            archive_preview_is_directory_ = true;
+            update_archive_header_state();
             content_preview_kind_ = glance::app::PreviewKind::archive;
             update_preview_mode_button();
             current_kind_ = glance::app::PreviewKind::archive;
             show_content_panel(current_kind_);
             ArchiveStatusText().Text(glance::app::localize(L"LoadingFolder"));
-            ArchiveEntryList().Items().Clear();
+            ArchiveEntryTree().RootNodes().Clear();
+            FolderEntryList().Items().Clear();
             load_directory_async(file.path, generation);
             return;
         }
@@ -945,7 +1129,8 @@ namespace winrt::Glance::App::implementation
         case glance::app::PreviewKind::archive:
             show_content_panel(kind);
             ArchiveStatusText().Text(glance::app::localize(L"LoadingArchive"));
-            ArchiveEntryList().Items().Clear();
+            ArchiveEntryTree().RootNodes().Clear();
+            FolderEntryList().Items().Clear();
             load_archive_async(file.path, generation);
             break;
         case glance::app::PreviewKind::office:
@@ -1573,25 +1758,109 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
-        auto items = ArchiveEntryList().Items();
-        items.Clear();
-        std::vector<ArchiveIconTarget> icon_targets;
-        icon_targets.reserve(preview.entries.size());
-        for (const auto& entry : preview.entries)
+        archive_entry_compressed_size_available_ =
+            !archive_preview_is_directory_ && preview.entry_compressed_size_available;
+        update_archive_header_state();
+        auto root_nodes = ArchiveEntryTree().RootNodes();
+        root_nodes.Clear();
+        FolderEntryList().Items().Clear();
+        if (archive_preview_is_directory_)
         {
+            sort_folder_entries(preview.entries, folder_preview_preferences_);
+        }
+        auto state = std::make_shared<ArchiveRenderState>();
+        state->preview = std::move(preview);
+        state->generation = generation;
+        state->icon_targets.reserve(state->preview.entry_count);
+        for (const auto& entry : state->preview.entries)
+        {
+            state->pending.push_back(PendingArchiveNode{ &entry, nullptr });
+        }
+        state->status = glance::app::localize_format(
+            L"FileCount",
+            { std::to_wstring(state->preview.file_count) });
+        if (archive_preview_is_directory_)
+        {
+            state->status += L"  |  " + glance::app::localize_format(
+                state->preview.truncated ? L"PartialTotalSize" : L"TotalSize",
+                { state->preview.original_size_known
+                    ? formatted_size(state->preview.original_size)
+                    : std::wstring(L"--") });
+        }
+        else
+        {
+            const auto compressed_size = state->preview.compressed_size_known
+                ? formatted_size(state->preview.compressed_size)
+                : std::wstring(L"--");
+            const auto original_size = state->preview.original_size_known
+                ? formatted_size(state->preview.original_size)
+                : std::wstring(L"--");
+            std::wstring compression_ratio{ L"--" };
+            if (state->preview.compressed_size_known &&
+                state->preview.original_size_known &&
+                state->preview.original_size != 0)
+            {
+                std::wostringstream value;
+                value << std::fixed << std::setprecision(1)
+                      << static_cast<double>(state->preview.compressed_size) * 100.0 /
+                             static_cast<double>(state->preview.original_size)
+                      << L'%';
+                compression_ratio = value.str();
+            }
+            state->status += L"  |  " + glance::app::localize_format(
+                L"ArchiveCompressedSize",
+                { compressed_size });
+            state->status += L"  |  " + glance::app::localize_format(
+                L"ArchiveOriginalSize",
+                { original_size });
+            state->status += L"  |  " + glance::app::localize_format(
+                L"ArchiveCompressionRatio",
+                { compression_ratio });
+        }
+        if (state->preview.truncated)
+        {
+            state->status += L"  |  " + glance::app::localize(L"ListTruncated");
+        }
+        if (state->preview.depth_limited)
+        {
+            state->status += L"  |  " + glance::app::localize(L"ArchiveDepthLimited");
+        }
+        archive_render_state_ = state;
+        render_archive_batch(state);
+    }
+
+    void MainWindow::render_archive_batch(const std::shared_ptr<ArchiveRenderState>& state)
+    {
+        if (state->generation != content_generation_ ||
+            archive_render_state_ != state ||
+            current_kind_ != glance::app::PreviewKind::archive)
+        {
+            return;
+        }
+
+        constexpr std::size_t batch_size = 64;
+        auto root_nodes = ArchiveEntryTree().RootNodes();
+        auto folder_items = FolderEntryList().Items();
+        for (std::size_t index = 0; index < batch_size && !state->pending.empty(); ++index)
+        {
+            const auto pending = std::move(state->pending.front());
+            state->pending.pop_front();
+            const auto& entry = *pending.entry;
+
             Grid row;
+            const auto columns = archive_columns(
+                archive_preview_is_directory_,
+                archive_entry_compressed_size_available_);
+            configure_archive_columns(row, columns);
+
+            Grid name_cell;
+            name_cell.Margin(Thickness{ 8, 0, 8, 0 });
             ColumnDefinition icon_column;
             icon_column.Width(GridLength{ 28, GridUnitType::Pixel });
-            row.ColumnDefinitions().Append(icon_column);
-            ColumnDefinition name_column;
-            name_column.Width(GridLength{ 1, GridUnitType::Star });
-            row.ColumnDefinitions().Append(name_column);
-            for (const double width : { 110.0, 150.0, 90.0 })
-            {
-                ColumnDefinition column;
-                column.Width(GridLength{ width, GridUnitType::Pixel });
-                row.ColumnDefinitions().Append(column);
-            }
+            name_cell.ColumnDefinitions().Append(icon_column);
+            ColumnDefinition name_text_column;
+            name_text_column.Width(GridLength{ 1, GridUnitType::Star });
+            name_cell.ColumnDefinitions().Append(name_text_column);
 
             Grid icon_host;
             icon_host.Width(20);
@@ -1611,27 +1880,35 @@ namespace winrt::Glance::App::implementation
             fallback_icon.FontSize(13);
             fallback_icon.Glyph(entry.is_folder ? L"\xE8B7" : L"\xE8A5");
             icon_host.Children().Append(fallback_icon);
-            row.Children().Append(icon_host);
+            name_cell.Children().Append(icon_host);
 
-            if (!entry.path.empty())
+            TextBlock name_text;
+            name_text.Text(entry.name);
+            name_text.FontSize(12);
+            name_text.VerticalAlignment(VerticalAlignment::Center);
+            name_text.TextTrimming(TextTrimming::CharacterEllipsis);
+            Grid::SetColumn(name_text, 1);
+            name_cell.Children().Append(name_text);
+            Grid::SetColumn(name_cell, 0);
+            row.Children().Append(name_cell);
+
+            const auto icon_path = entry.path.empty() ? entry.name : entry.path;
+            auto extension = entry.is_folder
+                ? std::wstring(L":folder")
+                : std::filesystem::path(icon_path).extension().wstring();
+            std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+                return static_cast<wchar_t>(std::towlower(value));
+            });
+            if (extension.empty())
             {
-                auto extension = entry.is_folder
-                    ? std::wstring(L":folder")
-                    : std::filesystem::path(entry.path).extension().wstring();
-                std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
-                    return static_cast<wchar_t>(std::towlower(value));
-                });
-                if (extension.empty())
-                {
-                    extension = L":file";
-                }
-                icon_targets.push_back(ArchiveIconTarget{
-                    entry.path,
-                    std::move(extension),
-                    entry.is_folder,
-                    make_weak(icon_image),
-                    make_weak(fallback_icon) });
+                extension = L":file";
             }
+            state->icon_targets.push_back(ArchiveIconTarget{
+                icon_path,
+                std::move(extension),
+                entry.is_folder,
+                make_weak(icon_image),
+                make_weak(fallback_icon) });
 
             const auto append_text = [&row](std::wstring_view value, int column, TextAlignment alignment = TextAlignment::Left) {
                 TextBlock text;
@@ -1640,35 +1917,86 @@ namespace winrt::Glance::App::implementation
                 text.VerticalAlignment(VerticalAlignment::Center);
                 text.TextAlignment(alignment);
                 text.TextTrimming(TextTrimming::CharacterEllipsis);
+                text.Margin(Thickness{ 8, 0, 8, 0 });
                 Grid::SetColumn(text, column);
                 row.Children().Append(text);
             };
-            append_text(entry.name, 1);
-            append_text(entry.type_name, 2);
-            append_text(entry.modified_time == 0 ? L"" : formatted_time(entry.modified_time), 3);
-            append_text(entry.is_folder ? L"" : formatted_size(entry.size), 4, TextAlignment::Right);
+            for (std::size_t column = 1; column < columns.size(); ++column)
+            {
+                switch (columns[column].kind)
+                {
+                case ArchiveColumnKind::type:
+                    append_text(entry.type_name, static_cast<int>(column));
+                    break;
+                case ArchiveColumnKind::modified_time:
+                    append_text(
+                        entry.modified_time == 0 ? L"" : formatted_time(entry.modified_time),
+                        static_cast<int>(column));
+                    break;
+                case ArchiveColumnKind::compressed_size:
+                    append_text(
+                        entry.is_folder
+                            ? L""
+                            : entry.compressed_size_known
+                                ? formatted_size(entry.compressed_size)
+                                : L"--",
+                        static_cast<int>(column),
+                        TextAlignment::Right);
+                    break;
+                case ArchiveColumnKind::original_size:
+                    append_text(
+                        entry.is_folder
+                            ? L""
+                            : entry.original_size_known
+                                ? formatted_size(entry.original_size)
+                                : L"--",
+                        static_cast<int>(column),
+                        TextAlignment::Right);
+                    break;
+                case ArchiveColumnKind::name:
+                default:
+                    break;
+                }
+            }
 
-            ListViewItem item;
-            item.Content(row);
-            items.Append(item);
+            if (archive_preview_is_directory_)
+            {
+                ListViewItem item;
+                item.Content(row);
+                folder_items.Append(item);
+            }
+            else
+            {
+                TreeViewNode node;
+                node.Content(row);
+                if (pending.parent != nullptr)
+                {
+                    pending.parent.Children().Append(node);
+                }
+                else
+                {
+                    root_nodes.Append(node);
+                }
+                for (const auto& child : entry.children)
+                {
+                    state->pending.push_back(PendingArchiveNode{ &child, node });
+                }
+            }
         }
-        std::wstring status = glance::app::localize_format(
-            L"EntryCount",
-            { std::to_wstring(preview.entries.size()) });
-        if (preview.show_total_size)
+
+        if (!state->pending.empty())
         {
-            status += L"  |  " + glance::app::localize_format(
-                preview.truncated ? L"PartialTotalSize" : L"TotalSize",
-                { formatted_size(preview.total_size) });
+            const auto lifetime = get_strong();
+            static_cast<void>(DispatcherQueue().TryEnqueue([lifetime, state] {
+                lifetime->render_archive_batch(state);
+            }));
+            return;
         }
-        if (preview.truncated)
+
+        ArchiveStatusText().Text(state->status);
+        if (!state->icon_targets.empty())
         {
-            status += L"  |  " + glance::app::localize(L"ListTruncated");
-        }
-        ArchiveStatusText().Text(status);
-        if (!icon_targets.empty())
-        {
-            load_archive_icons_async(std::move(icon_targets), generation);
+            load_archive_icons_async(std::move(state->icon_targets), state->generation);
         }
     }
 
@@ -3078,6 +3406,56 @@ namespace winrt::Glance::App::implementation
         text_preferences_.word_wrap = word_wrap_;
         glance::app::save_text_preferences(text_preferences_);
         update_text_layout();
+    }
+
+    void MainWindow::ArchiveHeaderButton_Click(IInspectable const& sender, RoutedEventArgs const&)
+    {
+        if (!archive_preview_is_directory_)
+        {
+            return;
+        }
+
+        const auto button = sender.try_as<Button>();
+        const auto tag = button != nullptr
+            ? unbox_value_or<hstring>(button.Tag(), L"")
+            : hstring{};
+        auto field = glance::app::FolderSortField::name;
+        if (tag == L"type")
+        {
+            field = glance::app::FolderSortField::type;
+        }
+        else if (tag == L"modified")
+        {
+            field = glance::app::FolderSortField::modified_time;
+        }
+        else if (tag == L"size")
+        {
+            field = glance::app::FolderSortField::size;
+        }
+
+        if (folder_preview_preferences_.sort_field == field)
+        {
+            folder_preview_preferences_.ascending = !folder_preview_preferences_.ascending;
+        }
+        else
+        {
+            folder_preview_preferences_.sort_field = field;
+            folder_preview_preferences_.ascending = true;
+        }
+        glance::app::save_folder_preview_preferences(folder_preview_preferences_);
+        update_archive_header_state();
+
+        if (archive_render_state_ == nullptr)
+        {
+            return;
+        }
+
+        auto preview = std::move(archive_render_state_->preview);
+        archive_render_state_.reset();
+        ArchiveEntryTree().RootNodes().Clear();
+        FolderEntryList().Items().Clear();
+        ArchiveStatusText().Text(glance::app::localize(L"LoadingFolder"));
+        apply_archive_preview(std::move(preview), content_generation_);
     }
 
     void MainWindow::EncodingOption_Click(IInspectable const& sender, RoutedEventArgs const&)

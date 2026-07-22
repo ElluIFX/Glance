@@ -9,6 +9,8 @@ namespace glance::contracts
     inline constexpr std::uint32_t frame_magic = 0x434E4C47;
     inline constexpr std::uint16_t protocol_version = 1;
     inline constexpr std::uint32_t maximum_payload_size = 1024U * 1024U;
+    inline constexpr std::uint32_t process_watchdog_interval_ms = 1000;
+    inline constexpr std::uint32_t process_watchdog_failure_limit = 5;
     inline constexpr wchar_t pipe_name[] = LR"(\\.\pipe\Glance.Core.v1)";
 
     enum class MessageType : std::uint16_t

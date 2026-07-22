@@ -459,7 +459,7 @@ namespace glance::core
             {
                 return;
             }
-            if (++missed_heartbeats_ >= 3)
+            if (++missed_heartbeats_ >= glance::contracts::process_watchdog_failure_limit)
             {
                 terminate_unresponsive_app();
             }
@@ -472,7 +472,7 @@ namespace glance::core
             {
                 missed_heartbeats_ = 0;
             }
-            else if (++missed_heartbeats_ >= 3)
+            else if (++missed_heartbeats_ >= glance::contracts::process_watchdog_failure_limit)
             {
                 terminate_unresponsive_app();
                 return;
@@ -549,7 +549,8 @@ namespace glance::core
 
     void CoreApplication::terminate_unresponsive_app()
     {
-        glance::contracts::log_event(L"UI health check failed three times; terminating it for recovery.");
+        glance::contracts::log_event(
+            L"UI health check failed five consecutive times; terminating it for recovery.");
         input_state_.ui_connected.store(false, std::memory_order_release);
         preview_state_.store(
             glance::contracts::PreviewWindowState::hidden,
@@ -561,7 +562,8 @@ namespace glance::core
             static_cast<void>(TerminateProcess(app_process_.get(), ERROR_PROCESS_ABORTED));
         }
         reset_app_health();
-        app_connection_grace_until_ms_ = GetTickCount64() + 500;
+        app_connection_grace_until_ms_ =
+            GetTickCount64() + glance::contracts::process_watchdog_interval_ms;
     }
 
     bool CoreApplication::launch_app()
