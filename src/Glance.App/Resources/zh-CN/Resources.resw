@@ -67,7 +67,7 @@
   <data name="PositionsReset" xml:space="preserve"><value>已重置保存的窗口位置</value></data>
   <data name="PositionsResetFailed" xml:space="preserve"><value>无法重置保存的窗口位置</value></data>
 
-  <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>始终置顶</value></data>
+  <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>始终显示</value></data>
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>钉住文件</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭预览</value></data>
   <data name="PreviewModeShowInfoTooltip" xml:space="preserve"><value>显示基础信息</value></data>

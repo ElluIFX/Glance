@@ -320,6 +320,7 @@ namespace winrt::Glance::App::implementation
         void set_image_zoom(float zoom, Windows::Foundation::Point anchor);
         void end_image_pan(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         void update_state();
+        void update_window_action_visibility();
         void set_topmost(bool enabled);
         void start_detached_focus_monitor();
         void stop_detached_focus_monitor();

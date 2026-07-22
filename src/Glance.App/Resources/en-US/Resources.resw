@@ -67,7 +67,7 @@
   <data name="PositionsReset" xml:space="preserve"><value>Saved positions reset</value></data>
   <data name="PositionsResetFailed" xml:space="preserve"><value>Could not reset saved positions</value></data>
 
-  <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>Always on top</value></data>
+  <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>Always visible</value></data>
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>Pin file</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close preview</value></data>
   <data name="PreviewModeShowInfoTooltip" xml:space="preserve"><value>Show basic information</value></data>

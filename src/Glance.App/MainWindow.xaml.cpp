@@ -670,6 +670,7 @@ namespace winrt::Glance::App::implementation
             user_sized_ = false;
             TopmostButton().IsChecked(false);
             PinButton().IsChecked(false);
+            update_window_action_visibility();
         }
         visible_ = true;
 
@@ -4985,22 +4986,31 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::PinButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        pinned_ = PinButton().IsChecked().Value();
-        topmost_ = pinned_;
-        TopmostButton().IsChecked(topmost_);
-        set_topmost(topmost_);
-        if (detached_ && !pinned_)
+        const bool pin_requested = PinButton().IsChecked().Value();
+        if (detached_ && !pin_requested)
         {
-            state_ = glance::contracts::PreviewWindowState::detached_unpinned;
-            foreground_when_unpinned_ = GetForegroundWindow();
-            start_detached_focus_monitor();
-            if (state_callback_)
-            {
-                state_callback_(instance_id_, state_);
-            }
+            stop_detached_focus_monitor();
+            clear_preview_content();
+            Close();
             return;
         }
+
+        pinned_ = pin_requested;
+        if (pinned_)
+        {
+            topmost_ = true;
+            TopmostButton().IsChecked(true);
+            set_topmost(true);
+        }
+        update_window_action_visibility();
         update_state();
+    }
+
+    void MainWindow::update_window_action_visibility()
+    {
+        const auto visibility = pinned_ ? Visibility::Collapsed : Visibility::Visible;
+        TopmostButton().Visibility(visibility);
+        ClosePreviewButton().Visibility(visibility);
     }
 
     void MainWindow::update_state()

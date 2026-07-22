@@ -38,24 +38,24 @@
                 <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE7C3;" />
             </ToggleButton>
             <ToggleButton
-                x:Name="TopmostButton"
-                x:Uid="TopmostButton"
-                Grid.Column="2"
-                Style="{StaticResource IconToggleButtonStyle}"
-                Margin="4,0,0,0"
-                Click="TopmostButton_Click"
-                ToolTipService.ToolTip="Always on top">
-                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE74A;" />
-            </ToggleButton>
-            <ToggleButton
                 x:Name="PinButton"
                 x:Uid="PinButton"
-                Grid.Column="3"
+                Grid.Column="2"
                 Style="{StaticResource IconToggleButtonStyle}"
                 Margin="4,0,0,0"
                 Click="PinButton_Click"
                 ToolTipService.ToolTip="Pin file">
                 <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE718;" />
+            </ToggleButton>
+            <ToggleButton
+                x:Name="TopmostButton"
+                x:Uid="TopmostButton"
+                Grid.Column="3"
+                Style="{StaticResource IconToggleButtonStyle}"
+                Margin="4,0,0,0"
+                Click="TopmostButton_Click"
+                ToolTipService.ToolTip="Always visible">
+                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE74A;" />
             </ToggleButton>
             <Button
                 x:Name="ClosePreviewButton"
