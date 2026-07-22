@@ -133,8 +133,17 @@
   <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>没有可用记忆尺寸时使用的宽度和高度</value></data>
   <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>记忆窗口尺寸</value></data>
   <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口尺寸</value></data>
-  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应媒体窗口尺寸</value></data>
-  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体固有尺寸调整初始窗口尺寸</value></data>
+  <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>自适应媒体尺寸</value></data>
+  <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>图片、视频、PDF 和 Office 文档的窗口尺寸策略</value></data>
+  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
+  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体固有尺寸调整窗口</value></data>
+  <data name="DynamicAutoFitLabel.Text" xml:space="preserve"><value>动态适应页面</value></data>
+  <data name="DynamicAutoFitDescription.Text" xml:space="preserve"><value>页面尺寸变化时同步调整窗口尺寸</value></data>
+  <data name="AdaptiveSizeRangeLabel.Text" xml:space="preserve"><value>自适应尺寸范围</value></data>
+  <data name="AdaptiveSizeRangeDescription.Text" xml:space="preserve"><value>窗口占显示器工作区的最小和最大比例</value></data>
+  <data name="AutoFitIgnoredExtensionsLabel.Text" xml:space="preserve"><value>忽略后缀</value></data>
+  <data name="AutoFitIgnoredExtensionsDescription.Text" xml:space="preserve"><value>使用分号分隔，后缀开头的点可省略</value></data>
+  <data name="AutoFitIgnoredExtensionsTextBox.PlaceholderText" xml:space="preserve"><value>.gif; webp; mp4</value></data>
   <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>记忆窗口位置</value></data>
   <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口位置</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>重置</value></data>

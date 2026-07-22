@@ -364,18 +364,6 @@
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="AutoFitWindowSizeLabel" x:Uid="AutoFitWindowSizeLabel" Text="Auto fit media window size" />
-                                    <TextBlock x:Name="AutoFitWindowSizeDescription" x:Uid="AutoFitWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Fit the initial window size to media dimensions" />
-                                </StackPanel>
-                                <ToggleSwitch x:Name="AutoFitWindowSizeToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="220" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
@@ -386,6 +374,66 @@
                                     <NumberBox x:Name="WindowOpacityNumberBox" Width="184" Minimum="10" Maximum="100" SmallChange="5" SpinButtonPlacementMode="Inline" Loaded="NumberBox_Loaded" ValueChanged="WindowNumberBox_ValueChanged" />
                                     <TextBlock VerticalAlignment="Center" Text="%" />
                                 </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" FontSize="14" FontWeight="SemiBold" Text="Adaptive media size" />
+                        <TextBlock x:Name="AdaptiveMediaSizeSectionDescription" x:Uid="AdaptiveMediaSizeSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Window sizing for images, video, PDF, and Office documents" />
+                    </StackPanel>
+                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="AutoFitWindowSizeLabel" x:Uid="AutoFitWindowSizeLabel" Text="Auto fit window size" />
+                                    <TextBlock x:Name="AutoFitWindowSizeDescription" x:Uid="AutoFitWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Fit the window to the media dimensions" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="AutoFitWindowSizeToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="DynamicAutoFitLabel" x:Uid="DynamicAutoFitLabel" Text="Adapt between pages" />
+                                    <TextBlock x:Name="DynamicAutoFitDescription" x:Uid="DynamicAutoFitDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Resize the window when the page dimensions change" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="DynamicAutoFitToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="AdaptiveSizeRangeLabel" x:Uid="AdaptiveSizeRangeLabel" Text="Adaptive size range" />
+                                    <TextBlock x:Name="AdaptiveSizeRangeDescription" x:Uid="AdaptiveSizeRangeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Minimum and maximum share of the monitor work area" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="6">
+                                    <NumberBox x:Name="AdaptiveMinimumPercentNumberBox" Width="82" Minimum="10" Maximum="100" SmallChange="5" SpinButtonPlacementMode="Compact" Loaded="NumberBox_Loaded" ValueChanged="WindowNumberBox_ValueChanged" />
+                                    <TextBlock VerticalAlignment="Center" Text="–" />
+                                    <NumberBox x:Name="AdaptiveMaximumPercentNumberBox" Width="82" Minimum="10" Maximum="100" SmallChange="5" SpinButtonPlacementMode="Compact" Loaded="NumberBox_Loaded" ValueChanged="WindowNumberBox_ValueChanged" />
+                                    <TextBlock VerticalAlignment="Center" Text="%" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="280" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="AutoFitIgnoredExtensionsLabel" x:Uid="AutoFitIgnoredExtensionsLabel" Text="Ignored extensions" />
+                                    <TextBlock x:Name="AutoFitIgnoredExtensionsDescription" x:Uid="AutoFitIgnoredExtensionsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Separate extensions with semicolons; leading dots are optional" />
+                                </StackPanel>
+                                <TextBox x:Name="AutoFitIgnoredExtensionsTextBox" x:Uid="AutoFitIgnoredExtensionsTextBox" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" PlaceholderText=".gif; webp; mp4" TextChanged="AutoFitIgnoredExtensionsTextBox_TextChanged" />
                             </Grid>
                         </StackPanel>
                     </Border>

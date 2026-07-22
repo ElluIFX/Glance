@@ -156,8 +156,11 @@ namespace winrt::Glance::App::implementation
             DWORD_PTR reference_data) noexcept;
         void configure_window();
         void position_initial_window(bool ignore_saved_size = false);
-        void auto_fit_window_to_content(double width, double height) noexcept;
-        [[nodiscard]] bool auto_fit_applies() const noexcept;
+        void auto_fit_window_to_content(
+            double width,
+            double height,
+            bool dynamic_update = false) noexcept;
+        [[nodiscard]] bool auto_fit_applies(bool dynamic_update = false) const noexcept;
         void save_current_window_placement() const noexcept;
         void clear_preview_content();
         void cancel_office_conversion() noexcept;
@@ -196,7 +199,10 @@ namespace winrt::Glance::App::implementation
             std::wstring path,
             std::uint64_t generation,
             std::wstring password = {});
-        winrt::fire_and_forget render_pdf_page_async(std::uint32_t page_index, std::uint64_t generation);
+        winrt::fire_and_forget render_pdf_page_async(
+            std::uint32_t page_index,
+            std::uint64_t generation,
+            bool dynamic_update = false);
         winrt::fire_and_forget load_pdf_thumbnails_async(std::uint64_t generation);
         void apply_pdf_open_result(
             std::shared_ptr<glance::app::PdfRenderClient> session,
@@ -234,7 +240,8 @@ namespace winrt::Glance::App::implementation
             std::uint64_t generation);
         winrt::fire_and_forget render_office_page_async(
             std::uint32_t page_index,
-            std::uint64_t generation);
+            std::uint64_t generation,
+            bool dynamic_update = false);
         winrt::fire_and_forget load_office_thumbnail_async(
             std::uint32_t page_index,
             std::uint64_t generation,

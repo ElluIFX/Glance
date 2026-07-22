@@ -133,8 +133,17 @@
   <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>Width and height used when no saved size applies</value></data>
   <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>Remember window size</value></data>
   <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>Store the last size separately for each preview type</value></data>
-  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit media window size</value></data>
-  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Fit the initial window size to media dimensions</value></data>
+  <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>Adaptive media size</value></data>
+  <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>Window sizing for images, video, PDF, and Office documents</value></data>
+  <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
+  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Fit the window to the media dimensions</value></data>
+  <data name="DynamicAutoFitLabel.Text" xml:space="preserve"><value>Adapt between pages</value></data>
+  <data name="DynamicAutoFitDescription.Text" xml:space="preserve"><value>Resize the window when the page dimensions change</value></data>
+  <data name="AdaptiveSizeRangeLabel.Text" xml:space="preserve"><value>Adaptive size range</value></data>
+  <data name="AdaptiveSizeRangeDescription.Text" xml:space="preserve"><value>Minimum and maximum share of the monitor work area</value></data>
+  <data name="AutoFitIgnoredExtensionsLabel.Text" xml:space="preserve"><value>Ignored extensions</value></data>
+  <data name="AutoFitIgnoredExtensionsDescription.Text" xml:space="preserve"><value>Separate extensions with semicolons; leading dots are optional</value></data>
+  <data name="AutoFitIgnoredExtensionsTextBox.PlaceholderText" xml:space="preserve"><value>.gif; webp; mp4</value></data>
   <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>Remember window position</value></data>
   <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>Store the last position separately for each preview type</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>Reset</value></data>

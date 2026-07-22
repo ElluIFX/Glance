@@ -946,9 +946,13 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    bool MainWindow::auto_fit_applies() const noexcept
+    bool MainWindow::auto_fit_applies(bool dynamic_update) const noexcept
     {
-        if (topmost_ || user_sized_ || !glance::app::load_window_preferences().auto_fit_media)
+        const auto preferences = glance::app::load_window_preferences();
+        if (topmost_ || user_sized_ || !preferences.auto_fit_media ||
+            (dynamic_update && !preferences.dynamic_auto_fit) ||
+            (current_index_ < files_.size() &&
+                glance::app::auto_fit_ignores_path(preferences, files_[current_index_].path)))
         {
             return false;
         }
@@ -958,9 +962,12 @@ namespace winrt::Glance::App::implementation
             (current_kind_ == glance::app::PreviewKind::media && !media_is_audio_);
     }
 
-    void MainWindow::auto_fit_window_to_content(double content_width, double content_height) noexcept
+    void MainWindow::auto_fit_window_to_content(
+        double content_width,
+        double content_height,
+        bool dynamic_update) noexcept
     {
-        if (!auto_fit_applies() || window_ == nullptr ||
+        if (!auto_fit_applies(dynamic_update) || window_ == nullptr ||
             content_width <= 0.0 || content_height <= 0.0)
         {
             return;
@@ -996,10 +1003,21 @@ namespace winrt::Glance::App::implementation
         const int vertical_chrome = std::max(0, current_height - static_cast<int>(std::lround(panel.ActualHeight())));
         const int work_width = info.rcWork.right - info.rcWork.left;
         const int work_height = info.rcWork.bottom - info.rcWork.top;
-        const int maximum_width = std::max(1, static_cast<int>(std::floor(work_width * 0.75)));
-        const int maximum_height = std::max(1, static_cast<int>(std::floor(work_height * 0.75)));
-        const int adaptive_minimum_width = std::max(1, static_cast<int>(std::ceil(work_width * 0.40)));
-        const int adaptive_minimum_height = std::max(1, static_cast<int>(std::ceil(work_height * 0.40)));
+        const auto preferences = glance::app::load_window_preferences();
+        const double maximum_fraction = preferences.adaptive_maximum_percent / 100.0;
+        const double minimum_fraction = preferences.adaptive_minimum_percent / 100.0;
+        const int maximum_width = std::max(
+            1,
+            static_cast<int>(std::floor(work_width * maximum_fraction)));
+        const int maximum_height = std::max(
+            1,
+            static_cast<int>(std::floor(work_height * maximum_fraction)));
+        const int adaptive_minimum_width = std::max(
+            1,
+            static_cast<int>(std::ceil(work_width * minimum_fraction)));
+        const int adaptive_minimum_height = std::max(
+            1,
+            static_cast<int>(std::ceil(work_height * minimum_fraction)));
         const UINT dpi = GetDpiForWindow(window_);
         const int minimum_width = std::min(maximum_width, MulDiv(480, static_cast<int>(dpi), 96));
         const int minimum_height = std::min(maximum_height, MulDiv(320, static_cast<int>(dpi), 96));
@@ -1029,7 +1047,7 @@ namespace winrt::Glance::App::implementation
             static_cast<int>(std::lround(content_height * scale)) + vertical_chrome,
             minimum_height,
             maximum_height);
-        const bool preserve_position = glance::app::load_window_preferences().remember_position;
+        const bool preserve_position = preferences.remember_position;
         const int x = preserve_position
             ? std::clamp(bounds.left, info.rcWork.left, std::max(info.rcWork.left, info.rcWork.right - width))
             : info.rcWork.left + (work_width - width) / 2;
@@ -1819,7 +1837,8 @@ namespace winrt::Glance::App::implementation
 
     fire_and_forget MainWindow::render_pdf_page_async(
         std::uint32_t page_index,
-        std::uint64_t generation)
+        std::uint64_t generation,
+        bool dynamic_update)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
@@ -1854,7 +1873,8 @@ namespace winrt::Glance::App::implementation
             rendered = std::move(rendered),
             page_index,
             request,
-            generation]() mutable {
+            generation,
+            dynamic_update]() mutable {
             using glance::contracts::pdf::Status;
             if (generation != lifetime->content_generation_ ||
                 session != lifetime->pdf_render_client_ ||
@@ -1880,7 +1900,8 @@ namespace winrt::Glance::App::implementation
                 lifetime->sync_pdf_thumbnail_selection();
                 lifetime->auto_fit_window_to_content(
                     rendered.page_width_points,
-                    rendered.page_height_points);
+                    rendered.page_height_points,
+                    dynamic_update);
             }
             catch (const hresult_error& error)
             {
@@ -2417,7 +2438,8 @@ namespace winrt::Glance::App::implementation
 
     fire_and_forget MainWindow::render_office_page_async(
         std::uint32_t page_index,
-        std::uint64_t generation)
+        std::uint64_t generation,
+        bool dynamic_update)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
@@ -2458,7 +2480,8 @@ namespace winrt::Glance::App::implementation
             rendered = std::move(rendered),
             page_index,
             request,
-            generation]() mutable {
+            generation,
+            dynamic_update]() mutable {
             if (generation != lifetime->content_generation_ ||
                 office_session != lifetime->office_preview_client_ ||
                 render_session != lifetime->pdf_render_client_ ||
@@ -2484,7 +2507,8 @@ namespace winrt::Glance::App::implementation
                 lifetime->sync_pdf_thumbnail_selection();
                 lifetime->auto_fit_window_to_content(
                     rendered.page_width_points,
-                    rendered.page_height_points);
+                    rendered.page_height_points,
+                    dynamic_update);
                 lifetime->load_office_thumbnail_async(page_index, generation);
             }
             catch (const hresult_error&)
@@ -4834,11 +4858,11 @@ namespace winrt::Glance::App::implementation
         static_cast<void>(PdfScroller().ChangeView(nullptr, nullptr, 1.0F, true));
         if (office_emf_preview_)
         {
-            render_office_page_async(page_index, content_generation_);
+            render_office_page_async(page_index, content_generation_, true);
         }
         else
         {
-            render_pdf_page_async(page_index, content_generation_);
+            render_pdf_page_async(page_index, content_generation_, true);
         }
     }
 

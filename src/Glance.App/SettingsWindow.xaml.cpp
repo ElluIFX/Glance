@@ -264,8 +264,13 @@ namespace winrt::Glance::App::implementation
         DefaultWindowHeightNumberBox().Value(window_preferences_.default_height);
         RememberWindowSizeToggle().IsOn(window_preferences_.remember_size);
         AutoFitWindowSizeToggle().IsOn(window_preferences_.auto_fit_media);
+        DynamicAutoFitToggle().IsOn(window_preferences_.dynamic_auto_fit);
+        AdaptiveMinimumPercentNumberBox().Value(window_preferences_.adaptive_minimum_percent);
+        AdaptiveMaximumPercentNumberBox().Value(window_preferences_.adaptive_maximum_percent);
+        AutoFitIgnoredExtensionsTextBox().Text(window_preferences_.auto_fit_ignored_extensions);
         RememberWindowPositionToggle().IsOn(window_preferences_.remember_position);
         WindowOpacityNumberBox().Value(window_preferences_.opacity_percent);
+        update_auto_fit_controls_enabled();
         media_preview_preferences_ = glance::app::load_media_preview_preferences();
         DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
         DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
@@ -454,6 +459,16 @@ namespace winrt::Glance::App::implementation
         set_text(RememberWindowSizeDescription(), L"RememberWindowSizeDescription.Text");
         set_text(AutoFitWindowSizeLabel(), L"AutoFitWindowSizeLabel.Text");
         set_text(AutoFitWindowSizeDescription(), L"AutoFitWindowSizeDescription.Text");
+        set_text(AdaptiveMediaSizeSectionTitle(), L"AdaptiveMediaSizeSectionTitle.Text");
+        set_text(AdaptiveMediaSizeSectionDescription(), L"AdaptiveMediaSizeSectionDescription.Text");
+        set_text(DynamicAutoFitLabel(), L"DynamicAutoFitLabel.Text");
+        set_text(DynamicAutoFitDescription(), L"DynamicAutoFitDescription.Text");
+        set_text(AdaptiveSizeRangeLabel(), L"AdaptiveSizeRangeLabel.Text");
+        set_text(AdaptiveSizeRangeDescription(), L"AdaptiveSizeRangeDescription.Text");
+        set_text(AutoFitIgnoredExtensionsLabel(), L"AutoFitIgnoredExtensionsLabel.Text");
+        set_text(AutoFitIgnoredExtensionsDescription(), L"AutoFitIgnoredExtensionsDescription.Text");
+        AutoFitIgnoredExtensionsTextBox().PlaceholderText(
+            glance::app::localize(L"AutoFitIgnoredExtensionsTextBox.PlaceholderText"));
         set_content(ResetWindowSizesButton(), L"ResetWindowSizesButton.Content");
         set_text(RememberWindowPositionLabel(), L"RememberWindowPositionLabel.Text");
         set_text(RememberWindowPositionDescription(), L"RememberWindowPositionDescription.Text");
@@ -628,7 +643,9 @@ namespace winrt::Glance::App::implementation
         {
             window_preferences_.remember_size = RememberWindowSizeToggle().IsOn();
             window_preferences_.auto_fit_media = AutoFitWindowSizeToggle().IsOn();
+            window_preferences_.dynamic_auto_fit = DynamicAutoFitToggle().IsOn();
             window_preferences_.remember_position = RememberWindowPositionToggle().IsOn();
+            update_auto_fit_controls_enabled();
             glance::app::save_window_preferences(window_preferences_);
             if (window_preferences_changed_callback_)
             {
@@ -638,7 +655,7 @@ namespace winrt::Glance::App::implementation
     }
 
     void SettingsWindow::WindowNumberBox_ValueChanged(
-        IInspectable const&,
+        IInspectable const& sender,
         Controls::NumberBoxValueChangedEventArgs const&)
     {
         if (initializing_)
@@ -649,12 +666,17 @@ namespace winrt::Glance::App::implementation
         const double width = DefaultWindowWidthNumberBox().Value();
         const double height = DefaultWindowHeightNumberBox().Value();
         const double opacity = WindowOpacityNumberBox().Value();
-        if (!std::isfinite(width) || !std::isfinite(height) || !std::isfinite(opacity))
+        const double adaptive_minimum = AdaptiveMinimumPercentNumberBox().Value();
+        const double adaptive_maximum = AdaptiveMaximumPercentNumberBox().Value();
+        if (!std::isfinite(width) || !std::isfinite(height) || !std::isfinite(opacity) ||
+            !std::isfinite(adaptive_minimum) || !std::isfinite(adaptive_maximum))
         {
             initializing_ = true;
             DefaultWindowWidthNumberBox().Value(window_preferences_.default_width);
             DefaultWindowHeightNumberBox().Value(window_preferences_.default_height);
             WindowOpacityNumberBox().Value(window_preferences_.opacity_percent);
+            AdaptiveMinimumPercentNumberBox().Value(window_preferences_.adaptive_minimum_percent);
+            AdaptiveMaximumPercentNumberBox().Value(window_preferences_.adaptive_maximum_percent);
             initializing_ = false;
             return;
         }
@@ -665,11 +687,59 @@ namespace winrt::Glance::App::implementation
             std::clamp(std::lround(height), 320L, 4320L));
         window_preferences_.opacity_percent = static_cast<std::uint32_t>(
             std::clamp(std::lround(opacity), 10L, 100L));
+        auto minimum_percent = static_cast<std::uint32_t>(
+            std::clamp(std::lround(adaptive_minimum), 10L, 100L));
+        auto maximum_percent = static_cast<std::uint32_t>(
+            std::clamp(std::lround(adaptive_maximum), 10L, 100L));
+        if (minimum_percent > maximum_percent)
+        {
+            const auto control = sender.try_as<Controls::NumberBox>();
+            if (control != nullptr && control.Name() == L"AdaptiveMinimumPercentNumberBox")
+            {
+                maximum_percent = minimum_percent;
+            }
+            else
+            {
+                minimum_percent = maximum_percent;
+            }
+            initializing_ = true;
+            AdaptiveMinimumPercentNumberBox().Value(minimum_percent);
+            AdaptiveMaximumPercentNumberBox().Value(maximum_percent);
+            initializing_ = false;
+        }
+        window_preferences_.adaptive_minimum_percent = minimum_percent;
+        window_preferences_.adaptive_maximum_percent = maximum_percent;
         glance::app::save_window_preferences(window_preferences_);
         if (window_preferences_changed_callback_)
         {
             window_preferences_changed_callback_();
         }
+    }
+
+    void SettingsWindow::AutoFitIgnoredExtensionsTextBox_TextChanged(
+        IInspectable const&,
+        Controls::TextChangedEventArgs const&)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+        window_preferences_.auto_fit_ignored_extensions =
+            AutoFitIgnoredExtensionsTextBox().Text().c_str();
+        glance::app::save_window_preferences(window_preferences_);
+        if (window_preferences_changed_callback_)
+        {
+            window_preferences_changed_callback_();
+        }
+    }
+
+    void SettingsWindow::update_auto_fit_controls_enabled() noexcept
+    {
+        const bool enabled = AutoFitWindowSizeToggle().IsOn();
+        DynamicAutoFitToggle().IsEnabled(enabled);
+        AdaptiveMinimumPercentNumberBox().IsEnabled(enabled);
+        AdaptiveMaximumPercentNumberBox().IsEnabled(enabled);
+        AutoFitIgnoredExtensionsTextBox().IsEnabled(enabled);
     }
 
     void SettingsWindow::set_media_volume(

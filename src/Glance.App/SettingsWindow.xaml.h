@@ -46,8 +46,11 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         void WindowNumberBox_ValueChanged(
-            IInspectable const&,
+            IInspectable const& sender,
             Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
+        void AutoFitIgnoredExtensionsTextBox_TextChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::TextChangedEventArgs const&);
         void DefaultAudioVolumeNumberBox_ValueChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
@@ -128,6 +131,7 @@ namespace winrt::Glance::App::implementation
         void save_text_preferences();
         void save_appearance_preferences();
         void save_footer_preferences();
+        void update_auto_fit_controls_enabled() noexcept;
         void rebuild_footer_field_rows();
         [[nodiscard]] FooterFieldControls footer_field_controls(glance::app::FooterField field);
         void set_media_volume(
