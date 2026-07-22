@@ -78,7 +78,18 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Spacing="10">
-                    <FontIcon FontSize="56" Glyph="&#xE8A5;" />
+                    <Grid Width="64" Height="64">
+                        <Image
+                            x:Name="GenericFileIconImage"
+                            Width="64"
+                            Height="64"
+                            Stretch="Uniform"
+                            Visibility="Collapsed" />
+                        <FontIcon
+                            x:Name="GenericFileFallbackIcon"
+                            FontSize="56"
+                            Glyph="&#xE8A5;" />
+                    </Grid>
                     <TextBlock
                         x:Name="FileNameText"
                         MaxWidth="620"

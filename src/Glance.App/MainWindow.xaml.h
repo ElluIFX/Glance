@@ -6,6 +6,7 @@
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
+#include "shell_icon_provider.h"
 #include "text_preferences.h"
 
 #include "glance/contracts/preview_state.h"
@@ -121,6 +122,11 @@ namespace winrt::Glance::App::implementation
         void reset_hidden_window_size() noexcept;
         void present_file(std::uint32_t index);
         void present_generic(const glance::app::PreviewFile& file);
+        winrt::fire_and_forget load_generic_icon_async(
+            std::wstring path,
+            bool is_folder,
+            bool use_file_attributes,
+            std::uint64_t generation);
         winrt::fire_and_forget load_generic_file_info_async(std::wstring path, std::uint64_t generation);
         void present_text(const glance::app::PreviewFile& file, bool markdown);
         winrt::fire_and_forget load_text_async(
@@ -146,6 +152,17 @@ namespace winrt::Glance::App::implementation
             std::uint64_t source_size,
             std::uint64_t source_modified_time);
         void apply_archive_preview(glance::app::ArchivePreview preview, std::uint64_t generation);
+        struct ArchiveIconTarget
+        {
+            std::wstring path;
+            std::wstring cache_key;
+            bool is_folder{};
+            winrt::weak_ref<Microsoft::UI::Xaml::Controls::Image> image;
+            winrt::weak_ref<Microsoft::UI::Xaml::Controls::FontIcon> fallback;
+        };
+        winrt::fire_and_forget load_archive_icons_async(
+            std::vector<ArchiveIconTarget> targets,
+            std::uint64_t generation);
         void apply_text_preview(glance::app::TextPreview preview, bool markdown, std::uint64_t generation);
         void render_markdown();
         winrt::fire_and_forget render_markdown_async(std::wstring html, std::uint64_t generation);

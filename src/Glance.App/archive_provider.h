@@ -10,6 +10,7 @@ namespace glance::app
     struct ArchiveEntry
     {
         std::wstring name;
+        std::wstring path;
         std::wstring type_name;
         std::uint64_t size{};
         std::uint64_t modified_time{};

@@ -372,6 +372,7 @@ namespace glance::app
             }
             ArchiveEntry entry;
             entry.name = iterator->path().filename().wstring();
+            entry.path = iterator->path().wstring();
             entry.is_folder = iterator->is_directory(error);
             if (error)
             {

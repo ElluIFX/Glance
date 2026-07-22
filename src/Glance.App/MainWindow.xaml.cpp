@@ -8,6 +8,7 @@
 #include "media_metadata_provider.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
+#include "shell_icon_provider.h"
 #include "syntax_highlighter.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
@@ -30,6 +31,7 @@
 #include <iomanip>
 #include <limits>
 #include <sstream>
+#include <unordered_map>
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
@@ -439,6 +441,9 @@ namespace winrt::Glance::App::implementation
         FileNameText().Text(L"");
         FilePathText().Text(L"");
         FileMetadataText().Text(L"");
+        GenericFileIconImage().Source(nullptr);
+        GenericFileIconImage().Visibility(Visibility::Collapsed);
+        GenericFileFallbackIcon().Visibility(Visibility::Visible);
         GenericAdvancedInfoText().Text(L"");
         GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
         LoadCloudFileButton().Visibility(Visibility::Collapsed);
@@ -752,15 +757,64 @@ namespace winrt::Glance::App::implementation
         FileNameText().Text(file.display_name);
         FilePathText().Text(!file.path.empty() ? file.path : file.parsing_name);
         FileMetadataText().Text(formatted_size(file.size) + L"  |  " + formatted_time(file.last_write_time));
+        GenericFileIconImage().Source(nullptr);
+        GenericFileIconImage().Visibility(Visibility::Collapsed);
+        GenericFileFallbackIcon().Visibility(Visibility::Visible);
         GenericAdvancedInfoText().Text(L"");
         GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
         LoadCloudFileButton().Visibility(file.is_cloud_placeholder ? Visibility::Visible : Visibility::Collapsed);
         ErrorText().Visibility(Visibility::Collapsed);
+        const auto icon_path = !file.path.empty() ? file.path : file.parsing_name;
+        if (!icon_path.empty())
+        {
+            load_generic_icon_async(
+                icon_path,
+                (file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0,
+                file.is_cloud_placeholder || file.path.empty(),
+                content_generation_);
+        }
         if (!file.path.empty() && !file.is_cloud_placeholder &&
             (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
         {
             load_generic_file_info_async(file.path, content_generation_);
         }
+    }
+
+    fire_and_forget MainWindow::load_generic_icon_async(
+        std::wstring path,
+        bool is_folder,
+        bool use_file_attributes,
+        std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        auto bitmap = glance::app::load_shell_icon(path, is_folder, 64, use_file_attributes);
+        if (bitmap == nullptr)
+        {
+            co_return;
+        }
+        static_cast<void>(dispatcher.TryEnqueue([lifetime, bitmap = std::move(bitmap), generation]() {
+            if (generation != lifetime->content_generation_ ||
+                lifetime->current_kind_ != glance::app::PreviewKind::generic)
+            {
+                return;
+            }
+            try
+            {
+                const auto source = glance::app::create_shell_icon_source(*bitmap);
+                if (source == nullptr)
+                {
+                    return;
+                }
+                lifetime->GenericFileIconImage().Source(source);
+                lifetime->GenericFileIconImage().Visibility(Visibility::Visible);
+                lifetime->GenericFileFallbackIcon().Visibility(Visibility::Collapsed);
+            }
+            catch (...)
+            {
+            }
+        }));
     }
 
     fire_and_forget MainWindow::load_generic_file_info_async(std::wstring path, std::uint64_t generation)
@@ -1144,6 +1198,8 @@ namespace winrt::Glance::App::implementation
 
         auto items = ArchiveEntryList().Items();
         items.Clear();
+        std::vector<ArchiveIconTarget> icon_targets;
+        icon_targets.reserve(preview.entries.size());
         for (const auto& entry : preview.entries)
         {
             Grid row;
@@ -1160,12 +1216,45 @@ namespace winrt::Glance::App::implementation
                 row.ColumnDefinitions().Append(column);
             }
 
-            FontIcon icon;
-            icon.FontSize(13);
-            icon.Glyph(entry.is_folder ? L"\xE8B7" : L"\xE8A5");
-            icon.HorizontalAlignment(HorizontalAlignment::Left);
-            Grid::SetColumn(icon, 0);
-            row.Children().Append(icon);
+            Grid icon_host;
+            icon_host.Width(20);
+            icon_host.Height(20);
+            icon_host.HorizontalAlignment(HorizontalAlignment::Left);
+            icon_host.VerticalAlignment(VerticalAlignment::Center);
+            Grid::SetColumn(icon_host, 0);
+
+            Image icon_image;
+            icon_image.Width(16);
+            icon_image.Height(16);
+            icon_image.Stretch(Media::Stretch::Uniform);
+            icon_image.Visibility(Visibility::Collapsed);
+            icon_host.Children().Append(icon_image);
+
+            FontIcon fallback_icon;
+            fallback_icon.FontSize(13);
+            fallback_icon.Glyph(entry.is_folder ? L"\xE8B7" : L"\xE8A5");
+            icon_host.Children().Append(fallback_icon);
+            row.Children().Append(icon_host);
+
+            if (!entry.path.empty())
+            {
+                auto extension = entry.is_folder
+                    ? std::wstring(L":folder")
+                    : std::filesystem::path(entry.path).extension().wstring();
+                std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+                    return static_cast<wchar_t>(std::towlower(value));
+                });
+                if (extension.empty())
+                {
+                    extension = L":file";
+                }
+                icon_targets.push_back(ArchiveIconTarget{
+                    entry.path,
+                    std::move(extension),
+                    entry.is_folder,
+                    make_weak(icon_image),
+                    make_weak(fallback_icon) });
+            }
 
             const auto append_text = [&row](std::wstring_view value, int column, TextAlignment alignment = TextAlignment::Left) {
                 TextBlock text;
@@ -1200,6 +1289,71 @@ namespace winrt::Glance::App::implementation
             status += L"  |  " + glance::app::localize(L"ListTruncated");
         }
         ArchiveStatusText().Text(status);
+        if (!icon_targets.empty())
+        {
+            load_archive_icons_async(std::move(icon_targets), generation);
+        }
+    }
+
+    fire_and_forget MainWindow::load_archive_icons_async(
+        std::vector<ArchiveIconTarget> targets,
+        std::uint64_t generation)
+    {
+        std::unordered_map<std::wstring, std::vector<ArchiveIconTarget>> groups;
+        for (auto& target : targets)
+        {
+            groups[target.cache_key].push_back(std::move(target));
+        }
+
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        for (auto& [cache_key, group] : groups)
+        {
+            static_cast<void>(cache_key);
+            const auto& representative = group.front();
+            auto bitmap = glance::app::load_shell_icon(
+                representative.path,
+                representative.is_folder,
+                16,
+                true);
+            if (bitmap == nullptr)
+            {
+                continue;
+            }
+
+            static_cast<void>(dispatcher.TryEnqueue(
+                [lifetime, bitmap = std::move(bitmap), group = std::move(group), generation]() mutable {
+                    if (generation != lifetime->content_generation_ ||
+                        lifetime->current_kind_ != glance::app::PreviewKind::archive)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        const auto source = glance::app::create_shell_icon_source(*bitmap);
+                        if (source == nullptr)
+                        {
+                            return;
+                        }
+                        for (auto& target : group)
+                        {
+                            const auto image = target.image.get();
+                            const auto fallback = target.fallback.get();
+                            if (image == nullptr || fallback == nullptr)
+                            {
+                                continue;
+                            }
+                            image.Source(source);
+                            image.Visibility(Visibility::Visible);
+                            fallback.Visibility(Visibility::Collapsed);
+                        }
+                    }
+                    catch (...)
+                    {
+                    }
+                }));
+        }
     }
 
     fire_and_forget MainWindow::load_office_async(
