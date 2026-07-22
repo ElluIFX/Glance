@@ -21,7 +21,6 @@
   <data name="LoadingConvertedDocument" xml:space="preserve"><value>Loading converted document...</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>Detecting...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>Unknown</value></data>
-  <data name="PreviewTruncated" xml:space="preserve"><value>Preview truncated at 8 MB</value></data>
   <data name="FontSizeOverlayFormat" xml:space="preserve"><value>{0} px</value></data>
   <data name="LineNumbersTooltip" xml:space="preserve"><value>Show line numbers</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>Line numbers are unavailable while wrapping</value></data>
@@ -59,8 +58,11 @@
   <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>Always on top</value></data>
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>Pin file</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close preview</value></data>
+  <data name="PreviewModeShowInfoTooltip" xml:space="preserve"><value>Show basic information</value></data>
+  <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>Show content preview</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>Load file</value></data>
   <data name="PreviewAsTextText.Text" xml:space="preserve"><value>Try preview as text</value></data>
+  <data name="SyntaxHighlightDisabledLargeFile" xml:space="preserve"><value>Large file: highlighting paused.</value></data>
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>Unable to preview as text</value></data>
   <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show advanced information</value></data>
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>

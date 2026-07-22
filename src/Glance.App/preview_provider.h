@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <string>
 
 namespace glance::app
 {
+    class IncrementalTextReader;
+
     enum class PreviewKind
     {
         generic,
@@ -22,7 +25,8 @@ namespace glance::app
         std::wstring content;
         std::wstring encoding;
         std::wstring error;
-        bool truncated{};
+        std::shared_ptr<IncrementalTextReader> reader;
+        bool has_more{};
     };
 
     enum class TextEncoding
@@ -39,8 +43,12 @@ namespace glance::app
     };
 
     [[nodiscard]] PreviewKind resolve_preview_kind(const std::wstring& path);
+    [[nodiscard]] bool can_try_preview_as_text(const std::wstring& path);
     [[nodiscard]] TextPreview load_text_preview(
         const std::wstring& path,
-        std::size_t maximum_bytes = 8U * 1024U * 1024U,
+        std::size_t chunk_bytes = 256U * 1024U,
         TextEncoding encoding = TextEncoding::automatic);
+    [[nodiscard]] TextPreview load_next_text_preview_chunk(
+        const std::shared_ptr<IncrementalTextReader>& reader,
+        std::size_t chunk_bytes = 256U * 1024U);
 }

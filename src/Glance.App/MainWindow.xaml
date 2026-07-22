@@ -15,6 +15,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Grid
                 x:Name="TitleBarDragRegion"
@@ -28,9 +29,18 @@
                     TextTrimming="CharacterEllipsis" />
             </Grid>
             <ToggleButton
+                x:Name="PreviewModeButton"
+                Grid.Column="1"
+                Style="{StaticResource IconToggleButtonStyle}"
+                Margin="4,0,0,0"
+                Click="PreviewModeButton_Click"
+                Visibility="Collapsed">
+                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE7C3;" />
+            </ToggleButton>
+            <ToggleButton
                 x:Name="TopmostButton"
                 x:Uid="TopmostButton"
-                Grid.Column="1"
+                Grid.Column="2"
                 Style="{StaticResource IconToggleButtonStyle}"
                 Margin="4,0,0,0"
                 Click="TopmostButton_Click"
@@ -40,7 +50,7 @@
             <ToggleButton
                 x:Name="PinButton"
                 x:Uid="PinButton"
-                Grid.Column="2"
+                Grid.Column="3"
                 Style="{StaticResource IconToggleButtonStyle}"
                 Margin="4,0,0,0"
                 Click="PinButton_Click"
@@ -50,7 +60,7 @@
             <Button
                 x:Name="ClosePreviewButton"
                 x:Uid="ClosePreviewButton"
-                Grid.Column="3"
+                Grid.Column="4"
                 Style="{StaticResource IconButtonStyle}"
                 Margin="4,0,0,0"
                 Click="ClosePreviewButton_Click"
@@ -167,6 +177,7 @@
                         HorizontalScrollBarVisibility="Auto"
                         HorizontalScrollMode="Enabled"
                         SizeChanged="TextPreviewScroller_SizeChanged"
+                        ViewChanged="TextPreviewScroller_ViewChanged"
                         VerticalScrollBarVisibility="Auto"
                         VerticalScrollMode="Enabled">
                         <Grid
@@ -179,7 +190,7 @@
                             <Border
                                 x:Name="LineNumberGutter"
                                 Background="{ThemeResource SubtleFillColorTransparentBrush}">
-                                <TextBlock
+                                <RichTextBlock
                                     x:Name="LineNumberText"
                                     MinWidth="42"
                                     Padding="10,12,10,12"
@@ -203,6 +214,56 @@
                                 TextWrapping="NoWrap" />
                         </Grid>
                     </ScrollViewer>
+                    <ListView
+                        x:Name="LongTextList"
+                        ContainerContentChanging="LongTextList_ContainerContentChanging"
+                        HorizontalContentAlignment="Stretch"
+                        IsItemClickEnabled="False"
+                        IsTabStop="False"
+                        Padding="0,12"
+                        PointerWheelChanged="TextPreviewScroller_PointerWheelChanged"
+                        SizeChanged="LongTextList_SizeChanged"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                        ScrollViewer.HorizontalScrollMode="Disabled"
+                        SelectionMode="None"
+                        Visibility="Collapsed">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="{ThemeResource SubtleFillColorTransparentBrush}">
+                                        <TextBlock
+                                            x:Name="LongTextLineNumbers"
+                                            MinWidth="42"
+                                            Padding="10,0"
+                                            FontFamily="Cascadia Mono, Consolas"
+                                            FontSize="13"
+                                            LineHeight="18"
+                                            LineStackingStrategy="BlockLineHeight"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            IsHitTestVisible="False"
+                                            Opacity="0.42"
+                                            TextAlignment="Right"
+                                            TextWrapping="NoWrap" />
+                                    </Border>
+                                    <TextBlock
+                                        x:Name="LongTextContent"
+                                        Grid.Column="1"
+                                        Padding="16,0"
+                                        FontFamily="Cascadia Mono, Consolas"
+                                        FontSize="13"
+                                        IsTextSelectionEnabled="True"
+                                        LineHeight="18"
+                                        LineStackingStrategy="BlockLineHeight"
+                                        Text="{Binding}"
+                                        TextWrapping="Wrap" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
                     <WebView2
                         x:Name="MarkdownPreviewWebView"
                         DefaultBackgroundColor="Transparent"
@@ -733,6 +794,7 @@
             MaxWidth="560"
             HorizontalAlignment="Center"
             VerticalAlignment="Top"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
             Canvas.ZIndex="200"
             IsClosable="True"
             IsIconVisible="True"

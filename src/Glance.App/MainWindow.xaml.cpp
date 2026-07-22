@@ -31,6 +31,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <unordered_map>
 
@@ -42,7 +43,10 @@ using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
-    constexpr std::uint64_t maximum_preview_as_text_file_size = 8ULL * 1024ULL * 1024ULL;
+    constexpr std::size_t text_chunk_bytes = 256U * 1024U;
+    constexpr std::size_t long_text_render_threshold = 256U * 1024U;
+    constexpr std::uint64_t automatic_syntax_highlight_limit_bytes = 64ULL * 1024ULL;
+    constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
 
     std::filesystem::path executable_directory()
     {
@@ -152,6 +156,7 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"MainWindow InitializeComponent complete.");
         ApplyLocalizedResources();
         ApplyAppearancePreferences();
+        text_preferences_ = glance::app::load_text_preferences();
         footer_preferences_ = glance::app::load_footer_preferences();
         configure_window();
         glance::contracts::log_event(L"MainWindow native configuration complete.");
@@ -195,12 +200,21 @@ namespace winrt::Glance::App::implementation
         set_tooltip(TopmostButton(), L"TopmostButton.ToolTipService.ToolTip");
         set_tooltip(PinButton(), L"PinButton.ToolTipService.ToolTip");
         set_tooltip(ClosePreviewButton(), L"ClosePreviewButton.ToolTipService.ToolTip");
+        update_preview_mode_button();
         set_tooltip(
             GenericAdvancedInfoButton(),
             L"GenericAdvancedInfoButton.ToolTipService.ToolTip");
         LoadCloudFileText().Text(glance::app::localize(L"LoadCloudFileText.Text"));
         PreviewAsTextText().Text(glance::app::localize(L"PreviewAsTextText.Text"));
-        PreviewErrorInfoBar().Title(glance::app::localize(L"PreviewErrorInfoBar.Title"));
+        if (preview_notice_active_)
+        {
+            PreviewErrorInfoBar().Message(
+                glance::app::localize(L"SyntaxHighlightDisabledLargeFile"));
+        }
+        else
+        {
+            PreviewErrorInfoBar().Title(glance::app::localize(L"PreviewErrorInfoBar.Title"));
+        }
         set_tooltip(MediaPlayPauseButton(), L"MediaPlayPauseButton.ToolTipService.ToolTip");
         set_tooltip(MediaMuteButton(), L"MediaMuteButton.ToolTipService.ToolTip");
         set_tooltip(PreviousPdfButton(), L"PreviousPdfButton.ToolTipService.ToolTip");
@@ -225,10 +239,6 @@ namespace winrt::Glance::App::implementation
         {
             EncodingSelector().Content(box_value(glance::app::localize(L"EncodingSelector.Content")));
         }
-        if (!TextEncodingText().Text().empty())
-        {
-            TextEncodingText().Text(glance::app::localize(L"PreviewTruncated"));
-        }
         update_line_number_visibility();
         update_generic_file_metadata();
         update_footer_metadata();
@@ -243,6 +253,7 @@ namespace winrt::Glance::App::implementation
             render_text_content();
             update_text_layout();
         }
+        update_preview_as_text_button();
     }
 
     void MainWindow::ApplyFooterPreferences()
@@ -441,9 +452,11 @@ namespace winrt::Glance::App::implementation
         MarkdownPreviewWebView().Opacity(0.0);
         MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
         TextContentRichText().Blocks().Clear();
-        LineNumberText().Text(L"");
+        LongTextList().Items().Clear();
+        LongTextList().Visibility(Visibility::Collapsed);
+        set_line_number_text(L"");
         TextEncodingText().Text(L"");
-        PreviewErrorInfoBar().IsOpen(false);
+        dismiss_preview_info_bar();
         if (font_size_overlay_timer_ != nullptr)
         {
             font_size_overlay_timer_.Stop();
@@ -468,6 +481,8 @@ namespace winrt::Glance::App::implementation
         LoadCloudFileButton().Visibility(Visibility::Collapsed);
         PreviewAsTextButton().Visibility(Visibility::Collapsed);
         GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
+        PreviewModeButton().Visibility(Visibility::Collapsed);
+        PreviewModeButton().IsChecked(false);
         ErrorText().Text(L"");
         ErrorText().Visibility(Visibility::Collapsed);
         GenericPanel().Visibility(Visibility::Visible);
@@ -485,6 +500,23 @@ namespace winrt::Glance::App::implementation
         current_text_.clear();
         current_text_path_.clear();
         current_text_markdown_ = false;
+        current_text_reader_.reset();
+        syntax_highlight_state_ = {};
+        text_syntax_ranges_.clear();
+        text_paragraph_ranges_.clear();
+        text_render_tail_.clear();
+        text_tail_block_attached_ = false;
+        text_highlight_offset_ = 0;
+        text_line_count_ = 0;
+        current_text_has_more_ = false;
+        text_chunk_loading_ = false;
+        line_numbers_simple_ = false;
+        virtual_line_numbers_ = false;
+        long_text_mode_ = false;
+        long_text_render_tail_.clear();
+        long_text_block_ranges_.clear();
+        long_text_block_start_lines_.clear();
+        long_text_next_line_ = 1;
         image_metadata_.clear();
         media_dimensions_.clear();
         media_technical_info_.clear();
@@ -497,6 +529,9 @@ namespace winrt::Glance::App::implementation
         source_window_ = nullptr;
         foreground_when_unpinned_ = nullptr;
         current_kind_ = glance::app::PreviewKind::generic;
+        content_preview_kind_ = glance::app::PreviewKind::generic;
+        basic_info_mode_ = false;
+        generic_text_preview_allowed_ = false;
         media_is_audio_ = false;
         image_metadata_visible_ = false;
         image_panning_ = false;
@@ -659,7 +694,7 @@ namespace winrt::Glance::App::implementation
         }
         const UINT dpi = GetDpiForWindow(window_);
         glance::app::save_window_size(
-            current_kind_,
+            basic_info_mode_ ? content_preview_kind_ : current_kind_,
             SIZE{
                 MulDiv(bounds.right - bounds.left, 96, static_cast<int>(dpi)),
                 MulDiv(bounds.bottom - bounds.top, 96, static_cast<int>(dpi)) },
@@ -673,7 +708,11 @@ namespace winrt::Glance::App::implementation
             return;
         }
         current_index_ = index;
-        PreviewErrorInfoBar().IsOpen(false);
+        basic_info_mode_ = false;
+        content_preview_kind_ = glance::app::PreviewKind::generic;
+        generic_text_preview_allowed_ = false;
+        update_preview_mode_button();
+        dismiss_preview_info_bar();
         const auto& file = files_[index];
         const auto generation = ++content_generation_;
         TitleText().Text(file.display_name);
@@ -700,6 +739,8 @@ namespace winrt::Glance::App::implementation
 
         if ((file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
         {
+            content_preview_kind_ = glance::app::PreviewKind::archive;
+            update_preview_mode_button();
             current_kind_ = glance::app::PreviewKind::archive;
             show_content_panel(current_kind_);
             ArchiveStatusText().Text(glance::app::localize(L"LoadingFolder"));
@@ -709,6 +750,8 @@ namespace winrt::Glance::App::implementation
         }
 
         const auto kind = glance::app::resolve_preview_kind(file.path);
+        content_preview_kind_ = kind;
+        update_preview_mode_button();
         current_kind_ = kind;
         switch (kind)
         {
@@ -784,14 +827,15 @@ namespace winrt::Glance::App::implementation
             load_office_async(file.path, generation, file.size, file.last_write_time);
             break;
         default:
-            present_generic(file, true);
+            present_generic(file, true, true);
             break;
         }
     }
 
     void MainWindow::present_generic(
         const glance::app::PreviewFile& file,
-        bool allow_text_preview)
+        bool allow_text_preview,
+        bool allow_advanced_info)
     {
         current_kind_ = glance::app::PreviewKind::generic;
         show_content_panel(glance::app::PreviewKind::generic);
@@ -806,15 +850,11 @@ namespace winrt::Glance::App::implementation
         generic_preview_preferences_ = glance::app::load_generic_preview_preferences();
         GenericAdvancedInfoButton().IsChecked(generic_preview_preferences_.show_advanced_info);
         LoadCloudFileButton().Visibility(file.is_cloud_placeholder ? Visibility::Visible : Visibility::Collapsed);
-        PreviewAsTextButton().Visibility(
-            allow_text_preview && !file.path.empty() && !file.is_cloud_placeholder &&
-                (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
-                file.size < maximum_preview_as_text_file_size
-            ? Visibility::Visible
-            : Visibility::Collapsed);
+        generic_text_preview_allowed_ = allow_text_preview;
+        update_preview_as_text_button();
         PreviewAsTextButton().IsEnabled(true);
         const bool advanced_info_available =
-            allow_text_preview && !file.path.empty() && !file.is_cloud_placeholder &&
+            allow_advanced_info && !file.path.empty() && !file.is_cloud_placeholder &&
             (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
         GenericAdvancedInfoButton().Visibility(
             advanced_info_available ? Visibility::Visible : Visibility::Collapsed);
@@ -832,6 +872,7 @@ namespace winrt::Glance::App::implementation
         {
             load_generic_file_info_async(file.path, content_generation_);
         }
+        update_footer_metadata();
     }
 
     fire_and_forget MainWindow::load_generic_icon_async(
@@ -916,13 +957,32 @@ namespace winrt::Glance::App::implementation
         current_text_.clear();
         current_text_path_ = file.path;
         current_text_markdown_ = markdown;
+        current_text_reader_.reset();
+        syntax_highlight_state_ = {};
+        text_syntax_ranges_.clear();
+        text_paragraph_ranges_.clear();
+        text_render_tail_.clear();
+        text_tail_block_attached_ = false;
+        text_highlight_offset_ = 0;
+        text_line_count_ = 0;
+        current_text_has_more_ = false;
+        text_chunk_loading_ = true;
+        line_numbers_simple_ = false;
+        virtual_line_numbers_ = false;
         current_text_encoding_ = glance::app::TextEncoding::automatic;
         markdown_preview_ = markdown;
         EncodingSelector().Content(box_value(glance::app::localize(L"EncodingDetecting")));
         apply_text_preferences();
+        syntax_highlight_notice_pending_ =
+            file.size > automatic_syntax_highlight_limit_bytes && syntax_highlighting_;
+        if (syntax_highlight_notice_pending_)
+        {
+            syntax_highlighting_ = false;
+            SyntaxHighlightButton().IsChecked(false);
+        }
         current_text_ = glance::app::localize(L"Loading");
         render_text_content();
-        LineNumberText().Text(L"");
+        set_line_number_text(L"");
         MarkdownModeButtons().Visibility(markdown ? Visibility::Visible : Visibility::Collapsed);
         set_markdown_preview_mode(markdown);
         if (markdown)
@@ -944,10 +1004,13 @@ namespace winrt::Glance::App::implementation
         glance::app::TextEncoding encoding,
         bool preview_as_text_attempt)
     {
+        text_chunk_loading_ = true;
+        current_text_has_more_ = false;
+        current_text_reader_.reset();
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
-        auto preview = glance::app::load_text_preview(path, 8U * 1024U * 1024U, encoding);
+        auto preview = glance::app::load_text_preview(path, text_chunk_bytes, encoding);
         static_cast<void>(dispatcher.TryEnqueue(
             [lifetime, preview = std::move(preview), markdown, generation, preview_as_text_attempt]() mutable {
                 lifetime->apply_text_preview(
@@ -1653,6 +1716,7 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        text_chunk_loading_ = false;
         if (!preview.error.empty())
         {
             if (preview_as_text_attempt)
@@ -1661,7 +1725,7 @@ namespace winrt::Glance::App::implementation
             }
             else if (current_index_ < files_.size())
             {
-                present_generic(files_[current_index_], true);
+                present_generic(files_[current_index_], true, true);
             }
             show_text_preview_error(std::move(preview.error));
             return;
@@ -1677,21 +1741,89 @@ namespace winrt::Glance::App::implementation
         }
 
         current_text_ = std::move(preview.content);
+        current_text_reader_ = std::move(preview.reader);
+        current_text_has_more_ = preview.has_more;
+        text_chunk_loading_ = false;
         if (current_text_encoding_ == glance::app::TextEncoding::automatic)
         {
             EncodingSelector().Content(box_value(preview.encoding));
         }
-        TextEncodingText().Text(preview.truncated ? glance::app::localize(L"PreviewTruncated") : L"");
+        TextEncodingText().Text(L"");
 
         render_text_content();
         update_line_numbers();
         update_line_number_visibility();
+        ensure_text_viewport_filled();
+        const bool show_highlight_notice =
+            syntax_highlight_notice_pending_ && !syntax_highlighting_;
+        syntax_highlight_notice_pending_ = false;
+        if (show_highlight_notice)
+        {
+            show_syntax_highlight_disabled_notice();
+        }
 
         if (markdown)
         {
             render_markdown();
-            set_markdown_preview_mode(markdown_preview_);
+            MarkdownPreviewButton().IsEnabled(!current_text_has_more_);
+            set_markdown_preview_mode(current_text_has_more_ ? false : markdown_preview_);
         }
+    }
+
+    fire_and_forget MainWindow::load_next_text_chunk_async(std::uint64_t generation)
+    {
+        if (text_chunk_loading_ || !current_text_has_more_ || current_text_reader_ == nullptr)
+        {
+            co_return;
+        }
+
+        text_chunk_loading_ = true;
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        const auto reader = current_text_reader_;
+        co_await resume_background();
+        auto preview = glance::app::load_next_text_preview_chunk(reader, text_chunk_bytes);
+        static_cast<void>(dispatcher.TryEnqueue(
+            [lifetime, preview = std::move(preview), generation]() mutable {
+                if (generation != lifetime->content_generation_)
+                {
+                    return;
+                }
+                lifetime->text_chunk_loading_ = false;
+                if (!preview.error.empty())
+                {
+                    lifetime->current_text_has_more_ = false;
+                    lifetime->current_text_reader_.reset();
+                    lifetime->show_text_preview_error(std::move(preview.error));
+                    return;
+                }
+
+                auto appended = std::move(preview.content);
+                lifetime->current_text_reader_ = std::move(preview.reader);
+                lifetime->current_text_has_more_ = preview.has_more;
+                lifetime->current_text_.append(appended);
+                if (lifetime->long_text_mode_)
+                {
+                    lifetime->append_syntax_ranges(appended);
+                    lifetime->append_long_text_content(appended);
+                }
+                else
+                {
+                    lifetime->append_text_content(appended);
+                }
+                lifetime->append_line_numbers(appended);
+                lifetime->ensure_text_viewport_filled();
+                glance::contracts::log_event(
+                    L"Incremental text chunk applied: characters=" +
+                    std::to_wstring(appended.size()) +
+                    L", has_more=" +
+                    std::to_wstring(lifetime->current_text_has_more_));
+                if (lifetime->current_text_markdown_)
+                {
+                    lifetime->render_markdown();
+                    lifetime->MarkdownPreviewButton().IsEnabled(!lifetime->current_text_has_more_);
+                }
+            }));
     }
 
     void MainWindow::render_markdown()
@@ -1739,38 +1871,433 @@ namespace winrt::Glance::App::implementation
     {
         auto blocks = TextContentRichText().Blocks();
         blocks.Clear();
-        Paragraph paragraph;
+        const bool use_long_text_view = current_text_has_more_ ||
+            (current_text_.size() > long_text_render_threshold &&
+             current_text_.find(L'\n') != std::wstring::npos);
+        long_text_mode_ = use_long_text_view;
+        TextPreviewScroller().Visibility(use_long_text_view ? Visibility::Collapsed : Visibility::Visible);
+        LongTextList().Visibility(use_long_text_view ? Visibility::Visible : Visibility::Collapsed);
+        ScrollViewer::SetHorizontalScrollMode(
+            LongTextList(),
+            word_wrap_ ? ScrollMode::Disabled : ScrollMode::Enabled);
+        ScrollViewer::SetHorizontalScrollBarVisibility(
+            LongTextList(),
+            word_wrap_ ? ScrollBarVisibility::Disabled : ScrollBarVisibility::Auto);
+        if (!use_long_text_view)
+        {
+            LongTextList().Items().Clear();
+            long_text_render_tail_.clear();
+            long_text_block_ranges_.clear();
+            long_text_block_start_lines_.clear();
+            long_text_next_line_ = 1;
+        }
+        syntax_highlight_state_ = {};
+        text_syntax_ranges_.clear();
+        text_paragraph_ranges_.clear();
+        text_render_tail_.clear();
+        text_tail_block_attached_ = false;
+        text_highlight_offset_ = 0;
+        styled_paragraph_start_ = std::numeric_limits<std::size_t>::max();
+        styled_paragraph_end_ = std::numeric_limits<std::size_t>::max();
+        syntax_highlight_layout_dirty_ = true;
+        if (use_long_text_view)
+        {
+            rebuild_long_text_content();
+            return;
+        }
         const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
-        paragraph.LineHeight(line_height);
-        paragraph.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
         LineNumberText().LineHeight(line_height);
+        if (current_text_.empty())
+        {
+            Paragraph paragraph;
+            paragraph.LineHeight(line_height);
+            paragraph.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
+            Run run;
+            run.Text(L" ");
+            paragraph.Inlines().Append(run);
+            blocks.Append(paragraph);
+        }
+        else
+        {
+            append_text_content(current_text_);
+        }
+        queue_visible_syntax_highlight_update();
+    }
 
-        const bool use_highlighting = syntax_highlighting_ && current_text_.size() <= 1024U * 1024U;
-        if (use_highlighting)
+    void MainWindow::append_text_content(std::wstring_view content)
+    {
+        if (content.empty())
+        {
+            return;
+        }
+        const auto blocks = TextContentRichText().Blocks();
+
+        append_syntax_ranges(content);
+
+        if (text_tail_block_attached_ && blocks.Size() > 0)
+        {
+            blocks.RemoveAtEnd();
+            if (!text_paragraph_ranges_.empty())
+            {
+                text_paragraph_ranges_.pop_back();
+            }
+            text_tail_block_attached_ = false;
+        }
+
+        std::wstring pending = std::move(text_render_tail_);
+        pending.append(content);
+        const std::size_t pending_source_start = current_text_.size() - pending.size();
+        text_render_tail_.clear();
+        constexpr std::size_t lines_per_text_block = 128;
+        std::size_t segment_start{};
+        std::size_t line_count{};
+        const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
+        const auto append_paragraph = [this, &blocks, line_height](
+                                          std::wstring_view text,
+                                          std::size_t source_start,
+                                          std::size_t source_length) {
+            Paragraph paragraph;
+            paragraph.LineHeight(line_height);
+            paragraph.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
+            Run run;
+            run.Text(hstring(text));
+            paragraph.Inlines().Append(run);
+            blocks.Append(paragraph);
+            text_paragraph_ranges_.push_back({ source_start, source_length });
+        };
+        for (std::size_t index = 0; index < pending.size(); ++index)
+        {
+            if (pending[index] != L'\n' || ++line_count < lines_per_text_block)
+            {
+                continue;
+            }
+            append_paragraph(
+                std::wstring_view(pending).substr(segment_start, index - segment_start),
+                pending_source_start + segment_start,
+                index - segment_start);
+            segment_start = index + 1;
+            line_count = 0;
+        }
+        text_render_tail_.assign(pending, segment_start, std::wstring::npos);
+        append_paragraph(
+            text_render_tail_.empty() ? std::wstring_view(L" ") : text_render_tail_,
+            pending_source_start + segment_start,
+            text_render_tail_.size());
+        text_tail_block_attached_ = true;
+        syntax_highlight_layout_dirty_ = true;
+    }
+
+    void MainWindow::append_syntax_ranges(std::wstring_view content)
+    {
+        if (syntax_highlighting_)
         {
             auto extension = std::filesystem::path(current_text_path_).extension().wstring();
             std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
                 return static_cast<wchar_t>(std::towlower(value));
             });
-            const bool dark = RootGrid().ActualTheme() == ElementTheme::Dark;
-            for (const auto& span : glance::app::highlight_source(current_text_, extension))
+            for (const auto& span : glance::app::highlight_source_chunk(
+                     content,
+                     extension,
+                     syntax_highlight_state_))
             {
+                std::optional<std::uint32_t> highlighter_index;
+                switch (span.style)
+                {
+                case glance::app::SyntaxStyle::keyword: highlighter_index = 0; break;
+                case glance::app::SyntaxStyle::string: highlighter_index = 1; break;
+                case glance::app::SyntaxStyle::comment: highlighter_index = 2; break;
+                case glance::app::SyntaxStyle::number: highlighter_index = 3; break;
+                case glance::app::SyntaxStyle::directive: highlighter_index = 4; break;
+                default: break;
+                }
+                if (highlighter_index)
+                {
+                    text_syntax_ranges_.push_back({
+                        text_highlight_offset_ + span.start,
+                        span.length,
+                        span.style });
+                }
+            }
+            text_highlight_offset_ += content.size();
+        }
+        else
+        {
+            text_highlight_offset_ += content.size();
+        }
+    }
+
+    void MainWindow::rebuild_long_text_content()
+    {
+        LongTextList().Items().Clear();
+        long_text_render_tail_.clear();
+        long_text_block_ranges_.clear();
+        long_text_block_start_lines_.clear();
+        long_text_next_line_ = 1;
+        syntax_highlight_state_ = {};
+        text_syntax_ranges_.clear();
+        text_highlight_offset_ = 0;
+        append_syntax_ranges(current_text_);
+        append_long_text_content(current_text_);
+    }
+
+    void MainWindow::append_long_text_content(std::wstring_view content)
+    {
+        if (content.empty())
+        {
+            return;
+        }
+        if (!long_text_block_ranges_.empty())
+        {
+            long_text_next_line_ = long_text_block_start_lines_.back();
+            LongTextList().Items().RemoveAtEnd();
+            long_text_block_ranges_.pop_back();
+            long_text_block_start_lines_.pop_back();
+        }
+
+        std::wstring pending = std::move(long_text_render_tail_);
+        pending.append(content);
+        const std::size_t pending_source_start = current_text_.size() - pending.size();
+        long_text_render_tail_.clear();
+        constexpr std::size_t lines_per_long_text_item = 128;
+        std::size_t segment_start{};
+        std::size_t line_count{};
+        const auto append_item = [this, &pending, pending_source_start](
+                                     std::size_t start,
+                                     std::size_t length,
+                                     std::size_t logical_lines) {
+            const auto text = std::wstring_view(pending).substr(start, length);
+            LongTextList().Items().Append(box_value(hstring(text.empty() ? L" " : text)));
+            long_text_block_ranges_.push_back({ pending_source_start + start, length });
+            long_text_block_start_lines_.push_back(long_text_next_line_);
+            long_text_next_line_ += logical_lines;
+        };
+        for (std::size_t index = 0; index < pending.size(); ++index)
+        {
+            if (pending[index] != L'\n' || ++line_count < lines_per_long_text_item)
+            {
+                continue;
+            }
+            append_item(segment_start, index - segment_start, lines_per_long_text_item);
+            segment_start = index + 1;
+            line_count = 0;
+        }
+        long_text_render_tail_.assign(pending, segment_start, std::wstring::npos);
+        append_item(segment_start, long_text_render_tail_.size(), line_count + 1U);
+    }
+
+    void MainWindow::queue_visible_syntax_highlight_update()
+    {
+        const double vertical_offset = TextPreviewScroller().VerticalOffset();
+        if (syntax_highlight_update_queued_ ||
+            (!syntax_highlight_layout_dirty_ &&
+             std::abs(vertical_offset - syntax_highlight_vertical_offset_) < 1.0))
+        {
+            return;
+        }
+        syntax_highlight_update_queued_ = true;
+        const auto weak = get_weak();
+        static_cast<void>(DispatcherQueue().TryEnqueue([weak] {
+            if (const auto self = weak.get())
+            {
+                self->syntax_highlight_update_queued_ = false;
+                try
+                {
+                    self->update_visible_syntax_highlights();
+                }
+                catch (const hresult_error& error)
+                {
+                    self->updating_syntax_highlights_ = false;
+                    glance::contracts::log_event(
+                        L"Visible syntax highlight update failed: " +
+                        std::wstring(error.message()));
+                }
+                catch (const std::exception& error)
+                {
+                    self->updating_syntax_highlights_ = false;
+                    glance::contracts::log_event(
+                        L"Visible syntax highlight update failed: " +
+                        to_hstring(error.what()));
+                }
+                catch (...)
+                {
+                    self->updating_syntax_highlights_ = false;
+                    glance::contracts::log_event(L"Visible syntax highlight update failed.");
+                }
+            }
+        }));
+    }
+
+    void MainWindow::update_visible_syntax_highlights()
+    {
+        if (updating_syntax_highlights_)
+        {
+            return;
+        }
+        updating_syntax_highlights_ = true;
+        const auto blocks = TextContentRichText().Blocks();
+        const auto set_plain_paragraph = [this, &blocks](std::size_t index) {
+            if (index >= blocks.Size() || index >= text_paragraph_ranges_.size())
+            {
+                return;
+            }
+            const auto paragraph = blocks.GetAt(static_cast<std::uint32_t>(index)).try_as<Paragraph>();
+            if (paragraph == nullptr)
+            {
+                return;
+            }
+            const auto& range = text_paragraph_ranges_[index];
+            paragraph.Inlines().Clear();
+            Run run;
+            run.Text(hstring(range.length == 0
+                ? std::wstring_view(L" ")
+                : std::wstring_view(current_text_).substr(range.start, range.length)));
+            paragraph.Inlines().Append(run);
+        };
+        if (styled_paragraph_start_ != std::numeric_limits<std::size_t>::max())
+        {
+            for (std::size_t index = styled_paragraph_start_;
+                 index < styled_paragraph_end_ && index < text_paragraph_ranges_.size();
+                 ++index)
+            {
+                set_plain_paragraph(index);
+            }
+        }
+        styled_paragraph_start_ = std::numeric_limits<std::size_t>::max();
+        styled_paragraph_end_ = std::numeric_limits<std::size_t>::max();
+
+        if (!syntax_highlighting_ || text_syntax_ranges_.empty() ||
+            current_text_.empty() || text_paragraph_ranges_.empty())
+        {
+            syntax_highlight_layout_dirty_ = false;
+            syntax_highlight_vertical_offset_ = TextPreviewScroller().VerticalOffset();
+            updating_syntax_highlights_ = false;
+            return;
+        }
+
+        const double extent_height = TextPreviewScroller().ExtentHeight();
+        const double viewport_height = TextPreviewScroller().ViewportHeight();
+        const double vertical_offset = TextPreviewScroller().VerticalOffset();
+        constexpr std::size_t highlight_buffer_characters = 512U;
+        const bool measured_scroll_extent = extent_height > viewport_height && extent_height > 0.0;
+        const double start_ratio = measured_scroll_extent
+            ? std::clamp(vertical_offset / extent_height, 0.0, 1.0)
+            : 0.0;
+        const double end_ratio = measured_scroll_extent
+            ? std::clamp((vertical_offset + viewport_height) / extent_height, 0.0, 1.0)
+            : 0.0;
+        const auto approximate_start = static_cast<std::size_t>(current_text_.size() * start_ratio);
+        const auto approximate_end = measured_scroll_extent
+            ? static_cast<std::size_t>(current_text_.size() * end_ratio)
+            : std::min(current_text_.size(), highlight_buffer_characters);
+        const std::size_t visible_start = approximate_start > highlight_buffer_characters
+            ? approximate_start - highlight_buffer_characters
+            : 0;
+        const std::size_t visible_end = std::min(
+            current_text_.size(),
+            approximate_end + highlight_buffer_characters);
+
+        const auto first_paragraph = std::lower_bound(
+            text_paragraph_ranges_.begin(),
+            text_paragraph_ranges_.end(),
+            visible_start,
+            [](const TextParagraphRange& range, std::size_t position) {
+                return range.start + range.length < position;
+            });
+        const auto last_paragraph = std::lower_bound(
+            first_paragraph,
+            text_paragraph_ranges_.end(),
+            visible_end,
+            [](const TextParagraphRange& range, std::size_t position) {
+                return range.start < position;
+            });
+        const std::size_t paragraph_start = static_cast<std::size_t>(std::distance(
+            text_paragraph_ranges_.begin(),
+            first_paragraph));
+        const std::size_t paragraph_end = std::min(
+            text_paragraph_ranges_.size(),
+            static_cast<std::size_t>(std::distance(
+                text_paragraph_ranges_.begin(),
+                last_paragraph)) + 1U);
+        const bool dark = RootGrid().ActualTheme() == ElementTheme::Dark;
+        for (std::size_t paragraph_index = paragraph_start;
+             paragraph_index < paragraph_end && paragraph_index < blocks.Size();
+             ++paragraph_index)
+        {
+            const auto paragraph = blocks.GetAt(
+                static_cast<std::uint32_t>(paragraph_index)).try_as<Paragraph>();
+            if (paragraph == nullptr)
+            {
+                continue;
+            }
+            const auto& paragraph_range = text_paragraph_ranges_[paragraph_index];
+            const std::size_t paragraph_end_offset = paragraph_range.start + paragraph_range.length;
+            paragraph.Inlines().Clear();
+            std::size_t cursor = paragraph_range.start;
+            auto syntax_range = std::lower_bound(
+                text_syntax_ranges_.begin(),
+                text_syntax_ranges_.end(),
+                paragraph_range.start,
+                [](const TextSyntaxRange& range, std::size_t position) {
+                    return range.start + range.length <= position;
+                });
+            const auto append_run = [&paragraph](
+                                        std::wstring_view text,
+                                        Media::Brush foreground = nullptr) {
+                if (text.empty())
+                {
+                    return;
+                }
                 Run run;
-                run.Text(span.text);
-                if (const auto foreground = syntax_brush(span.style, text_preferences_.syntax_theme, dark))
+                run.Text(hstring(text));
+                if (foreground != nullptr)
                 {
                     run.Foreground(foreground);
                 }
                 paragraph.Inlines().Append(run);
+            };
+            while (syntax_range != text_syntax_ranges_.end() &&
+                   syntax_range->start < paragraph_end_offset)
+            {
+                const std::size_t style_start = std::max(cursor, syntax_range->start);
+                const std::size_t style_end = std::min(
+                    paragraph_end_offset,
+                    syntax_range->start + syntax_range->length);
+                if (style_start > cursor)
+                {
+                    append_run(std::wstring_view(current_text_).substr(
+                        cursor,
+                        style_start - cursor));
+                }
+                if (style_end > style_start)
+                {
+                    append_run(
+                        std::wstring_view(current_text_).substr(
+                            style_start,
+                            style_end - style_start),
+                        syntax_brush(
+                            syntax_range->style,
+                            text_preferences_.syntax_theme,
+                            dark));
+                    cursor = style_end;
+                }
+                ++syntax_range;
+            }
+            if (cursor < paragraph_end_offset)
+            {
+                append_run(std::wstring_view(current_text_).substr(
+                    cursor,
+                    paragraph_end_offset - cursor));
+            }
+            if (paragraph.Inlines().Size() == 0)
+            {
+                append_run(L" ");
             }
         }
-        else
-        {
-            Run run;
-            run.Text(current_text_.empty() ? L" " : current_text_);
-            paragraph.Inlines().Append(run);
-        }
-        blocks.Append(paragraph);
+        styled_paragraph_start_ = paragraph_start;
+        styled_paragraph_end_ = paragraph_end;
+        syntax_highlight_layout_dirty_ = false;
+        syntax_highlight_vertical_offset_ = TextPreviewScroller().VerticalOffset();
+        updating_syntax_highlights_ = false;
     }
 
     void MainWindow::apply_text_preferences()
@@ -1796,9 +2323,9 @@ namespace winrt::Glance::App::implementation
         const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
         LineNumberText().LineHeight(line_height);
         const auto blocks = TextContentRichText().Blocks();
-        if (blocks.Size() > 0)
+        for (std::uint32_t index = 0; index < blocks.Size(); ++index)
         {
-            if (const auto paragraph = blocks.GetAt(0).try_as<Paragraph>())
+            if (const auto paragraph = blocks.GetAt(index).try_as<Paragraph>())
             {
                 paragraph.LineHeight(line_height);
                 paragraph.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
@@ -1808,32 +2335,61 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_text_layout()
     {
+        const bool should_use_long_text_view = current_text_has_more_ ||
+            (current_text_.size() > long_text_render_threshold &&
+             current_text_.find(L'\n') != std::wstring::npos);
+        if (should_use_long_text_view != long_text_mode_ && !current_text_.empty())
+        {
+            render_text_content();
+        }
         TextContentRichText().TextWrapping(word_wrap_ ? TextWrapping::Wrap : TextWrapping::NoWrap);
         TextPreviewScroller().HorizontalScrollMode(
             word_wrap_ ? ScrollMode::Disabled : ScrollMode::Enabled);
         TextPreviewScroller().HorizontalScrollBarVisibility(
             word_wrap_ ? ScrollBarVisibility::Disabled : ScrollBarVisibility::Auto);
+        ScrollViewer::SetHorizontalScrollMode(
+            LongTextList(),
+            word_wrap_ ? ScrollMode::Disabled : ScrollMode::Enabled);
+        ScrollViewer::SetHorizontalScrollBarVisibility(
+            LongTextList(),
+            word_wrap_ ? ScrollBarVisibility::Disabled : ScrollBarVisibility::Auto);
+        for (std::uint32_t index = 0; index < LongTextList().Items().Size(); ++index)
+        {
+            const auto container = LongTextList().ContainerFromIndex(index).try_as<ListViewItem>();
+            const auto root = container != nullptr
+                ? container.ContentTemplateRoot().try_as<Grid>()
+                : nullptr;
+            if (root != nullptr && root.Children().Size() >= 2)
+            {
+                if (const auto content = root.Children().GetAt(1).try_as<TextBlock>())
+                {
+                    content.TextWrapping(word_wrap_ ? TextWrapping::Wrap : TextWrapping::NoWrap);
+                }
+            }
+        }
         TextContentRichText().Width(
             word_wrap_
                 ? std::max(1.0, TextPreviewScroller().ActualWidth() - LineNumberGutter().ActualWidth())
                 : std::numeric_limits<double>::quiet_NaN());
         update_line_numbers();
         update_line_number_visibility();
+        ensure_text_viewport_filled();
     }
 
     void MainWindow::update_line_numbers()
     {
         if (current_text_.empty())
         {
-            LineNumberText().Text(L"");
+            set_line_number_text(L"");
+            text_line_count_ = 0;
+            line_numbers_simple_ = false;
+            virtual_line_numbers_ = false;
             return;
         }
 
         const auto simple_numbers = [this] {
-            const std::size_t line_count = 1
-                + static_cast<std::size_t>(std::ranges::count(current_text_, L'\n'));
             std::wostringstream output;
-            for (std::size_t line = 1; line <= line_count; ++line)
+            for (std::size_t line = 1; line <= text_line_count_; ++line)
             {
                 if (line > 1)
                 {
@@ -1843,17 +2399,30 @@ namespace winrt::Glance::App::implementation
             }
             return output.str();
         };
+        text_line_count_ = 1
+            + static_cast<std::size_t>(std::ranges::count(current_text_, L'\n'));
 
-        if (!word_wrap_ || current_text_.size() > 1024U * 1024U)
+        if (current_text_has_more_ || current_text_.size() > text_chunk_bytes)
         {
-            LineNumberText().Text(simple_numbers());
+            line_numbers_simple_ = true;
+            virtual_line_numbers_ = true;
+            update_virtual_line_numbers();
+            return;
+        }
+        virtual_line_numbers_ = false;
+        LineNumberText().Margin(Thickness{});
+        if (!word_wrap_)
+        {
+            line_numbers_simple_ = true;
+            set_line_number_text(simple_numbers());
             return;
         }
 
         const double content_width = TextContentRichText().Width() - 32.0;
         if (!std::isfinite(content_width) || content_width <= 1.0)
         {
-            LineNumberText().Text(simple_numbers());
+            line_numbers_simple_ = true;
+            set_line_number_text(simple_numbers());
             return;
         }
 
@@ -1863,7 +2432,8 @@ namespace winrt::Glance::App::implementation
                 __uuidof(IDWriteFactory),
                 reinterpret_cast<IUnknown**>(factory.put()))))
         {
-            LineNumberText().Text(simple_numbers());
+            line_numbers_simple_ = true;
+            set_line_number_text(simple_numbers());
             return;
         }
         com_ptr<IDWriteTextFormat> format;
@@ -1877,7 +2447,8 @@ namespace winrt::Glance::App::implementation
                 L"",
                 format.put())))
         {
-            LineNumberText().Text(simple_numbers());
+            line_numbers_simple_ = true;
+            set_line_number_text(simple_numbers());
             return;
         }
         format->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
@@ -1890,7 +2461,8 @@ namespace winrt::Glance::App::implementation
                 std::numeric_limits<float>::max(),
                 layout.put())))
         {
-            LineNumberText().Text(simple_numbers());
+            line_numbers_simple_ = true;
+            set_line_number_text(simple_numbers());
             return;
         }
 
@@ -1899,7 +2471,8 @@ namespace winrt::Glance::App::implementation
         std::vector<DWRITE_LINE_METRICS> metrics(metric_count);
         if (FAILED(layout->GetLineMetrics(metrics.data(), metric_count, &metric_count)))
         {
-            LineNumberText().Text(simple_numbers());
+            line_numbers_simple_ = true;
+            set_line_number_text(simple_numbers());
             return;
         }
 
@@ -1927,7 +2500,124 @@ namespace winrt::Glance::App::implementation
         {
             output << L'\n' << logical_line;
         }
-        LineNumberText().Text(output.str());
+        line_numbers_simple_ = false;
+        set_line_number_text(output.str());
+    }
+
+    void MainWindow::set_line_number_text(std::wstring text)
+    {
+        line_number_text_ = std::move(text);
+        const auto blocks = LineNumberText().Blocks();
+        blocks.Clear();
+        if (line_number_text_.empty())
+        {
+            return;
+        }
+
+        constexpr std::size_t lines_per_number_block = 64;
+        const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
+        std::size_t segment_start{};
+        std::size_t line_count{};
+        const auto append_block = [&blocks, line_height](std::wstring_view value) {
+            Paragraph paragraph;
+            paragraph.LineHeight(line_height);
+            paragraph.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
+            Run run;
+            run.Text(hstring(value));
+            paragraph.Inlines().Append(run);
+            blocks.Append(paragraph);
+        };
+        for (std::size_t index = 0; index < line_number_text_.size(); ++index)
+        {
+            if (line_number_text_[index] != L'\n' || ++line_count < lines_per_number_block)
+            {
+                continue;
+            }
+            append_block(std::wstring_view(line_number_text_).substr(
+                segment_start,
+                index - segment_start));
+            segment_start = index + 1;
+            line_count = 0;
+        }
+        append_block(std::wstring_view(line_number_text_).substr(segment_start));
+    }
+
+    void MainWindow::append_line_numbers(std::wstring_view content)
+    {
+        const auto added_lines = static_cast<std::size_t>(std::ranges::count(content, L'\n'));
+        const bool should_use_simple =
+            !word_wrap_ || current_text_has_more_ || current_text_.size() > text_chunk_bytes;
+        if (!line_numbers_simple_ || !should_use_simple || text_line_count_ == 0)
+        {
+            update_line_numbers();
+            return;
+        }
+
+        if (added_lines == 0)
+        {
+            return;
+        }
+        if (virtual_line_numbers_)
+        {
+            text_line_count_ += added_lines;
+            update_virtual_line_numbers();
+            return;
+        }
+        std::wstring numbers = line_number_text_;
+        for (std::size_t index = 0; index < added_lines; ++index)
+        {
+            numbers.push_back(L'\n');
+            numbers.append(std::to_wstring(++text_line_count_));
+        }
+        set_line_number_text(std::move(numbers));
+    }
+
+    void MainWindow::update_virtual_line_numbers()
+    {
+        if (!virtual_line_numbers_ || text_line_count_ == 0)
+        {
+            return;
+        }
+        const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
+        const std::size_t first_line = std::min(
+            text_line_count_ - 1,
+            static_cast<std::size_t>(std::max(0.0, TextPreviewScroller().VerticalOffset()) / line_height));
+        const std::size_t visible_line_count = static_cast<std::size_t>(std::ceil(
+            std::max(line_height, TextPreviewScroller().ViewportHeight()) / line_height)) + 4U;
+        const std::size_t last_line = std::min(
+            text_line_count_,
+            first_line + visible_line_count);
+        std::wostringstream output;
+        for (std::size_t line = first_line + 1; line <= last_line; ++line)
+        {
+            if (line > first_line + 1)
+            {
+                output << L'\n';
+            }
+            output << line;
+        }
+        set_line_number_text(output.str());
+        LineNumberText().Margin(Thickness{ 0.0, first_line * line_height, 0.0, 0.0 });
+    }
+
+    void MainWindow::ensure_text_viewport_filled()
+    {
+        if (!long_text_mode_ || !current_text_has_more_ || text_chunk_loading_)
+        {
+            return;
+        }
+        const double viewport_height = LongTextList().ActualHeight();
+        if (viewport_height <= 0.0)
+        {
+            return;
+        }
+        const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
+        const std::size_t minimum_lines =
+            static_cast<std::size_t>(std::ceil(viewport_height / line_height)) + 4U;
+        if (text_line_count_ < minimum_lines)
+        {
+            load_next_text_chunk_async(content_generation_);
+        }
     }
 
     void MainWindow::show_content_panel(glance::app::PreviewKind kind)
@@ -1968,10 +2658,89 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void MainWindow::dismiss_preview_info_bar()
+    {
+        syntax_highlight_notice_pending_ = false;
+        preview_notice_active_ = false;
+        if (preview_notice_timer_ != nullptr)
+        {
+            preview_notice_timer_.Stop();
+        }
+        PreviewErrorInfoBar().IsOpen(false);
+    }
+
+    void MainWindow::show_syntax_highlight_disabled_notice()
+    {
+        if (preview_notice_timer_ != nullptr)
+        {
+            preview_notice_timer_.Stop();
+        }
+        PreviewErrorInfoBar().IsOpen(false);
+        preview_notice_active_ = true;
+        PreviewErrorInfoBar().Title(L"");
+        PreviewErrorInfoBar().Message(
+            glance::app::localize(L"SyntaxHighlightDisabledLargeFile"));
+        PreviewErrorInfoBar().Severity(InfoBarSeverity::Informational);
+        PreviewErrorInfoBar().IsClosable(false);
+        PreviewErrorInfoBar().IsOpen(true);
+        if (preview_notice_timer_ == nullptr)
+        {
+            preview_notice_timer_ = DispatcherTimer();
+            preview_notice_timer_.Interval(std::chrono::seconds(3));
+            const auto weak = get_weak();
+            preview_notice_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+                if (const auto self = weak.get())
+                {
+                    self->preview_notice_timer_.Stop();
+                    self->preview_notice_active_ = false;
+                    self->PreviewErrorInfoBar().IsOpen(false);
+                }
+            });
+        }
+        preview_notice_timer_.Start();
+    }
+
     void MainWindow::show_text_preview_error(std::wstring message)
     {
+        dismiss_preview_info_bar();
+        PreviewErrorInfoBar().Title(glance::app::localize(L"PreviewErrorInfoBar.Title"));
         PreviewErrorInfoBar().Message(std::move(message));
+        PreviewErrorInfoBar().Severity(InfoBarSeverity::Error);
+        PreviewErrorInfoBar().IsClosable(true);
         PreviewErrorInfoBar().IsOpen(true);
+    }
+
+    void MainWindow::update_preview_mode_button()
+    {
+        const bool available =
+            content_preview_kind_ != glance::app::PreviewKind::generic &&
+            current_index_ < files_.size() &&
+            !files_[current_index_].path.empty() &&
+            !files_[current_index_].is_cloud_placeholder &&
+            (files_[current_index_].attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+        PreviewModeButton().Visibility(available ? Visibility::Visible : Visibility::Collapsed);
+        PreviewModeButton().IsChecked(available && basic_info_mode_);
+        ToolTipService::SetToolTip(
+            PreviewModeButton(),
+            box_value(glance::app::localize(
+                available && basic_info_mode_
+                    ? L"PreviewModeShowContentTooltip"
+                    : L"PreviewModeShowInfoTooltip")));
+    }
+
+    void MainWindow::update_preview_as_text_button()
+    {
+        const bool available =
+            generic_text_preview_allowed_ &&
+            !basic_info_mode_ &&
+            current_kind_ == glance::app::PreviewKind::generic &&
+            current_index_ < files_.size() &&
+            !files_[current_index_].path.empty() &&
+            !files_[current_index_].is_cloud_placeholder &&
+            (files_[current_index_].attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
+            files_[current_index_].size <= maximum_preview_as_text_bytes &&
+            glance::app::can_try_preview_as_text(files_[current_index_].path);
+        PreviewAsTextButton().Visibility(available ? Visibility::Visible : Visibility::Collapsed);
     }
 
     void MainWindow::show_provider_error(std::wstring message, std::uint64_t generation)
@@ -2028,6 +2797,38 @@ namespace winrt::Glance::App::implementation
         update_state();
     }
 
+    void MainWindow::PreviewModeButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (content_preview_kind_ == glance::app::PreviewKind::generic ||
+            current_index_ >= files_.size())
+        {
+            basic_info_mode_ = false;
+            update_preview_mode_button();
+            return;
+        }
+
+        const auto& file = files_[current_index_];
+        if (file.path.empty() || file.is_cloud_placeholder ||
+            (file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+        {
+            basic_info_mode_ = false;
+            update_preview_mode_button();
+            return;
+        }
+
+        basic_info_mode_ = PreviewModeButton().IsChecked().Value();
+        update_preview_mode_button();
+        if (!basic_info_mode_)
+        {
+            present_file(current_index_);
+            return;
+        }
+
+        ++content_generation_;
+        dismiss_preview_info_bar();
+        present_generic(file, false, true);
+    }
+
     void MainWindow::ClosePreviewButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         if (detached_)
@@ -2052,7 +2853,10 @@ namespace winrt::Glance::App::implementation
         MarkdownCodeButton().IsChecked(!preview);
         MarkdownPreviewButton().FontWeight(preview ? Windows::UI::Text::FontWeights::SemiBold() : Windows::UI::Text::FontWeights::Normal());
         MarkdownCodeButton().FontWeight(preview ? Windows::UI::Text::FontWeights::Normal() : Windows::UI::Text::FontWeights::SemiBold());
-        TextPreviewScroller().Visibility(preview ? Visibility::Collapsed : Visibility::Visible);
+        TextPreviewScroller().Visibility(
+            !preview && !long_text_mode_ ? Visibility::Visible : Visibility::Collapsed);
+        LongTextList().Visibility(
+            !preview && long_text_mode_ ? Visibility::Visible : Visibility::Collapsed);
         MarkdownPreviewWebView().Visibility(preview ? Visibility::Visible : Visibility::Collapsed);
     }
 
@@ -2068,7 +2872,26 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_line_number_visibility()
     {
-        LineNumberGutter().Visibility(line_numbers_visible_ ? Visibility::Visible : Visibility::Collapsed);
+        LineNumberGutter().Visibility(
+            line_numbers_visible_ && !long_text_mode_ ? Visibility::Visible : Visibility::Collapsed);
+        if (long_text_mode_)
+        {
+            for (std::uint32_t index = 0; index < LongTextList().Items().Size(); ++index)
+            {
+                const auto container = LongTextList().ContainerFromIndex(index).try_as<ListViewItem>();
+                const auto root = container != nullptr
+                    ? container.ContentTemplateRoot().try_as<Grid>()
+                    : nullptr;
+                if (root != nullptr && root.Children().Size() > 0)
+                {
+                    if (const auto border = root.Children().GetAt(0).try_as<Border>())
+                    {
+                        border.Visibility(
+                            line_numbers_visible_ ? Visibility::Visible : Visibility::Collapsed);
+                    }
+                }
+            }
+        }
         LineNumbersButton().IsEnabled(true);
         LineNumbersButton().IsChecked(line_numbers_visible_);
         ToolTipService::SetToolTip(
@@ -2087,6 +2910,10 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::SyntaxHighlightButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
+        if (syntax_highlight_notice_pending_ || preview_notice_active_)
+        {
+            dismiss_preview_info_bar();
+        }
         syntax_highlighting_ = SyntaxHighlightButton().IsChecked().Value();
         text_preferences_.syntax_highlighting = syntax_highlighting_;
         glance::app::save_text_preferences(text_preferences_);
@@ -2150,7 +2977,7 @@ namespace winrt::Glance::App::implementation
         EncodingSelector().Content(box_value(option.Text()));
         current_text_ = glance::app::localize(L"Loading");
         render_text_content();
-        LineNumberText().Text(L"");
+        set_line_number_text(L"");
         const auto generation = ++content_generation_;
         load_text_async(current_text_path_, current_text_markdown_, generation, current_text_encoding_);
     }
@@ -2160,6 +2987,164 @@ namespace winrt::Glance::App::implementation
         if (word_wrap_)
         {
             update_text_layout();
+        }
+    }
+
+    void MainWindow::TextPreviewScroller_ViewChanged(
+        IInspectable const&,
+        ScrollViewerViewChangedEventArgs const&)
+    {
+        update_virtual_line_numbers();
+        queue_visible_syntax_highlight_update();
+        const double scrollable_height = TextPreviewScroller().ScrollableHeight();
+        if (scrollable_height <= 0.0 ||
+            TextPreviewScroller().VerticalOffset() < scrollable_height * 0.75)
+        {
+            return;
+        }
+        load_next_text_chunk_async(content_generation_);
+    }
+
+    void MainWindow::LongTextList_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
+    {
+        ensure_text_viewport_filled();
+    }
+
+    void MainWindow::LongTextList_ContainerContentChanging(
+        ListViewBase const&,
+        ContainerContentChangingEventArgs const& args)
+    {
+        if (args.InRecycleQueue())
+        {
+            return;
+        }
+        if (args.Phase() == 0)
+        {
+            const auto weak = get_weak();
+            args.RegisterUpdateCallback(
+                [weak](
+                    ListViewBase const& callback_sender,
+                    ContainerContentChangingEventArgs const& callback_args) {
+                    if (const auto self = weak.get())
+                    {
+                        self->LongTextList_ContainerContentChanging(
+                            callback_sender,
+                            callback_args);
+                    }
+                });
+            return;
+        }
+        const std::size_t item_index = args.ItemIndex();
+        if (item_index >= long_text_block_ranges_.size())
+        {
+            return;
+        }
+        const auto root = args.ItemContainer().ContentTemplateRoot().try_as<Grid>();
+        if (root == nullptr || root.Children().Size() < 2)
+        {
+            return;
+        }
+        const auto line_border = root.Children().GetAt(0).try_as<Border>();
+        const auto line_numbers = line_border != nullptr
+            ? line_border.Child().try_as<TextBlock>()
+            : nullptr;
+        const auto content = root.Children().GetAt(1).try_as<TextBlock>();
+        if (line_numbers == nullptr || content == nullptr)
+        {
+            return;
+        }
+
+        const auto& block_range = long_text_block_ranges_[item_index];
+        const auto block_text = std::wstring_view(current_text_).substr(
+            block_range.start,
+            block_range.length);
+        content.Text(hstring(block_text.empty() ? L" " : block_text));
+        content.FontFamily(Media::FontFamily(text_preferences_.font_family));
+        content.FontSize(text_preferences_.font_size);
+        content.TextWrapping(word_wrap_ ? TextWrapping::Wrap : TextWrapping::NoWrap);
+
+        std::wostringstream numbers;
+        std::size_t line = long_text_block_start_lines_[item_index];
+        numbers << line;
+        for (const wchar_t character : block_text)
+        {
+            if (character == L'\n')
+            {
+                numbers << L'\n' << ++line;
+            }
+        }
+        line_numbers.Text(numbers.str());
+        line_numbers.FontFamily(Media::FontFamily(text_preferences_.font_family));
+        line_numbers.FontSize(text_preferences_.font_size);
+        const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
+        line_numbers.LineHeight(line_height);
+        line_numbers.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
+        content.LineHeight(line_height);
+        content.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
+        line_border.Visibility(line_numbers_visible_ ? Visibility::Visible : Visibility::Collapsed);
+
+        const auto highlighters = content.TextHighlighters();
+        highlighters.Clear();
+        if (syntax_highlighting_)
+        {
+            const bool dark = RootGrid().ActualTheme() == ElementTheme::Dark;
+            std::array<TextHighlighter, 5> item_highlighters;
+            const std::array styles{
+                glance::app::SyntaxStyle::keyword,
+                glance::app::SyntaxStyle::string,
+                glance::app::SyntaxStyle::comment,
+                glance::app::SyntaxStyle::number,
+                glance::app::SyntaxStyle::directive };
+            const auto transparent_background = Media::SolidColorBrush(
+                Windows::UI::Color{ 0, 0, 0, 0 });
+            for (std::size_t index = 0; index < styles.size(); ++index)
+            {
+                item_highlighters[index] = TextHighlighter();
+                item_highlighters[index].Foreground(syntax_brush(
+                    styles[index],
+                    text_preferences_.syntax_theme,
+                    dark));
+                item_highlighters[index].Background(transparent_background);
+            }
+            const std::size_t block_end = block_range.start + block_range.length;
+            auto range = std::lower_bound(
+                text_syntax_ranges_.begin(),
+                text_syntax_ranges_.end(),
+                block_range.start,
+                [](const TextSyntaxRange& value, std::size_t position) {
+                    return value.start + value.length <= position;
+                });
+            while (range != text_syntax_ranges_.end() && range->start < block_end)
+            {
+                const std::size_t start = std::max(range->start, block_range.start);
+                const std::size_t end = std::min(range->start + range->length, block_end);
+                std::size_t highlighter_index{};
+                switch (range->style)
+                {
+                case glance::app::SyntaxStyle::keyword: highlighter_index = 0; break;
+                case glance::app::SyntaxStyle::string: highlighter_index = 1; break;
+                case glance::app::SyntaxStyle::comment: highlighter_index = 2; break;
+                case glance::app::SyntaxStyle::number: highlighter_index = 3; break;
+                case glance::app::SyntaxStyle::directive: highlighter_index = 4; break;
+                default: ++range; continue;
+                }
+                TextRange text_range;
+                text_range.StartIndex = static_cast<std::int32_t>(start - block_range.start);
+                text_range.Length = static_cast<std::int32_t>(end - start);
+                item_highlighters[highlighter_index].Ranges().Append(text_range);
+                ++range;
+            }
+            for (const auto& highlighter : item_highlighters)
+            {
+                highlighters.Append(highlighter);
+            }
+        }
+
+        const auto item_count = LongTextList().Items().Size();
+        if (current_text_has_more_ && item_count > 0 &&
+            (item_index + 1U) * 4U >= item_count * 3U)
+        {
+            load_next_text_chunk_async(content_generation_);
         }
     }
 
@@ -2841,7 +3826,9 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::PreviewAsTextButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        if (current_kind_ != glance::app::PreviewKind::generic ||
+        if (basic_info_mode_ ||
+            !generic_text_preview_allowed_ ||
+            current_kind_ != glance::app::PreviewKind::generic ||
             current_index_ >= files_.size())
         {
             return;
@@ -2850,13 +3837,14 @@ namespace winrt::Glance::App::implementation
         const auto& file = files_[current_index_];
         if (file.path.empty() || file.is_cloud_placeholder ||
             (file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
-            file.size >= maximum_preview_as_text_file_size)
+            file.size > maximum_preview_as_text_bytes ||
+            !glance::app::can_try_preview_as_text(file.path))
         {
             return;
         }
 
         ++content_generation_;
-        PreviewErrorInfoBar().IsOpen(false);
+        dismiss_preview_info_bar();
         PreviewAsTextButton().IsEnabled(false);
         ErrorText().Visibility(Visibility::Collapsed);
         load_text_async(

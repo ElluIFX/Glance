@@ -28,19 +28,36 @@ namespace
 
     void append_span(
         std::vector<glance::app::SyntaxSpan>& spans,
-        std::wstring_view text,
+        std::size_t start,
+        std::size_t length,
         glance::app::SyntaxStyle style)
     {
-        if (text.empty())
+        if (length == 0)
         {
             return;
         }
-        if (!spans.empty() && spans.back().style == style)
+        if (!spans.empty() && spans.back().style == style &&
+            spans.back().start + spans.back().length == start)
         {
-            spans.back().text.append(text);
+            spans.back().length += length;
             return;
         }
-        spans.push_back({ std::wstring(text), style });
+        spans.push_back({ start, length, style });
+    }
+
+    std::uint8_t trailing_terminator_prefix(
+        std::wstring_view text,
+        std::wstring_view terminator)
+    {
+        const auto maximum = std::min(text.size(), terminator.size() - 1U);
+        for (std::size_t length = maximum; length > 0; --length)
+        {
+            if (text.substr(text.size() - length) == terminator.substr(0, length))
+            {
+                return static_cast<std::uint8_t>(length);
+            }
+        }
+        return 0;
     }
 
     const std::unordered_set<std::wstring>& keywords(std::wstring_view extension)
@@ -129,7 +146,10 @@ namespace
 
 namespace glance::app
 {
-    std::vector<SyntaxSpan> highlight_source(std::wstring_view text, std::wstring_view extension)
+    std::vector<SyntaxSpan> highlight_source_chunk(
+        std::wstring_view text,
+        std::wstring_view extension,
+        SyntaxHighlightState& state)
     {
         std::vector<SyntaxSpan> spans;
         spans.reserve(std::min<std::size_t>(text.size() / 24, 8192));
@@ -165,25 +185,138 @@ namespace glance::app
         const bool sql_comments = extension == L".sql";
         const bool markup = has_extension(extension, markup_extensions);
         const auto& language_keywords = keywords(extension);
-        bool line_start{ true };
-
         for (std::size_t index = 0; index < text.size();)
         {
             const std::size_t start = index;
+            if (state.continuation == SyntaxContinuation::block_comment ||
+                state.continuation == SyntaxContinuation::markup_comment)
+            {
+                const auto terminator = state.continuation == SyntaxContinuation::block_comment
+                    ? std::wstring_view(L"*/")
+                    : std::wstring_view(L"-->");
+                if (state.continuation_prefix > 0)
+                {
+                    const auto remainder = terminator.substr(state.continuation_prefix);
+                    if (text.substr(index).starts_with(remainder))
+                    {
+                        index += remainder.size();
+                        append_span(spans, start, index - start, SyntaxStyle::comment);
+                        state.continuation = SyntaxContinuation::none;
+                        state.continuation_prefix = 0;
+                        continue;
+                    }
+                    state.continuation_prefix = 0;
+                }
+                const auto end = text.find(terminator, index);
+                index = end == std::wstring_view::npos
+                    ? text.size()
+                    : end + terminator.size();
+                append_span(spans, start, index - start, SyntaxStyle::comment);
+                state.line_start = index > start && text[index - 1] == L'\n';
+                if (end != std::wstring_view::npos)
+                {
+                    state.continuation = SyntaxContinuation::none;
+                    state.continuation_prefix = 0;
+                }
+                else
+                {
+                    state.continuation_prefix = trailing_terminator_prefix(
+                        text.substr(start, index - start),
+                        terminator);
+                }
+                continue;
+            }
+            if (state.continuation == SyntaxContinuation::line_comment ||
+                state.continuation == SyntaxContinuation::directive)
+            {
+                const auto end = text.find(L'\n', index);
+                index = end == std::wstring_view::npos ? text.size() : end + 1;
+                append_span(
+                    spans,
+                    start,
+                    index - start,
+                    state.continuation == SyntaxContinuation::line_comment
+                        ? SyntaxStyle::comment
+                        : SyntaxStyle::directive);
+                state.line_start = end != std::wstring_view::npos;
+                if (end != std::wstring_view::npos)
+                {
+                    state.continuation = SyntaxContinuation::none;
+                }
+                continue;
+            }
+            if (state.continuation == SyntaxContinuation::markup_directive)
+            {
+                const auto end = text.find(L'>', index);
+                index = end == std::wstring_view::npos ? text.size() : end + 1;
+                append_span(spans, start, index - start, SyntaxStyle::directive);
+                state.line_start = index > start && text[index - 1] == L'\n';
+                if (end != std::wstring_view::npos)
+                {
+                    state.continuation = SyntaxContinuation::none;
+                }
+                continue;
+            }
+            if (state.continuation == SyntaxContinuation::string)
+            {
+                if (state.string_escape_pending && index < text.size())
+                {
+                    ++index;
+                    state.string_escape_pending = false;
+                }
+                while (index < text.size())
+                {
+                    if (text[index] == L'\\')
+                    {
+                        if (index + 1 < text.size())
+                        {
+                            index += 2;
+                        }
+                        else
+                        {
+                            ++index;
+                            state.string_escape_pending = true;
+                        }
+                        continue;
+                    }
+                    const wchar_t value = text[index++];
+                    if (value == state.quote || value == L'\n')
+                    {
+                        state.continuation = SyntaxContinuation::none;
+                        state.string_escape_pending = false;
+                        break;
+                    }
+                }
+                append_span(spans, start, index - start, SyntaxStyle::string);
+                state.line_start = index > start && text[index - 1] == L'\n';
+                continue;
+            }
             if (markup && text.substr(index).starts_with(L"<!--"))
             {
                 const auto end = text.find(L"-->", index + 4);
                 index = end == std::wstring_view::npos ? text.size() : end + 3;
-                append_span(spans, text.substr(start, index - start), SyntaxStyle::comment);
-                line_start = index > start && text[index - 1] == L'\n';
+                append_span(spans, start, index - start, SyntaxStyle::comment);
+                state.line_start = index > start && text[index - 1] == L'\n';
+                state.continuation = end == std::wstring_view::npos
+                    ? SyntaxContinuation::markup_comment
+                    : SyntaxContinuation::none;
+                state.continuation_prefix = end == std::wstring_view::npos
+                    ? trailing_terminator_prefix(text.substr(start, index - start), L"-->")
+                    : 0;
                 continue;
             }
             if (block_comments && text.substr(index).starts_with(L"/*"))
             {
                 const auto end = text.find(L"*/", index + 2);
                 index = end == std::wstring_view::npos ? text.size() : end + 2;
-                append_span(spans, text.substr(start, index - start), SyntaxStyle::comment);
-                line_start = index > start && text[index - 1] == L'\n';
+                append_span(spans, start, index - start, SyntaxStyle::comment);
+                state.line_start = index > start && text[index - 1] == L'\n';
+                state.continuation = end == std::wstring_view::npos
+                    ? SyntaxContinuation::block_comment
+                    : SyntaxContinuation::none;
+                state.continuation_prefix = end == std::wstring_view::npos
+                    ? trailing_terminator_prefix(text.substr(start, index - start), L"*/")
+                    : 0;
                 continue;
             }
             const bool slash_comment = slash_comments && text.substr(index).starts_with(L"//");
@@ -194,44 +327,68 @@ namespace glance::app
             {
                 const auto end = text.find(L'\n', index);
                 index = end == std::wstring_view::npos ? text.size() : end + 1;
-                append_span(spans, text.substr(start, index - start), SyntaxStyle::comment);
-                line_start = end != std::wstring_view::npos;
+                append_span(spans, start, index - start, SyntaxStyle::comment);
+                state.line_start = end != std::wstring_view::npos;
+                state.continuation = end == std::wstring_view::npos
+                    ? SyntaxContinuation::line_comment
+                    : SyntaxContinuation::none;
                 continue;
             }
-            if (preprocessor && line_start && text[index] == L'#')
+            if (preprocessor && state.line_start && text[index] == L'#')
             {
                 const auto end = text.find(L'\n', index);
                 index = end == std::wstring_view::npos ? text.size() : end + 1;
-                append_span(spans, text.substr(start, index - start), SyntaxStyle::directive);
-                line_start = end != std::wstring_view::npos;
+                append_span(spans, start, index - start, SyntaxStyle::directive);
+                state.line_start = end != std::wstring_view::npos;
+                state.continuation = end == std::wstring_view::npos
+                    ? SyntaxContinuation::directive
+                    : SyntaxContinuation::none;
                 continue;
             }
             if (markup && text[index] == L'<')
             {
                 const auto end = text.find(L'>', index + 1);
                 index = end == std::wstring_view::npos ? text.size() : end + 1;
-                append_span(spans, text.substr(start, index - start), SyntaxStyle::directive);
-                line_start = false;
+                append_span(spans, start, index - start, SyntaxStyle::directive);
+                state.line_start = false;
+                state.continuation = end == std::wstring_view::npos
+                    ? SyntaxContinuation::markup_directive
+                    : SyntaxContinuation::none;
                 continue;
             }
             if (text[index] == L'\'' || text[index] == L'"' || text[index] == L'`')
             {
                 const wchar_t quote = text[index++];
+                bool closed{};
                 while (index < text.size())
                 {
-                    if (text[index] == L'\\' && index + 1 < text.size())
+                    if (text[index] == L'\\')
                     {
-                        index += 2;
+                        if (index + 1 < text.size())
+                        {
+                            index += 2;
+                        }
+                        else
+                        {
+                            ++index;
+                            state.string_escape_pending = true;
+                        }
                         continue;
                     }
                     const wchar_t value = text[index++];
                     if (value == quote || value == L'\n')
                     {
+                        closed = true;
                         break;
                     }
                 }
-                append_span(spans, text.substr(start, index - start), SyntaxStyle::string);
-                line_start = index > start && text[index - 1] == L'\n';
+                append_span(spans, start, index - start, SyntaxStyle::string);
+                state.line_start = index > start && text[index - 1] == L'\n';
+                if (!closed)
+                {
+                    state.continuation = SyntaxContinuation::string;
+                    state.quote = quote;
+                }
                 continue;
             }
             if (std::iswdigit(text[index]) != 0)
@@ -242,8 +399,8 @@ namespace glance::app
                 {
                     ++index;
                 }
-                append_span(spans, text.substr(start, index - start), SyntaxStyle::number);
-                line_start = false;
+                append_span(spans, start, index - start, SyntaxStyle::number);
+                state.line_start = false;
                 continue;
             }
             if (is_identifier_start(text[index]))
@@ -256,24 +413,33 @@ namespace glance::app
                 const std::wstring token(text.substr(start, index - start));
                 append_span(
                     spans,
-                    token,
+                    start,
+                    index - start,
                     language_keywords.contains(token) ? SyntaxStyle::keyword : SyntaxStyle::plain);
-                line_start = false;
+                state.line_start = false;
                 continue;
             }
 
             ++index;
             const wchar_t value = text[start];
-            append_span(spans, text.substr(start, 1), SyntaxStyle::plain);
+            append_span(spans, start, 1, SyntaxStyle::plain);
             if (value == L'\n')
             {
-                line_start = true;
+                state.line_start = true;
             }
             else if (std::iswspace(value) == 0)
             {
-                line_start = false;
+                state.line_start = false;
             }
         }
         return spans;
+    }
+
+    std::vector<SyntaxSpan> highlight_source(
+        std::wstring_view text,
+        std::wstring_view extension)
+    {
+        SyntaxHighlightState state;
+        return highlight_source_chunk(text, extension, state);
     }
 }
