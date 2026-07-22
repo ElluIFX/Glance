@@ -247,8 +247,8 @@
   <data name="GenericCreatedAt" xml:space="preserve"><value>Created at {0}</value></data>
   <data name="GenericVolumeId" xml:space="preserve"><value>Volume ID: {0}</value></data>
   <data name="GenericFileId" xml:space="preserve"><value>File ID: {0}</value></data>
-  <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>Modified {0}</value></data>
-  <data name="FooterCreationTimeFormat" xml:space="preserve"><value>Created {0}</value></data>
+  <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>Modified at {0}</value></data>
+  <data name="FooterCreationTimeFormat" xml:space="preserve"><value>Created at {0}</value></data>
   <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance Settings</value></data>
   <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close settings</value></data>
   <data name="LanguageLabel.Text" xml:space="preserve"><value>Language</value></data>

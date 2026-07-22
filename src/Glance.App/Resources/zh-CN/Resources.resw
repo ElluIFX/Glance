@@ -247,8 +247,8 @@
   <data name="GenericCreatedAt" xml:space="preserve"><value>创建于 {0}</value></data>
   <data name="GenericVolumeId" xml:space="preserve"><value>卷标识：{0}</value></data>
   <data name="GenericFileId" xml:space="preserve"><value>文件 ID：{0}</value></data>
-  <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>修改 {0}</value></data>
-  <data name="FooterCreationTimeFormat" xml:space="preserve"><value>创建 {0}</value></data>
+  <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>修改于 {0}</value></data>
+  <data name="FooterCreationTimeFormat" xml:space="preserve"><value>创建于 {0}</value></data>
   <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance 设置</value></data>
   <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭设置</value></data>
   <data name="LanguageLabel.Text" xml:space="preserve"><value>语言</value></data>
