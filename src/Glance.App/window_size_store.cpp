@@ -105,14 +105,15 @@ namespace glance::app
     {
         DWORD value{};
         DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   L"Software\\Glance",
-                   L"AutoFitWindowSize",
-                   RRF_RT_REG_DWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS && value != 0;
+        const LSTATUS status = RegGetValueW(
+            HKEY_CURRENT_USER,
+            L"Software\\Glance",
+            L"AutoFitWindowSize",
+            RRF_RT_REG_DWORD,
+            nullptr,
+            &value,
+            &size);
+        return status == ERROR_SUCCESS ? value != 0 : true;
     }
 
     void set_auto_fit_window_size_enabled(bool enabled) noexcept

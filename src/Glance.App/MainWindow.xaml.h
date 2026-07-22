@@ -50,6 +50,9 @@ namespace winrt::Glance::App::implementation
         void TextPreviewScroller_SizeChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::SizeChangedEventArgs const&);
+        void TextPreviewScroller_PointerWheelChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void ImagePanel_SizeChanged(IInspectable const&, Microsoft::UI::Xaml::SizeChangedEventArgs const&);
         void PdfPanel_SizeChanged(IInspectable const&, Microsoft::UI::Xaml::SizeChangedEventArgs const&);
         void PdfScroller_PointerWheelChanged(
@@ -148,8 +151,10 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget render_markdown_async(std::wstring html, std::uint64_t generation);
         void render_text_content();
         void apply_text_preferences();
+        void apply_text_font_metrics();
         void update_text_layout();
         void update_line_numbers();
+        void show_text_font_size_overlay();
         void set_markdown_preview_mode(bool preview);
         void update_line_number_visibility();
         void show_content_panel(glance::app::PreviewKind kind);
@@ -185,7 +190,7 @@ namespace winrt::Glance::App::implementation
         bool user_sized_{};
         bool line_numbers_visible_{ true };
         bool syntax_highlighting_{ true };
-        bool word_wrap_{};
+        bool word_wrap_{ true };
         bool media_is_audio_{};
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};
@@ -212,9 +217,11 @@ namespace winrt::Glance::App::implementation
         Windows::Data::Pdf::PdfDocument pdf_document_{ nullptr };
         std::uint32_t pdf_page_index_{};
         int pdf_wheel_delta_{};
+        int text_font_wheel_delta_{};
         Microsoft::UI::Xaml::DispatcherTimer focus_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer media_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer copy_feedback_timer_{ nullptr };
+        Microsoft::UI::Xaml::DispatcherTimer font_size_overlay_timer_{ nullptr };
         glance::app::PreviewKind current_kind_{ glance::app::PreviewKind::generic };
         glance::contracts::PreviewWindowState state_{ glance::contracts::PreviewWindowState::hidden };
     };

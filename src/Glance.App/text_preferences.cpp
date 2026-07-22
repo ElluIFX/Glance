@@ -105,7 +105,10 @@ namespace glance::app
             result.font_family = font_family;
         }
         result.font_size = std::clamp(static_cast<double>(read_dword(L"FontSize", 13)), 9.0, 32.0);
-        result.word_wrap = read_dword(L"WordWrap", 0) != 0;
+        result.syntax_theme = static_cast<SyntaxThemePreference>(std::min<DWORD>(
+            read_dword(L"SyntaxTheme", 0),
+            static_cast<DWORD>(SyntaxThemePreference::tomorrow_night)));
+        result.word_wrap = read_dword(L"WordWrap", 1) != 0;
         result.syntax_highlighting = read_dword(L"SyntaxHighlighting", 1) != 0;
         result.line_numbers = read_dword(L"LineNumbers", 1) != 0;
         return result;
@@ -128,6 +131,7 @@ namespace glance::app
             return;
         }
         const auto font_size = static_cast<DWORD>(std::clamp(preferences.font_size, 9.0, 32.0));
+        const DWORD syntax_theme = static_cast<DWORD>(preferences.syntax_theme);
         const DWORD word_wrap = preferences.word_wrap;
         const DWORD syntax_highlighting = preferences.syntax_highlighting;
         const DWORD line_numbers = preferences.line_numbers;
@@ -139,6 +143,7 @@ namespace glance::app
             reinterpret_cast<const BYTE*>(preferences.font_family.c_str()),
             static_cast<DWORD>((preferences.font_family.size() + 1) * sizeof(wchar_t)));
         RegSetValueExW(key, L"FontSize", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&font_size), sizeof(font_size));
+        RegSetValueExW(key, L"SyntaxTheme", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&syntax_theme), sizeof(syntax_theme));
         RegSetValueExW(key, L"WordWrap", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&word_wrap), sizeof(word_wrap));
         RegSetValueExW(key, L"SyntaxHighlighting", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&syntax_highlighting), sizeof(syntax_highlighting));
         RegSetValueExW(key, L"LineNumbers", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&line_numbers), sizeof(line_numbers));

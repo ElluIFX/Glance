@@ -228,6 +228,8 @@ namespace winrt::Glance::App::implementation
         FontFamilyComboBox().SelectedIndex(selected_font);
         FontSizeNumberBox().Value(text_preferences_.font_size);
         SyntaxHighlightingToggle().IsOn(text_preferences_.syntax_highlighting);
+        SyntaxThemeComboBox().SelectedIndex(static_cast<int>(text_preferences_.syntax_theme));
+        SyntaxThemeComboBox().IsEnabled(text_preferences_.syntax_highlighting);
         LineNumbersToggle().IsOn(text_preferences_.line_numbers);
         WordWrapToggle().IsOn(text_preferences_.word_wrap);
         path_copy_preferences_ = glance::app::load_path_copy_preferences();
@@ -344,6 +346,34 @@ namespace winrt::Glance::App::implementation
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
         set_text(FontSizeLabel(), L"FontSizeLabel.Text");
         set_text(SyntaxHighlightingLabel(), L"SyntaxHighlightingLabel.Text");
+        set_text(SyntaxThemeLabel(), L"SyntaxThemeLabel.Text");
+        const int selected_syntax_theme = SyntaxThemeComboBox().SelectedIndex();
+        const bool was_initializing_syntax_theme = initializing_;
+        initializing_ = true;
+        SyntaxThemeComboBox().Items().Clear();
+        static constexpr std::array syntax_theme_resources{
+            std::wstring_view(L"SyntaxThemeGlance"),
+            std::wstring_view(L"SyntaxThemeVisualStudio"),
+            std::wstring_view(L"SyntaxThemeMonokai"),
+            std::wstring_view(L"SyntaxThemeGitHub"),
+            std::wstring_view(L"SyntaxThemeDracula"),
+            std::wstring_view(L"SyntaxThemeSolarized"),
+            std::wstring_view(L"SyntaxThemeNord"),
+            std::wstring_view(L"SyntaxThemeOneDark"),
+            std::wstring_view(L"SyntaxThemeGruvbox"),
+            std::wstring_view(L"SyntaxThemeTomorrowNight") };
+        static_assert(
+            syntax_theme_resources.size() ==
+            static_cast<std::size_t>(glance::app::SyntaxThemePreference::tomorrow_night) + 1);
+        for (const auto resource : syntax_theme_resources)
+        {
+            SyntaxThemeComboBox().Items().Append(box_value(glance::app::localize(resource)));
+        }
+        if (selected_syntax_theme >= 0)
+        {
+            SyntaxThemeComboBox().SelectedIndex(selected_syntax_theme);
+        }
+        initializing_ = was_initializing_syntax_theme;
         set_text(LineNumbersLabel(), L"LineNumbersLabel.Text");
         set_text(WordWrapLabel(), L"WordWrapLabel.Text");
         set_text(PathCopyPageTitle(), L"PathCopyPageTitle.Text");
@@ -529,6 +559,12 @@ namespace winrt::Glance::App::implementation
             text_preferences_.font_size = FontSizeNumberBox().Value();
         }
         text_preferences_.syntax_highlighting = SyntaxHighlightingToggle().IsOn();
+        const int syntax_theme = SyntaxThemeComboBox().SelectedIndex();
+        if (syntax_theme >= 0 && syntax_theme <= static_cast<int>(glance::app::SyntaxThemePreference::tomorrow_night))
+        {
+            text_preferences_.syntax_theme = static_cast<glance::app::SyntaxThemePreference>(syntax_theme);
+        }
+        SyntaxThemeComboBox().IsEnabled(text_preferences_.syntax_highlighting);
         text_preferences_.line_numbers = LineNumbersToggle().IsOn();
         text_preferences_.word_wrap = WordWrapToggle().IsOn();
         glance::app::save_text_preferences(text_preferences_);
@@ -554,6 +590,13 @@ namespace winrt::Glance::App::implementation
             text_preferences_.font_size = args.NewValue();
             save_text_preferences();
         }
+    }
+
+    void SettingsWindow::SyntaxThemeComboBox_SelectionChanged(
+        IInspectable const&,
+        Controls::SelectionChangedEventArgs const&)
+    {
+        save_text_preferences();
     }
 
     void SettingsWindow::TextPreferenceToggle_Toggled(IInspectable const&, RoutedEventArgs const&)

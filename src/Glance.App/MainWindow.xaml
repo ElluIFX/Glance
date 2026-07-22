@@ -144,7 +144,9 @@
                         SizeChanged="TextPreviewScroller_SizeChanged"
                         VerticalScrollBarVisibility="Auto"
                         VerticalScrollMode="Enabled">
-                        <Grid x:Name="TextCodePanel">
+                        <Grid
+                            x:Name="TextCodePanel"
+                            PointerWheelChanged="TextPreviewScroller_PointerWheelChanged">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
@@ -663,5 +665,26 @@
                 <FontIcon FontSize="14" Glyph="&#xE838;" />
             </Button>
         </Grid>
+
+        <Border
+            x:Name="TextFontSizeOverlay"
+            Grid.RowSpan="3"
+            MinWidth="88"
+            Padding="16,10"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            Canvas.ZIndex="100"
+            CornerRadius="6"
+            IsHitTestVisible="False"
+            Visibility="Collapsed">
+            <TextBlock
+                x:Name="TextFontSizeOverlayText"
+                HorizontalAlignment="Center"
+                FontSize="18"
+                FontWeight="SemiBold" />
+        </Border>
     </Grid>
 </Window>

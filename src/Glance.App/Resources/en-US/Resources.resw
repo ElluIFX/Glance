@@ -22,6 +22,7 @@
   <data name="EncodingDetecting" xml:space="preserve"><value>Detecting...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="PreviewTruncated" xml:space="preserve"><value>Preview truncated at 8 MB</value></data>
+  <data name="FontSizeOverlayFormat" xml:space="preserve"><value>{0} px</value></data>
   <data name="LineNumbersTooltip" xml:space="preserve"><value>Show line numbers</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>Line numbers are unavailable while wrapping</value></data>
   <data name="NoImageMetadata" xml:space="preserve"><value>No embedded image metadata.</value></data>
@@ -97,6 +98,17 @@
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>Font family</value></data>
   <data name="FontSizeLabel.Text" xml:space="preserve"><value>Font size</value></data>
   <data name="SyntaxHighlightingLabel.Text" xml:space="preserve"><value>Syntax highlighting</value></data>
+  <data name="SyntaxThemeLabel.Text" xml:space="preserve"><value>Highlighting style</value></data>
+  <data name="SyntaxThemeGlance" xml:space="preserve"><value>Glance</value></data>
+  <data name="SyntaxThemeVisualStudio" xml:space="preserve"><value>Visual Studio</value></data>
+  <data name="SyntaxThemeMonokai" xml:space="preserve"><value>Monokai</value></data>
+  <data name="SyntaxThemeGitHub" xml:space="preserve"><value>GitHub</value></data>
+  <data name="SyntaxThemeDracula" xml:space="preserve"><value>Dracula</value></data>
+  <data name="SyntaxThemeSolarized" xml:space="preserve"><value>Solarized</value></data>
+  <data name="SyntaxThemeNord" xml:space="preserve"><value>Nord</value></data>
+  <data name="SyntaxThemeOneDark" xml:space="preserve"><value>One Dark</value></data>
+  <data name="SyntaxThemeGruvbox" xml:space="preserve"><value>Gruvbox</value></data>
+  <data name="SyntaxThemeTomorrowNight" xml:space="preserve"><value>Tomorrow Night</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>Line numbers</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>Wrap long lines</value></data>
   <data name="PathCopyPageTitle.Text" xml:space="preserve"><value>Path copy</value></data>

@@ -394,6 +394,20 @@
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="SyntaxThemeLabel" x:Uid="SyntaxThemeLabel" VerticalAlignment="Center" Text="Highlighting style" />
+                                <ComboBox
+                                    x:Name="SyntaxThemeComboBox"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    SelectionChanged="SyntaxThemeComboBox_SelectionChanged" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="LineNumbersLabel" x:Uid="LineNumbersLabel" VerticalAlignment="Center" Text="Line numbers" />

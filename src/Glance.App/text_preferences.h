@@ -1,15 +1,31 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 namespace glance::app
 {
+    enum class SyntaxThemePreference : std::uint32_t
+    {
+        glance,
+        visual_studio,
+        monokai,
+        github,
+        dracula,
+        solarized,
+        nord,
+        one_dark,
+        gruvbox,
+        tomorrow_night,
+    };
+
     struct TextPreferences
     {
         std::wstring font_family{ L"Cascadia Mono" };
         double font_size{ 13.0 };
-        bool word_wrap{};
+        SyntaxThemePreference syntax_theme{ SyntaxThemePreference::glance };
+        bool word_wrap{ true };
         bool syntax_highlighting{ true };
         bool line_numbers{ true };
     };

@@ -45,6 +45,9 @@ namespace winrt::Glance::App::implementation
         void FontSizeNumberBox_ValueChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
+        void SyntaxThemeComboBox_SelectionChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
         void TextPreferenceToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);

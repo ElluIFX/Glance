@@ -85,6 +85,57 @@ namespace
             std::wstring_view(L".m4a"), std::wstring_view(L".aac"), std::wstring_view(L".ogg") };
         return std::ranges::find(audio_extensions, extension) != audio_extensions.end();
     }
+
+    struct SyntaxPalette
+    {
+        std::array<std::uint32_t, 5> light;
+        std::array<std::uint32_t, 5> dark;
+    };
+
+    constexpr std::array syntax_palettes{
+        SyntaxPalette{ { 0x005FB8, 0x107C10, 0x6B6B6B, 0x9C6500, 0xA4262C }, { 0x569CD6, 0xCE9178, 0x6A9955, 0xB5CEA8, 0xC586C0 } },
+        SyntaxPalette{ { 0x0000FF, 0xA31515, 0x008000, 0x098658, 0x800080 }, { 0x569CD6, 0xCE9178, 0x6A9955, 0xB5CEA8, 0xC586C0 } },
+        SyntaxPalette{ { 0xC2185B, 0x7A5D00, 0x6B6B63, 0x6F42C1, 0x007C91 }, { 0xF92672, 0xE6DB74, 0x75715E, 0xAE81FF, 0x66D9EF } },
+        SyntaxPalette{ { 0xCF222E, 0x0A3069, 0x6E7781, 0x0550AE, 0x8250DF }, { 0xFF7B72, 0xA5D6FF, 0x8B949E, 0x79C0FF, 0xD2A8FF } },
+        SyntaxPalette{ { 0xC2185B, 0x6F5B00, 0x607090, 0x6A4C93, 0x007C91 }, { 0xFF79C6, 0xF1FA8C, 0x6272A4, 0xBD93F9, 0x8BE9FD } },
+        SyntaxPalette{ { 0x859900, 0x2AA198, 0x93A1A1, 0xD33682, 0x268BD2 }, { 0xB5BD00, 0x2AA198, 0x839496, 0xD33682, 0x268BD2 } },
+        SyntaxPalette{ { 0x8F5F86, 0x4F7D4A, 0x6A7280, 0xA44A3F, 0x3B6EA5 }, { 0xB48EAD, 0xA3BE8C, 0x616E88, 0xD08770, 0x81A1C1 } },
+        SyntaxPalette{ { 0xA626A4, 0x50A14F, 0xA0A1A7, 0x986801, 0x4078F2 }, { 0xC678DD, 0x98C379, 0x5C6370, 0xD19A66, 0x61AFEF } },
+        SyntaxPalette{ { 0xCC241D, 0x79740E, 0x928374, 0x8F3F71, 0x076678 }, { 0xFB4934, 0xB8BB26, 0x928374, 0xD3869B, 0x83A598 } },
+        SyntaxPalette{ { 0x8959A8, 0x718C00, 0x8E908C, 0xF5871F, 0x4271AE }, { 0xB294BB, 0xB5BD68, 0x969896, 0xDE935F, 0x81A2BE } },
+    };
+    static_assert(
+        syntax_palettes.size() ==
+        static_cast<std::size_t>(glance::app::SyntaxThemePreference::tomorrow_night) + 1);
+
+    Media::Brush syntax_brush(
+        glance::app::SyntaxStyle style,
+        glance::app::SyntaxThemePreference theme,
+        bool dark)
+    {
+        std::size_t style_index{};
+        switch (style)
+        {
+        case glance::app::SyntaxStyle::keyword: style_index = 0; break;
+        case glance::app::SyntaxStyle::string: style_index = 1; break;
+        case glance::app::SyntaxStyle::comment: style_index = 2; break;
+        case glance::app::SyntaxStyle::number: style_index = 3; break;
+        case glance::app::SyntaxStyle::directive: style_index = 4; break;
+        default: return nullptr;
+        }
+
+        const auto theme_index = std::min<std::size_t>(
+            static_cast<std::uint32_t>(theme),
+            syntax_palettes.size() - 1);
+        const auto& palette = syntax_palettes[theme_index];
+        const std::uint32_t rgb = (dark ? palette.dark : palette.light)[style_index];
+        const Windows::UI::Color color{
+            255,
+            static_cast<std::uint8_t>((rgb >> 16U) & 0xFFU),
+            static_cast<std::uint8_t>((rgb >> 8U) & 0xFFU),
+            static_cast<std::uint8_t>(rgb & 0xFFU) };
+        return Media::SolidColorBrush(color);
+    }
 }
 
 namespace winrt::Glance::App::implementation
@@ -372,6 +423,11 @@ namespace winrt::Glance::App::implementation
         TextContentRichText().Blocks().Clear();
         LineNumberText().Text(L"");
         TextEncodingText().Text(L"");
+        if (font_size_overlay_timer_ != nullptr)
+        {
+            font_size_overlay_timer_.Stop();
+        }
+        TextFontSizeOverlay().Visibility(Visibility::Collapsed);
         ArchiveEntryList().Items().Clear();
         ArchiveStatusText().Text(L"");
         FileList().Items().Clear();
@@ -1349,46 +1405,11 @@ namespace winrt::Glance::App::implementation
                 return static_cast<wchar_t>(std::towlower(value));
             });
             const bool dark = RootGrid().ActualTheme() == ElementTheme::Dark;
-            const auto brush = [dark](glance::app::SyntaxStyle style) -> Media::Brush {
-                Windows::UI::Color color{};
-                color.A = 255;
-                switch (style)
-                {
-                case glance::app::SyntaxStyle::keyword:
-                    color.R = dark ? 86 : 0;
-                    color.G = dark ? 156 : 95;
-                    color.B = dark ? 214 : 184;
-                    break;
-                case glance::app::SyntaxStyle::string:
-                    color.R = dark ? 206 : 16;
-                    color.G = dark ? 145 : 124;
-                    color.B = dark ? 120 : 16;
-                    break;
-                case glance::app::SyntaxStyle::comment:
-                    color.R = dark ? 106 : 107;
-                    color.G = dark ? 153 : 107;
-                    color.B = dark ? 85 : 107;
-                    break;
-                case glance::app::SyntaxStyle::number:
-                    color.R = dark ? 181 : 156;
-                    color.G = dark ? 206 : 101;
-                    color.B = dark ? 168 : 0;
-                    break;
-                case glance::app::SyntaxStyle::directive:
-                    color.R = dark ? 197 : 164;
-                    color.G = dark ? 134 : 38;
-                    color.B = dark ? 192 : 44;
-                    break;
-                default:
-                    return nullptr;
-                }
-                return Media::SolidColorBrush(color);
-            };
             for (const auto& span : glance::app::highlight_source(current_text_, extension))
             {
                 Run run;
                 run.Text(span.text);
-                if (const auto foreground = brush(span.style))
+                if (const auto foreground = syntax_brush(span.style, text_preferences_.syntax_theme, dark))
                 {
                     run.Foreground(foreground);
                 }
@@ -1412,13 +1433,29 @@ namespace winrt::Glance::App::implementation
         word_wrap_ = text_preferences_.word_wrap;
         const Media::FontFamily font(text_preferences_.font_family);
         TextContentRichText().FontFamily(font);
-        TextContentRichText().FontSize(text_preferences_.font_size);
         LineNumberText().FontFamily(font);
-        LineNumberText().FontSize(text_preferences_.font_size);
+        apply_text_font_metrics();
         SyntaxHighlightButton().IsChecked(syntax_highlighting_);
         WordWrapButton().IsChecked(word_wrap_);
         update_text_layout();
         update_line_number_visibility();
+    }
+
+    void MainWindow::apply_text_font_metrics()
+    {
+        TextContentRichText().FontSize(text_preferences_.font_size);
+        LineNumberText().FontSize(text_preferences_.font_size);
+        const double line_height = std::max(18.0, std::ceil(text_preferences_.font_size * 1.38));
+        LineNumberText().LineHeight(line_height);
+        const auto blocks = TextContentRichText().Blocks();
+        if (blocks.Size() > 0)
+        {
+            if (const auto paragraph = blocks.GetAt(0).try_as<Paragraph>())
+            {
+                paragraph.LineHeight(line_height);
+                paragraph.LineStackingStrategy(LineStackingStrategy::BlockLineHeight);
+            }
+        }
     }
 
     void MainWindow::update_text_layout()
@@ -1742,6 +1779,60 @@ namespace winrt::Glance::App::implementation
         {
             update_text_layout();
         }
+    }
+
+    void MainWindow::TextPreviewScroller_PointerWheelChanged(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        if ((GetKeyState(VK_CONTROL) & 0x8000) == 0)
+        {
+            text_font_wheel_delta_ = 0;
+            return;
+        }
+
+        args.Handled(true);
+        text_font_wheel_delta_ += args.GetCurrentPoint(TextCodePanel()).Properties().MouseWheelDelta();
+        const int steps = text_font_wheel_delta_ / WHEEL_DELTA;
+        text_font_wheel_delta_ %= WHEEL_DELTA;
+        if (steps == 0)
+        {
+            return;
+        }
+
+        const double font_size = std::clamp(text_preferences_.font_size + steps, 9.0, 32.0);
+        if (font_size != text_preferences_.font_size)
+        {
+            text_preferences_.font_size = font_size;
+            glance::app::save_text_preferences(text_preferences_);
+            apply_text_font_metrics();
+            update_text_layout();
+        }
+        show_text_font_size_overlay();
+    }
+
+    void MainWindow::show_text_font_size_overlay()
+    {
+        TextFontSizeOverlayText().Text(glance::app::localize_format(
+            L"FontSizeOverlayFormat",
+            { std::to_wstring(static_cast<int>(text_preferences_.font_size)) }));
+        TextFontSizeOverlay().Visibility(Visibility::Visible);
+
+        if (font_size_overlay_timer_ == nullptr)
+        {
+            font_size_overlay_timer_ = DispatcherTimer();
+            font_size_overlay_timer_.Interval(std::chrono::milliseconds(900));
+            const auto weak = get_weak();
+            font_size_overlay_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+                if (const auto self = weak.get())
+                {
+                    self->font_size_overlay_timer_.Stop();
+                    self->TextFontSizeOverlay().Visibility(Visibility::Collapsed);
+                }
+            });
+        }
+        font_size_overlay_timer_.Stop();
+        font_size_overlay_timer_.Start();
     }
 
     void MainWindow::ImagePanel_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
