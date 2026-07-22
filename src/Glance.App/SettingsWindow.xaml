@@ -332,7 +332,7 @@
                                     HorizontalAlignment="Stretch"
                                     VerticalAlignment="Center"
                                     Maximum="32"
-                                    Minimum="9"
+                                    Minimum="7"
                                     SmallChange="1"
                                     SpinButtonPlacementMode="Inline"
                                     ValueChanged="FontSizeNumberBox_ValueChanged" />

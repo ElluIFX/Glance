@@ -104,7 +104,7 @@ namespace glance::app
         {
             result.font_family = font_family;
         }
-        result.font_size = std::clamp(static_cast<double>(read_dword(L"FontSize", 13)), 9.0, 32.0);
+        result.font_size = std::clamp(static_cast<double>(read_dword(L"FontSize", 13)), 7.0, 32.0);
         result.syntax_theme = static_cast<SyntaxThemePreference>(std::min<DWORD>(
             read_dword(L"SyntaxTheme", 0),
             static_cast<DWORD>(SyntaxThemePreference::tomorrow_night)));
@@ -130,7 +130,7 @@ namespace glance::app
         {
             return;
         }
-        const auto font_size = static_cast<DWORD>(std::clamp(preferences.font_size, 9.0, 32.0));
+        const auto font_size = static_cast<DWORD>(std::clamp(preferences.font_size, 7.0, 32.0));
         const DWORD syntax_theme = static_cast<DWORD>(preferences.syntax_theme);
         const DWORD word_wrap = preferences.word_wrap;
         const DWORD syntax_highlighting = preferences.syntax_highlighting;

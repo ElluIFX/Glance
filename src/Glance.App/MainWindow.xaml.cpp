@@ -2057,7 +2057,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
-        const double font_size = std::clamp(text_preferences_.font_size + steps, 9.0, 32.0);
+        const double font_size = std::clamp(text_preferences_.font_size + steps, 7.0, 32.0);
         if (font_size != text_preferences_.font_size)
         {
             text_preferences_.font_size = font_size;

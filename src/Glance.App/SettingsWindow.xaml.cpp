@@ -645,11 +645,21 @@ namespace winrt::Glance::App::implementation
         IInspectable const&,
         Controls::NumberBoxValueChangedEventArgs const& args)
     {
-        if (!initializing_ && std::isfinite(args.NewValue()))
+        if (initializing_)
         {
-            text_preferences_.font_size = args.NewValue();
-            save_text_preferences();
+            return;
         }
+
+        if (!std::isfinite(args.NewValue()))
+        {
+            initializing_ = true;
+            FontSizeNumberBox().Value(text_preferences_.font_size);
+            initializing_ = false;
+            return;
+        }
+
+        text_preferences_.font_size = args.NewValue();
+        save_text_preferences();
     }
 
     void SettingsWindow::SyntaxThemeComboBox_SelectionChanged(
