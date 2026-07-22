@@ -50,6 +50,8 @@
   <data name="CoreNotRunning" xml:space="preserve"><value>未运行</value></data>
   <data name="MediaComponentsAvailable" xml:space="preserve"><value>ffprobe 可用</value></data>
   <data name="MediaComponentsUnavailable" xml:space="preserve"><value>未检测到 ffprobe</value></data>
+  <data name="OfficeComAvailable" xml:space="preserve"><value>COM 自动化可用</value></data>
+  <data name="OfficeComUnavailable" xml:space="preserve"><value>未检测到 COM 自动化</value></data>
   <data name="AdministratorAccessAvailable" xml:space="preserve"><value>已获取</value></data>
   <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>未获取</value></data>
   <data name="SizesReset" xml:space="preserve"><value>已重置保存的窗口尺寸</value></data>
@@ -166,7 +168,8 @@
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>维护</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态、诊断和已保存的应用状态</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>输入核心</value></data>
-  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>媒体组件</value></data>
+  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>媒体信息组件</value></data>
+  <data name="OfficeAvailabilityLabel.Text" xml:space="preserve"><value>Office 可用性</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>管理员权限</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>诊断包</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>导出</value></data>

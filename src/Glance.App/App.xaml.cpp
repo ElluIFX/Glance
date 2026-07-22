@@ -3,6 +3,7 @@
 #include "appearance_preferences.h"
 #include "localization.h"
 #include "MainWindow.xaml.h"
+#include "office_availability.h"
 #include "SettingsWindow.xaml.h"
 #include "startup_registration.h"
 #include "glance/contracts/diagnostics.h"
@@ -126,6 +127,7 @@ namespace winrt::Glance::App::implementation
         const auto appearance = glance::app::load_appearance_preferences();
         glance::app::apply_ui_language(appearance.language);
         glance::app::apply_accent_resources(appearance);
+        glance::app::initialize_office_availability();
         glance::contracts::log_event(L"Creating the initial preview window.");
         create_active_window();
         glance::contracts::log_event(L"Creating the notification area icon.");

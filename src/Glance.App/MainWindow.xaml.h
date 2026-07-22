@@ -17,10 +17,13 @@
 
 #include <windows.h>
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace winrt::Glance::App::implementation
@@ -142,6 +145,7 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool auto_fit_applies() const noexcept;
         void save_current_window_placement() const noexcept;
         void clear_preview_content();
+        void cancel_office_conversion() noexcept;
         void reset_hidden_window_size() noexcept;
         void present_file(std::uint32_t index);
         void present_generic(
@@ -324,6 +328,18 @@ namespace winrt::Glance::App::implementation
         std::wstring image_metadata_;
         std::wstring media_dimensions_;
         std::wstring media_technical_info_;
+        struct OfficeConversionOperation
+        {
+            void attach_process(HANDLE value) noexcept;
+            void detach_process(HANDLE value) noexcept;
+            void cancel() noexcept;
+            [[nodiscard]] bool is_cancelled() const noexcept;
+
+            std::atomic_bool cancelled{};
+            std::mutex process_mutex;
+            HANDLE process{};
+        };
+        std::shared_ptr<OfficeConversionOperation> office_conversion_;
         std::wstring office_temp_pdf_;
         std::wstring office_cache_source_path_;
         std::uint64_t office_cache_source_size_{};

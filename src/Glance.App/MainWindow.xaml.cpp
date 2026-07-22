@@ -7,6 +7,7 @@
 #include "localization.h"
 #include "markdown_renderer.h"
 #include "media_metadata_provider.h"
+#include "office_availability.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "shell_icon_provider.h"
@@ -150,6 +151,40 @@ namespace
 
 namespace winrt::Glance::App::implementation
 {
+    void MainWindow::OfficeConversionOperation::attach_process(HANDLE value) noexcept
+    {
+        std::scoped_lock lock(process_mutex);
+        process = value;
+        if (cancelled.load(std::memory_order_acquire) && process != nullptr)
+        {
+            TerminateProcess(process, ERROR_CANCELLED);
+        }
+    }
+
+    void MainWindow::OfficeConversionOperation::detach_process(HANDLE value) noexcept
+    {
+        std::scoped_lock lock(process_mutex);
+        if (process == value)
+        {
+            process = nullptr;
+        }
+    }
+
+    void MainWindow::OfficeConversionOperation::cancel() noexcept
+    {
+        cancelled.store(true, std::memory_order_release);
+        std::scoped_lock lock(process_mutex);
+        if (process != nullptr)
+        {
+            TerminateProcess(process, ERROR_CANCELLED);
+        }
+    }
+
+    bool MainWindow::OfficeConversionOperation::is_cancelled() const noexcept
+    {
+        return cancelled.load(std::memory_order_acquire);
+    }
+
     MainWindow::MainWindow()
     {
         glance::contracts::log_event(L"MainWindow InitializeComponent begin.");
@@ -387,6 +422,7 @@ namespace winrt::Glance::App::implementation
         if (message == WM_NCDESTROY && self != nullptr)
         {
             glance::contracts::log_event(L"MainWindow received WM_NCDESTROY.");
+            self->cancel_office_conversion();
             RemoveWindowSubclass(window, window_subclass, 1);
             self->stop_detached_focus_monitor();
             if (self->media_timer_ != nullptr)
@@ -474,6 +510,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::clear_preview_content()
     {
+        cancel_office_conversion();
         ++content_generation_;
         stop_media_playback();
 
@@ -580,6 +617,15 @@ namespace winrt::Glance::App::implementation
         pdf_page_index_ = 0;
         pdf_wheel_delta_ = 0;
 
+    }
+
+    void MainWindow::cancel_office_conversion() noexcept
+    {
+        if (office_conversion_ != nullptr)
+        {
+            office_conversion_->cancel();
+            office_conversion_.reset();
+        }
     }
 
     void MainWindow::reset_hidden_window_size() noexcept
@@ -783,6 +829,7 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        cancel_office_conversion();
         current_index_ = index;
         basic_info_mode_ = false;
         content_preview_kind_ = glance::app::PreviewKind::generic;
@@ -826,6 +873,15 @@ namespace winrt::Glance::App::implementation
         }
 
         const auto kind = glance::app::resolve_preview_kind(file.path);
+        if (kind == glance::app::PreviewKind::office &&
+            !glance::app::office_preview_available(file.path))
+        {
+            content_preview_kind_ = glance::app::PreviewKind::generic;
+            update_preview_mode_button();
+            current_kind_ = glance::app::PreviewKind::generic;
+            present_generic(file, false, true);
+            return;
+        }
         content_preview_kind_ = kind;
         update_preview_mode_button();
         current_kind_ = kind;
@@ -1696,6 +1752,8 @@ namespace winrt::Glance::App::implementation
 
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
+        const auto operation = std::make_shared<OfficeConversionOperation>();
+        office_conversion_ = operation;
         co_await resume_background();
 
         std::error_code filesystem_error;
@@ -1711,7 +1769,7 @@ namespace winrt::Glance::App::implementation
         const auto host_path = executable_directory() / L"Glance.OfficeHost.exe";
 
         DWORD exit_code = ERROR_FILE_NOT_FOUND;
-        const bool staged = !filesystem_error && std::filesystem::copy_file(
+        const bool staged = !operation->is_cancelled() && !filesystem_error && std::filesystem::copy_file(
             path,
             staged_input_path,
             std::filesystem::copy_options::overwrite_existing,
@@ -1736,6 +1794,7 @@ namespace winrt::Glance::App::implementation
                     &process))
             {
                 CloseHandle(process.hThread);
+                operation->attach_process(process.hProcess);
                 const DWORD wait_result = WaitForSingleObject(process.hProcess, 120000);
                 if (wait_result == WAIT_TIMEOUT)
                 {
@@ -1743,21 +1802,33 @@ namespace winrt::Glance::App::implementation
                     WaitForSingleObject(process.hProcess, 5000);
                 }
                 static_cast<void>(GetExitCodeProcess(process.hProcess, &exit_code));
+                operation->detach_process(process.hProcess);
                 CloseHandle(process.hProcess);
             }
         }
         DeleteFileW(staged_input_path.c_str());
 
         filesystem_error.clear();
-        const bool succeeded = exit_code == 0 && std::filesystem::is_regular_file(output_path, filesystem_error);
+        const bool succeeded = !operation->is_cancelled() && exit_code == 0 &&
+            std::filesystem::is_regular_file(output_path, filesystem_error);
         static_cast<void>(dispatcher.TryEnqueue([
             lifetime,
+            operation,
             source = std::move(path),
             source_size,
             source_modified_time,
             output = output_path.wstring(),
             generation,
             succeeded] {
+            if (lifetime->office_conversion_ == operation)
+            {
+                lifetime->office_conversion_.reset();
+            }
+            if (operation->is_cancelled())
+            {
+                DeleteFileW(output.c_str());
+                return;
+            }
             if (!succeeded)
             {
                 DeleteFileW(output.c_str());
@@ -2904,6 +2975,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
+        cancel_office_conversion();
         ++content_generation_;
         dismiss_preview_info_bar();
         present_generic(file, false, true);

@@ -4,6 +4,7 @@
 #include "footer_preferences.h"
 #include "localization.h"
 #include "media_metadata_provider.h"
+#include "office_availability.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "startup_registration.h"
@@ -519,6 +520,7 @@ namespace winrt::Glance::App::implementation
         set_text(MaintenancePageDescription(), L"MaintenancePageDescription.Text");
         set_text(InputCoreLabel(), L"InputCoreLabel.Text");
         set_text(MediaComponentsLabel(), L"MediaComponentsLabel.Text");
+        set_text(OfficeAvailabilityLabel(), L"OfficeAvailabilityLabel.Text");
         set_text(AdministratorAccessLabel(), L"AdministratorAccessLabel.Text");
         set_text(DiagnosticBundleLabel(), L"DiagnosticBundleLabel.Text");
         set_content(ExportDiagnosticBundleButton(), L"ExportDiagnosticBundleButton.Content");
@@ -570,6 +572,12 @@ namespace winrt::Glance::App::implementation
             glance::app::media_probe_available(),
             L"MediaComponentsAvailable",
             L"MediaComponentsUnavailable");
+        set_status_indicator(
+            OfficeAvailabilityStatusIcon(),
+            OfficeAvailabilityStatusText(),
+            glance::app::office_com_available(),
+            L"OfficeComAvailable",
+            L"OfficeComUnavailable");
         set_status_indicator(
             AdministratorAccessStatusIcon(),
             AdministratorAccessStatusText(),

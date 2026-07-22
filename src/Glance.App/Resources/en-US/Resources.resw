@@ -50,6 +50,8 @@
   <data name="CoreNotRunning" xml:space="preserve"><value>Not running</value></data>
   <data name="MediaComponentsAvailable" xml:space="preserve"><value>ffprobe available</value></data>
   <data name="MediaComponentsUnavailable" xml:space="preserve"><value>ffprobe not found</value></data>
+  <data name="OfficeComAvailable" xml:space="preserve"><value>COM automation available</value></data>
+  <data name="OfficeComUnavailable" xml:space="preserve"><value>COM automation not found</value></data>
   <data name="AdministratorAccessAvailable" xml:space="preserve"><value>Acquired</value></data>
   <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>Not acquired</value></data>
   <data name="SizesReset" xml:space="preserve"><value>Saved sizes reset</value></data>
@@ -166,7 +168,8 @@
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>Maintenance</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>Runtime status, diagnostics, and saved application state</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>Input core</value></data>
-  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Media components</value></data>
+  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Media information components</value></data>
+  <data name="OfficeAvailabilityLabel.Text" xml:space="preserve"><value>Office availability</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>Administrator access</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>Diagnostic package</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>Export</value></data>
