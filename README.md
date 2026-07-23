@@ -32,7 +32,7 @@
 
 <p align="center">
 相比同类软件更注重稳定性与可靠性，在你需要预览文件时，<b>Glance 保证随叫随到</b>
-</p>
+</p>  
 
 <p align="center">
   <img src="docs/screenshot.png" alt="Glance Screenshot" style="max-width: 90%; border-radius: 8px;">

@@ -18,6 +18,14 @@ namespace glance::app
         one_dark,
         gruvbox,
         tomorrow_night,
+        catppuccin,
+        tokyo_night,
+        rose_pine,
+        everforest,
+        ayu,
+        horizon,
+        papercolor,
+        material,
     };
 
     struct TextPreferences

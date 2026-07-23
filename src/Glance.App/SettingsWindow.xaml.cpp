@@ -528,10 +528,18 @@ namespace winrt::Glance::App::implementation
             std::wstring_view(L"SyntaxThemeNord"),
             std::wstring_view(L"SyntaxThemeOneDark"),
             std::wstring_view(L"SyntaxThemeGruvbox"),
-            std::wstring_view(L"SyntaxThemeTomorrowNight") };
+            std::wstring_view(L"SyntaxThemeTomorrowNight"),
+            std::wstring_view(L"SyntaxThemeCatppuccin"),
+            std::wstring_view(L"SyntaxThemeTokyoNight"),
+            std::wstring_view(L"SyntaxThemeRosePine"),
+            std::wstring_view(L"SyntaxThemeEverforest"),
+            std::wstring_view(L"SyntaxThemeAyu"),
+            std::wstring_view(L"SyntaxThemeHorizon"),
+            std::wstring_view(L"SyntaxThemePaperColor"),
+            std::wstring_view(L"SyntaxThemeMaterial") };
         static_assert(
             syntax_theme_resources.size() ==
-            static_cast<std::size_t>(glance::app::SyntaxThemePreference::tomorrow_night) + 1);
+            static_cast<std::size_t>(glance::app::SyntaxThemePreference::material) + 1);
         for (const auto resource : syntax_theme_resources)
         {
             SyntaxThemeComboBox().Items().Append(box_value(glance::app::localize(resource)));
@@ -963,7 +971,7 @@ namespace winrt::Glance::App::implementation
         }
         text_preferences_.syntax_highlighting = SyntaxHighlightingToggle().IsOn();
         const int syntax_theme = SyntaxThemeComboBox().SelectedIndex();
-        if (syntax_theme >= 0 && syntax_theme <= static_cast<int>(glance::app::SyntaxThemePreference::tomorrow_night))
+        if (syntax_theme >= 0 && syntax_theme <= static_cast<int>(glance::app::SyntaxThemePreference::material))
         {
             text_preferences_.syntax_theme = static_cast<glance::app::SyntaxThemePreference>(syntax_theme);
         }

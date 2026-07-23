@@ -66,6 +66,8 @@ $requiredFiles = @(
     "Glance.OfficeHost.exe",
     "Glance.RenderHost.exe",
     "pdfium.dll",
+    "Lexilla.dll",
+    "Scintilla.dll",
     "Glance.pri",
     "App.xbf",
     "MainWindow.xbf",
@@ -113,6 +115,10 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\PDFium-NOTICE.txt") 
     -Destination (Join-Path $payloadDirectory "licenses\PDFium-NOTICE.txt") -Force
 Copy-Item -Path (Join-Path $pdfiumLicenseSource "*") `
     -Destination $pdfiumLicenseDestination -Force
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\Scintilla-Lexilla.txt") `
+    -Destination (Join-Path $payloadDirectory "licenses\Scintilla-Lexilla.txt") -Force
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\Tinted-Theming.txt") `
+    -Destination (Join-Path $payloadDirectory "licenses\Tinted-Theming.txt") -Force
 
 $forbiddenRuntimeFiles = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File | Where-Object {
     $_.Name -in @(

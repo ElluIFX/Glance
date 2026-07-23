@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cctype>
 #include <cwctype>
 #include <cstdint>
@@ -25,56 +26,6 @@
 namespace
 {
     constexpr std::size_t maximum_encoding_detection_bytes = 16U * 1024U;
-    constexpr std::size_t newline_search_bytes = 64U * 1024U;
-
-    std::vector<std::byte> newline_sequence_for_encoding(std::string_view encoding)
-    {
-        if (encoding == "UTF-16LE")
-        {
-            return { std::byte{ 0x0A }, std::byte{ 0x00 } };
-        }
-        if (encoding == "UTF-16BE")
-        {
-            return { std::byte{ 0x00 }, std::byte{ 0x0A } };
-        }
-        if (encoding == "UTF-32LE")
-        {
-            return {
-                std::byte{ 0x0A }, std::byte{ 0x00 },
-                std::byte{ 0x00 }, std::byte{ 0x00 } };
-        }
-        if (encoding == "UTF-32BE")
-        {
-            return {
-                std::byte{ 0x00 }, std::byte{ 0x00 },
-                std::byte{ 0x00 }, std::byte{ 0x0A } };
-        }
-        return { std::byte{ 0x0A } };
-    }
-
-    std::optional<std::size_t> find_newline_end(
-        const std::span<const std::byte> bytes,
-        std::size_t start,
-        const std::span<const std::byte> newline)
-    {
-        if (newline.empty() || start >= bytes.size())
-        {
-            return std::nullopt;
-        }
-        const std::size_t alignment = newline.size();
-        if (const std::size_t remainder = start % alignment; remainder != 0)
-        {
-            start += alignment - remainder;
-        }
-        for (std::size_t index = start; index + newline.size() <= bytes.size(); index += alignment)
-        {
-            if (std::ranges::equal(bytes.subspan(index, newline.size()), newline))
-            {
-                return index + newline.size();
-            }
-        }
-        return std::nullopt;
-    }
 
     std::wstring lower_extension(const std::wstring& path)
     {
@@ -636,13 +587,11 @@ namespace glance::app
             std::uint64_t file_size,
             std::uint64_t byte_offset,
             std::wstring display_encoding,
-            std::vector<std::byte> newline_sequence,
             std::unique_ptr<UConverter, ConverterCloser> converter)
             : path_(std::move(path)),
               file_size_(file_size),
               byte_offset_(byte_offset),
               display_encoding_(std::move(display_encoding)),
-              newline_sequence_(std::move(newline_sequence)),
               converter_(std::move(converter))
         {
         }
@@ -653,7 +602,9 @@ namespace glance::app
             TextPreview result;
             result.reader = shared_from_this();
             result.encoding = display_encoding_;
-            if (failed_ || byte_offset_ >= file_size_)
+            if (cancelled_.load(std::memory_order_relaxed) ||
+                failed_ ||
+                byte_offset_ >= file_size_)
             {
                 return result;
             }
@@ -676,41 +627,10 @@ namespace glance::app
                     reinterpret_cast<char*>(bytes.data()),
                     static_cast<std::streamsize>(bytes.size()));
                 bytes.resize(static_cast<std::size_t>(stream.gcount()));
-                while (byte_offset_ + bytes.size() < file_size_)
-                {
-                    if (const auto newline_end = find_newline_end(
-                            bytes,
-                            requested,
-                            newline_sequence_))
-                    {
-                        bytes.resize(*newline_end);
-                        break;
-                    }
-
-                    const auto extension = static_cast<std::size_t>(
-                        std::min<std::uint64_t>(
-                            file_size_ - byte_offset_ - bytes.size(),
-                            newline_search_bytes));
-                    const std::size_t previous_size = bytes.size();
-                    bytes.resize(previous_size + extension);
-                    stream.read(
-                        reinterpret_cast<char*>(bytes.data() + previous_size),
-                        static_cast<std::streamsize>(extension));
-                    const auto bytes_read = static_cast<std::size_t>(stream.gcount());
-                    bytes.resize(previous_size + bytes_read);
-                    if (bytes_read == 0)
-                    {
-                        break;
-                    }
-                    if (const auto newline_end = find_newline_end(
-                            bytes,
-                            requested,
-                            newline_sequence_))
-                    {
-                        bytes.resize(*newline_end);
-                        break;
-                    }
-                }
+            }
+            if (cancelled_.load(std::memory_order_relaxed))
+            {
+                return result;
             }
             if (bytes.empty())
             {
@@ -757,14 +677,19 @@ namespace glance::app
             return result;
         }
 
+        void cancel() noexcept
+        {
+            cancelled_.store(true, std::memory_order_relaxed);
+        }
+
     private:
         std::wstring path_;
         std::uint64_t file_size_{};
         std::uint64_t byte_offset_{};
         std::wstring display_encoding_;
-        std::vector<std::byte> newline_sequence_;
         std::unique_ptr<UConverter, ConverterCloser> converter_;
         std::mutex mutex_;
+        std::atomic_bool cancelled_{};
         bool failed_{};
     };
 
@@ -962,7 +887,6 @@ namespace glance::app
             file_size_bytes,
             plan->byte_offset,
             plan->display_name,
-            newline_sequence_for_encoding(plan->converter_name),
             std::move(converter));
         return reader->read_next(chunk_bytes);
     }
@@ -978,5 +902,14 @@ namespace glance::app
             return result;
         }
         return reader->read_next(chunk_bytes);
+    }
+
+    void cancel_text_preview_read(
+        const std::shared_ptr<IncrementalTextReader>& reader) noexcept
+    {
+        if (reader != nullptr)
+        {
+            reader->cancel();
+        }
     }
 }

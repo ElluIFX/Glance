@@ -172,101 +172,29 @@
                 </StackPanel>
 
                 <Grid x:Name="TextPanel" Visibility="Collapsed">
-                    <ScrollViewer
-                        x:Name="TextPreviewScroller"
-                        HorizontalScrollBarVisibility="Auto"
-                        HorizontalScrollMode="Enabled"
-                        SizeChanged="TextPreviewScroller_SizeChanged"
-                        ViewChanged="TextPreviewScroller_ViewChanged"
-                        VerticalScrollBarVisibility="Auto"
-                        VerticalScrollMode="Enabled">
-                        <Grid
-                            x:Name="TextCodePanel"
-                            PointerWheelChanged="TextPreviewScroller_PointerWheelChanged">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Border
-                                x:Name="LineNumberGutter"
-                                Background="{ThemeResource SubtleFillColorTransparentBrush}">
-                                <RichTextBlock
-                                    x:Name="LineNumberText"
-                                    MinWidth="42"
-                                    Padding="10,12,10,12"
-                                    FontFamily="Cascadia Mono, Consolas"
-                                    FontSize="13"
-                                    LineHeight="18"
-                                    LineStackingStrategy="BlockLineHeight"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    IsHitTestVisible="False"
-                                    Opacity="0.42"
-                                    TextAlignment="Right"
-                                    TextWrapping="NoWrap" />
-                            </Border>
-                            <RichTextBlock
-                                x:Name="TextContentRichText"
-                                Grid.Column="1"
-                                Padding="16,12"
-                                FontFamily="Cascadia Mono, Consolas"
-                                FontSize="13"
-                                IsTextSelectionEnabled="True"
-                                TextWrapping="NoWrap" />
-                        </Grid>
-                    </ScrollViewer>
-                    <ListView
-                        x:Name="LongTextList"
-                        ContainerContentChanging="LongTextList_ContainerContentChanging"
-                        HorizontalContentAlignment="Stretch"
-                        IsItemClickEnabled="False"
-                        IsTabStop="False"
-                        Padding="0,12"
-                        PointerWheelChanged="TextPreviewScroller_PointerWheelChanged"
-                        SizeChanged="LongTextList_SizeChanged"
-                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                        ScrollViewer.HorizontalScrollMode="Disabled"
-                        SelectionMode="None"
-                        Visibility="Collapsed">
-                        <ListView.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Padding="0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Background="{ThemeResource SubtleFillColorTransparentBrush}">
-                                        <TextBlock
-                                            x:Name="LongTextLineNumbers"
-                                            MinWidth="42"
-                                            Padding="10,0"
-                                            FontFamily="Cascadia Mono, Consolas"
-                                            FontSize="13"
-                                            LineHeight="18"
-                                            LineStackingStrategy="BlockLineHeight"
-                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                            IsHitTestVisible="False"
-                                            Opacity="0.42"
-                                            TextAlignment="Right"
-                                            TextWrapping="NoWrap" />
-                                    </Border>
-                                    <TextBlock
-                                        x:Name="LongTextContent"
-                                        Grid.Column="1"
-                                        Padding="16,0"
-                                        FontFamily="Cascadia Mono, Consolas"
-                                        FontSize="13"
-                                        IsTextSelectionEnabled="True"
-                                        LineHeight="18"
-                                        LineStackingStrategy="BlockLineHeight"
-                                        Text="{Binding}"
-                                        TextWrapping="Wrap" />
-                                </Grid>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
+                    <Grid
+                        x:Name="TextEditorHost"
+                        Loaded="TextEditorHost_Loaded"
+                        SizeChanged="TextEditorHost_SizeChanged" />
                     <Grid
                         x:Name="WebPreviewHost"
                         Visibility="Collapsed" />
+                    <Grid
+                        x:Name="TextLoadingOverlay"
+                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed">
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="12">
+                            <ProgressRing Width="32" Height="32" IsActive="True" />
+                            <TextBlock
+                                x:Name="TextLoadingText"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
                 </Grid>
 
                 <Grid
@@ -949,6 +877,7 @@
             VerticalAlignment="Top"
             Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
             Canvas.ZIndex="200"
+            Closed="PreviewErrorInfoBar_Closed"
             IsClosable="True"
             IsIconVisible="True"
             IsOpen="False"

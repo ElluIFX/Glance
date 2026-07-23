@@ -74,7 +74,6 @@
   <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>显示内容预览</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>加载文件</value></data>
   <data name="PreviewAsTextText.Text" xml:space="preserve"><value>尝试以文本预览</value></data>
-  <data name="SyntaxHighlightDisabledLargeFile" xml:space="preserve"><value>文件较大，已暂停高亮</value></data>
   <data name="AutoFitPausedNotice" xml:space="preserve"><value>已暂停窗口自适应</value></data>
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>无法以文本预览</value></data>
   <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示高级信息</value></data>
@@ -182,6 +181,14 @@
   <data name="SyntaxThemeOneDark" xml:space="preserve"><value>One Dark</value></data>
   <data name="SyntaxThemeGruvbox" xml:space="preserve"><value>Gruvbox</value></data>
   <data name="SyntaxThemeTomorrowNight" xml:space="preserve"><value>Tomorrow Night</value></data>
+  <data name="SyntaxThemeCatppuccin" xml:space="preserve"><value>Catppuccin</value></data>
+  <data name="SyntaxThemeTokyoNight" xml:space="preserve"><value>Tokyo Night</value></data>
+  <data name="SyntaxThemeRosePine" xml:space="preserve"><value>Rosé Pine</value></data>
+  <data name="SyntaxThemeEverforest" xml:space="preserve"><value>Everforest</value></data>
+  <data name="SyntaxThemeAyu" xml:space="preserve"><value>Ayu</value></data>
+  <data name="SyntaxThemeHorizon" xml:space="preserve"><value>Horizon</value></data>
+  <data name="SyntaxThemePaperColor" xml:space="preserve"><value>PaperColor</value></data>
+  <data name="SyntaxThemeMaterial" xml:space="preserve"><value>Material</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>行号</value></data>
   <data name="LineNumbersDescription.Text" xml:space="preserve"><value>显示不可选中的行号栏</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>自动换行</value></data>

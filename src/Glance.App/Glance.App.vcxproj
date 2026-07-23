@@ -79,7 +79,8 @@
     <ClInclude Include="pipe_client.h" />
     <ClInclude Include="preview_file.h" />
     <ClInclude Include="preview_provider.h" />
-    <ClInclude Include="syntax_highlighter.h" />
+    <ClInclude Include="scintilla_text_view.h" />
+    <ClInclude Include="syntax_theme.h" />
     <ClInclude Include="startup_registration.h" />
     <ClInclude Include="text_preferences.h" />
     <ClInclude Include="tray_icon.h" />
@@ -88,6 +89,11 @@
     <ClInclude Include="third_party\md4c\entity.h" />
     <ClInclude Include="third_party\md4c\md4c.h" />
     <ClInclude Include="third_party\md4c\md4c-html.h" />
+    <ClInclude Include="third_party\scintilla\include\ILexer.h" />
+    <ClInclude Include="third_party\scintilla\include\Lexilla.h" />
+    <ClInclude Include="third_party\scintilla\include\Sci_Position.h" />
+    <ClInclude Include="third_party\scintilla\include\SciLexer.h" />
+    <ClInclude Include="third_party\scintilla\include\Scintilla.h" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
@@ -116,8 +122,9 @@
     <ClCompile Include="SettingsWindow.xaml.cpp"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClCompile>
     <ClCompile Include="pipe_client.cpp" />
     <ClCompile Include="preview_provider.cpp" />
+    <ClCompile Include="scintilla_text_view.cpp" />
     <ClCompile Include="shell_icon_provider.cpp" />
-    <ClCompile Include="syntax_highlighter.cpp" />
+    <ClCompile Include="syntax_theme.cpp" />
     <ClCompile Include="startup_registration.cpp" />
     <ClCompile Include="text_preferences.cpp" />
     <ClCompile Include="tray_icon.cpp" />
@@ -150,6 +157,14 @@
   <ItemGroup>
     <Content Include="Assets\AppIcon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="third_party\scintilla\bin\x64\Lexilla.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Lexilla.dll</TargetPath>
+    </Content>
+    <Content Include="third_party\scintilla\bin\x64\Scintilla.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Scintilla.dll</TargetPath>
     </Content>
   </ItemGroup>
   <ItemGroup>

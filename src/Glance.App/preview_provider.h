@@ -52,4 +52,6 @@ namespace glance::app
     [[nodiscard]] TextPreview load_next_text_preview_chunk(
         const std::shared_ptr<IncrementalTextReader>& reader,
         std::size_t chunk_bytes = 256U * 1024U);
+    void cancel_text_preview_read(
+        const std::shared_ptr<IncrementalTextReader>& reader) noexcept;
 }

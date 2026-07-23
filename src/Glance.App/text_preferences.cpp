@@ -107,7 +107,7 @@ namespace glance::app
         result.font_size = std::clamp(static_cast<double>(read_dword(L"FontSize", 13)), 7.0, 32.0);
         result.syntax_theme = static_cast<SyntaxThemePreference>(std::min<DWORD>(
             read_dword(L"SyntaxTheme", 0),
-            static_cast<DWORD>(SyntaxThemePreference::tomorrow_night)));
+            static_cast<DWORD>(SyntaxThemePreference::material)));
         result.word_wrap = read_dword(L"WordWrap", 1) != 0;
         result.syntax_highlighting = read_dword(L"SyntaxHighlighting", 1) != 0;
         result.line_numbers = read_dword(L"LineNumbers", 1) != 0;

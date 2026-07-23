@@ -12,8 +12,8 @@
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
 #include "pdf_render_client.h"
+#include "scintilla_text_view.h"
 #include "shell_icon_provider.h"
-#include "syntax_highlighter.h"
 #include "text_preferences.h"
 
 #include "glance/contracts/preview_state.h"
@@ -65,21 +65,12 @@ namespace winrt::Glance::App::implementation
         void WordWrapButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ArchiveHeaderButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void EncodingOption_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void TextPreviewScroller_SizeChanged(
+        void TextEditorHost_Loaded(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void TextEditorHost_SizeChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::SizeChangedEventArgs const&);
-        void TextPreviewScroller_ViewChanged(
-            IInspectable const&,
-            Microsoft::UI::Xaml::Controls::ScrollViewerViewChangedEventArgs const&);
-        void LongTextList_ContainerContentChanging(
-            Microsoft::UI::Xaml::Controls::ListViewBase const&,
-            Microsoft::UI::Xaml::Controls::ContainerContentChangingEventArgs const&);
-        void LongTextList_SizeChanged(
-            IInspectable const&,
-            Microsoft::UI::Xaml::SizeChangedEventArgs const&);
-        void TextPreviewScroller_PointerWheelChanged(
-            IInspectable const&,
-            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void ImagePanel_SizeChanged(IInspectable const&, Microsoft::UI::Xaml::SizeChangedEventArgs const&);
         void PdfPanel_SizeChanged(IInspectable const&, Microsoft::UI::Xaml::SizeChangedEventArgs const&);
         void PdfScroller_PointerWheelChanged(
@@ -133,6 +124,9 @@ namespace winrt::Glance::App::implementation
         void PasswordPromptInput_KeyDown(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const&);
+        void PreviewErrorInfoBar_Closed(
+            Microsoft::UI::Xaml::Controls::InfoBar const&,
+            Microsoft::UI::Xaml::Controls::InfoBarClosedEventArgs const&);
         void FileList_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
@@ -180,7 +174,7 @@ namespace winrt::Glance::App::implementation
             std::uint64_t generation);
         winrt::fire_and_forget load_generic_file_info_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_footer_access_async(std::wstring path, std::uint64_t generation);
-        void prepare_text_preview(const glance::app::PreviewFile& file, bool markdown, bool web = false);
+        bool prepare_text_preview(const glance::app::PreviewFile& file, bool markdown, bool web = false);
         void present_text(const glance::app::PreviewFile& file, bool markdown, bool web = false);
         winrt::fire_and_forget load_text_async(
             std::wstring path,
@@ -190,6 +184,7 @@ namespace winrt::Glance::App::implementation
             glance::app::TextEncoding encoding,
             bool preview_as_text_attempt = false);
         winrt::fire_and_forget load_next_text_chunk_async(std::uint64_t generation);
+        void set_text_loading(bool loading);
         winrt::fire_and_forget load_image_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_image_metadata_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_media_async(std::wstring path, std::uint64_t generation);
@@ -291,21 +286,16 @@ namespace winrt::Glance::App::implementation
         void update_web_view_idle_state();
         void release_web_view_control() noexcept;
         void release_large_preview_buffers();
-        void render_text_content();
-        void append_syntax_ranges(std::wstring_view content);
-        void append_text_content(std::wstring_view content);
-        void rebuild_long_text_content();
-        void append_long_text_content(std::wstring_view content);
-        void set_line_number_text(std::wstring text);
-        void append_line_numbers(std::wstring_view content);
-        void update_virtual_line_numbers();
+        bool ensure_text_editor();
+        void update_text_editor_bounds() noexcept;
+        void update_text_editor_occlusions() noexcept;
+        void queue_text_editor_occlusion_update();
+        void update_text_editor_visibility() noexcept;
         void ensure_text_viewport_filled();
-        void queue_visible_syntax_highlight_update();
-        void update_visible_syntax_highlights();
         void apply_text_preferences();
         void apply_text_font_metrics();
         void update_text_layout();
-        void update_line_numbers();
+        void adjust_text_font_size(int steps);
         void show_text_font_size_overlay();
         void set_markdown_preview_mode(bool preview);
         void update_line_number_visibility();
@@ -313,7 +303,6 @@ namespace winrt::Glance::App::implementation
         void dismiss_preview_info_bar();
         void show_preview_notice(std::wstring resource_key);
         void animate_preview_info_bar(bool opening);
-        void show_syntax_highlight_disabled_notice();
         void show_text_preview_error(std::wstring message);
         void show_provider_error(std::wstring message, std::uint64_t generation);
         void update_image_fit_surface();
@@ -373,44 +362,14 @@ namespace winrt::Glance::App::implementation
         Windows::Foundation::Point image_pan_start_{};
         std::uint64_t content_generation_{};
         std::wstring current_text_;
-        std::wstring line_number_text_;
         std::wstring current_text_path_;
         bool current_text_markdown_{};
         bool current_text_web_{};
         std::shared_ptr<glance::app::IncrementalTextReader> current_text_reader_;
-        glance::app::SyntaxHighlightState syntax_highlight_state_{};
-        struct TextSyntaxRange
-        {
-            std::size_t start{};
-            std::size_t length{};
-            glance::app::SyntaxStyle style{};
-        };
-        std::vector<TextSyntaxRange> text_syntax_ranges_;
-        struct TextParagraphRange
-        {
-            std::size_t start{};
-            std::size_t length{};
-        };
-        std::vector<TextParagraphRange> text_paragraph_ranges_;
-        std::wstring text_render_tail_;
-        bool text_tail_block_attached_{};
-        std::wstring long_text_render_tail_;
-        std::vector<TextParagraphRange> long_text_block_ranges_;
-        std::vector<std::size_t> long_text_block_start_lines_;
-        std::size_t long_text_next_line_{ 1 };
-        std::size_t text_highlight_offset_{};
-        std::size_t styled_paragraph_start_{ std::numeric_limits<std::size_t>::max() };
-        std::size_t styled_paragraph_end_{ std::numeric_limits<std::size_t>::max() };
-        bool syntax_highlight_layout_dirty_{};
-        double syntax_highlight_vertical_offset_{ -1.0 };
-        std::size_t text_line_count_{};
+        std::unique_ptr<glance::app::ScintillaTextView> text_editor_;
         bool current_text_has_more_{};
         bool text_chunk_loading_{};
-        bool line_numbers_simple_{};
-        bool virtual_line_numbers_{};
-        bool long_text_mode_{};
-        bool syntax_highlight_update_queued_{};
-        bool updating_syntax_highlights_{};
+        bool text_loading_{};
         glance::app::TextEncoding current_text_encoding_{ glance::app::TextEncoding::automatic };
         glance::app::TextPreferences text_preferences_{};
         glance::app::FooterPreferences footer_preferences_{};
@@ -460,7 +419,6 @@ namespace winrt::Glance::App::implementation
         std::uint32_t pdf_page_index_{};
         std::atomic_uint64_t pdf_render_request_{};
         int pdf_wheel_delta_{};
-        int text_font_wheel_delta_{};
         int media_seek_wheel_delta_{};
         int media_volume_wheel_delta_{};
         Microsoft::UI::Xaml::DispatcherTimer focus_timer_{ nullptr };
@@ -471,7 +429,6 @@ namespace winrt::Glance::App::implementation
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_hide_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer web_view_idle_timer_{ nullptr };
         Microsoft::UI::Xaml::Controls::WebView2 web_preview_{ nullptr };
-        bool syntax_highlight_notice_pending_{};
         bool preview_notice_active_{};
         bool preview_notice_hiding_{};
         std::wstring preview_notice_resource_key_;
