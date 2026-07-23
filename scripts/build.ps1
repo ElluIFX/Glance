@@ -25,6 +25,7 @@ $solution = Join-Path $repositoryRoot "Glance.sln"
 $msbuild = Get-GlanceMSBuild
 $target = if ($Clean) { "Clean" } elseif ($Rebuild) { "Rebuild" } else { "Build" }
 
+& (Join-Path $PSScriptRoot "prepare-dependencies.ps1")
 Stop-GlanceProcesses
 
 $arguments = @(
