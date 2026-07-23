@@ -46,12 +46,9 @@ Compared with similar tools, Glance prioritizes stability and reliability — <b
 - Pin preview windows and open multiple independent previews — turn files into sticky notes
 - Remember window size and position by content type to match your workflow
 - Fine-grained customization of behavior and display for personal preference
-
-### 🎯 What matters most
-
-- **Low friction** — No complex shortcuts; Space and your mouse are enough for full access
-- **High reliability** — Rigorous multi-process architecture with mutual supervision, staying responsive under demanding conditions
-- **Lightweight** — No heavyweight plugin system; stay lean, reliable, and fast
+- **No complex shortcuts; Space and your mouse are enough for full access**
+- **Rigorous multi-process architecture with mutual supervision, staying responsive under demanding conditions**
+- **No heavyweight plugin system; stay lean, reliable, and fast**
 
 ## 🚀 Usage
 
