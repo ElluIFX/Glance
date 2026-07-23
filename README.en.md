@@ -38,7 +38,7 @@ Compared with similar tools, Glance prioritizes stability and reliability — <b
   <img src="docs/screenshot.png" alt="Glance Screenshot" style="max-width: 90%; border-radius: 8px;">
 </p>
 
-## ✨ Highlights
+## Highlights
 
 - Launch previews quickly from File Explorer, common file dialogs, and Everything
 - Supports text, code, Markdown, images, audio/video, PDF, archives, Office, and more
@@ -50,7 +50,7 @@ Compared with similar tools, Glance prioritizes stability and reliability — <b
 - **Rigorous multi-process architecture with mutual supervision, staying responsive under demanding conditions**
 - **No heavyweight plugin system; stay lean, reliable, and fast**
 
-## 🚀 Usage
+## Usage
 
 Download and install Glance from [Releases](https://github.com/ElluIFX/Glance/releases). After launch, select a file and press Space to preview. Settings and Exit are available from the system tray.
 
@@ -60,7 +60,7 @@ Download and install Glance from [Releases](https://github.com/ElluIFX/Glance/re
 - **Microsoft Office** — Required for Word / Excel / PowerPoint preview; the corresponding components must be installed
 - **ffprobe.exe** — Used for extended media metadata. Get it from the [FFmpeg download page](https://ffmpeg.org/download.html), then place it in the Glance install directory or add it to `PATH`; basic audio/video preview still works without it
 
-## 🛠️ Development
+## Development
 
 Released under the [GNU General Public License v3.0](LICENSE). Feature requests, format-support needs, and bug reports or suggestions are welcome at [Issues](https://github.com/ElluIFX/Glance/issues).
 

@@ -38,7 +38,7 @@
   <img src="docs/screenshot.png" alt="Glance Screenshot" style="max-width: 90%; border-radius: 8px;">
 </p>
 
-## ✨ 软件特色
+## 软件特色
 
 - 可从资源管理器、文件选择窗口和 Everything 快速发起预览
 - 支持文本、代码、Markdown、图片、音视频、PDF、压缩包和 Office 等各类格式
@@ -50,7 +50,7 @@
 - **严谨的多进程架构，互为监督，在复杂工况下保持可靠响应**
 - **拒绝繁杂插件系统，保持轻量、可靠、高效**
 
-## 🚀 使用
+## 使用
 
 从 [Releases](https://github.com/ElluIFX/Glance/releases) 下载并安装 Glance。运行后，选中文件并按下空格即可预览；设置与退出入口位于系统托盘
 
@@ -60,7 +60,7 @@
 - **Microsoft Office** — 预览 Word / Excel / PowerPoint 时，需已安装对应组件
 - **ffprobe.exe** — 用于显示扩展媒体元数据，可从 [FFmpeg 官网](https://ffmpeg.org/download.html) 获取，放入 Glance 安装目录或加入 `PATH`，缺失不影响基础音视频预览
 
-## 🛠️ 开发
+## 开发
 
 遵循 [GNU General Public License v3.0](LICENSE) 开源。功能请求、格式支持需求，以及问题与建议，请提交至 [Issues](https://github.com/ElluIFX/Glance/issues)。
 
