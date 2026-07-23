@@ -1437,6 +1437,7 @@ namespace winrt::Glance::App::implementation
                     media_is_audio_
                         ? preferences.audio_volume_percent
                         : preferences.video_volume_percent);
+                reverse_media_seek_wheel_ = preferences.reverse_seek_wheel;
             }
             MediaCoverImage().Source(nullptr);
             MediaCoverImage().Visibility(Visibility::Collapsed);
@@ -4475,7 +4476,7 @@ namespace winrt::Glance::App::implementation
         }
         else
         {
-            media_seek_wheel_delta_ += delta;
+            media_seek_wheel_delta_ += reverse_media_seek_wheel_ ? -delta : delta;
             const int steps = media_seek_wheel_delta_ / WHEEL_DELTA;
             media_seek_wheel_delta_ %= WHEEL_DELTA;
             if (steps != 0)

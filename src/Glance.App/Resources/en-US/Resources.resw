@@ -82,7 +82,7 @@
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
   <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>Play or pause</value></data>
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mute or unmute</value></data>
-  <data name="MediaAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show media information</value></data>
+  <data name="MediaAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show advanced media information</value></data>
   <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Previous page</value></data>
   <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Next page</value></data>
   <data name="PdfThumbnailsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Thumbnails</value></data>
@@ -194,6 +194,8 @@
   <data name="AutoplayAudioDescription.Text" xml:space="preserve"><value>Start audio playback when a preview opens</value></data>
   <data name="AutoplayVideoLabel.Text" xml:space="preserve"><value>Autoplay video</value></data>
   <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>Start video playback when a preview opens</value></data>
+  <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>Reverse seek wheel direction</value></data>
+  <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>Reverse the mouse wheel direction used to seek media</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Text preview</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Editor appearance and layout</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>Font family</value></data>
@@ -223,10 +225,11 @@
   <data name="SyntaxThemePaperColor" xml:space="preserve"><value>PaperColor</value></data>
   <data name="SyntaxThemeMaterial" xml:space="preserve"><value>Material</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>Line numbers</value></data>
-  <data name="LineNumbersDescription.Text" xml:space="preserve"><value>Show a non-selectable line number column</value></data>
+  <data name="LineNumbersDescription.Text" xml:space="preserve"><value>Show line numbers on the left side of the preview</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>Wrap long lines</value></data>
   <data name="WordWrapDescription.Text" xml:space="preserve"><value>Wrap text to the available viewport width</value></data>
   <data name="PathCopyGroupLabel.Text" xml:space="preserve"><value>Path copying</value></data>
+  <data name="PathCopyGroupDescription.Text" xml:space="preserve"><value>Customize copied path output</value></data>
   <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>Quote copied paths</value></data>
   <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>Wrap copied paths in double quotes</value></data>
   <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix separators</value></data>
@@ -234,7 +237,7 @@
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>Maintenance</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>Runtime status, diagnostics, and saved application state</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>Input core</value></data>
-  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Media information availability</value></data>
+  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Advanced media information availability</value></data>
   <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 availability</value></data>
   <data name="WebViewAvailable" xml:space="preserve"><value>Runtime available</value></data>
   <data name="WebViewUnavailable" xml:space="preserve"><value>Runtime not found</value></data>

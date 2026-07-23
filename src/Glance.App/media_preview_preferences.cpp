@@ -75,6 +75,7 @@ namespace glance::app
             .video_volume_percent = read_volume(L"VideoVolume"),
             .autoplay_audio = read_bool(L"AutoplayAudio", true),
             .autoplay_video = read_bool(L"AutoplayVideo", true),
+            .reverse_seek_wheel = read_bool(L"ReverseSeekWheel", false),
         };
     }
 
@@ -99,6 +100,7 @@ namespace glance::app
         write_volume(key, L"VideoVolume", preferences.video_volume_percent);
         write_bool(key, L"AutoplayAudio", preferences.autoplay_audio);
         write_bool(key, L"AutoplayVideo", preferences.autoplay_video);
+        write_bool(key, L"ReverseSeekWheel", preferences.reverse_seek_wheel);
         RegCloseKey(key);
     }
 }

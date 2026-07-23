@@ -354,6 +354,7 @@ namespace winrt::Glance::App::implementation
         bool syntax_highlighting_{ true };
         bool word_wrap_{ true };
         bool media_is_audio_{};
+        bool reverse_media_seek_wheel_{};
         bool media_advanced_info_visible_{};
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};

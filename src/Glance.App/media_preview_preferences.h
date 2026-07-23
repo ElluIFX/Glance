@@ -10,6 +10,7 @@ namespace glance::app
         std::uint32_t video_volume_percent{ 100 };
         bool autoplay_audio{ true };
         bool autoplay_video{ true };
+        bool reverse_seek_wheel{};
     };
 
     [[nodiscard]] MediaPreviewPreferences load_media_preview_preferences() noexcept;

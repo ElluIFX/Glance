@@ -537,7 +537,10 @@
                     <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
-                                <TextBlock x:Name="PathCopyGroupLabel" x:Uid="PathCopyGroupLabel" VerticalAlignment="Center" Text="Path copying" />
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="PathCopyGroupLabel" x:Uid="PathCopyGroupLabel" Text="Path copying" />
+                                    <TextBlock x:Name="PathCopyGroupDescription" x:Uid="PathCopyGroupDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Customize copied path output" />
+                                </StackPanel>
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
@@ -655,7 +658,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="LineNumbersLabel" x:Uid="LineNumbersLabel" Text="Line numbers" />
-                                    <TextBlock x:Name="LineNumbersDescription" x:Uid="LineNumbersDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Show a non-selectable line number column" />
+                                    <TextBlock x:Name="LineNumbersDescription" x:Uid="LineNumbersDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Show line numbers on the left side of the preview" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="LineNumbersToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
@@ -757,6 +760,24 @@
                                 </StackPanel>
                                 <ToggleSwitch x:Name="AutoplayVideoToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                             </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="ReverseSeekWheelLabel" x:Uid="ReverseSeekWheelLabel" Text="Reverse seek wheel direction" />
+                                    <TextBlock x:Name="ReverseSeekWheelDescription" x:Uid="ReverseSeekWheelDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Reverse the mouse wheel direction used to seek media" />
+                                </StackPanel>
+                                <ToggleSwitch
+                                    x:Name="ReverseSeekWheelToggle"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    OffContent="{x:Null}"
+                                    OnContent="{x:Null}"
+                                    Toggled="MediaPreferenceToggle_Toggled" />
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -792,7 +813,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="MediaComponentsLabel" x:Uid="MediaComponentsLabel" Text="Media information availability" />
+                                    <TextBlock x:Name="MediaComponentsLabel" x:Uid="MediaComponentsLabel" Text="Advanced media information availability" />
                                     <TextBlock x:Name="MediaComponentsStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>
                                 <FontIcon x:Name="MediaComponentsStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />

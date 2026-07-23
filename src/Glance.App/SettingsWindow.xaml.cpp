@@ -292,6 +292,7 @@ namespace winrt::Glance::App::implementation
         DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
         AutoplayAudioToggle().IsOn(media_preview_preferences_.autoplay_audio);
         AutoplayVideoToggle().IsOn(media_preview_preferences_.autoplay_video);
+        ReverseSeekWheelToggle().IsOn(media_preview_preferences_.reverse_seek_wheel);
         text_preferences_ = glance::app::load_text_preferences();
         const auto font_families = glance::app::system_font_families();
         int selected_font{};
@@ -505,6 +506,8 @@ namespace winrt::Glance::App::implementation
         set_text(AutoplayAudioDescription(), L"AutoplayAudioDescription.Text");
         set_text(AutoplayVideoLabel(), L"AutoplayVideoLabel.Text");
         set_text(AutoplayVideoDescription(), L"AutoplayVideoDescription.Text");
+        set_text(ReverseSeekWheelLabel(), L"ReverseSeekWheelLabel.Text");
+        set_text(ReverseSeekWheelDescription(), L"ReverseSeekWheelDescription.Text");
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
@@ -555,6 +558,7 @@ namespace winrt::Glance::App::implementation
         set_text(WordWrapLabel(), L"WordWrapLabel.Text");
         set_text(WordWrapDescription(), L"WordWrapDescription.Text");
         set_text(PathCopyGroupLabel(), L"PathCopyGroupLabel.Text");
+        set_text(PathCopyGroupDescription(), L"PathCopyGroupDescription.Text");
         set_text(QuoteCopiedPathLabel(), L"QuoteCopiedPathLabel.Text");
         set_text(QuoteCopiedPathDescription(), L"QuoteCopiedPathDescription.Text");
         set_text(UnixPathSeparatorsLabel(), L"UnixPathSeparatorsLabel.Text");
@@ -838,6 +842,7 @@ namespace winrt::Glance::App::implementation
         }
         media_preview_preferences_.autoplay_audio = AutoplayAudioToggle().IsOn();
         media_preview_preferences_.autoplay_video = AutoplayVideoToggle().IsOn();
+        media_preview_preferences_.reverse_seek_wheel = ReverseSeekWheelToggle().IsOn();
         glance::app::save_media_preview_preferences(media_preview_preferences_);
     }
 

@@ -82,7 +82,7 @@
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>系统 ANSI</value></data>
   <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>播放或暂停</value></data>
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>静音或取消静音</value></data>
-  <data name="MediaAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示媒体信息</value></data>
+  <data name="MediaAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示高级媒体信息</value></data>
   <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>上一页</value></data>
   <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>下一页</value></data>
   <data name="PdfThumbnailsButton.ToolTipService.ToolTip" xml:space="preserve"><value>缩略图</value></data>
@@ -194,6 +194,8 @@
   <data name="AutoplayAudioDescription.Text" xml:space="preserve"><value>打开音频预览时自动开始播放</value></data>
   <data name="AutoplayVideoLabel.Text" xml:space="preserve"><value>自动播放视频</value></data>
   <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>打开视频预览时自动开始播放</value></data>
+  <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>反转进度滚轮方向</value></data>
+  <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>反转鼠标滚轮调整播放进度的方向</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文本预览</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>编辑器外观和布局</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>字体</value></data>
@@ -223,10 +225,11 @@
   <data name="SyntaxThemePaperColor" xml:space="preserve"><value>PaperColor</value></data>
   <data name="SyntaxThemeMaterial" xml:space="preserve"><value>Material</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>行号</value></data>
-  <data name="LineNumbersDescription.Text" xml:space="preserve"><value>显示不可选中的行号栏</value></data>
+  <data name="LineNumbersDescription.Text" xml:space="preserve"><value>在预览左侧显示行号</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>自动换行</value></data>
   <data name="WordWrapDescription.Text" xml:space="preserve"><value>按可用视口宽度换行</value></data>
   <data name="PathCopyGroupLabel.Text" xml:space="preserve"><value>路径复制</value></data>
+  <data name="PathCopyGroupDescription.Text" xml:space="preserve"><value>调整路径复制的结果</value></data>
   <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>为复制的路径添加引号</value></data>
   <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>使用双引号包裹复制的路径</value></data>
   <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix 路径分隔符</value></data>
@@ -234,7 +237,7 @@
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>维护</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态、诊断和已保存的应用状态</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>输入核心</value></data>
-  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>媒体信息可用性</value></data>
+  <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>高级媒体信息可用性</value></data>
   <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 可用性</value></data>
   <data name="WebViewAvailable" xml:space="preserve"><value>运行时可用</value></data>
   <data name="WebViewUnavailable" xml:space="preserve"><value>未检测到运行时</value></data>
