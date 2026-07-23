@@ -8,6 +8,7 @@
 #include "resource.h"
 #include "SettingsWindow.xaml.h"
 #include "startup_registration.h"
+#include "webview_availability.h"
 #include "glance/contracts/diagnostics.h"
 
 #include <shellapi.h>
@@ -247,6 +248,7 @@ namespace winrt::Glance::App::implementation
             ResetEvent(shutdown_event_);
         }
 
+        glance::app::initialize_webview_availability();
         glance::app::initialize_office_availability();
         glance::app::prewarm_pdf_render_client();
         glance::contracts::log_event(L"Creating the initial preview window.");

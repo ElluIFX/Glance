@@ -10,6 +10,7 @@
 #include "startup_registration.h"
 #include "text_preferences.h"
 #include "update_checker.h"
+#include "webview_availability.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
 #include "../version.h"
@@ -18,8 +19,6 @@
 #endif
 
 #include <microsoft.ui.xaml.window.h>
-#include <winrt/Microsoft.Web.WebView2.Core.h>
-
 #include <algorithm>
 #include <array>
 #include <filesystem>
@@ -195,19 +194,6 @@ namespace
         }
         CloseHandle(mutex);
         return true;
-    }
-
-    bool webview_runtime_available() noexcept
-    {
-        try
-        {
-            return !Microsoft::Web::WebView2::Core::CoreWebView2Environment::
-                GetAvailableBrowserVersionString().empty();
-        }
-        catch (...)
-        {
-            return false;
-        }
     }
 
     void set_status_indicator(
@@ -624,7 +610,7 @@ namespace winrt::Glance::App::implementation
         set_status_indicator(
             WebViewAvailabilityStatusIcon(),
             WebViewAvailabilityStatusText(),
-            webview_runtime_available(),
+            glance::app::webview_runtime_available(),
             L"WebViewAvailable",
             L"WebViewUnavailable");
         set_status_indicator(
@@ -1305,6 +1291,7 @@ namespace winrt::Glance::App::implementation
         }
         if (tag == L"maintenance")
         {
+            glance::app::refresh_webview_availability();
             refresh_runtime_statuses();
         }
     }

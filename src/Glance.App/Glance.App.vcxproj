@@ -86,6 +86,7 @@
     <ClInclude Include="text_preferences.h" />
     <ClInclude Include="tray_icon.h" />
     <ClInclude Include="update_checker.h" />
+    <ClInclude Include="webview_availability.h" />
     <ClInclude Include="window_size_store.h" />
     <ClInclude Include="window_preferences.h" />
     <ClInclude Include="third_party\md4c\entity.h" />
@@ -131,6 +132,7 @@
     <ClCompile Include="text_preferences.cpp" />
     <ClCompile Include="tray_icon.cpp" />
     <ClCompile Include="update_checker.cpp" />
+    <ClCompile Include="webview_availability.cpp" />
     <ClCompile Include="window_size_store.cpp" />
     <ClCompile Include="window_preferences.cpp" />
     <ClCompile Include="third_party\md4c\entity.c">

@@ -11,6 +11,7 @@
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "shell_icon_provider.h"
+#include "webview_availability.h"
 #include "window_size_store.h"
 #include "window_preferences.h"
 #include "glance/contracts/diagnostics.h"
@@ -1637,7 +1638,8 @@ namespace winrt::Glance::App::implementation
         current_text_path_ = file.path;
         current_text_markdown_ = markdown;
         current_text_web_ = web;
-        web_preview_available_ = markdown || web;
+        web_preview_available_ =
+            (markdown || web) && glance::app::webview_runtime_available();
         if (web_preview_ != nullptr)
         {
             web_preview_.DefaultBackgroundColor(
@@ -1649,7 +1651,7 @@ namespace winrt::Glance::App::implementation
         current_text_has_more_ = false;
         text_chunk_loading_ = true;
         current_text_encoding_ = glance::app::TextEncoding::automatic;
-        markdown_preview_ = markdown || web;
+        markdown_preview_ = web_preview_available_;
         EncodingSelector().Content(box_value(glance::app::localize(L"EncodingDetecting")));
         apply_text_preferences();
         text_editor_->clear();
@@ -1659,11 +1661,11 @@ namespace winrt::Glance::App::implementation
             syntax_highlighting_,
             RootGrid().ActualTheme() == ElementTheme::Dark);
         set_text_loading(true);
-        MarkdownModeButtons().Visibility(markdown || web ? Visibility::Visible : Visibility::Collapsed);
-        MarkdownPreviewButton().IsEnabled(true);
+        MarkdownModeButtons().Visibility(web_preview_available_ ? Visibility::Visible : Visibility::Collapsed);
+        MarkdownPreviewButton().IsEnabled(web_preview_available_);
         MarkdownCodeButton().IsEnabled(true);
-        set_markdown_preview_mode(markdown || web);
-        if (markdown || web)
+        set_markdown_preview_mode(web_preview_available_);
+        if (web_preview_available_)
         {
             if (web_preview_ != nullptr)
             {
@@ -1682,7 +1684,7 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
-        if (web)
+        if (web && web_preview_available_)
         {
             render_web_document_async(file.path, content_generation_);
         }
@@ -3192,12 +3194,14 @@ namespace winrt::Glance::App::implementation
 
         if (markdown)
         {
-            if (!current_text_has_more_)
+            if (web_preview_available_ && !current_text_has_more_)
             {
                 render_markdown();
             }
-            MarkdownPreviewButton().IsEnabled(!current_text_has_more_);
-            set_markdown_preview_mode(current_text_has_more_ ? false : markdown_preview_);
+            MarkdownPreviewButton().IsEnabled(
+                web_preview_available_ && !current_text_has_more_);
+            set_markdown_preview_mode(
+                web_preview_available_ && !current_text_has_more_ && markdown_preview_);
         }
         else if (web)
         {
@@ -3256,17 +3260,24 @@ namespace winrt::Glance::App::implementation
                     std::to_wstring(lifetime->current_text_has_more_));
                 if (lifetime->current_text_markdown_)
                 {
-                    if (!lifetime->current_text_has_more_)
+                    if (lifetime->web_preview_available_ &&
+                        !lifetime->current_text_has_more_)
                     {
                         lifetime->render_markdown();
                     }
-                    lifetime->MarkdownPreviewButton().IsEnabled(!lifetime->current_text_has_more_);
+                    lifetime->MarkdownPreviewButton().IsEnabled(
+                        lifetime->web_preview_available_ &&
+                        !lifetime->current_text_has_more_);
                 }
             }));
     }
 
     void MainWindow::render_markdown()
     {
+        if (!web_preview_available_)
+        {
+            return;
+        }
         const auto html = glance::app::render_markdown_html(
             current_text_,
             RootGrid().ActualTheme() == ElementTheme::Dark);
@@ -3305,6 +3316,7 @@ namespace winrt::Glance::App::implementation
             if (generation == content_generation_)
             {
                 web_preview_available_ = false;
+                MarkdownModeButtons().Visibility(Visibility::Collapsed);
                 MarkdownPreviewButton().IsEnabled(false);
                 set_markdown_preview_mode(false);
             }
@@ -3351,6 +3363,7 @@ namespace winrt::Glance::App::implementation
                 current_kind_ == glance::app::PreviewKind::web)
             {
                 web_preview_available_ = false;
+                MarkdownModeButtons().Visibility(Visibility::Collapsed);
                 MarkdownPreviewButton().IsEnabled(false);
                 set_markdown_preview_mode(false);
             }
@@ -3981,6 +3994,11 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::MarkdownPreviewButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
+        if (!web_preview_available_)
+        {
+            set_markdown_preview_mode(false);
+            return;
+        }
         set_markdown_preview_mode(true);
         if (web_preview_ == nullptr)
         {
