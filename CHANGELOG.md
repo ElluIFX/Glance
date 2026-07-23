@@ -4,6 +4,25 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.07.24] - 2026-07-24
+
+### Added
+
+- Detailed audio and video information with optional extended metadata from `ffprobe`.
+- Configurable Office preview caching with bounded queue size and expiration.
+- An option to reverse the media seek wheel direction.
+
+### Changed
+
+- Reduced the default text preview font size.
+- Cached WebView availability after startup to avoid repeated runtime probing.
+- Extended installer support to Windows 10.
+
+### Fixed
+
+- Improved text preview responsiveness, scrollbar theme stability, and opacity consistency.
+- Cleared stale Office navigation content while switching documents.
+
 ## [2026.07.23.2] - 2026-07-23
 
 ### Fixed
@@ -59,5 +78,7 @@ The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 - Improved preview switching, pinned-window lifecycle, adaptive sizing, image rotation, large-text rendering, and archive enumeration stability.
 - Prevented stalled Shell selection queries and expensive directory rendering from taking down the preview workflow.
 
+[2026.07.24]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.24
+[2026.07.23.2]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.23.2
 [2026.07.23.1]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.23.1
 [2026.07.23]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.23
