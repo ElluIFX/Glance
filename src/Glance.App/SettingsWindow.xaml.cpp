@@ -5,6 +5,8 @@
 #include "localization.h"
 #include "media_metadata_provider.h"
 #include "office_availability.h"
+#include "office_preview_cache.h"
+#include "office_preview_preferences.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "startup_registration.h"
@@ -254,6 +256,8 @@ namespace winrt::Glance::App::implementation
         SetWindowPos(window, nullptr, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
 
         initializing_ = true;
+        OfficeCacheCapacitySlider().ValueChanged(
+            { this, &SettingsWindow::OfficeCacheCapacitySlider_ValueChanged });
         appearance_preferences_ = glance::app::load_appearance_preferences();
         LanguageComboBox().SelectedIndex(appearance_preferences_.language == L"zh-CN" ? 1 : 0);
         ThemeComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.theme));
@@ -297,6 +301,12 @@ namespace winrt::Glance::App::implementation
         SyntaxThemeComboBox().IsEnabled(text_preferences_.syntax_highlighting);
         LineNumbersToggle().IsOn(text_preferences_.line_numbers);
         WordWrapToggle().IsOn(text_preferences_.word_wrap);
+        office_preview_preferences_ = glance::app::load_office_preview_preferences();
+        OfficeCacheCapacitySlider().Value(office_preview_preferences_.cache_capacity);
+        OfficeCacheCapacityValueText().Text(
+            std::to_wstring(office_preview_preferences_.cache_capacity));
+        OfficeCacheExpirationNumberBox().Value(
+            office_preview_preferences_.cache_expiration_minutes);
         path_copy_preferences_ = glance::app::load_path_copy_preferences();
         QuoteCopiedPathToggle().IsOn(path_copy_preferences_.quote_path);
         UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
@@ -496,6 +506,15 @@ namespace winrt::Glance::App::implementation
         set_text(ReverseSeekWheelDescription(), L"ReverseSeekWheelDescription.Text");
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
+        set_text(PlainTextPreviewSectionTitle(), L"PlainTextPreviewSectionTitle.Text");
+        set_text(PlainTextPreviewSectionDescription(), L"PlainTextPreviewSectionDescription.Text");
+        set_text(OfficePreviewSectionTitle(), L"OfficePreviewSectionTitle.Text");
+        set_text(OfficePreviewSectionDescription(), L"OfficePreviewSectionDescription.Text");
+        set_text(OfficeCacheCapacityLabel(), L"OfficeCacheCapacityLabel.Text");
+        set_text(OfficeCacheCapacityDescription(), L"OfficeCacheCapacityDescription.Text");
+        set_text(OfficeCacheExpirationLabel(), L"OfficeCacheExpirationLabel.Text");
+        set_text(OfficeCacheExpirationDescription(), L"OfficeCacheExpirationDescription.Text");
+        set_text(OfficeCacheExpirationUnit(), L"OfficeCacheExpirationUnit.Text");
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
         set_text(FontFamilyDescription(), L"FontFamilyDescription.Text");
         set_text(FontSizeLabel(), L"FontSizeLabel.Text");
@@ -1089,6 +1108,50 @@ namespace winrt::Glance::App::implementation
 
         text_preferences_.font_size = args.NewValue();
         save_text_preferences();
+    }
+
+    void SettingsWindow::OfficeCacheCapacitySlider_ValueChanged(
+        IInspectable const&,
+        Controls::Primitives::RangeBaseValueChangedEventArgs const& args)
+    {
+        const auto capacity = static_cast<std::uint32_t>(
+            std::clamp(std::lround(args.NewValue()), 0L, 16L));
+        OfficeCacheCapacityValueText().Text(std::to_wstring(capacity));
+        if (initializing_)
+        {
+            return;
+        }
+
+        office_preview_preferences_.cache_capacity = capacity;
+        glance::app::save_office_preview_preferences(office_preview_preferences_);
+        glance::app::configure_office_preview_cache(office_preview_preferences_);
+    }
+
+    void SettingsWindow::OfficeCacheExpirationNumberBox_ValueChanged(
+        IInspectable const&,
+        Controls::NumberBoxValueChangedEventArgs const& args)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+        if (!std::isfinite(args.NewValue()))
+        {
+            initializing_ = true;
+            OfficeCacheExpirationNumberBox().Value(
+                office_preview_preferences_.cache_expiration_minutes);
+            initializing_ = false;
+            return;
+        }
+
+        office_preview_preferences_.cache_expiration_minutes = static_cast<std::uint32_t>(
+            std::clamp(std::lround(args.NewValue()), 1L, 60L));
+        initializing_ = true;
+        OfficeCacheExpirationNumberBox().Value(
+            office_preview_preferences_.cache_expiration_minutes);
+        initializing_ = false;
+        glance::app::save_office_preview_preferences(office_preview_preferences_);
+        glance::app::configure_office_preview_cache(office_preview_preferences_);
     }
 
     void SettingsWindow::SyntaxThemeComboBox_SelectionChanged(

@@ -8,6 +8,7 @@
 #include "markdown_renderer.h"
 #include "media_metadata_provider.h"
 #include "office_availability.h"
+#include "office_preview_cache.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "shell_icon_provider.h"
@@ -752,11 +753,6 @@ namespace winrt::Glance::App::implementation
             {
                 self->media_timer_.Stop();
             }
-            if (!self->office_temp_pdf_.empty())
-            {
-                DeleteFileW(self->office_temp_pdf_.c_str());
-                self->office_temp_pdf_.clear();
-            }
             self->state_ = glance::contracts::PreviewWindowState::closed;
             if (self->state_callback_)
             {
@@ -816,6 +812,25 @@ namespace winrt::Glance::App::implementation
             position_initial_window();
         }
         update_state();
+    }
+
+    bool MainWindow::IsPreviewingFile(const std::wstring& path) const noexcept
+    {
+        return visible_ &&
+            current_index_ < files_.size() &&
+            CompareStringOrdinal(
+                files_[current_index_].path.c_str(),
+                -1,
+                path.c_str(),
+                -1,
+                TRUE) == CSTR_EQUAL;
+    }
+
+    void MainWindow::CloseForReplacement()
+    {
+        stop_detached_focus_monitor();
+        clear_preview_content();
+        Close();
     }
 
     void MainWindow::HidePreview()
@@ -987,15 +1002,26 @@ namespace winrt::Glance::App::implementation
     void MainWindow::cancel_office_conversion() noexcept
     {
         office_emf_preview_ = false;
-        if (office_preview_client_ != nullptr)
-        {
-            office_preview_client_->cancel();
-            office_preview_client_.reset();
-        }
+        office_thumbnail_background_active_ = false;
+        office_thumbnail_requested_.clear();
         if (office_conversion_ != nullptr)
         {
             office_conversion_->cancel();
             office_conversion_.reset();
+        }
+        auto cache_entry = std::exchange(
+            office_cache_entry_,
+            glance::app::OfficePreviewCacheHandle{});
+        auto office_session = std::exchange(
+            office_preview_client_,
+            std::shared_ptr<glance::app::OfficePreviewClient>{});
+        if (cache_entry != nullptr)
+        {
+            glance::app::return_office_preview_cache(std::move(cache_entry));
+        }
+        else if (office_session != nullptr)
+        {
+            office_session->cancel();
         }
     }
 
@@ -1332,6 +1358,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
         cancel_office_conversion();
+        cancel_pdf_render();
         hide_password_prompt();
         current_index_ = index;
         basic_info_mode_ = false;
@@ -1343,6 +1370,20 @@ namespace winrt::Glance::App::implementation
         update_archive_header_state();
         update_preview_mode_button();
         dismiss_preview_info_bar();
+        pdf_thumbnail_selection_updating_ = true;
+        PdfThumbnailList().Items().Clear();
+        PdfOutlineTree().RootNodes().Clear();
+        pdf_thumbnail_selection_updating_ = false;
+        PdfThumbnailList().Visibility(Visibility::Visible);
+        PdfOutlineTree().Visibility(Visibility::Collapsed);
+        PdfThumbnailsButton().IsChecked(true);
+        PdfOutlineButton().IsChecked(false);
+        PdfOutlineButton().IsEnabled(false);
+        pdf_thumbnail_images_.clear();
+        pdf_thumbnail_items_built_ = 0;
+        pdf_outline_.clear();
+        pdf_page_index_ = 0;
+        pdf_page_count_ = 0;
         const auto& file = files_[index];
         const auto generation = ++content_generation_;
         TitleText().Text(file.display_name);
@@ -1478,7 +1519,6 @@ namespace winrt::Glance::App::implementation
             break;
         case glance::app::PreviewKind::office:
             show_content_panel(glance::app::PreviewKind::pdf);
-            cancel_pdf_render();
             PdfPageImage().Source(nullptr);
             pdf_wheel_delta_ = 0;
             PdfPageText().Text(L"1 / 1");
@@ -2705,12 +2745,31 @@ namespace winrt::Glance::App::implementation
 
     fire_and_forget MainWindow::load_word_emf_async(
         std::wstring path,
-        std::uint64_t generation)
+        std::uint64_t generation,
+        std::uint64_t source_size,
+        std::uint64_t source_modified_time)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
-        auto office_session = std::make_shared<glance::app::OfficePreviewClient>();
+        auto cache_entry = glance::app::take_office_preview_cache(
+            path,
+            source_size,
+            source_modified_time);
+        const bool cache_hit = cache_entry != nullptr &&
+            cache_entry->kind == glance::app::OfficePreviewCacheKind::word &&
+            cache_entry->word_client != nullptr;
+        if (!cache_hit)
+        {
+            cache_entry = std::make_shared<glance::app::OfficePreviewCacheEntry>();
+            cache_entry->source_path = path;
+            cache_entry->source_size = source_size;
+            cache_entry->source_modified_time = source_modified_time;
+            cache_entry->kind = glance::app::OfficePreviewCacheKind::word;
+            cache_entry->word_client = std::make_shared<glance::app::OfficePreviewClient>();
+        }
+        auto office_session = cache_entry->word_client;
         auto render_session = glance::app::acquire_pdf_render_client();
+        office_cache_entry_ = cache_entry;
         office_preview_client_ = office_session;
         pdf_render_client_ = render_session;
         office_emf_preview_ = true;
@@ -2734,7 +2793,7 @@ namespace winrt::Glance::App::implementation
         bool opened{};
         try
         {
-            opened = office_session->open_word(path);
+            opened = cache_hit || office_session->open_word(path);
             if (opened)
             {
                 page = office_session->render_page(0);
@@ -2751,10 +2810,17 @@ namespace winrt::Glance::App::implementation
         if (!opened || page.status != glance::contracts::office::Status::success ||
             rendered.status != glance::contracts::pdf::Status::success)
         {
+            cache_entry->ready.store(false, std::memory_order_release);
             office_session->cancel();
             render_session->cancel();
-            static_cast<void>(dispatcher.TryEnqueue([lifetime, office_session, render_session, generation] {
+            static_cast<void>(dispatcher.TryEnqueue([
+                lifetime,
+                cache_entry,
+                office_session,
+                render_session,
+                generation] {
                 if (generation != lifetime->content_generation_ ||
+                    cache_entry != lifetime->office_cache_entry_ ||
                     office_session != lifetime->office_preview_client_ ||
                     render_session != lifetime->pdf_render_client_)
                 {
@@ -2766,14 +2832,17 @@ namespace winrt::Glance::App::implementation
             }));
             co_return;
         }
+        cache_entry->ready.store(true, std::memory_order_release);
 
         static_cast<void>(dispatcher.TryEnqueue([
             lifetime,
+            cache_entry,
             office_session,
             render_session,
             rendered = std::move(rendered),
             generation]() mutable {
             if (generation != lifetime->content_generation_ ||
+                cache_entry != lifetime->office_cache_entry_ ||
                 office_session != lifetime->office_preview_client_ ||
                 render_session != lifetime->pdf_render_client_)
             {
@@ -2796,14 +2865,31 @@ namespace winrt::Glance::App::implementation
             }
         }));
 
-        auto count = office_session->page_count();
+        auto count_value = cache_entry->page_count.load(std::memory_order_acquire);
+        glance::app::OfficePageCountResult count;
+        if (count_value > 0)
+        {
+            count.status = glance::contracts::office::Status::success;
+            count.page_count = count_value;
+        }
+        else
+        {
+            count = office_session->page_count();
+            if (count.status == glance::contracts::office::Status::success &&
+                count.page_count > 0)
+            {
+                cache_entry->page_count.store(count.page_count, std::memory_order_release);
+            }
+        }
         static_cast<void>(dispatcher.TryEnqueue([
             lifetime,
+            cache_entry,
             office_session,
             render_session,
             count,
             generation] {
             if (generation != lifetime->content_generation_ ||
+                cache_entry != lifetime->office_cache_entry_ ||
                 office_session != lifetime->office_preview_client_ ||
                 render_session != lifetime->pdf_render_client_)
             {
@@ -3006,17 +3092,23 @@ namespace winrt::Glance::App::implementation
         if (_wcsicmp(extension.c_str(), L".doc") == 0 ||
             _wcsicmp(extension.c_str(), L".docx") == 0)
         {
-            load_word_emf_async(std::move(path), generation);
+            load_word_emf_async(
+                std::move(path),
+                generation,
+                source_size,
+                source_modified_time);
             co_return;
         }
-        std::error_code cache_error;
-        if (path == office_cache_source_path_ &&
-            source_size == office_cache_source_size_ &&
-            source_modified_time == office_cache_source_modified_time_ &&
-            std::filesystem::is_regular_file(office_temp_pdf_, cache_error))
+        auto cached_entry = glance::app::take_office_preview_cache(
+            path,
+            source_size,
+            source_modified_time);
+        if (cached_entry != nullptr &&
+            cached_entry->kind == glance::app::OfficePreviewCacheKind::pdf)
         {
+            office_cache_entry_ = cached_entry;
             PdfLoadingText().Text(glance::app::localize(L"LoadingConvertedDocument"));
-            load_pdf_async(office_temp_pdf_, generation);
+            load_pdf_async(cached_entry->pdf_path, generation);
             co_return;
         }
 
@@ -3110,18 +3202,19 @@ namespace winrt::Glance::App::implementation
                 }
                 return;
             }
-            if (!lifetime->office_temp_pdf_.empty() && lifetime->office_temp_pdf_ != output)
-            {
-                DeleteFileW(lifetime->office_temp_pdf_.c_str());
-            }
-            lifetime->office_temp_pdf_ = output;
-            lifetime->office_cache_source_path_ = source;
-            lifetime->office_cache_source_size_ = source_size;
-            lifetime->office_cache_source_modified_time_ = source_modified_time;
             if (generation != lifetime->content_generation_)
             {
+                DeleteFileW(output.c_str());
                 return;
             }
+            auto cache_entry = std::make_shared<glance::app::OfficePreviewCacheEntry>();
+            cache_entry->source_path = source;
+            cache_entry->source_size = source_size;
+            cache_entry->source_modified_time = source_modified_time;
+            cache_entry->kind = glance::app::OfficePreviewCacheKind::pdf;
+            cache_entry->pdf_path = output;
+            cache_entry->ready.store(true, std::memory_order_release);
+            lifetime->office_cache_entry_ = std::move(cache_entry);
             lifetime->PdfPageText().Text(L"1 / 1");
             lifetime->load_pdf_async(output, generation);
         }));

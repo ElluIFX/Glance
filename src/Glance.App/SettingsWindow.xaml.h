@@ -4,6 +4,7 @@
 #include "appearance_preferences.h"
 #include "footer_preferences.h"
 #include "media_preview_preferences.h"
+#include "office_preview_preferences.h"
 #include "path_copy_preferences.h"
 #include "text_preferences.h"
 #include "window_preferences.h"
@@ -81,6 +82,12 @@ namespace winrt::Glance::App::implementation
         void FontSizeNumberBox_ValueChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
+        void OfficeCacheCapacitySlider_ValueChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const&);
+        void OfficeCacheExpirationNumberBox_ValueChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
         void SyntaxThemeComboBox_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
@@ -152,6 +159,7 @@ namespace winrt::Glance::App::implementation
         glance::app::PathCopyPreferences path_copy_preferences_{};
         glance::app::AppearancePreferences appearance_preferences_{};
         glance::app::MediaPreviewPreferences media_preview_preferences_{};
+        glance::app::OfficePreviewPreferences office_preview_preferences_{};
         glance::app::WindowPreferences window_preferences_{};
         glance::app::FooterPreferences footer_preferences_{};
         ExitCallback exit_callback_;

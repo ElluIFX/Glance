@@ -68,7 +68,9 @@
     <ClInclude Include="media_metadata_provider.h" />
     <ClInclude Include="media_preview_preferences.h" />
     <ClInclude Include="office_availability.h" />
+    <ClInclude Include="office_preview_cache.h" />
     <ClInclude Include="office_preview_client.h" />
+    <ClInclude Include="office_preview_preferences.h" />
     <ClInclude Include="path_copy_preferences.h" />
     <ClInclude Include="pdf_render_client.h" />
     <ClInclude Include="pch.h" />
@@ -116,7 +118,9 @@
     <ClCompile Include="media_metadata_provider.cpp" />
     <ClCompile Include="media_preview_preferences.cpp" />
     <ClCompile Include="office_availability.cpp" />
+    <ClCompile Include="office_preview_cache.cpp" />
     <ClCompile Include="office_preview_client.cpp" />
+    <ClCompile Include="office_preview_preferences.cpp" />
     <ClCompile Include="path_copy_preferences.cpp" />
     <ClCompile Include="pdf_render_client.cpp" />
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>

@@ -9,6 +9,7 @@
 #include "media_metadata_provider.h"
 #include "media_preview_preferences.h"
 #include "office_preview_client.h"
+#include "office_preview_cache.h"
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
@@ -47,6 +48,8 @@ namespace winrt::Glance::App::implementation
             std::uint32_t focused_index,
             std::uint32_t source_kind,
             HWND source_window);
+        [[nodiscard]] bool IsPreviewingFile(const std::wstring& path) const noexcept;
+        void CloseForReplacement();
         void HidePreview();
         void ApplyAppearancePreferences();
         void ApplyWindowPreferences();
@@ -237,7 +240,9 @@ namespace winrt::Glance::App::implementation
             std::uint64_t source_modified_time);
         winrt::fire_and_forget load_word_emf_async(
             std::wstring path,
-            std::uint64_t generation);
+            std::uint64_t generation,
+            std::uint64_t source_size,
+            std::uint64_t source_modified_time);
         winrt::fire_and_forget render_office_page_async(
             std::uint32_t page_index,
             std::uint64_t generation,
@@ -412,14 +417,11 @@ namespace winrt::Glance::App::implementation
             HANDLE process{};
         };
         std::shared_ptr<OfficeConversionOperation> office_conversion_;
+        glance::app::OfficePreviewCacheHandle office_cache_entry_;
         std::shared_ptr<glance::app::OfficePreviewClient> office_preview_client_;
         bool office_emf_preview_{};
         bool office_thumbnail_background_active_{};
         std::vector<bool> office_thumbnail_requested_;
-        std::wstring office_temp_pdf_;
-        std::wstring office_cache_source_path_;
-        std::uint64_t office_cache_source_size_{};
-        std::uint64_t office_cache_source_modified_time_{};
         std::shared_ptr<glance::app::PdfRenderClient> pdf_render_client_;
         std::wstring pdf_source_path_;
         std::wstring pdf_password_;

@@ -138,7 +138,7 @@
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>General</value></data>
   <data name="WindowNavigationItem.Content" xml:space="preserve"><value>Window</value></data>
   <data name="FooterNavigationItem.Content" xml:space="preserve"><value>Footer</value></data>
-  <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>Text preview</value></data>
+  <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>Document preview</value></data>
   <data name="MediaPreviewNavigationItem.Content" xml:space="preserve"><value>Media preview</value></data>
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>Maintenance</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>About</value></data>
@@ -196,8 +196,17 @@
   <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>Start video playback when a preview opens</value></data>
   <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>Reverse seek wheel direction</value></data>
   <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>Reverse the mouse wheel direction used to seek media</value></data>
-  <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Text preview</value></data>
-  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Editor appearance and layout</value></data>
+  <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Document preview</value></data>
+  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Plain text and Office document behavior</value></data>
+  <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>Plain text preview</value></data>
+  <data name="PlainTextPreviewSectionDescription.Text" xml:space="preserve"><value>Text appearance, highlighting, and layout</value></data>
+  <data name="OfficePreviewSectionTitle.Text" xml:space="preserve"><value>Office document preview</value></data>
+  <data name="OfficePreviewSectionDescription.Text" xml:space="preserve"><value>Reuse recent Office previews to reduce reopening time</value></data>
+  <data name="OfficeCacheCapacityLabel.Text" xml:space="preserve"><value>Cache queue size</value></data>
+  <data name="OfficeCacheCapacityDescription.Text" xml:space="preserve"><value>Number of recent Office previews kept ready; 0 disables caching</value></data>
+  <data name="OfficeCacheExpirationLabel.Text" xml:space="preserve"><value>Cache expiration</value></data>
+  <data name="OfficeCacheExpirationDescription.Text" xml:space="preserve"><value>Release cached Office resources after this many minutes without access</value></data>
+  <data name="OfficeCacheExpirationUnit.Text" xml:space="preserve"><value>min</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>Font family</value></data>
   <data name="FontFamilyDescription.Text" xml:space="preserve"><value>Font used for plain text and code</value></data>
   <data name="FontSizeLabel.Text" xml:space="preserve"><value>Font size</value></data>

@@ -138,7 +138,7 @@
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>常规</value></data>
   <data name="WindowNavigationItem.Content" xml:space="preserve"><value>窗口</value></data>
   <data name="FooterNavigationItem.Content" xml:space="preserve"><value>底栏</value></data>
-  <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>文本预览</value></data>
+  <data name="TextPreviewNavigationItem.Content" xml:space="preserve"><value>文档预览</value></data>
   <data name="MediaPreviewNavigationItem.Content" xml:space="preserve"><value>媒体预览</value></data>
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>维护</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>关于</value></data>
@@ -196,8 +196,17 @@
   <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>打开视频预览时自动开始播放</value></data>
   <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>反转进度滚轮方向</value></data>
   <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>反转鼠标滚轮调整播放进度的方向</value></data>
-  <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文本预览</value></data>
-  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>编辑器外观和布局</value></data>
+  <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文档预览</value></data>
+  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>纯文本与 Office 文档行为</value></data>
+  <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>纯文本预览</value></data>
+  <data name="PlainTextPreviewSectionDescription.Text" xml:space="preserve"><value>调整文本外观、高亮与布局</value></data>
+  <data name="OfficePreviewSectionTitle.Text" xml:space="preserve"><value>Office 文档预览</value></data>
+  <data name="OfficePreviewSectionDescription.Text" xml:space="preserve"><value>复用最近的 Office 预览以缩短再次打开时间</value></data>
+  <data name="OfficeCacheCapacityLabel.Text" xml:space="preserve"><value>缓存队列大小</value></data>
+  <data name="OfficeCacheCapacityDescription.Text" xml:space="preserve"><value>保留以便快速再次预览的文档数量；0 表示不缓存</value></data>
+  <data name="OfficeCacheExpirationLabel.Text" xml:space="preserve"><value>缓存过期时间</value></data>
+  <data name="OfficeCacheExpirationDescription.Text" xml:space="preserve"><value>缓存项在指定分钟内未被访问时释放对应资源</value></data>
+  <data name="OfficeCacheExpirationUnit.Text" xml:space="preserve"><value>分钟</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>字体</value></data>
   <data name="FontFamilyDescription.Text" xml:space="preserve"><value>纯文本和代码使用的字体</value></data>
   <data name="FontSizeLabel.Text" xml:space="preserve"><value>字号</value></data>
