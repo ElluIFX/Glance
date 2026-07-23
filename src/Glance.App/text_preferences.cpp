@@ -104,7 +104,7 @@ namespace glance::app
         {
             result.font_family = font_family;
         }
-        result.font_size = std::clamp(static_cast<double>(read_dword(L"FontSize", 13)), 7.0, 32.0);
+        result.font_size = std::clamp(static_cast<double>(read_dword(L"FontSize", 9)), 7.0, 32.0);
         result.syntax_theme = static_cast<SyntaxThemePreference>(std::min<DWORD>(
             read_dword(L"SyntaxTheme", 0),
             static_cast<DWORD>(SyntaxThemePreference::material)));

@@ -31,7 +31,7 @@ namespace glance::app
     struct TextPreferences
     {
         std::wstring font_family{ L"Cascadia Mono" };
-        double font_size{ 13.0 };
+        double font_size{ 9.0 };
         SyntaxThemePreference syntax_theme{ SyntaxThemePreference::glance };
         bool word_wrap{ true };
         bool syntax_highlighting{ true };
