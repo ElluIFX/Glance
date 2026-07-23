@@ -140,7 +140,7 @@ namespace glance::app
         HANDLE mapping = CreateFileMappingW(
             INVALID_HANDLE_VALUE,
             &security,
-            PAGE_READWRITE,
+            PAGE_READWRITE | SEC_RESERVE,
             0,
             shared_bitmap_size,
             nullptr);

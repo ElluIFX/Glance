@@ -286,7 +286,11 @@ namespace winrt::Glance::App::implementation
         void render_markdown();
         winrt::fire_and_forget render_markdown_async(std::wstring html, std::uint64_t generation);
         winrt::fire_and_forget render_web_document_async(std::wstring path, std::uint64_t generation);
+        Microsoft::UI::Xaml::Controls::WebView2 ensure_web_view_control();
         void clear_web_view_content() noexcept;
+        void update_web_view_idle_state();
+        void release_web_view_control() noexcept;
+        void release_large_preview_buffers();
         void render_text_content();
         void append_syntax_ranges(std::wstring_view content);
         void append_text_content(std::wstring_view content);
@@ -465,6 +469,8 @@ namespace winrt::Glance::App::implementation
         Microsoft::UI::Xaml::DispatcherTimer font_size_overlay_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_hide_timer_{ nullptr };
+        Microsoft::UI::Xaml::DispatcherTimer web_view_idle_timer_{ nullptr };
+        Microsoft::UI::Xaml::Controls::WebView2 web_preview_{ nullptr };
         bool syntax_highlight_notice_pending_{};
         bool preview_notice_active_{};
         bool preview_notice_hiding_{};

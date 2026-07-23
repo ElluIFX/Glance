@@ -55,6 +55,8 @@ namespace
     constexpr std::size_t long_text_render_threshold = 256U * 1024U;
     constexpr std::uint64_t automatic_syntax_highlight_limit_bytes = 64ULL * 1024ULL;
     constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
+    constexpr std::size_t retained_preview_buffer_limit_bytes = 8U * 1024U * 1024U;
+    constexpr auto web_view_idle_timeout = std::chrono::minutes(5);
 
     std::optional<std::wstring> file_url_from_path(const std::wstring& path)
     {
@@ -389,6 +391,24 @@ namespace winrt::Glance::App::implementation
             if (const auto self = weak.get())
             {
                 self->update_media_controls();
+            }
+        });
+        web_view_idle_timer_ = DispatcherTimer();
+        web_view_idle_timer_.Interval(web_view_idle_timeout);
+        web_view_idle_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+            if (const auto self = weak.get())
+            {
+                self->web_view_idle_timer_.Stop();
+                const bool active = self->visible_ && !self->basic_info_mode_ &&
+                    self->markdown_preview_ &&
+                    (self->current_kind_ == glance::app::PreviewKind::markdown ||
+                     self->current_kind_ == glance::app::PreviewKind::web) &&
+                    self->WebPreviewHost().Visibility() == Visibility::Visible;
+                if (active)
+                {
+                    return;
+                }
+                self->release_web_view_control();
             }
         });
     }
@@ -790,8 +810,6 @@ namespace winrt::Glance::App::implementation
         PdfThumbnailList().Items().Clear();
         PdfOutlineTree().RootNodes().Clear();
         hide_password_prompt();
-        MarkdownPreviewWebView().Opacity(0.0);
-        MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
         clear_web_view_content();
         TextContentRichText().Blocks().Clear();
         LongTextList().Items().Clear();
@@ -898,7 +916,35 @@ namespace winrt::Glance::App::implementation
         office_thumbnail_background_active_ = false;
         office_thumbnail_requested_.clear();
         pdf_wheel_delta_ = 0;
+        release_large_preview_buffers();
+    }
 
+    void MainWindow::release_large_preview_buffers()
+    {
+        const auto release_string = [](std::wstring& value) {
+            if (value.capacity() > retained_preview_buffer_limit_bytes / sizeof(wchar_t))
+            {
+                std::wstring{}.swap(value);
+            }
+        };
+        const auto release_vector = []<typename T>(std::vector<T>& value) {
+            if (value.capacity() > retained_preview_buffer_limit_bytes / sizeof(T))
+            {
+                std::vector<T>{}.swap(value);
+            }
+        };
+
+        release_string(current_text_);
+        release_string(line_number_text_);
+        release_string(text_render_tail_);
+        release_string(long_text_render_tail_);
+        release_vector(text_syntax_ranges_);
+        release_vector(text_paragraph_ranges_);
+        release_vector(long_text_block_ranges_);
+        release_vector(long_text_block_start_lines_);
+        release_vector(files_);
+        release_vector(pdf_outline_);
+        release_vector(pdf_thumbnail_images_);
     }
 
     void MainWindow::cancel_office_conversion() noexcept
@@ -1533,11 +1579,14 @@ namespace winrt::Glance::App::implementation
         current_text_path_ = file.path;
         current_text_markdown_ = markdown;
         current_text_web_ = web;
-        web_preview_available_ = web;
-        MarkdownPreviewWebView().DefaultBackgroundColor(
-            web
-                ? Windows::UI::Color{ 255, 255, 255, 255 }
-                : Windows::UI::Color{ 0, 0, 0, 0 });
+        web_preview_available_ = markdown || web;
+        if (web_preview_ != nullptr)
+        {
+            web_preview_.DefaultBackgroundColor(
+                web
+                    ? Windows::UI::Color{ 255, 255, 255, 255 }
+                    : Windows::UI::Color{ 0, 0, 0, 0 });
+        }
         current_text_reader_.reset();
         syntax_highlight_state_ = {};
         text_syntax_ranges_.clear();
@@ -1570,7 +1619,10 @@ namespace winrt::Glance::App::implementation
         set_markdown_preview_mode(markdown || web);
         if (markdown || web)
         {
-            MarkdownPreviewWebView().Opacity(0.0);
+            if (web_preview_ != nullptr)
+            {
+                web_preview_.Opacity(0.0);
+            }
         }
     }
 
@@ -3076,13 +3128,16 @@ namespace winrt::Glance::App::implementation
         const auto lifetime = get_strong();
         try
         {
-            co_await MarkdownPreviewWebView().EnsureCoreWebView2Async();
+            const auto web_view = ensure_web_view_control();
+            co_await web_view.EnsureCoreWebView2Async();
             if (generation != content_generation_)
             {
                 co_return;
             }
-            MarkdownPreviewWebView().NavigateToString(html);
-            MarkdownPreviewWebView().Opacity(1.0);
+            web_view.NavigateToString(html);
+            web_preview_available_ = true;
+            web_view.Opacity(1.0);
+            update_web_view_idle_state();
         }
         catch (const hresult_error& error)
         {
@@ -3090,6 +3145,8 @@ namespace winrt::Glance::App::implementation
                 L"Markdown WebView initialization failed: " + std::wstring(error.message()));
             if (generation == content_generation_)
             {
+                web_preview_available_ = false;
+                MarkdownPreviewButton().IsEnabled(false);
                 set_markdown_preview_mode(false);
             }
         }
@@ -3108,14 +3165,15 @@ namespace winrt::Glance::App::implementation
                 throw hresult_error(E_INVALIDARG, L"Unable to create a file URL.");
             }
 
-            co_await MarkdownPreviewWebView().EnsureCoreWebView2Async();
+            const auto web_view = ensure_web_view_control();
+            co_await web_view.EnsureCoreWebView2Async();
             if (generation != content_generation_ ||
                 current_kind_ != glance::app::PreviewKind::web)
             {
                 co_return;
             }
 
-            const auto core = MarkdownPreviewWebView().CoreWebView2();
+            const auto core = web_view.CoreWebView2();
             const auto settings = core.Settings();
             settings.AreDefaultContextMenusEnabled(false);
             settings.AreDevToolsEnabled(false);
@@ -3123,7 +3181,8 @@ namespace winrt::Glance::App::implementation
             core.Navigate(*url);
             web_preview_available_ = true;
             MarkdownPreviewButton().IsEnabled(true);
-            MarkdownPreviewWebView().Opacity(1.0);
+            web_view.Opacity(1.0);
+            update_web_view_idle_state();
         }
         catch (const hresult_error& error)
         {
@@ -3139,22 +3198,93 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    WebView2 MainWindow::ensure_web_view_control()
+    {
+        if (web_preview_ == nullptr)
+        {
+            web_preview_ = WebView2();
+            web_preview_.HorizontalAlignment(HorizontalAlignment::Stretch);
+            web_preview_.VerticalAlignment(VerticalAlignment::Stretch);
+            web_preview_.DefaultBackgroundColor(
+                current_text_web_
+                    ? Windows::UI::Color{ 255, 255, 255, 255 }
+                    : Windows::UI::Color{ 0, 0, 0, 0 });
+            web_preview_.Opacity(0.0);
+            WebPreviewHost().Children().Append(web_preview_);
+        }
+        return web_preview_;
+    }
+
     void MainWindow::clear_web_view_content() noexcept
     {
         web_preview_available_ = false;
         try
         {
-            if (const auto core = MarkdownPreviewWebView().CoreWebView2())
+            if (web_preview_ != nullptr)
             {
-                core.Stop();
-                core.Navigate(L"about:blank");
+                if (const auto core = web_preview_.CoreWebView2())
+                {
+                    core.Stop();
+                    core.Navigate(L"about:blank");
+                }
+                web_preview_.Opacity(0.0);
             }
         }
         catch (...)
         {
         }
-        MarkdownPreviewWebView().Opacity(0.0);
-        MarkdownPreviewWebView().Visibility(Visibility::Collapsed);
+        WebPreviewHost().Visibility(Visibility::Collapsed);
+        update_web_view_idle_state();
+    }
+
+    void MainWindow::update_web_view_idle_state()
+    {
+        if (web_view_idle_timer_ == nullptr)
+        {
+            return;
+        }
+        web_view_idle_timer_.Stop();
+        if (web_preview_ == nullptr)
+        {
+            return;
+        }
+        const bool active = visible_ && !basic_info_mode_ && markdown_preview_ &&
+            (current_kind_ == glance::app::PreviewKind::markdown ||
+             current_kind_ == glance::app::PreviewKind::web) &&
+            WebPreviewHost().Visibility() == Visibility::Visible;
+        if (!active)
+        {
+            web_view_idle_timer_.Start();
+        }
+    }
+
+    void MainWindow::release_web_view_control() noexcept
+    {
+        if (web_view_idle_timer_ != nullptr)
+        {
+            web_view_idle_timer_.Stop();
+        }
+        if (web_preview_ == nullptr)
+        {
+            return;
+        }
+        const auto web_view = web_preview_;
+        web_preview_ = nullptr;
+        try
+        {
+            WebPreviewHost().Visibility(Visibility::Collapsed);
+            WebPreviewHost().Children().Clear();
+        }
+        catch (...)
+        {
+        }
+        try
+        {
+            web_view.Close();
+        }
+        catch (...)
+        {
+        }
     }
 
     void MainWindow::render_text_content()
@@ -4228,12 +4358,24 @@ namespace winrt::Glance::App::implementation
             !preview && !long_text_mode_ ? Visibility::Visible : Visibility::Collapsed);
         LongTextList().Visibility(
             !preview && long_text_mode_ ? Visibility::Visible : Visibility::Collapsed);
-        MarkdownPreviewWebView().Visibility(preview ? Visibility::Visible : Visibility::Collapsed);
+        WebPreviewHost().Visibility(preview ? Visibility::Visible : Visibility::Collapsed);
+        update_web_view_idle_state();
     }
 
     void MainWindow::MarkdownPreviewButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         set_markdown_preview_mode(true);
+        if (web_preview_ == nullptr)
+        {
+            if (current_text_markdown_ && !current_text_has_more_)
+            {
+                render_markdown();
+            }
+            else if (current_text_web_ && !current_text_path_.empty())
+            {
+                render_web_document_async(current_text_path_, content_generation_);
+            }
+        }
     }
 
     void MainWindow::MarkdownCodeButton_Click(IInspectable const&, RoutedEventArgs const&)

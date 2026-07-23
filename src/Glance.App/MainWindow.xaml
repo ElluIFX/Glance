@@ -264,9 +264,8 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
-                    <WebView2
-                        x:Name="MarkdownPreviewWebView"
-                        DefaultBackgroundColor="Transparent"
+                    <Grid
+                        x:Name="WebPreviewHost"
                         Visibility="Collapsed" />
                 </Grid>
 

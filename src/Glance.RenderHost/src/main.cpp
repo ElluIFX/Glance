@@ -257,6 +257,35 @@ namespace
         }
 
     private:
+        bool ensure_bitmap_capacity(std::uint64_t byte_count)
+        {
+            if (byte_count > shared_bitmap_size || bitmap_memory_ == nullptr)
+            {
+                return false;
+            }
+            SYSTEM_INFO system_info{};
+            GetSystemInfo(&system_info);
+            const std::uint64_t page_size = system_info.dwPageSize;
+            const std::uint64_t required =
+                (byte_count + page_size - 1U) / page_size * page_size;
+            if (required <= committed_bitmap_size_)
+            {
+                return true;
+            }
+            const std::uint64_t additional = required - committed_bitmap_size_;
+            auto* const start = bitmap_memory_ + committed_bitmap_size_;
+            if (VirtualAlloc(
+                    start,
+                    static_cast<SIZE_T>(additional),
+                    MEM_COMMIT,
+                    PAGE_READWRITE) == nullptr)
+            {
+                return false;
+            }
+            committed_bitmap_size_ = required;
+            return true;
+        }
+
         void close_document()
         {
             if (document_ != nullptr)
@@ -398,7 +427,7 @@ namespace
             const int stride = FPDFBitmap_GetStride(bitmap);
             const std::uint64_t byte_count =
                 static_cast<std::uint64_t>(stride) * static_cast<std::uint32_t>(height);
-            if (stride <= 0 || byte_count > shared_bitmap_size)
+            if (stride <= 0 || !ensure_bitmap_capacity(byte_count))
             {
                 FPDFBitmap_Destroy(bitmap);
                 FPDF_ClosePage(page);
@@ -480,7 +509,7 @@ namespace
             const int height = std::max(1, static_cast<int>(std::lround(page_height * scale)));
             const std::uint32_t stride = static_cast<std::uint32_t>(width) * 4U;
             const std::uint64_t byte_count = static_cast<std::uint64_t>(stride) * height;
-            if (byte_count > shared_bitmap_size)
+            if (!ensure_bitmap_capacity(byte_count))
             {
                 DeleteEnhMetaFile(metafile);
                 send_response(Status::render_failed, {});
@@ -547,6 +576,7 @@ namespace
         HANDLE response_{};
         HANDLE mapping_{};
         std::byte* bitmap_memory_{};
+        std::uint64_t committed_bitmap_size_{};
         std::vector<std::byte> document_bytes_;
         FPDF_DOCUMENT document_{};
     };
