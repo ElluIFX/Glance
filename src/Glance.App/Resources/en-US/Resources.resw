@@ -231,6 +231,16 @@
   <data name="AboutAuthorLabel.Text" xml:space="preserve"><value>Author</value></data>
   <data name="AboutLicenseText.Text" xml:space="preserve"><value>License: GPL-3.0</value></data>
   <data name="AboutProjectLink.Content" xml:space="preserve"><value>GitHub repository</value></data>
+  <data name="CheckForUpdatesButton.Content" xml:space="preserve"><value>Check for updates</value></data>
+  <data name="UpdateAvailableTitle" xml:space="preserve"><value>Update available</value></data>
+  <data name="UpdateAvailableMessage" xml:space="preserve"><value>Version {0} is available. Open the release page?</value></data>
+  <data name="UpdateAvailablePrimary" xml:space="preserve"><value>Open release</value></data>
+  <data name="UpdateUpToDateTitle" xml:space="preserve"><value>Glance is up to date</value></data>
+  <data name="UpdateUpToDateMessage" xml:space="preserve"><value>You are using the latest version ({0}).</value></data>
+  <data name="UpdateCheckFailedTitle" xml:space="preserve"><value>Could not check for updates</value></data>
+  <data name="UpdateRateLimitedMessage" xml:space="preserve"><value>GitHub's request limit has been reached. Try again later.</value></data>
+  <data name="UpdateNoReleaseMessage" xml:space="preserve"><value>No published release was found.</value></data>
+  <data name="UpdateCheckFailedMessage" xml:space="preserve"><value>Could not reach GitHub. Check your connection and try again.</value></data>
   <data name="ExitConfirmationTitle" xml:space="preserve"><value>Exit Glance?</value></data>
   <data name="ExitConfirmationMessage" xml:space="preserve"><value>Preview shortcuts will stop working until Glance is started again.</value></data>
   <data name="ExitConfirmationPrimary" xml:space="preserve"><value>Exit</value></data>

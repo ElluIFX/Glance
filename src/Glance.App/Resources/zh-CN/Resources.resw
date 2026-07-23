@@ -231,6 +231,16 @@
   <data name="AboutAuthorLabel.Text" xml:space="preserve"><value>作者</value></data>
   <data name="AboutLicenseText.Text" xml:space="preserve"><value>许可证：GPL-3.0</value></data>
   <data name="AboutProjectLink.Content" xml:space="preserve"><value>GitHub 仓库</value></data>
+  <data name="CheckForUpdatesButton.Content" xml:space="preserve"><value>检查更新</value></data>
+  <data name="UpdateAvailableTitle" xml:space="preserve"><value>发现新版本</value></data>
+  <data name="UpdateAvailableMessage" xml:space="preserve"><value>最新版本为 {0}，是否打开 Release 页面？</value></data>
+  <data name="UpdateAvailablePrimary" xml:space="preserve"><value>打开 Release</value></data>
+  <data name="UpdateUpToDateTitle" xml:space="preserve"><value>Glance 已是最新版本</value></data>
+  <data name="UpdateUpToDateMessage" xml:space="preserve"><value>当前使用的 {0} 已是最新版本。</value></data>
+  <data name="UpdateCheckFailedTitle" xml:space="preserve"><value>无法检查更新</value></data>
+  <data name="UpdateRateLimitedMessage" xml:space="preserve"><value>GitHub 请求次数已达上限，请稍后重试。</value></data>
+  <data name="UpdateNoReleaseMessage" xml:space="preserve"><value>未找到已发布的版本。</value></data>
+  <data name="UpdateCheckFailedMessage" xml:space="preserve"><value>无法访问 GitHub，请检查网络连接后重试。</value></data>
   <data name="ExitConfirmationTitle" xml:space="preserve"><value>退出 Glance？</value></data>
   <data name="ExitConfirmationMessage" xml:space="preserve"><value>重新启动 Glance 前，预览快捷键将停止工作。</value></data>
   <data name="ExitConfirmationPrimary" xml:space="preserve"><value>退出</value></data>

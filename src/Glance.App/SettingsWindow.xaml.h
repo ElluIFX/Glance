@@ -66,6 +66,9 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget ResetAllSettingsButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        winrt::fire_and_forget CheckForUpdatesButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ResetWindowSizesButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -142,6 +145,7 @@ namespace winrt::Glance::App::implementation
         bool initializing_{};
         bool exit_confirmation_open_{};
         bool reset_confirmation_open_{};
+        bool update_check_in_progress_{};
         DiagnosticBundleState diagnostic_bundle_state_{};
         std::wstring diagnostic_bundle_path_;
         glance::app::TextPreferences text_preferences_{};

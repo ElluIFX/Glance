@@ -9,6 +9,7 @@
 #include "resource.h"
 #include "startup_registration.h"
 #include "text_preferences.h"
+#include "update_checker.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
 #include "../version.h"
@@ -576,6 +577,7 @@ namespace winrt::Glance::App::implementation
         set_text(AboutAuthorLabel(), L"AboutAuthorLabel.Text");
         set_text(AboutLicenseText(), L"AboutLicenseText.Text");
         set_content(AboutProjectLink(), L"AboutProjectLink.Content");
+        set_content(CheckForUpdatesButton(), L"CheckForUpdatesButton.Content");
         AboutVersionText().Text(glance::app::localize_format(
             L"VersionFormat", { GLANCE_VERSION_WSTRING }));
         refresh_runtime_statuses();
@@ -937,6 +939,91 @@ namespace winrt::Glance::App::implementation
         failure_dialog.CloseButtonText(glance::app::localize(L"OK"));
         co_await failure_dialog.ShowAsync();
         lifetime->reset_confirmation_open_ = false;
+    }
+
+    fire_and_forget SettingsWindow::CheckForUpdatesButton_Click(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        const auto lifetime = get_strong();
+        if (update_check_in_progress_)
+        {
+            co_return;
+        }
+
+        update_check_in_progress_ = true;
+        CheckForUpdatesButton().IsEnabled(false);
+        UpdateCheckProgressRing().Visibility(Visibility::Visible);
+        UpdateCheckProgressRing().IsActive(true);
+
+        apartment_context ui_thread;
+        glance::app::UpdateCheckResult result;
+        try
+        {
+            co_await resume_background();
+            result = glance::app::check_for_updates(GLANCE_VERSION_WSTRING);
+            co_await ui_thread;
+        }
+        catch (...)
+        {
+            co_return;
+        }
+
+        lifetime->update_check_in_progress_ = false;
+        lifetime->CheckForUpdatesButton().IsEnabled(true);
+        lifetime->UpdateCheckProgressRing().IsActive(false);
+        lifetime->UpdateCheckProgressRing().Visibility(Visibility::Collapsed);
+        if (lifetime->RootGrid().XamlRoot() == nullptr)
+        {
+            co_return;
+        }
+
+        try
+        {
+            Controls::ContentDialog dialog;
+            dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
+            dialog.CloseButtonText(glance::app::localize(L"OK"));
+            dialog.DefaultButton(Controls::ContentDialogButton::Close);
+
+            switch (result.status)
+            {
+            case glance::app::UpdateCheckStatus::update_available:
+                dialog.Title(box_value(glance::app::localize(L"UpdateAvailableTitle")));
+                dialog.Content(box_value(glance::app::localize_format(
+                    L"UpdateAvailableMessage", { result.latest_version })));
+                dialog.PrimaryButtonText(glance::app::localize(L"UpdateAvailablePrimary"));
+                dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+                break;
+            case glance::app::UpdateCheckStatus::up_to_date:
+                dialog.Title(box_value(glance::app::localize(L"UpdateUpToDateTitle")));
+                dialog.Content(box_value(glance::app::localize_format(
+                    L"UpdateUpToDateMessage", { GLANCE_VERSION_WSTRING })));
+                break;
+            case glance::app::UpdateCheckStatus::rate_limited:
+                dialog.Title(box_value(glance::app::localize(L"UpdateCheckFailedTitle")));
+                dialog.Content(box_value(glance::app::localize(L"UpdateRateLimitedMessage")));
+                break;
+            case glance::app::UpdateCheckStatus::no_release:
+                dialog.Title(box_value(glance::app::localize(L"UpdateCheckFailedTitle")));
+                dialog.Content(box_value(glance::app::localize(L"UpdateNoReleaseMessage")));
+                break;
+            default:
+                dialog.Title(box_value(glance::app::localize(L"UpdateCheckFailedTitle")));
+                dialog.Content(box_value(glance::app::localize(L"UpdateCheckFailedMessage")));
+                break;
+            }
+
+            const auto dialog_result = co_await dialog.ShowAsync();
+            if (result.status == glance::app::UpdateCheckStatus::update_available &&
+                dialog_result == Controls::ContentDialogResult::Primary)
+            {
+                static_cast<void>(co_await Windows::System::Launcher::LaunchUriAsync(
+                    Windows::Foundation::Uri(L"https://github.com/ElluIFX/Glance/releases/latest")));
+            }
+        }
+        catch (...)
+        {
+        }
     }
 
     void SettingsWindow::ResetWindowSizesButton_Click(IInspectable const&, RoutedEventArgs const&)

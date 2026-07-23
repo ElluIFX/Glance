@@ -45,7 +45,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;icu.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;icu.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;Winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -84,6 +84,7 @@
     <ClInclude Include="startup_registration.h" />
     <ClInclude Include="text_preferences.h" />
     <ClInclude Include="tray_icon.h" />
+    <ClInclude Include="update_checker.h" />
     <ClInclude Include="window_size_store.h" />
     <ClInclude Include="window_preferences.h" />
     <ClInclude Include="third_party\md4c\entity.h" />
@@ -128,6 +129,7 @@
     <ClCompile Include="startup_registration.cpp" />
     <ClCompile Include="text_preferences.cpp" />
     <ClCompile Include="tray_icon.cpp" />
+    <ClCompile Include="update_checker.cpp" />
     <ClCompile Include="window_size_store.cpp" />
     <ClCompile Include="window_preferences.cpp" />
     <ClCompile Include="third_party\md4c\entity.c">

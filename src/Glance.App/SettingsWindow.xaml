@@ -918,6 +918,19 @@
                             Stretch="Uniform" />
                         <TextBlock HorizontalAlignment="Center" FontSize="28" FontWeight="SemiBold" Text="Glance" />
                         <TextBlock x:Name="AboutVersionText" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Spacing="10">
+                            <Button
+                                x:Name="CheckForUpdatesButton"
+                                x:Uid="CheckForUpdatesButton"
+                                Click="CheckForUpdatesButton_Click"
+                                Content="Check for updates" />
+                            <ProgressRing
+                                x:Name="UpdateCheckProgressRing"
+                                Width="18"
+                                Height="18"
+                                IsActive="False"
+                                Visibility="Collapsed" />
+                        </StackPanel>
                         <StackPanel Margin="0,10,0,0" HorizontalAlignment="Center" Orientation="Horizontal" Spacing="6">
                             <TextBlock x:Name="AboutAuthorLabel" x:Uid="AboutAuthorLabel" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Author" />
                             <HyperlinkButton Padding="0" Content="@Ellu" NavigateUri="https://github.com/ElluIFX" />
