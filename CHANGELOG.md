@@ -4,6 +4,12 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.07.23.2] - 2026-07-23
+
+### Fixed
+
+- Restored Scintilla and Lexilla runtime dependencies during clean local and GitHub Actions builds.
+
 ## [2026.07.23.1] - 2026-07-23
 
 ### Added
