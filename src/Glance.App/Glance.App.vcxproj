@@ -45,7 +45,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;icu.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;Winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Delayimp.lib;Dwrite.lib;icu.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;Winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>Winhttp.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

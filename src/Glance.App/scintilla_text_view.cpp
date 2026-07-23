@@ -13,7 +13,6 @@
 #include <filesystem>
 #include <initializer_list>
 #include <mutex>
-#include <thread>
 #include <uxtheme.h>
 
 #pragma comment(lib, "gdi32.lib")
@@ -23,6 +22,8 @@ namespace
 {
     constexpr wchar_t host_window_class[] = L"Glance.ScintillaHost";
     constexpr UINT_PTR editor_subclass_id = 1;
+    constexpr WPARAM active_layout_threads = 4;
+    constexpr WPARAM idle_layout_threads = 1;
 
     struct LexerDefinition
     {
@@ -431,6 +432,9 @@ namespace glance::app
     void ScintillaTextView::set_visible(bool visible) noexcept
     {
         visible_ = visible;
+        call(
+            SCI_SETLAYOUTTHREADS,
+            visible ? active_layout_threads : idle_layout_threads);
         if (host_ != nullptr)
         {
             ShowWindow(host_, visible ? SW_SHOWNOACTIVATE : SW_HIDE);
@@ -700,9 +704,7 @@ namespace glance::app
         call(SCI_SETBUFFEREDDRAW, TRUE);
         call(SCI_SETPHASESDRAW, SC_PHASES_MULTIPLE);
         call(SCI_SETLAYOUTCACHE, SC_CACHE_PAGE);
-        call(
-            SCI_SETLAYOUTTHREADS,
-            std::max(1U, std::thread::hardware_concurrency()));
+        call(SCI_SETLAYOUTTHREADS, idle_layout_threads);
         call(SCI_SETIDLESTYLING, SC_IDLESTYLING_AFTERVISIBLE);
         call(SCI_SETSCROLLWIDTH, 1);
         call(SCI_SETSCROLLWIDTHTRACKING, TRUE);
