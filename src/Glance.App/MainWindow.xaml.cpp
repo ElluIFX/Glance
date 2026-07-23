@@ -280,6 +280,52 @@ namespace
         return std::ranges::find(audio_extensions, extension) != audio_extensions.end();
     }
 
+    std::wstring format_media_bitrate(std::uint32_t bitrate)
+    {
+        if (bitrate == 0)
+        {
+            return {};
+        }
+        std::wostringstream output;
+        if (bitrate >= 1000000)
+        {
+            output << std::fixed << std::setprecision(1) << bitrate / 1000000.0 << L" Mbps";
+        }
+        else
+        {
+            output << (bitrate + 500) / 1000 << L" kbps";
+        }
+        return output.str();
+    }
+
+    std::wstring format_media_subtype(winrt::hstring const& subtype)
+    {
+        std::wstring result(subtype);
+        if (result.size() <= 16)
+        {
+            std::ranges::transform(result, result.begin(), [](wchar_t value) {
+                return static_cast<wchar_t>(std::towupper(value));
+            });
+        }
+        return result;
+    }
+
+    std::wstring format_media_frame_rate(
+        const Windows::Media::MediaProperties::MediaRatio& ratio)
+    {
+        if (ratio == nullptr || ratio.Denominator() == 0 || ratio.Numerator() == 0)
+        {
+            return {};
+        }
+        const double frame_rate =
+            static_cast<double>(ratio.Numerator()) / ratio.Denominator();
+        std::wostringstream output;
+        output << std::fixed << std::setprecision(
+            std::abs(frame_rate - std::round(frame_rate)) < 0.01 ? 0 : 2)
+               << frame_rate << L" fps";
+        return output.str();
+    }
+
 }
 
 namespace winrt::Glance::App::implementation
@@ -339,6 +385,27 @@ namespace winrt::Glance::App::implementation
             {
                 self->update_media_controls();
             }
+        });
+        Windows::Media::Playback::MediaPlayer media_player;
+        MediaPreview().SetMediaPlayer(media_player);
+        const auto dispatcher = DispatcherQueue();
+        media_player.MediaOpened([weak, dispatcher](
+                                     Windows::Media::Playback::MediaPlayer const& sender,
+                                     IInspectable const&) {
+            const auto item =
+                sender.Source().try_as<Windows::Media::Playback::MediaPlaybackItem>();
+            if (item == nullptr)
+            {
+                return;
+            }
+            static_cast<void>(dispatcher.TryEnqueue([weak, item] {
+                if (const auto self = weak.get())
+                {
+                    self->update_media_playback_metadata(
+                        item,
+                        self->media_playback_generation_);
+                }
+            }));
         });
         web_view_idle_timer_ = DispatcherTimer();
         web_view_idle_timer_.Interval(web_view_idle_timeout);
@@ -437,6 +504,9 @@ namespace winrt::Glance::App::implementation
         }
         set_tooltip(MediaPlayPauseButton(), L"MediaPlayPauseButton.ToolTipService.ToolTip");
         set_tooltip(MediaMuteButton(), L"MediaMuteButton.ToolTipService.ToolTip");
+        set_tooltip(
+            MediaAdvancedInfoButton(),
+            L"MediaAdvancedInfoButton.ToolTipService.ToolTip");
         set_tooltip(PreviousPdfButton(), L"PreviousPdfButton.ToolTipService.ToolTip");
         set_tooltip(NextPdfButton(), L"NextPdfButton.ToolTipService.ToolTip");
         set_tooltip(PdfThumbnailsButton(), L"PdfThumbnailsButton.ToolTipService.ToolTip");
@@ -464,6 +534,10 @@ namespace winrt::Glance::App::implementation
         update_line_number_visibility();
         update_generic_file_metadata();
         update_footer_metadata();
+        if (current_kind_ == glance::app::PreviewKind::media)
+        {
+            update_media_advanced_info();
+        }
     }
 
     void MainWindow::ApplyTextPreferences()
@@ -773,6 +847,8 @@ namespace winrt::Glance::App::implementation
         ImagePreview().Source(nullptr);
         ImageMetadataText().Text(L"");
         ImageMetadataOverlay().Visibility(Visibility::Collapsed);
+        MediaAdvancedInfoText().Text(L"");
+        MediaAdvancedInfoOverlay().Visibility(Visibility::Collapsed);
         MediaCoverImage().Source(nullptr);
         MediaTitleText().Text(L"");
         MediaAlbumText().Text(L"");
@@ -824,6 +900,7 @@ namespace winrt::Glance::App::implementation
         LoadCloudFileButton().Visibility(Visibility::Collapsed);
         PreviewAsTextButton().Visibility(Visibility::Collapsed);
         GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
+        MediaAdvancedInfoButton().Visibility(Visibility::Collapsed);
         PreviewModeButton().Visibility(Visibility::Collapsed);
         PreviewModeButton().IsChecked(false);
         ErrorText().Text(L"");
@@ -850,7 +927,10 @@ namespace winrt::Glance::App::implementation
         text_chunk_loading_ = false;
         image_metadata_.clear();
         media_dimensions_.clear();
-        media_technical_info_.clear();
+        media_playback_info_.clear();
+        media_playback_item_ = nullptr;
+        media_playback_generation_ = 0;
+        media_metadata_ = {};
         footer_access_mode_.clear();
         footer_access_loaded_ = false;
         footer_access_requested_ = false;
@@ -864,6 +944,7 @@ namespace winrt::Glance::App::implementation
         basic_info_mode_ = false;
         generic_text_preview_allowed_ = false;
         media_is_audio_ = false;
+        media_advanced_info_visible_ = false;
         image_metadata_visible_ = false;
         image_panning_ = false;
         image_pixel_width_ = 0;
@@ -1267,7 +1348,10 @@ namespace winrt::Glance::App::implementation
         image_pixel_width_ = 0;
         image_pixel_height_ = 0;
         media_dimensions_.clear();
-        media_technical_info_.clear();
+        media_playback_info_.clear();
+        media_playback_item_ = nullptr;
+        media_playback_generation_ = 0;
+        media_metadata_ = {};
         footer_access_mode_.clear();
         footer_access_loaded_ = false;
         footer_access_requested_ = false;
@@ -1361,7 +1445,14 @@ namespace winrt::Glance::App::implementation
             MediaAlbumText().Text(L"");
             MediaArtistText().Text(L"");
             media_dimensions_.clear();
-            media_technical_info_.clear();
+            media_playback_info_.clear();
+            media_playback_item_ = nullptr;
+            media_playback_generation_ = 0;
+            media_metadata_ = {};
+            media_advanced_info_visible_ = false;
+            MediaAdvancedInfoButton().IsChecked(false);
+            MediaAdvancedInfoText().Text(glance::app::localize(L"Loading"));
+            MediaAdvancedInfoOverlay().Visibility(Visibility::Collapsed);
             media_controls_idle_ticks_ = 0;
             show_media_controls();
             load_media_async(file.path, generation);
@@ -1687,6 +1778,7 @@ namespace winrt::Glance::App::implementation
         {
             const auto file = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
             const auto source = Windows::Media::Core::MediaSource::CreateFromStorageFile(file);
+            const Windows::Media::Playback::MediaPlaybackItem playback_item(source);
             if (generation != content_generation_)
             {
                 co_return;
@@ -1714,7 +1806,9 @@ namespace winrt::Glance::App::implementation
                 MediaMuteIcon().Foreground(white);
                 MediaTimeText().Foreground(white);
             }
-            MediaPreview().Source(source);
+            media_playback_item_ = playback_item;
+            media_playback_generation_ = generation;
+            MediaPreview().Source(playback_item);
             MediaPreview().MediaPlayer().IsMuted(false);
             MediaPreview().MediaPlayer().Volume(MediaVolumeSlider().Value() / 100.0);
             const auto preferences = glance::app::load_media_preview_preferences();
@@ -1724,7 +1818,6 @@ namespace winrt::Glance::App::implementation
             }
             media_timer_.Start();
 
-            std::uint64_t native_bitrate{};
             if (media_is_audio_)
             {
                 try
@@ -1742,7 +1835,6 @@ namespace winrt::Glance::App::implementation
                     {
                         artist = std::wstring(properties.AlbumArtist());
                     }
-                    native_bitrate = properties.Bitrate();
                     MediaTitleText().Text(title);
                     MediaAlbumText().Text(properties.Album());
                     MediaArtistText().Text(artist);
@@ -1776,21 +1868,17 @@ namespace winrt::Glance::App::implementation
                     {
                         co_return;
                     }
-                    native_bitrate = properties.Bitrate();
                     if (properties.Width() > 0 && properties.Height() > 0)
                     {
-                        media_dimensions_ = std::to_wstring(properties.Width())
-                            + L" x " + std::to_wstring(properties.Height());
                         auto_fit_window_to_content(properties.Width(), properties.Height());
                     }
-                    update_media_footer();
                 }
                 catch (const hresult_error&)
                 {
                 }
                 reveal_deferred_preview();
             }
-            load_media_technical_metadata_async(path, generation, media_is_audio_, native_bitrate);
+            load_media_technical_metadata_async(path, generation);
         }
         catch (const hresult_error& error)
         {
@@ -1801,33 +1889,123 @@ namespace winrt::Glance::App::implementation
 
     fire_and_forget MainWindow::load_media_technical_metadata_async(
         std::wstring path,
-        std::uint64_t generation,
-        bool audio,
-        std::uint64_t fallback_bitrate)
+        std::uint64_t generation)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
-        auto metadata = glance::app::probe_media_metadata(path, audio);
-        if (metadata.bitrate == 0)
-        {
-            metadata.bitrate = fallback_bitrate;
-        }
-        auto formatted = glance::app::format_media_metadata(metadata, audio);
+        auto metadata = glance::app::probe_media_metadata(path);
         static_cast<void>(dispatcher.TryEnqueue(
-            [lifetime, generation, formatted = std::move(formatted)]() mutable {
+            [lifetime,
+             generation,
+             metadata = std::move(metadata)]() mutable {
                 if (generation != lifetime->content_generation_)
                 {
                     return;
                 }
-                lifetime->media_technical_info_ = std::move(formatted);
-                lifetime->update_media_footer();
+                lifetime->media_metadata_ = std::move(metadata);
+                lifetime->update_media_advanced_info();
             }));
     }
 
     void MainWindow::update_media_footer()
     {
         update_footer_metadata();
+    }
+
+    void MainWindow::update_media_playback_metadata(
+        const Windows::Media::Playback::MediaPlaybackItem& item,
+        std::uint64_t generation)
+    {
+        if (generation != content_generation_ ||
+            current_kind_ != glance::app::PreviewKind::media ||
+            media_playback_item_ == nullptr ||
+            media_playback_item_ != item)
+        {
+            return;
+        }
+
+        try
+        {
+            std::vector<std::wstring> fields;
+            const auto append = [&fields](std::wstring value) {
+                if (!value.empty())
+                {
+                    fields.push_back(std::move(value));
+                }
+            };
+
+            if (media_is_audio_)
+            {
+                const auto tracks = item.AudioTracks();
+                if (tracks.Size() > 0)
+                {
+                    const auto properties = tracks.GetAt(0).GetEncodingProperties();
+                    if (properties.SampleRate() > 0)
+                    {
+                        std::wostringstream sample_rate;
+                        sample_rate << std::fixed << std::setprecision(
+                            properties.SampleRate() % 1000 == 0 ? 0 : 1)
+                                    << properties.SampleRate() / 1000.0 << L" kHz";
+                        append(sample_rate.str());
+                    }
+                    if (properties.BitsPerSample() > 0)
+                    {
+                        append(std::to_wstring(properties.BitsPerSample()) + L"-bit");
+                    }
+                    if (properties.ChannelCount() > 0)
+                    {
+                        append(glance::app::localize_format(
+                            L"MediaFooterChannelsFormat",
+                            { std::to_wstring(properties.ChannelCount()) }));
+                    }
+                    append(format_media_subtype(properties.Subtype()));
+                    append(format_media_bitrate(properties.Bitrate()));
+                }
+            }
+            else
+            {
+                const auto tracks = item.VideoTracks();
+                if (tracks.Size() > 0)
+                {
+                    const auto properties = tracks.GetAt(0).GetEncodingProperties();
+                    if (properties.Width() > 0 && properties.Height() > 0)
+                    {
+                        media_dimensions_ = std::to_wstring(properties.Width())
+                            + L" x " + std::to_wstring(properties.Height());
+                    }
+                    append(format_media_frame_rate(properties.FrameRate()));
+                    append(format_media_subtype(properties.Subtype()));
+                    append(format_media_bitrate(properties.Bitrate()));
+                }
+            }
+
+            media_playback_info_.clear();
+            for (const auto& field : fields)
+            {
+                media_playback_info_ +=
+                    media_playback_info_.empty() ? field : L"  |  " + field;
+            }
+            update_media_footer();
+        }
+        catch (const hresult_error&)
+        {
+            media_playback_info_.clear();
+            update_media_footer();
+        }
+    }
+
+    void MainWindow::update_media_advanced_info()
+    {
+        auto text = glance::app::format_media_advanced_metadata(media_metadata_);
+        if (text.empty())
+        {
+            text = glance::app::localize(L"NoMediaMetadata");
+        }
+        MediaAdvancedInfoText().Text(std::move(text));
+        MediaAdvancedInfoOverlay().Visibility(
+            media_advanced_info_visible_ ? Visibility::Visible : Visibility::Collapsed);
+        MediaAdvancedInfoButton().IsChecked(media_advanced_info_visible_);
     }
 
     void MainWindow::update_footer_metadata()
@@ -1887,7 +2065,7 @@ namespace winrt::Glance::App::implementation
         if (current_kind_ == glance::app::PreviewKind::media)
         {
             append(media_dimensions_);
-            append(media_technical_info_);
+            append(media_playback_info_);
         }
 
         std::wstring metadata;
@@ -3488,6 +3666,10 @@ namespace winrt::Glance::App::implementation
         ArchivePanel().Visibility(kind == glance::app::PreviewKind::archive ? Visibility::Visible : Visibility::Collapsed);
         ImageStatusControls().Visibility(
             kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
+        MediaAdvancedInfoButton().Visibility(
+            kind == glance::app::PreviewKind::media && glance::app::media_probe_available()
+                ? Visibility::Visible
+                : Visibility::Collapsed);
         TextStatusControls().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         LineNumbersButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         SyntaxHighlightButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
@@ -3507,6 +3689,9 @@ namespace winrt::Glance::App::implementation
         if (kind != glance::app::PreviewKind::media)
         {
             stop_media_playback();
+            media_advanced_info_visible_ = false;
+            MediaAdvancedInfoButton().IsChecked(false);
+            MediaAdvancedInfoOverlay().Visibility(Visibility::Collapsed);
         }
         if (kind != glance::app::PreviewKind::pdf)
         {
@@ -4035,6 +4220,12 @@ namespace winrt::Glance::App::implementation
         update_image_metadata_visibility();
     }
 
+    void MainWindow::MediaAdvancedInfoButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        media_advanced_info_visible_ = MediaAdvancedInfoButton().IsChecked().Value();
+        update_media_advanced_info();
+    }
+
     void MainWindow::set_image_zoom(float zoom, Windows::Foundation::Point anchor)
     {
         const float old_zoom = ImageScroller().ZoomFactor();
@@ -4188,6 +4379,9 @@ namespace winrt::Glance::App::implementation
             MediaPreview().MediaPlayer().Pause();
         }
         MediaPreview().Source(nullptr);
+        media_playback_item_ = nullptr;
+        media_playback_generation_ = 0;
+        media_playback_info_.clear();
     }
 
     void MainWindow::update_media_controls()

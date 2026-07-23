@@ -25,6 +25,7 @@
   <data name="LineNumbersTooltip" xml:space="preserve"><value>Show line numbers</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>Line numbers are unavailable while wrapping</value></data>
   <data name="NoImageMetadata" xml:space="preserve"><value>No embedded image metadata.</value></data>
+  <data name="NoMediaMetadata" xml:space="preserve"><value>No media information available.</value></data>
   <data name="ImageDecodeError" xml:space="preserve"><value>The image could not be decoded. {0}</value></data>
   <data name="MediaOpenError" xml:space="preserve"><value>The media file could not be opened. {0}</value></data>
   <data name="PdfEmptyError" xml:space="preserve"><value>The PDF contains no pages.</value></data>
@@ -81,6 +82,7 @@
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
   <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>Play or pause</value></data>
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mute or unmute</value></data>
+  <data name="MediaAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show media information</value></data>
   <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Previous page</value></data>
   <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Next page</value></data>
   <data name="PdfThumbnailsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Thumbnails</value></data>
@@ -98,6 +100,36 @@
   <data name="ZoomInButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom in</value></data>
   <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>Rotate clockwise</value></data>
   <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>Image metadata (EXIF)</value></data>
+  <data name="MediaInfoContainer" xml:space="preserve"><value>Container</value></data>
+  <data name="MediaInfoDuration" xml:space="preserve"><value>Duration</value></data>
+  <data name="MediaInfoOverallBitrate" xml:space="preserve"><value>Overall bitrate</value></data>
+  <data name="MediaInfoChapters" xml:space="preserve"><value>Chapters</value></data>
+  <data name="MediaInfoStreamHeading" xml:space="preserve"><value>{0} stream {1}</value></data>
+  <data name="MediaInfoCodec" xml:space="preserve"><value>Codec</value></data>
+  <data name="MediaInfoResolution" xml:space="preserve"><value>Resolution</value></data>
+  <data name="MediaInfoFrameRate" xml:space="preserve"><value>Frame rate</value></data>
+  <data name="MediaInfoPixelFormat" xml:space="preserve"><value>Pixel format</value></data>
+  <data name="MediaInfoBitDepth" xml:space="preserve"><value>Bit depth</value></data>
+  <data name="MediaInfoColor" xml:space="preserve"><value>Color</value></data>
+  <data name="MediaInfoAspectRatio" xml:space="preserve"><value>Aspect ratio (SAR / DAR)</value></data>
+  <data name="MediaInfoRotation" xml:space="preserve"><value>Rotation</value></data>
+  <data name="MediaInfoSampleRate" xml:space="preserve"><value>Sample rate</value></data>
+  <data name="MediaInfoSampleFormat" xml:space="preserve"><value>Sample format</value></data>
+  <data name="MediaInfoChannels" xml:space="preserve"><value>Channels</value></data>
+  <data name="MediaFooterChannelsFormat" xml:space="preserve"><value>{0} ch</value></data>
+  <data name="MediaInfoBitrate" xml:space="preserve"><value>Bitrate</value></data>
+  <data name="MediaInfoFrames" xml:space="preserve"><value>Frames</value></data>
+  <data name="MediaInfoLanguage" xml:space="preserve"><value>Language</value></data>
+  <data name="MediaInfoTitle" xml:space="preserve"><value>Title</value></data>
+  <data name="MediaInfoDefault" xml:space="preserve"><value>Default</value></data>
+  <data name="MediaInfoForced" xml:space="preserve"><value>Forced</value></data>
+  <data name="MediaInfoDisposition" xml:space="preserve"><value>Disposition</value></data>
+  <data name="MediaInfoMetadata" xml:space="preserve"><value>Metadata</value></data>
+  <data name="MediaTypeVideo" xml:space="preserve"><value>Video</value></data>
+  <data name="MediaTypeAudio" xml:space="preserve"><value>Audio</value></data>
+  <data name="MediaTypeSubtitle" xml:space="preserve"><value>Subtitle</value></data>
+  <data name="MediaTypeAttachment" xml:space="preserve"><value>Attachment</value></data>
+  <data name="MediaTypeData" xml:space="preserve"><value>Data</value></data>
   <data name="WordWrapButton.ToolTipService.ToolTip" xml:space="preserve"><value>Wrap long lines</value></data>
   <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>Copy path</value></data>
   <data name="OpenFolderButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open containing folder</value></data>

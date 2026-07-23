@@ -315,6 +315,28 @@
                         </StackPanel>
                     </Grid>
                     <Border
+                        x:Name="MediaAdvancedInfoOverlay"
+                        Margin="12"
+                        MaxWidth="440"
+                        MaxHeight="360"
+                        Padding="10,7"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="#B3202020"
+                        CornerRadius="4"
+                        Visibility="Collapsed">
+                        <ScrollViewer
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto">
+                            <TextBlock
+                                x:Name="MediaAdvancedInfoText"
+                                Foreground="White"
+                                FontSize="12"
+                                IsTextSelectionEnabled="True"
+                                TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Border>
+                    <Border
                         x:Name="MediaControlsOverlay"
                         Height="56"
                         Padding="10,0"
@@ -659,7 +681,9 @@
                 x:Name="FooterMetadataText"
                 VerticalAlignment="Center"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                FontSize="12" />
+                FontSize="12"
+                TextTrimming="CharacterEllipsis"
+                ToolTipService.ToolTip="{Binding Text, ElementName=FooterMetadataText}" />
             <StackPanel
                 x:Name="TextStatusControls"
                 Grid.Column="1"
@@ -811,6 +835,16 @@
                 Style="{StaticResource IconToggleButtonStyle}"
                 Click="GenericAdvancedInfoButton_Click"
                 ToolTipService.ToolTip="Show advanced information"
+                Visibility="Collapsed">
+                <FontIcon FontSize="14" Glyph="&#xE946;" />
+            </ToggleButton>
+            <ToggleButton
+                x:Name="MediaAdvancedInfoButton"
+                x:Uid="MediaAdvancedInfoButton"
+                Grid.Column="4"
+                Style="{StaticResource IconToggleButtonStyle}"
+                Click="MediaAdvancedInfoButton_Click"
+                ToolTipService.ToolTip="Show media information"
                 Visibility="Collapsed">
                 <FontIcon FontSize="14" Glyph="&#xE946;" />
             </ToggleButton>

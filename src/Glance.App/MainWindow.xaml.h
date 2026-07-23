@@ -6,6 +6,7 @@
 #include "footer_preferences.h"
 #include "folder_preview_preferences.h"
 #include "generic_preview_preferences.h"
+#include "media_metadata_provider.h"
 #include "media_preview_preferences.h"
 #include "office_preview_client.h"
 #include "preview_file.h"
@@ -106,6 +107,9 @@ namespace winrt::Glance::App::implementation
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void MediaPlayPauseButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MediaMuteButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void MediaAdvancedInfoButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MediaSeekSlider_ValueChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const&);
@@ -190,9 +194,7 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget load_media_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_media_technical_metadata_async(
             std::wstring path,
-            std::uint64_t generation,
-            bool audio,
-            std::uint64_t fallback_bitrate);
+            std::uint64_t generation);
         winrt::fire_and_forget load_pdf_async(
             std::wstring path,
             std::uint64_t generation,
@@ -312,6 +314,10 @@ namespace winrt::Glance::App::implementation
         void show_media_controls();
         void update_media_controls();
         void update_media_footer();
+        void update_media_playback_metadata(
+            const Windows::Media::Playback::MediaPlaybackItem& item,
+            std::uint64_t generation);
+        void update_media_advanced_info();
         void update_footer_metadata();
         void update_generic_file_metadata();
         void request_footer_access_if_needed();
@@ -348,6 +354,7 @@ namespace winrt::Glance::App::implementation
         bool syntax_highlighting_{ true };
         bool word_wrap_{ true };
         bool media_is_audio_{};
+        bool media_advanced_info_visible_{};
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};
         bool markdown_preview_{};
@@ -388,7 +395,10 @@ namespace winrt::Glance::App::implementation
         bool footer_access_requested_{};
         std::wstring image_metadata_;
         std::wstring media_dimensions_;
-        std::wstring media_technical_info_;
+        std::wstring media_playback_info_;
+        Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };
+        std::uint64_t media_playback_generation_{};
+        glance::app::MediaTechnicalMetadata media_metadata_;
         struct OfficeConversionOperation
         {
             void attach_process(HANDLE value) noexcept;

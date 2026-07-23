@@ -35,6 +35,7 @@
 #include <winrt/Windows.Graphics.h>
 #include <winrt/Windows.Graphics.Imaging.h>
 #include <winrt/Windows.Media.Core.h>
+#include <winrt/Windows.Media.MediaProperties.h>
 #include <winrt/Windows.Media.Playback.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.Storage.FileProperties.h>
