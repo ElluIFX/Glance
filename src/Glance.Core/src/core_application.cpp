@@ -910,9 +910,27 @@ namespace glance::core
     void CoreApplication::apply_selection(glance::contracts::SelectionSnapshot next)
     {
         auto preview_state = preview_state_.load(std::memory_order_acquire);
+        const HWND foreground_window = GetForegroundWindow();
+        DWORD foreground_process_id{};
+        if (foreground_window != nullptr)
+        {
+            GetWindowThreadProcessId(foreground_window, &foreground_process_id);
+        }
+        const bool app_is_foreground =
+            foreground_window != nullptr &&
+            foreground_process_id != 0 &&
+            app_process_ &&
+            foreground_process_id == GetProcessId(app_process_.get());
+        if (preview_state == glance::contracts::PreviewWindowState::active_interactive ||
+            (preview_state == glance::contracts::PreviewWindowState::active_following &&
+             app_is_foreground))
+        {
+            input_state_.eligible_selection.store(false, std::memory_order_release);
+            return;
+        }
         if (preview_state == glance::contracts::PreviewWindowState::active_following &&
             selection_.source_window != 0 &&
-            reinterpret_cast<std::uintptr_t>(GetForegroundWindow()) != selection_.source_window)
+            reinterpret_cast<std::uintptr_t>(foreground_window) != selection_.source_window)
         {
             if (pipe_server_.send(glance::contracts::MessageType::close_active_preview))
             {
@@ -945,7 +963,9 @@ namespace glance::core
         const bool eligible = selection_.accepts_hotkey &&
                               selection_.host_kind != glance::contracts::HostKind::unsupported &&
                               !selection_.items.empty();
-        input_state_.eligible_selection.store(eligible, std::memory_order_release);
+        input_state_.eligible_selection.store(
+            eligible && preview_state != glance::contracts::PreviewWindowState::active_interactive,
+            std::memory_order_release);
 
         const bool follows_selection = preview_state == glance::contracts::PreviewWindowState::active_following ||
                                        preview_state == glance::contracts::PreviewWindowState::active_topmost;
@@ -959,7 +979,8 @@ namespace glance::core
                 glance::contracts::MessageType::open_active_preview,
                 make_open_payload(selection_)));
         }
-        else if (preview_state == glance::contracts::PreviewWindowState::active_following)
+        else if (preview_state == glance::contracts::PreviewWindowState::active_following &&
+                 !app_is_foreground)
         {
             if (pipe_server_.send(glance::contracts::MessageType::close_active_preview))
             {
@@ -1070,10 +1091,16 @@ namespace glance::core
         {
             const auto state = static_cast<glance::contracts::PreviewWindowState>(flags);
             preview_state_.store(state, std::memory_order_release);
+            const bool interactive =
+                state == glance::contracts::PreviewWindowState::active_interactive;
             const bool active = state == glance::contracts::PreviewWindowState::active_following ||
                                 state == glance::contracts::PreviewWindowState::active_topmost ||
                                 state == glance::contracts::PreviewWindowState::active_pinned;
             input_state_.preview_active.store(active, std::memory_order_release);
+            if (interactive)
+            {
+                input_state_.eligible_selection.store(false, std::memory_order_release);
+            }
             return;
         }
         if (type == glance::contracts::MessageType::shutdown)

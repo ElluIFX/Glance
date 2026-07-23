@@ -1193,7 +1193,13 @@ namespace glance::app
                 return zip_preview;
             }
             auto shell_preview = load_shell_archive_preview(path, maximum_entries);
-            return shell_preview.error.empty() ? std::move(shell_preview) : std::move(zip_preview);
+            if (shell_preview.error.empty() && shell_preview.entry_count != 0)
+            {
+                return shell_preview;
+            }
+            zip_preview.unsupported_or_encrypted = true;
+            zip_preview.error = localize(L"ArchiveUnavailableNotice");
+            return zip_preview;
         }
 
         auto shell_preview = load_shell_archive_preview(path, maximum_entries);
@@ -1203,7 +1209,17 @@ namespace glance::app
             return shell_preview;
         }
         auto tar_preview = load_tar_archive_preview(path, maximum_entries);
-        return tar_preview.error.empty() ? std::move(tar_preview) : std::move(shell_preview);
+        if (tar_preview.error.empty())
+        {
+            return tar_preview;
+        }
+        if (shell_preview.error.empty() && shell_preview.entry_count != 0)
+        {
+            return shell_preview;
+        }
+        tar_preview.unsupported_or_encrypted = true;
+        tar_preview.error = localize(L"ArchiveUnavailableNotice");
+        return tar_preview;
     }
 
     ArchivePreview load_shell_archive_preview(

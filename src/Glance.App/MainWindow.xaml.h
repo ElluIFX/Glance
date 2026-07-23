@@ -382,6 +382,7 @@ namespace winrt::Glance::App::implementation
         std::wstring archive_password_;
         PasswordPromptTarget password_prompt_target_{ PasswordPromptTarget::none };
         bool password_prompt_activation_enabled_{};
+        bool password_prompt_focused_{};
         std::wstring footer_access_mode_;
         bool footer_access_loaded_{};
         bool footer_access_requested_{};

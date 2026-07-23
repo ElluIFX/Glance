@@ -13,6 +13,7 @@ namespace glance::contracts
         detached_pinned_topmost,
         detached_unpinned,
         closed,
+        active_interactive,
     };
 
     struct InteractionSnapshot

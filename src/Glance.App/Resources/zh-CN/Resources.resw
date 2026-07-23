@@ -17,7 +17,7 @@
   <data name="LoadingFolder" xml:space="preserve"><value>正在加载文件夹...</value></data>
   <data name="LoadingArchive" xml:space="preserve"><value>正在读取目录...</value></data>
   <data name="LoadingPdf" xml:space="preserve"><value>正在加载 PDF...</value></data>
-  <data name="ConvertingOffice" xml:space="preserve"><value>正在使用 Microsoft Office 转换...</value></data>
+  <data name="ConvertingOffice" xml:space="preserve"><value>正在使用 Microsoft Office 打开...</value></data>
   <data name="LoadingConvertedDocument" xml:space="preserve"><value>正在加载转换后的文档...</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>正在检测...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>未知</value></data>
@@ -52,7 +52,7 @@
   <data name="ArchiveOriginalSize" xml:space="preserve"><value>原始大小 {0}</value></data>
   <data name="ArchiveCompressionRatio" xml:space="preserve"><value>压缩率 {0}</value></data>
   <data name="ListTruncated" xml:space="preserve"><value>列表已截断</value></data>
-  <data name="ArchiveDepthLimited" xml:space="preserve"><value>最多显示 6 层</value></data>
+  <data name="ArchiveDepthLimited" xml:space="preserve"><value>预览深度限制</value></data>
   <data name="UnknownTime" xml:space="preserve"><value>未知时间</value></data>
   <data name="CoreRunning" xml:space="preserve"><value>正在运行</value></data>
   <data name="CoreNotRunning" xml:space="preserve"><value>未运行</value></data>
@@ -75,6 +75,7 @@
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>加载文件</value></data>
   <data name="PreviewAsTextText.Text" xml:space="preserve"><value>尝试以文本预览</value></data>
   <data name="AutoFitPausedNotice" xml:space="preserve"><value>已暂停窗口自适应</value></data>
+  <data name="ArchiveUnavailableNotice" xml:space="preserve"><value>压缩包损坏或加密，不支持预览</value></data>
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>无法以文本预览</value></data>
   <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示高级信息</value></data>
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>系统 ANSI</value></data>

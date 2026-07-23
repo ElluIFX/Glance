@@ -37,6 +37,7 @@ namespace glance::app
         bool encrypted{};
         bool password_required{};
         bool invalid_password{};
+        bool unsupported_or_encrypted{};
         bool truncated{};
         bool entry_limit_reached{};
         bool depth_limited{};

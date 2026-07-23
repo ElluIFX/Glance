@@ -615,6 +615,21 @@ namespace winrt::Glance::App::implementation
             {
                 return MA_NOACTIVATE;
             }
+            if (!self->password_prompt_focused_)
+            {
+                self->password_prompt_focused_ = true;
+                self->update_state();
+            }
+        }
+        if (message == WM_ACTIVATE && self != nullptr &&
+            self->password_prompt_activation_enabled_)
+        {
+            const bool focused = LOWORD(wparam) != WA_INACTIVE;
+            if (self->password_prompt_focused_ != focused)
+            {
+                self->password_prompt_focused_ = focused;
+                self->update_state();
+            }
         }
         if (message == WM_GETMINMAXINFO)
         {
@@ -2182,6 +2197,20 @@ namespace winrt::Glance::App::implementation
             show_password_prompt(
                 PasswordPromptTarget::archive,
                 preview.invalid_password);
+            return;
+        }
+        if (preview.unsupported_or_encrypted)
+        {
+            archive_render_state_.reset();
+            archive_entry_compressed_size_available_ = false;
+            content_preview_kind_ = glance::app::PreviewKind::generic;
+            update_preview_mode_button();
+            if (current_index_ < files_.size())
+            {
+                present_generic(files_[current_index_], false, true);
+            }
+            show_preview_notice(L"ArchiveUnavailableNotice");
+            reveal_deferred_preview();
             return;
         }
         if (!preview.error.empty())
@@ -4580,21 +4609,25 @@ namespace winrt::Glance::App::implementation
         PasswordPromptOverlay().Visibility(Visibility::Visible);
         if (GetForegroundWindow() == window_)
         {
+            password_prompt_focused_ = true;
+            update_state();
             PasswordPromptInput().Focus(FocusState::Programmatic);
         }
     }
 
     void MainWindow::hide_password_prompt()
     {
+        const bool was_focused = password_prompt_focused_;
         password_prompt_target_ = PasswordPromptTarget::none;
+        password_prompt_focused_ = false;
         PasswordPromptInput().Password(L"");
         PasswordPromptError().Text(L"");
         PasswordPromptError().Visibility(Visibility::Collapsed);
         PasswordPromptOverlay().Visibility(Visibility::Collapsed);
         set_password_prompt_activation(false);
-        if (GetForegroundWindow() == window_ && IsWindow(source_window_))
+        if (was_focused)
         {
-            SetForegroundWindow(source_window_);
+            update_state();
         }
     }
 
@@ -4716,6 +4749,12 @@ namespace winrt::Glance::App::implementation
         if (!visible_)
         {
             state_ = glance::contracts::PreviewWindowState::hidden;
+        }
+        else if (password_prompt_target_ != PasswordPromptTarget::none &&
+                 password_prompt_focused_ &&
+                 !detached_)
+        {
+            state_ = glance::contracts::PreviewWindowState::active_interactive;
         }
         else if (detached_)
         {

@@ -17,7 +17,7 @@
   <data name="LoadingFolder" xml:space="preserve"><value>Loading folder...</value></data>
   <data name="LoadingArchive" xml:space="preserve"><value>Loading directory...</value></data>
   <data name="LoadingPdf" xml:space="preserve"><value>Loading PDF...</value></data>
-  <data name="ConvertingOffice" xml:space="preserve"><value>Converting with Microsoft Office...</value></data>
+  <data name="ConvertingOffice" xml:space="preserve"><value>Opening with Microsoft Office...</value></data>
   <data name="LoadingConvertedDocument" xml:space="preserve"><value>Loading converted document...</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>Detecting...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>Unknown</value></data>
@@ -52,7 +52,7 @@
   <data name="ArchiveOriginalSize" xml:space="preserve"><value>Original {0}</value></data>
   <data name="ArchiveCompressionRatio" xml:space="preserve"><value>Ratio {0}</value></data>
   <data name="ListTruncated" xml:space="preserve"><value>List truncated</value></data>
-  <data name="ArchiveDepthLimited" xml:space="preserve"><value>Showing up to 6 levels</value></data>
+  <data name="ArchiveDepthLimited" xml:space="preserve"><value>Preview depth limit</value></data>
   <data name="UnknownTime" xml:space="preserve"><value>Unknown time</value></data>
   <data name="CoreRunning" xml:space="preserve"><value>Running</value></data>
   <data name="CoreNotRunning" xml:space="preserve"><value>Not running</value></data>
@@ -75,6 +75,7 @@
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>Load file</value></data>
   <data name="PreviewAsTextText.Text" xml:space="preserve"><value>Try preview as text</value></data>
   <data name="AutoFitPausedNotice" xml:space="preserve"><value>Auto fit paused</value></data>
+  <data name="ArchiveUnavailableNotice" xml:space="preserve"><value>The archive is damaged or encrypted and cannot be previewed</value></data>
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>Unable to preview as text</value></data>
   <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show advanced information</value></data>
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
