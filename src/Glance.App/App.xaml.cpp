@@ -73,6 +73,21 @@ namespace
                    TRUE) == CSTR_EQUAL;
     }
 
+    bool signal_existing_instance_shutdown() noexcept
+    {
+        const HANDLE event = OpenEventW(
+            EVENT_MODIFY_STATE,
+            FALSE,
+            L"Local\\Glance.Shutdown");
+        if (event == nullptr)
+        {
+            return GetLastError() == ERROR_FILE_NOT_FOUND;
+        }
+        const bool signaled = SetEvent(event) != FALSE;
+        CloseHandle(event);
+        return signaled;
+    }
+
     HANDLE open_supervised_process(DWORD process_id) noexcept
     {
         HANDLE process = OpenProcess(
@@ -195,6 +210,10 @@ namespace winrt::Glance::App::implementation
             {
                 const auto path = executable_path();
                 ExitProcess(!path.empty() && glance::app::cleanup_launch_at_sign_in(path) ? 0 : 1);
+            }
+            if (argument == L"--shutdown")
+            {
+                ExitProcess(signal_existing_instance_shutdown() ? 0 : 1);
             }
 #if defined _DEBUG
             constexpr std::wstring_view debug_preview_prefix = L"--debug-preview=";
@@ -433,10 +452,17 @@ namespace winrt::Glance::App::implementation
             core_watchdog_timer_.Interval(std::chrono::milliseconds(
                 glance::contracts::process_watchdog_interval_ms));
             core_watchdog_timer_.Tick([this](IInspectable const&, IInspectable const&) {
-                if (!shutting_down_.load(std::memory_order_acquire))
+                if (shutting_down_.load(std::memory_order_acquire))
                 {
-                    supervise_core();
+                    return;
                 }
+                if (shutdown_event_ != nullptr &&
+                    WaitForSingleObject(shutdown_event_, 0) == WAIT_OBJECT_0)
+                {
+                    exit_application();
+                    return;
+                }
+                supervise_core();
             });
         }
         core_watchdog_timer_.Start();
