@@ -37,6 +37,55 @@ function Get-InnoSetupCompiler {
     throw "Inno Setup 6 was not found. Install JRSoftware.InnoSetup with winget or set INNO_SETUP_COMPILER."
 }
 
+function Copy-MsvcRuntime {
+    param(
+        [Parameter(Mandatory)]
+        [string] $RepositoryRoot,
+
+        [Parameter(Mandatory)]
+        [string] $Platform,
+
+        [Parameter(Mandatory)]
+        [string] $Destination
+    )
+
+    $msbuild = Get-GlanceMSBuild
+    $project = Join-Path $RepositoryRoot "src\Glance.App\Glance.App.vcxproj"
+    $propertyOutput = & $msbuild $project `
+        /nologo `
+        /p:Configuration=Release `
+        /p:Platform=$Platform `
+        /getProperty:VCToolsInstallDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to query the MSVC toolset directory."
+    }
+
+    $toolsDirectory = ($propertyOutput -join [Environment]::NewLine).Trim()
+    if (-not $toolsDirectory) {
+        throw "MSBuild did not report VCToolsInstallDir."
+    }
+
+    $toolsDirectory = $toolsDirectory.TrimEnd('\', '/')
+    $toolVersion = Split-Path -Leaf $toolsDirectory
+    $vcDirectory = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $toolsDirectory))
+    $runtimeRoot = Join-Path $vcDirectory "Redist\MSVC\$toolVersion\$Platform"
+    $runtimeDirectories = @(
+        Get-ChildItem -LiteralPath $runtimeRoot -Directory -Filter "Microsoft.VC*.CRT" -ErrorAction Stop
+    )
+    if ($runtimeDirectories.Count -ne 1) {
+        throw "Expected one MSVC CRT directory under '$runtimeRoot', found $($runtimeDirectories.Count)."
+    }
+
+    $runtimeFiles = @(Get-ChildItem -LiteralPath $runtimeDirectories[0].FullName -File -Filter "*.dll")
+    if (-not $runtimeFiles) {
+        throw "No app-local MSVC runtime files were found under '$($runtimeDirectories[0].FullName)'."
+    }
+
+    foreach ($runtimeFile in $runtimeFiles) {
+        Copy-Item -LiteralPath $runtimeFile.FullName -Destination $Destination -Force
+    }
+}
+
 $repositoryRoot = Get-GlanceRepositoryRoot
 $artifactsDirectory = Join-Path $repositoryRoot "artifacts"
 $payloadDirectory = Join-Path $artifactsDirectory "package\payload"
@@ -57,6 +106,11 @@ New-Item -ItemType Directory -Path $installerOutputDirectory -Force | Out-Null
     -SelfContained `
     -OutputDirectory $payloadDirectory
 
+Copy-MsvcRuntime `
+    -RepositoryRoot $repositoryRoot `
+    -Platform $Platform `
+    -Destination $payloadDirectory
+
 $requiredFiles = @(
     "Glance.exe",
     "Glance.Core.exe",
@@ -68,6 +122,9 @@ $requiredFiles = @(
     "pdfium.dll",
     "Lexilla.dll",
     "Scintilla.dll",
+    "msvcp140.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
     "Glance.pri",
     "App.xbf",
     "MainWindow.xbf",
