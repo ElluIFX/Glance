@@ -32,6 +32,7 @@ namespace glance::app
         void set_bounds(int x, int y, int width, int height) noexcept;
         void set_occlusions(std::span<const RECT> rectangles) noexcept;
         void set_visible(bool visible) noexcept;
+        void set_opacity(std::uint32_t opacity_percent) noexcept;
         void clear() noexcept;
         void append_text(std::wstring_view text);
         void set_file_path(std::wstring_view path);
@@ -67,6 +68,7 @@ namespace glance::app
         void apply_theme(bool dark);
         void apply_lexer_styles();
         void update_line_number_width() noexcept;
+        void request_near_end_check() noexcept;
         void handle_notification(const NMHDR& header) noexcept;
 
         HWND parent_{};
@@ -81,7 +83,10 @@ namespace glance::app
         TextPreferences preferences_{};
         bool syntax_highlighting_{ true };
         bool dark_{};
+        bool native_theme_initialized_{};
         bool visible_{};
+        bool near_end_check_pending_{};
+        std::uint32_t opacity_percent_{ 100 };
         int wheel_delta_{};
     };
 }

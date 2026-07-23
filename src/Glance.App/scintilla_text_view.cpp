@@ -22,6 +22,7 @@ namespace
 {
     constexpr wchar_t host_window_class[] = L"Glance.ScintillaHost";
     constexpr UINT_PTR editor_subclass_id = 1;
+    constexpr UINT near_end_check_message = WM_APP + 1;
     constexpr WPARAM active_layout_threads = 4;
     constexpr WPARAM idle_layout_threads = 1;
 
@@ -441,6 +442,47 @@ namespace glance::app
         }
     }
 
+    void ScintillaTextView::set_opacity(std::uint32_t opacity_percent) noexcept
+    {
+        if (host_ == nullptr)
+        {
+            return;
+        }
+
+        const auto opacity = std::clamp(opacity_percent, 10U, 100U);
+        if (opacity_percent_ == opacity)
+        {
+            return;
+        }
+        opacity_percent_ = opacity;
+
+        const LONG_PTR extended_style = GetWindowLongPtrW(host_, GWL_EXSTYLE);
+        if (opacity < 100)
+        {
+            if ((extended_style & WS_EX_LAYERED) == 0)
+            {
+                SetWindowLongPtrW(
+                    host_,
+                    GWL_EXSTYLE,
+                    extended_style | WS_EX_LAYERED);
+            }
+            const BYTE alpha = static_cast<BYTE>(MulDiv(
+                static_cast<int>(opacity),
+                255,
+                100));
+            SetLayeredWindowAttributes(host_, 0, alpha, LWA_ALPHA);
+        }
+        else if ((extended_style & WS_EX_LAYERED) != 0)
+        {
+            SetWindowLongPtrW(host_, GWL_EXSTYLE, extended_style & ~WS_EX_LAYERED);
+            RedrawWindow(
+                host_,
+                nullptr,
+                nullptr,
+                RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
+        }
+    }
+
     void ScintillaTextView::set_occlusions(
         std::span<const RECT> rectangles) noexcept
     {
@@ -548,7 +590,6 @@ namespace glance::app
     {
         preferences_ = preferences;
         syntax_highlighting_ = syntax_highlighting;
-        dark_ = dark;
         if (editor_ == nullptr)
         {
             return;
@@ -634,7 +675,13 @@ namespace glance::app
                     LOWORD(lparam),
                     HIWORD(lparam),
                     TRUE);
-                if (self->near_end_callback_ && self->should_load_more())
+                self->request_near_end_check();
+                return 0;
+            }
+            if (message == near_end_check_message)
+            {
+                self->near_end_check_pending_ = false;
+                if (self->near_end_callback_)
                 {
                     self->near_end_callback_();
                 }
@@ -705,7 +752,7 @@ namespace glance::app
         call(SCI_SETPHASESDRAW, SC_PHASES_MULTIPLE);
         call(SCI_SETLAYOUTCACHE, SC_CACHE_PAGE);
         call(SCI_SETLAYOUTTHREADS, idle_layout_threads);
-        call(SCI_SETIDLESTYLING, SC_IDLESTYLING_AFTERVISIBLE);
+        call(SCI_SETIDLESTYLING, SC_IDLESTYLING_TOVISIBLE);
         call(SCI_SETSCROLLWIDTH, 1);
         call(SCI_SETSCROLLWIDTHTRACKING, TRUE);
         call(SCI_SETMARGINLEFT, 0, 12);
@@ -757,15 +804,21 @@ namespace glance::app
 
     void ScintillaTextView::apply_theme(bool dark)
     {
+        const bool update_native_theme =
+            !native_theme_initialized_ || dark_ != dark;
         dark_ = dark;
         if (editor_ == nullptr)
         {
             return;
         }
-        SetWindowTheme(host_, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
-        SetWindowTheme(editor_, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
-        SendMessageW(host_, WM_THEMECHANGED, 0, 0);
-        SendMessageW(editor_, WM_THEMECHANGED, 0, 0);
+        if (update_native_theme)
+        {
+            SetWindowTheme(host_, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
+            SetWindowTheme(editor_, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
+            SendMessageW(host_, WM_THEMECHANGED, 0, 0);
+            SendMessageW(editor_, WM_THEMECHANGED, 0, 0);
+            native_theme_initialized_ = true;
+        }
         const auto& palette = syntax_theme_palette(preferences_.syntax_theme, dark);
         call(SCI_STYLESETFORE, STYLE_DEFAULT, color_ref(palette.foreground));
         call(SCI_STYLESETBACK, STYLE_DEFAULT, color_ref(palette.background));
@@ -1030,15 +1083,32 @@ namespace glance::app
         call(SCI_SETMARGINWIDTHN, 0, std::max<LRESULT>(36, width + 16));
     }
 
+    void ScintillaTextView::request_near_end_check() noexcept
+    {
+        if (host_ == nullptr ||
+            near_end_callback_ == nullptr ||
+            near_end_check_pending_)
+        {
+            return;
+        }
+        near_end_check_pending_ = true;
+        if (!PostMessageW(host_, near_end_check_message, 0, 0))
+        {
+            near_end_check_pending_ = false;
+        }
+    }
+
     void ScintillaTextView::handle_notification(const NMHDR& header) noexcept
     {
         if (header.hwndFrom != editor_ || header.code != SCN_UPDATEUI)
         {
             return;
         }
-        if (near_end_callback_ && should_load_more())
+        const auto& notification =
+            reinterpret_cast<const SCNotification&>(header);
+        if ((notification.updated & SC_UPDATE_V_SCROLL) != 0)
         {
-            near_end_callback_();
+            request_near_end_check();
         }
     }
 }

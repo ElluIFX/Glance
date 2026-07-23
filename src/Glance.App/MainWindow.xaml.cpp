@@ -475,6 +475,10 @@ namespace winrt::Glance::App::implementation
         {
             SetWindowLongPtrW(window_, GWL_EXSTYLE, extended_style & ~WS_EX_LAYERED);
         }
+        if (text_editor_ != nullptr)
+        {
+            text_editor_->set_opacity(preferences.opacity_percent);
+        }
     }
 
     void MainWindow::ApplyLocalizedResources()
@@ -3586,6 +3590,8 @@ namespace winrt::Glance::App::implementation
         {
             return false;
         }
+        text_editor_->set_opacity(
+            glance::app::load_window_preferences().opacity_percent);
         update_text_editor_bounds();
         return true;
     }

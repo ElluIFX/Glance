@@ -133,7 +133,7 @@
   <data name="WordWrapButton.ToolTipService.ToolTip" xml:space="preserve"><value>Wrap long lines</value></data>
   <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>Copy path</value></data>
   <data name="OpenFolderButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open containing folder</value></data>
-  <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open with default application</value></data>
+  <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open with default application&#xA;Right-click to choose an application</value></data>
 
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>General</value></data>
   <data name="WindowNavigationItem.Content" xml:space="preserve"><value>Window</value></data>

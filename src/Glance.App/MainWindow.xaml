@@ -875,7 +875,7 @@
                 Margin="4,0,0,0"
                 Click="OpenDefaultButton_Click"
                 RightTapped="OpenDefaultButton_RightTapped"
-                ToolTipService.ToolTip="Open file">
+                ToolTipService.ToolTip="Open with default application&#xA;Right-click to choose an application">
                 <FontIcon FontSize="14" Glyph="&#xE7C3;" />
             </Button>
         </Grid>

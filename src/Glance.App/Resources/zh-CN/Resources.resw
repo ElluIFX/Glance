@@ -133,7 +133,7 @@
   <data name="WordWrapButton.ToolTipService.ToolTip" xml:space="preserve"><value>自动换行</value></data>
   <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>复制路径</value></data>
   <data name="OpenFolderButton.ToolTipService.ToolTip" xml:space="preserve"><value>打开所在文件夹</value></data>
-  <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>使用默认应用打开</value></data>
+  <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>使用默认应用打开&#xA;右键选择打开方式</value></data>
 
   <data name="GeneralNavigationItem.Content" xml:space="preserve"><value>常规</value></data>
   <data name="WindowNavigationItem.Content" xml:space="preserve"><value>窗口</value></data>
