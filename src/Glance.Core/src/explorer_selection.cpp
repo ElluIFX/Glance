@@ -533,6 +533,7 @@ namespace glance::core
         {
             if (is_native_text_input_focused(thread_info))
             {
+                snapshot.text_input_active = true;
                 log_common_dialog_rejection(L"text input is focused");
                 return snapshot;
             }
@@ -592,6 +593,23 @@ namespace glance::core
                 return snapshot;
             }
             snapshot.accepts_hotkey = !snapshot.items.empty();
+            return snapshot;
+        }
+
+        if (is_native_text_input_focused(thread_info))
+        {
+            snapshot.text_input_active = true;
+            log_explorer_rejection(L"native text input is focused");
+            return snapshot;
+        }
+
+        const bool input_site = thread_info.hwndFocus != nullptr &&
+            GetAncestor(thread_info.hwndFocus, GA_ROOT) == root &&
+            _wcsicmp(window_class_name(thread_info.hwndFocus).c_str(), L"InputSiteWindowClass") == 0;
+        if (input_site && is_text_input_focused())
+        {
+            snapshot.text_input_active = true;
+            log_explorer_rejection(L"the InputSite focus resolves to text input");
             return snapshot;
         }
 
@@ -699,14 +717,9 @@ namespace glance::core
 
             const bool focused_view = thread_info.hwndFocus == view_window ||
                 (thread_info.hwndFocus != nullptr && IsChild(view_window, thread_info.hwndFocus));
-            const bool input_site = thread_info.hwndFocus != nullptr &&
-                GetAncestor(thread_info.hwndFocus, GA_ROOT) == root &&
-                _wcsicmp(window_class_name(thread_info.hwndFocus).c_str(), L"InputSiteWindowClass") == 0;
-            if (!focused_view && (!input_site || is_text_input_focused()))
+            if (!focused_view && !input_site)
             {
-                log_explorer_rejection(input_site
-                    ? L"the InputSite focus resolves to text input"
-                    : L"focus is outside the active Shell view");
+                log_explorer_rejection(L"focus is outside the active Shell view");
                 continue;
             }
             selected_snapshot.accepts_hotkey = !selected_snapshot.items.empty();

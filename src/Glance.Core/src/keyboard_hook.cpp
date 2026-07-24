@@ -4,6 +4,49 @@
 
 #include <string>
 
+namespace
+{
+    bool native_text_input_active() noexcept
+    {
+        const HWND foreground = GetForegroundWindow();
+        const HWND root = foreground == nullptr ? nullptr : GetAncestor(foreground, GA_ROOT);
+        if (root == nullptr)
+        {
+            return false;
+        }
+
+        const DWORD thread_id = GetWindowThreadProcessId(root, nullptr);
+        GUITHREADINFO thread_info{ sizeof(GUITHREADINFO) };
+        if (thread_id == 0 || !GetGUIThreadInfo(thread_id, &thread_info))
+        {
+            return false;
+        }
+
+        const HWND focused = thread_info.hwndFocus;
+        for (HWND current = focused; current != nullptr; current = GetParent(current))
+        {
+            wchar_t class_name[128]{};
+            GetClassNameW(current, class_name, static_cast<int>(std::size(class_name)));
+            if (_wcsicmp(class_name, L"Edit") == 0 ||
+                _wcsnicmp(class_name, L"RichEdit", 8) == 0)
+            {
+                return true;
+            }
+            if (current == root)
+            {
+                break;
+            }
+        }
+
+        const bool blinking_caret = thread_info.hwndCaret != nullptr &&
+            (thread_info.flags & GUI_CARETBLINKING) != 0;
+        return blinking_caret && focused != nullptr &&
+            (thread_info.hwndCaret == focused ||
+             IsChild(focused, thread_info.hwndCaret) ||
+             IsChild(thread_info.hwndCaret, focused));
+    }
+}
+
 namespace glance::core
 {
     thread_local KeyboardHookService::HookThread* KeyboardHookService::HookThread::current_ = nullptr;
@@ -100,6 +143,9 @@ namespace glance::core
             const bool connected = state_.ui_connected.load(std::memory_order_acquire);
             const bool active = state_.preview_active.load(std::memory_order_acquire);
             const bool eligible = state_.eligible_selection.load(std::memory_order_acquire);
+            const bool text_input_active =
+                state_.text_input_active.load(std::memory_order_acquire) ||
+                (key.vkCode == VK_SPACE && native_text_input_active());
             const bool modified = (key.flags & LLKHF_ALTDOWN) != 0 ||
                 (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ||
                 (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0 ||
@@ -110,6 +156,7 @@ namespace glance::core
                 connected,
                 active,
                 eligible,
+                text_input_active,
                 modified);
 
             if (key.vkCode == VK_SPACE)
@@ -118,6 +165,7 @@ namespace glance::core
                     L"Space input decision: connected=" + std::to_wstring(connected) +
                     L", active=" + std::to_wstring(active) +
                     L", eligible=" + std::to_wstring(eligible) +
+                    L", textInput=" + std::to_wstring(text_input_active) +
                     L", modified=" + std::to_wstring(modified) +
                     L", capture=" + std::to_wstring(should_capture) + L".");
             }

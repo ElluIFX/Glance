@@ -909,6 +909,8 @@ namespace glance::core
 
     void CoreApplication::apply_selection(glance::contracts::SelectionSnapshot next)
     {
+        input_state_.text_input_active.store(next.text_input_active, std::memory_order_release);
+
         auto preview_state = preview_state_.load(std::memory_order_acquire);
         const HWND foreground_window = GetForegroundWindow();
         DWORD foreground_process_id{};
@@ -996,6 +998,7 @@ namespace glance::core
     {
         if (selection_.source_window != next.source_window ||
             selection_.accepts_hotkey != next.accepts_hotkey ||
+            selection_.text_input_active != next.text_input_active ||
             selection_.focused_index != next.focused_index ||
             selection_.items.size() != next.items.size())
         {

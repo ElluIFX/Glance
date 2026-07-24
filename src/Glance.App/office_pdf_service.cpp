@@ -738,6 +738,14 @@ namespace
                 {
                     job = existing->second;
                 }
+                else if (valid_pdf(final_path))
+                {
+                    return {
+                        .status = glance::app::OfficePdfStatus::success,
+                        .cache_key = std::move(source.cache_key),
+                        .pdf_path = final_path.wstring(),
+                    };
+                }
                 else
                 {
                     job = std::make_shared<ConversionJob>();

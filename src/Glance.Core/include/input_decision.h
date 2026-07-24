@@ -9,9 +9,14 @@ namespace glance::core
         bool connected,
         bool preview_active,
         bool eligible_selection,
+        bool text_input_active,
         bool modified) noexcept
     {
         if (!connected || modified)
+        {
+            return false;
+        }
+        if (virtual_key == VK_SPACE && text_input_active)
         {
             return false;
         }

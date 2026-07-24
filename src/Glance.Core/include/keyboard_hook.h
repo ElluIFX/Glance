@@ -19,6 +19,7 @@ namespace glance::core
         std::atomic_bool ui_connected{};
         std::atomic_bool eligible_selection{};
         std::atomic_bool preview_active{};
+        std::atomic_bool text_input_active{};
     };
 
     class KeyboardHookService

@@ -37,6 +37,7 @@ namespace glance::contracts
         std::uint32_t source_process_id{};
         HostKind host_kind{ HostKind::unsupported };
         bool accepts_hotkey{};
+        bool text_input_active{};
         std::vector<FileDescriptor> items;
         std::uint32_t focused_index{};
     };
