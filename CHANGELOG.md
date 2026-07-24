@@ -4,6 +4,18 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.07.24.1] - 2026-07-24
+
+### Changed
+
+- Replaced incremental Office rendering and application-managed cache queues with background PDF preparation keyed by file identity.
+- Office source documents are copied with shared access and released promptly while completed previews remain reusable from the system temporary directory.
+
+### Fixed
+
+- Preserved Space input while renaming files or typing in other Explorer text fields.
+- Prevented duplicate Office conversions when a second request arrives as the first conversion completes.
+
 ## [2026.07.24] - 2026-07-24
 
 ### Added
@@ -78,6 +90,7 @@ The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 - Improved preview switching, pinned-window lifecycle, adaptive sizing, image rotation, large-text rendering, and archive enumeration stability.
 - Prevented stalled Shell selection queries and expensive directory rendering from taking down the preview workflow.
 
+[2026.07.24.1]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.24.1
 [2026.07.24]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.24
 [2026.07.23.2]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.23.2
 [2026.07.23.1]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.23.1
