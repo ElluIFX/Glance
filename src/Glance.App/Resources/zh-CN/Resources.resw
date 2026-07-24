@@ -17,7 +17,7 @@
   <data name="LoadingFolder" xml:space="preserve"><value>正在加载文件夹...</value></data>
   <data name="LoadingArchive" xml:space="preserve"><value>正在读取目录...</value></data>
   <data name="LoadingPdf" xml:space="preserve"><value>正在加载 PDF...</value></data>
-  <data name="PreparingOfficePreview" xml:space="preserve"><value>正在后台准备预览，请稍候回来。</value></data>
+  <data name="PreparingOfficePreview" xml:space="preserve"><value>正在后台准备预览</value></data>
   <data name="LoadingConvertedDocument" xml:space="preserve"><value>正在加载转换后的文档...</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>正在检测...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>未知</value></data>

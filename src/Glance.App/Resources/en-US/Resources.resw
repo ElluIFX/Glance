@@ -17,7 +17,7 @@
   <data name="LoadingFolder" xml:space="preserve"><value>Loading folder...</value></data>
   <data name="LoadingArchive" xml:space="preserve"><value>Loading directory...</value></data>
   <data name="LoadingPdf" xml:space="preserve"><value>Loading PDF...</value></data>
-  <data name="PreparingOfficePreview" xml:space="preserve"><value>Preparing the preview in the background. Check back shortly.</value></data>
+  <data name="PreparingOfficePreview" xml:space="preserve"><value>Preparing the preview in the background</value></data>
   <data name="LoadingConvertedDocument" xml:space="preserve"><value>Loading converted document...</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>Detecting...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>Unknown</value></data>
