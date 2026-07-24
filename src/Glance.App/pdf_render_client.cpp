@@ -423,32 +423,6 @@ namespace glance::app
         return consume_render_response(result.status, response);
     }
 
-    PdfRenderResult PdfRenderClient::render_emf(
-        const std::wstring& path,
-        std::uint32_t page_index,
-        std::uint32_t maximum_width,
-        std::uint32_t maximum_height)
-    {
-        std::scoped_lock lock(mutex_);
-        PdfRenderResult result;
-        const RenderEmfRequest request{
-            .page_index = page_index,
-            .path_characters = static_cast<std::uint32_t>(path.size()),
-            .maximum_width = maximum_width,
-            .maximum_height = maximum_height,
-        };
-        std::vector<std::byte> payload;
-        append_value(payload, request);
-        append_utf16(payload, path);
-        std::vector<std::byte> response;
-        if (!transact(Command::render_emf, payload, result.status, response) ||
-            result.status != Status::success || response.size() != sizeof(RenderResponse))
-        {
-            return result;
-        }
-        return consume_render_response(result.status, response);
-    }
-
     PdfRenderResult PdfRenderClient::consume_render_response(
         Status status,
         const std::vector<std::byte>& response)

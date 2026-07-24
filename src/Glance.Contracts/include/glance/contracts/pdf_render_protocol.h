@@ -5,7 +5,7 @@
 namespace glance::contracts::pdf
 {
     inline constexpr std::uint32_t protocol_magic = 0x46504447U;
-    inline constexpr std::uint32_t protocol_version = 2U;
+    inline constexpr std::uint32_t protocol_version = 3U;
     inline constexpr std::uint32_t maximum_payload_size = 8U * 1024U * 1024U;
     inline constexpr std::uint32_t shared_bitmap_size = 64U * 1024U * 1024U;
     inline constexpr std::uint32_t maximum_bitmap_dimension = 4096U;
@@ -15,7 +15,6 @@ namespace glance::contracts::pdf
         open_document = 1,
         render_page = 2,
         shutdown = 3,
-        render_emf = 4,
     };
 
     enum class Status : std::uint32_t
@@ -69,14 +68,6 @@ namespace glance::contracts::pdf
     struct RenderRequest
     {
         std::uint32_t page_index{};
-        std::uint32_t maximum_width{};
-        std::uint32_t maximum_height{};
-    };
-
-    struct RenderEmfRequest
-    {
-        std::uint32_t page_index{};
-        std::uint32_t path_characters{};
         std::uint32_t maximum_width{};
         std::uint32_t maximum_height{};
     };

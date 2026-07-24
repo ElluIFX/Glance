@@ -245,10 +245,6 @@ namespace
                 {
                     handle_render(payload);
                 }
-                else if (request.command == Command::render_emf)
-                {
-                    handle_render_emf(payload);
-                }
                 else
                 {
                     send_response(Status::invalid_request, {});
@@ -447,128 +443,6 @@ namespace
             append_value(response_payload, response);
             FPDFBitmap_Destroy(bitmap);
             FPDF_ClosePage(page);
-            send_response(Status::success, response_payload);
-        }
-
-        void handle_render_emf(const std::vector<std::byte>& payload)
-        {
-            if (payload.size() < sizeof(RenderEmfRequest))
-            {
-                send_response(Status::invalid_request, {});
-                return;
-            }
-            RenderEmfRequest request{};
-            std::memcpy(&request, payload.data(), sizeof(request));
-            const std::size_t path_bytes =
-                static_cast<std::size_t>(request.path_characters) * sizeof(wchar_t);
-            if (payload.size() != sizeof(request) + path_bytes)
-            {
-                send_response(Status::invalid_request, {});
-                return;
-            }
-            const auto* path_characters =
-                reinterpret_cast<const wchar_t*>(payload.data() + sizeof(request));
-            const std::wstring path(path_characters, request.path_characters);
-            HENHMETAFILE metafile = GetEnhMetaFileW(path.c_str());
-            if (metafile == nullptr)
-            {
-                send_response(Status::open_failed, {});
-                return;
-            }
-            ENHMETAHEADER header{};
-            if (GetEnhMetaFileHeader(metafile, sizeof(header), &header) == 0)
-            {
-                DeleteEnhMetaFile(metafile);
-                send_response(Status::render_failed, {});
-                return;
-            }
-            const double frame_width = static_cast<double>(header.rclFrame.right - header.rclFrame.left);
-            const double frame_height = static_cast<double>(header.rclFrame.bottom - header.rclFrame.top);
-            const float page_width = static_cast<float>(frame_width * 72.0 / 2540.0);
-            const float page_height = static_cast<float>(frame_height * 72.0 / 2540.0);
-            if (!std::isfinite(page_width) || !std::isfinite(page_height) ||
-                page_width <= 0.0F || page_height <= 0.0F)
-            {
-                DeleteEnhMetaFile(metafile);
-                send_response(Status::render_failed, {});
-                return;
-            }
-
-            const std::uint32_t maximum_width = std::clamp(
-                request.maximum_width,
-                1U,
-                maximum_bitmap_dimension);
-            const std::uint32_t maximum_height = std::clamp(
-                request.maximum_height,
-                1U,
-                maximum_bitmap_dimension);
-            const double scale = std::min(
-                maximum_width / static_cast<double>(page_width),
-                maximum_height / static_cast<double>(page_height));
-            const int width = std::max(1, static_cast<int>(std::lround(page_width * scale)));
-            const int height = std::max(1, static_cast<int>(std::lround(page_height * scale)));
-            const std::uint32_t stride = static_cast<std::uint32_t>(width) * 4U;
-            const std::uint64_t byte_count = static_cast<std::uint64_t>(stride) * height;
-            if (!ensure_bitmap_capacity(byte_count))
-            {
-                DeleteEnhMetaFile(metafile);
-                send_response(Status::render_failed, {});
-                return;
-            }
-
-            BITMAPINFO bitmap_info{};
-            bitmap_info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-            bitmap_info.bmiHeader.biWidth = width;
-            bitmap_info.bmiHeader.biHeight = -height;
-            bitmap_info.bmiHeader.biPlanes = 1;
-            bitmap_info.bmiHeader.biBitCount = 32;
-            bitmap_info.bmiHeader.biCompression = BI_RGB;
-            void* pixels{};
-            HDC device = CreateCompatibleDC(nullptr);
-            HBITMAP bitmap = device != nullptr
-                ? CreateDIBSection(device, &bitmap_info, DIB_RGB_COLORS, &pixels, nullptr, 0)
-                : nullptr;
-            if (device == nullptr || bitmap == nullptr || pixels == nullptr)
-            {
-                if (bitmap != nullptr) DeleteObject(bitmap);
-                if (device != nullptr) DeleteDC(device);
-                DeleteEnhMetaFile(metafile);
-                send_response(Status::render_failed, {});
-                return;
-            }
-            HGDIOBJ previous = SelectObject(device, bitmap);
-            PatBlt(device, 0, 0, width, height, WHITENESS);
-            const RECT destination{ 0, 0, width, height };
-            const BOOL rendered = PlayEnhMetaFile(device, metafile, &destination);
-            GdiFlush();
-            SelectObject(device, previous);
-            DeleteEnhMetaFile(metafile);
-            if (!rendered)
-            {
-                DeleteObject(bitmap);
-                DeleteDC(device);
-                send_response(Status::render_failed, {});
-                return;
-            }
-            auto* bgra = static_cast<std::byte*>(pixels);
-            for (std::uint64_t offset = 3; offset < byte_count; offset += 4)
-            {
-                bgra[offset] = std::byte{ 0xFF };
-            }
-            std::memcpy(bitmap_memory_, pixels, static_cast<std::size_t>(byte_count));
-            DeleteObject(bitmap);
-            DeleteDC(device);
-
-            const RenderResponse response{
-                .page_index = request.page_index,
-                .pixel_width = static_cast<std::uint32_t>(width),
-                .pixel_height = static_cast<std::uint32_t>(height),
-                .stride = stride,
-                .page_width_points = page_width,
-                .page_height_points = page_height,
-            };
-            std::vector<std::byte> response_payload;
-            append_value(response_payload, response);
             send_response(Status::success, response_payload);
         }
 

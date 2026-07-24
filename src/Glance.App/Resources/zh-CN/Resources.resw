@@ -17,7 +17,7 @@
   <data name="LoadingFolder" xml:space="preserve"><value>正在加载文件夹...</value></data>
   <data name="LoadingArchive" xml:space="preserve"><value>正在读取目录...</value></data>
   <data name="LoadingPdf" xml:space="preserve"><value>正在加载 PDF...</value></data>
-  <data name="ConvertingOffice" xml:space="preserve"><value>正在使用 Microsoft Office 打开...</value></data>
+  <data name="PreparingOfficePreview" xml:space="preserve"><value>正在后台准备预览，请稍候回来。</value></data>
   <data name="LoadingConvertedDocument" xml:space="preserve"><value>正在加载转换后的文档...</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>正在检测...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>未知</value></data>
@@ -197,16 +197,9 @@
   <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>反转进度滚轮方向</value></data>
   <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>反转鼠标滚轮调整播放进度的方向</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文档预览</value></data>
-  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>纯文本与 Office 文档行为</value></data>
+  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>纯文本文档的外观与行为</value></data>
   <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>纯文本预览</value></data>
   <data name="PlainTextPreviewSectionDescription.Text" xml:space="preserve"><value>调整文本外观、高亮与布局</value></data>
-  <data name="OfficePreviewSectionTitle.Text" xml:space="preserve"><value>Office 文档预览</value></data>
-  <data name="OfficePreviewSectionDescription.Text" xml:space="preserve"><value>复用最近的 Office 预览以缩短再次打开时间</value></data>
-  <data name="OfficeCacheCapacityLabel.Text" xml:space="preserve"><value>缓存队列大小</value></data>
-  <data name="OfficeCacheCapacityDescription.Text" xml:space="preserve"><value>保留以便快速再次预览的文档数量；0 表示不缓存</value></data>
-  <data name="OfficeCacheExpirationLabel.Text" xml:space="preserve"><value>缓存过期时间</value></data>
-  <data name="OfficeCacheExpirationDescription.Text" xml:space="preserve"><value>缓存项在指定分钟内未被访问时释放对应资源</value></data>
-  <data name="OfficeCacheExpirationUnit.Text" xml:space="preserve"><value>分钟</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>字体</value></data>
   <data name="FontFamilyDescription.Text" xml:space="preserve"><value>纯文本和代码使用的字体</value></data>
   <data name="FontSizeLabel.Text" xml:space="preserve"><value>字号</value></data>

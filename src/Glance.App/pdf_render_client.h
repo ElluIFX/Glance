@@ -55,11 +55,6 @@ namespace glance::app
             std::uint32_t page_index,
             std::uint32_t maximum_width,
             std::uint32_t maximum_height);
-        [[nodiscard]] PdfRenderResult render_emf(
-            const std::wstring& path,
-            std::uint32_t page_index,
-            std::uint32_t maximum_width,
-            std::uint32_t maximum_height);
         void cancel() noexcept;
         [[nodiscard]] bool prewarm();
 

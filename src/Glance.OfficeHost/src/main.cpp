@@ -3,10 +3,9 @@
 #include <windows.h>
 #include <shellapi.h>
 
-#include <filesystem>
 #include <cstdint>
+#include <filesystem>
 #include <string>
-#include <string_view>
 
 namespace
 {
@@ -29,27 +28,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         return 2;
     }
 
-    if (argument_count == 6 && std::wstring_view(arguments[1]) == L"--word-session")
-    {
-        const std::wstring input_path = arguments[2];
-        const std::wstring cache_directory = arguments[3];
-        const HANDLE request_pipe = parse_handle(arguments[4]);
-        const HANDLE response_pipe = parse_handle(arguments[5]);
-        LocalFree(arguments);
-        if (request_pipe == nullptr || response_pipe == nullptr ||
-            !std::filesystem::is_regular_file(input_path) ||
-            !std::filesystem::is_directory(cache_directory))
-        {
-            return 3;
-        }
-        return glance::office::run_word_preview_session(
-            input_path,
-            cache_directory,
-            request_pipe,
-            response_pipe);
-    }
-
-    if (argument_count != 3)
+    if (argument_count != 4)
     {
         LocalFree(arguments);
         return 2;
@@ -57,13 +36,18 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
     const std::wstring input_path = arguments[1];
     const std::wstring output_path = arguments[2];
+    const HANDLE cancellation_event = parse_handle(arguments[3]);
     LocalFree(arguments);
 
     if (!std::filesystem::is_regular_file(input_path) ||
-        _wcsicmp(std::filesystem::path(output_path).extension().c_str(), L".pdf") != 0)
+        _wcsicmp(std::filesystem::path(output_path).extension().c_str(), L".pdf") != 0 ||
+        cancellation_event == nullptr)
     {
         return 3;
     }
     DeleteFileW(output_path.c_str());
-    return glance::office::export_to_pdf(input_path, output_path);
+    return glance::office::export_to_pdf(
+        input_path,
+        output_path,
+        cancellation_event);
 }

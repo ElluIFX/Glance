@@ -45,7 +45,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Delayimp.lib;Dwrite.lib;icu.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;Winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Bcrypt.lib;Comctl32.lib;Dbghelp.lib;Delayimp.lib;Dwrite.lib;icu.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;Winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>Winhttp.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
   </ItemDefinitionGroup>
@@ -68,9 +68,7 @@
     <ClInclude Include="media_metadata_provider.h" />
     <ClInclude Include="media_preview_preferences.h" />
     <ClInclude Include="office_availability.h" />
-    <ClInclude Include="office_preview_cache.h" />
-    <ClInclude Include="office_preview_client.h" />
-    <ClInclude Include="office_preview_preferences.h" />
+    <ClInclude Include="office_pdf_service.h" />
     <ClInclude Include="path_copy_preferences.h" />
     <ClInclude Include="pdf_render_client.h" />
     <ClInclude Include="pch.h" />
@@ -118,9 +116,7 @@
     <ClCompile Include="media_metadata_provider.cpp" />
     <ClCompile Include="media_preview_preferences.cpp" />
     <ClCompile Include="office_availability.cpp" />
-    <ClCompile Include="office_preview_cache.cpp" />
-    <ClCompile Include="office_preview_client.cpp" />
-    <ClCompile Include="office_preview_preferences.cpp" />
+    <ClCompile Include="office_pdf_service.cpp" />
     <ClCompile Include="path_copy_preferences.cpp" />
     <ClCompile Include="pdf_render_client.cpp" />
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>

@@ -8,8 +8,6 @@
 #include "generic_preview_preferences.h"
 #include "media_metadata_provider.h"
 #include "media_preview_preferences.h"
-#include "office_preview_client.h"
-#include "office_preview_cache.h"
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
@@ -166,7 +164,6 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool auto_fit_applies(bool dynamic_update = false) const noexcept;
         void save_current_window_placement() const noexcept;
         void clear_preview_content();
-        void cancel_office_conversion() noexcept;
         void cancel_pdf_render() noexcept;
         void reset_hidden_window_size() noexcept;
         void present_file(std::uint32_t index);
@@ -235,23 +232,7 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget load_directory_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_office_async(
             std::wstring path,
-            std::uint64_t generation,
-            std::uint64_t source_size,
-            std::uint64_t source_modified_time);
-        winrt::fire_and_forget load_word_emf_async(
-            std::wstring path,
-            std::uint64_t generation,
-            std::uint64_t source_size,
-            std::uint64_t source_modified_time);
-        winrt::fire_and_forget render_office_page_async(
-            std::uint32_t page_index,
-            std::uint64_t generation,
-            bool dynamic_update = false);
-        winrt::fire_and_forget load_office_thumbnail_async(
-            std::uint32_t page_index,
-            std::uint64_t generation,
-            bool continue_background = false);
-        void continue_office_thumbnail_generation(std::uint64_t generation);
+            std::uint64_t generation);
         struct ArchiveIconTarget
         {
             std::wstring path;
@@ -405,23 +386,6 @@ namespace winrt::Glance::App::implementation
         Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };
         std::uint64_t media_playback_generation_{};
         glance::app::MediaTechnicalMetadata media_metadata_;
-        struct OfficeConversionOperation
-        {
-            void attach_process(HANDLE value) noexcept;
-            void detach_process(HANDLE value) noexcept;
-            void cancel() noexcept;
-            [[nodiscard]] bool is_cancelled() const noexcept;
-
-            std::atomic_bool cancelled{};
-            std::mutex process_mutex;
-            HANDLE process{};
-        };
-        std::shared_ptr<OfficeConversionOperation> office_conversion_;
-        glance::app::OfficePreviewCacheHandle office_cache_entry_;
-        std::shared_ptr<glance::app::OfficePreviewClient> office_preview_client_;
-        bool office_emf_preview_{};
-        bool office_thumbnail_background_active_{};
-        std::vector<bool> office_thumbnail_requested_;
         std::shared_ptr<glance::app::PdfRenderClient> pdf_render_client_;
         std::wstring pdf_source_path_;
         std::wstring pdf_password_;
