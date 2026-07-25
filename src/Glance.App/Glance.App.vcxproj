@@ -84,6 +84,7 @@
     <ClInclude Include="scintilla_text_view.h" />
     <ClInclude Include="syntax_theme.h" />
     <ClInclude Include="startup_registration.h" />
+    <ClInclude Include="text_font_fallback.h" />
     <ClInclude Include="text_preferences.h" />
     <ClInclude Include="tray_icon.h" />
     <ClInclude Include="update_checker.h" />

@@ -8,6 +8,7 @@
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "startup_registration.h"
+#include "text_font_fallback.h"
 #include "text_preferences.h"
 #include "update_checker.h"
 #include "webview_availability.h"
@@ -280,8 +281,15 @@ namespace winrt::Glance::App::implementation
         AutoplayVideoToggle().IsOn(media_preview_preferences_.autoplay_video);
         ReverseSeekWheelToggle().IsOn(media_preview_preferences_.reverse_seek_wheel);
         text_preferences_ = glance::app::load_text_preferences();
-        const auto font_families = glance::app::system_font_families();
-        int selected_font{};
+        auto font_families = glance::app::system_font_families();
+        if (font_families.empty())
+        {
+            for (const auto font_family : glance::app::preferred_text_font_families)
+            {
+                font_families.emplace_back(font_family);
+            }
+        }
+        int selected_font = -1;
         for (std::size_t index = 0; index < font_families.size(); ++index)
         {
             FontFamilyComboBox().Items().Append(box_value(font_families[index]));
@@ -289,6 +297,11 @@ namespace winrt::Glance::App::implementation
             {
                 selected_font = static_cast<int>(index);
             }
+        }
+        if (selected_font < 0)
+        {
+            selected_font = static_cast<int>(font_families.size());
+            FontFamilyComboBox().Items().Append(box_value(text_preferences_.font_family));
         }
         FontFamilyComboBox().SelectedIndex(selected_font);
         FontSizeNumberBox().Value(text_preferences_.font_size);

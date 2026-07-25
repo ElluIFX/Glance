@@ -1,9 +1,11 @@
 #include "input_decision.h"
 #include "pan_interaction.h"
+#include "text_font_fallback.h"
 
 #include <cmath>
 #include <iostream>
 #include <string_view>
+#include <vector>
 
 namespace
 {
@@ -54,9 +56,32 @@ int main()
     expect(clamped_offsets.horizontal == 0.0, "horizontal pan clamp");
     expect(clamped_offsets.vertical == 0.0, "vertical pan clamp");
 
+    const std::vector<std::wstring> fonts_without_cascadia{
+        L"Arial",
+        L"consolas",
+        L"Courier New"
+    };
+    expect(
+        glance::app::select_default_text_font_family(fonts_without_cascadia) == L"consolas",
+        "font fallback prefers Consolas");
+
+    const std::vector<std::wstring> fonts_without_consolas{
+        L"Arial",
+        L"Courier New",
+        L"Lucida Console"
+    };
+    expect(
+        glance::app::select_default_text_font_family(fonts_without_consolas) == L"Courier New",
+        "font fallback prefers Courier New");
+
+    const std::vector<std::wstring> no_fonts;
+    expect(
+        glance::app::select_default_text_font_family(no_fonts) == L"Cascadia Mono",
+        "font fallback keeps primary default");
+
     if (failures == 0)
     {
-        std::cout << "All input decision tests passed.\n";
+        std::cout << "All regression tests passed\n";
     }
     return failures == 0 ? 0 : 1;
 }

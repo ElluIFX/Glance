@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "text_preferences.h"
+#include "text_font_fallback.h"
 
 #include <dwrite.h>
 
@@ -103,6 +104,11 @@ namespace glance::app
                 &size) == ERROR_SUCCESS && font_family[0] != L'\0')
         {
             result.font_family = font_family;
+        }
+        else
+        {
+            const auto font_families = system_font_families();
+            result.font_family = select_default_text_font_family(font_families);
         }
         result.font_size = std::clamp(static_cast<double>(read_dword(L"FontSize", 9)), 7.0, 32.0);
         result.syntax_theme = static_cast<SyntaxThemePreference>(std::min<DWORD>(
