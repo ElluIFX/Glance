@@ -93,7 +93,7 @@ namespace glance::app
             static_cast<MD_SIZE>(std::min<std::size_t>(input.size(), std::numeric_limits<MD_SIZE>::max())),
             append_html,
             &html,
-            MD_DIALECT_GITHUB | MD_FLAG_NOHTML,
+            MD_DIALECT_GITHUB,
             MD_HTML_FLAG_SKIP_UTF8_BOM);
         if (result != 0)
         {
