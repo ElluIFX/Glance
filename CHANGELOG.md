@@ -4,6 +4,19 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.07.25] - 2026-07-25
+
+### Changed
+
+- Added left-button panning for enlarged PDF previews and Office documents converted to PDF.
+- Selected the default text preview font from common installed Windows monospace fonts.
+- Simplified the Office background preparation status text.
+
+### Fixed
+
+- Reduced accumulated WebView2 processes by sharing one environment and user data directory across previews.
+- Closed inactive WebView2 controls after one minute and released them immediately when preview windows are destroyed.
+
 ## [2026.07.24.1] - 2026-07-24
 
 ### Changed
@@ -90,6 +103,7 @@ The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 - Improved preview switching, pinned-window lifecycle, adaptive sizing, image rotation, large-text rendering, and archive enumeration stability.
 - Prevented stalled Shell selection queries and expensive directory rendering from taking down the preview workflow.
 
+[2026.07.25]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.25
 [2026.07.24.1]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.24.1
 [2026.07.24]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.24
 [2026.07.23.2]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.23.2
