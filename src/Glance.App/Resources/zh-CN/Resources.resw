@@ -116,7 +116,7 @@
   <data name="MediaInfoSampleRate" xml:space="preserve"><value>采样率</value></data>
   <data name="MediaInfoSampleFormat" xml:space="preserve"><value>采样格式</value></data>
   <data name="MediaInfoChannels" xml:space="preserve"><value>声道</value></data>
-  <data name="MediaFooterChannelsFormat" xml:space="preserve"><value>{0} 声道</value></data>
+  <data name="MediaFooterChannelsFormat" xml:space="preserve"><value>{0}声道</value></data>
   <data name="MediaInfoBitrate" xml:space="preserve"><value>码率</value></data>
   <data name="MediaInfoFrames" xml:space="preserve"><value>帧数</value></data>
   <data name="MediaInfoLanguage" xml:space="preserve"><value>语言</value></data>
@@ -154,6 +154,7 @@
   <data name="FooterModifiedTimeCheckBox.Content" xml:space="preserve"><value>修改时间</value></data>
   <data name="FooterCreationTimeCheckBox.Content" xml:space="preserve"><value>创建时间</value></data>
   <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>文件权限 (RWXD)</value></data>
+  <data name="FooterMediaInfoCheckBox.Content" xml:space="preserve"><value>媒体信息</value></data>
   <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>上移</value></data>
   <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>下移</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>保存诊断信息</value></data>

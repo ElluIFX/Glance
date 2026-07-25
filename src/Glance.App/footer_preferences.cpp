@@ -6,6 +6,7 @@
 namespace
 {
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Footer";
+    constexpr std::size_t legacy_field_count = 4;
     constexpr std::uint32_t all_fields_mask =
         (1U << static_cast<std::uint32_t>(glance::app::footer_field_count)) - 1U;
 
@@ -22,6 +23,22 @@ namespace
             seen |= 1U << value;
         }
         return seen == all_fields_mask;
+    }
+
+    bool valid_legacy_order(
+        const std::array<glance::app::FooterField, legacy_field_count>& order) noexcept
+    {
+        std::uint32_t seen{};
+        for (const auto field : order)
+        {
+            const auto value = static_cast<std::uint32_t>(field);
+            if (value >= legacy_field_count || (seen & (1U << value)) != 0)
+            {
+                return false;
+            }
+            seen |= 1U << value;
+        }
+        return seen == (1U << legacy_field_count) - 1U;
     }
 }
 
@@ -46,18 +63,29 @@ namespace glance::app
 
         std::array<FooterField, footer_field_count> order{};
         DWORD order_size = static_cast<DWORD>(sizeof(order));
-        if (RegGetValueW(
+        const LSTATUS order_status = RegGetValueW(
                 HKEY_CURRENT_USER,
                 registry_path,
                 L"FieldOrder",
                 RRF_RT_REG_BINARY,
                 nullptr,
                 order.data(),
-                &order_size) == ERROR_SUCCESS &&
-            order_size == sizeof(order) &&
-            valid_order(order))
+                &order_size);
+        if (order_status == ERROR_SUCCESS && order_size == sizeof(order) && valid_order(order))
         {
             result.order = order;
+        }
+        else if (order_status == ERROR_SUCCESS &&
+                 order_size == legacy_field_count * sizeof(FooterField))
+        {
+            std::array<FooterField, legacy_field_count> legacy_order{};
+            std::copy_n(order.begin(), legacy_order.size(), legacy_order.begin());
+            if (valid_legacy_order(legacy_order))
+            {
+                std::copy(legacy_order.begin(), legacy_order.end(), result.order.begin());
+                result.order.back() = FooterField::media_info;
+                result.enabled_mask |= footer_field_bit(FooterField::media_info);
+            }
         }
         return result;
     }

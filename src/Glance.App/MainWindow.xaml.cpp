@@ -258,11 +258,11 @@ namespace
         std::wostringstream output;
         if (bitrate >= 1000000)
         {
-            output << std::fixed << std::setprecision(1) << bitrate / 1000000.0 << L" Mbps";
+            output << std::fixed << std::setprecision(1) << bitrate / 1000000.0 << L"Mbps";
         }
         else
         {
-            output << (bitrate + 500) / 1000 << L" kbps";
+            output << (bitrate + 500) / 1000 << L"kbps";
         }
         return output.str();
     }
@@ -291,7 +291,7 @@ namespace
         std::wostringstream output;
         output << std::fixed << std::setprecision(
             std::abs(frame_rate - std::round(frame_rate)) < 0.01 ? 0 : 2)
-               << frame_rate << L" fps";
+               << frame_rate << L"fps";
         return output.str();
     }
 
@@ -559,6 +559,23 @@ namespace winrt::Glance::App::implementation
     void MainWindow::ApplyFooterPreferences()
     {
         footer_preferences_ = glance::app::load_footer_preferences();
+        if (glance::app::footer_field_enabled(
+                footer_preferences_, glance::app::FooterField::media_info) &&
+            current_index_ < files_.size())
+        {
+            if (current_kind_ == glance::app::PreviewKind::image &&
+                image_bits_per_pixel_ == 0)
+            {
+                load_image_media_info_async(files_[current_index_].path, content_generation_);
+            }
+            else if (current_kind_ == glance::app::PreviewKind::media &&
+                     media_playback_item_ != nullptr)
+            {
+                update_media_playback_metadata(
+                    media_playback_item_,
+                    media_playback_generation_);
+            }
+        }
         update_footer_metadata();
         request_footer_access_if_needed();
     }
@@ -898,6 +915,7 @@ namespace winrt::Glance::App::implementation
         image_panning_ = false;
         image_pixel_width_ = 0;
         image_pixel_height_ = 0;
+        image_bits_per_pixel_ = 0;
         pdf_panning_ = false;
         pdf_page_index_ = 0;
         pdf_page_count_ = 0;
@@ -1313,6 +1331,7 @@ namespace winrt::Glance::App::implementation
         TitleText().Text(file.display_name);
         image_pixel_width_ = 0;
         image_pixel_height_ = 0;
+        image_bits_per_pixel_ = 0;
         media_dimensions_.clear();
         media_playback_info_.clear();
         media_playback_item_ = nullptr;
@@ -1381,6 +1400,7 @@ namespace winrt::Glance::App::implementation
             image_panning_ = false;
             image_pixel_width_ = 0;
             image_pixel_height_ = 0;
+            image_bits_per_pixel_ = 0;
             image_metadata_.clear();
             image_metadata_visible_ = false;
             ImageTransform().Rotation(image_rotation_);
@@ -1390,6 +1410,11 @@ namespace winrt::Glance::App::implementation
             ImageMetadataOverlay().Visibility(Visibility::Collapsed);
             static_cast<void>(ImageScroller().ChangeView(nullptr, nullptr, 1.0F, true));
             load_image_async(file.path, generation);
+            if (glance::app::footer_field_enabled(
+                    footer_preferences_, glance::app::FooterField::media_info))
+            {
+                load_image_media_info_async(file.path, generation);
+            }
             load_image_metadata_async(file.path, generation);
             break;
         case glance::app::PreviewKind::media:
@@ -1745,6 +1770,27 @@ namespace winrt::Glance::App::implementation
             }));
     }
 
+    fire_and_forget MainWindow::load_image_media_info_async(
+        std::wstring path,
+        std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        const auto bit_depth = glance::app::load_image_bit_depth(path);
+        static_cast<void>(dispatcher.TryEnqueue([lifetime, bit_depth, generation] {
+            if (generation != lifetime->content_generation_ ||
+                !glance::app::footer_field_enabled(
+                    lifetime->footer_preferences_,
+                    glance::app::FooterField::media_info))
+            {
+                return;
+            }
+            lifetime->image_bits_per_pixel_ = bit_depth;
+            lifetime->update_footer_metadata();
+        }));
+    }
+
     fire_and_forget MainWindow::load_media_async(std::wstring path, std::uint64_t generation)
     {
         const auto lifetime = get_strong();
@@ -1893,6 +1939,8 @@ namespace winrt::Glance::App::implementation
     {
         if (generation != content_generation_ ||
             current_kind_ != glance::app::PreviewKind::media ||
+            !glance::app::footer_field_enabled(
+                footer_preferences_, glance::app::FooterField::media_info) ||
             media_playback_item_ == nullptr ||
             media_playback_item_ != item)
         {
@@ -1920,7 +1968,7 @@ namespace winrt::Glance::App::implementation
                         std::wostringstream sample_rate;
                         sample_rate << std::fixed << std::setprecision(
                             properties.SampleRate() % 1000 == 0 ? 0 : 1)
-                                    << properties.SampleRate() / 1000.0 << L" kHz";
+                                    << properties.SampleRate() / 1000.0 << L"kHz";
                         append(sample_rate.str());
                     }
                     if (properties.BitsPerSample() > 0)
@@ -1946,7 +1994,7 @@ namespace winrt::Glance::App::implementation
                     if (properties.Width() > 0 && properties.Height() > 0)
                     {
                         media_dimensions_ = std::to_wstring(properties.Width())
-                            + L" x " + std::to_wstring(properties.Height());
+                            + L"x" + std::to_wstring(properties.Height());
                     }
                     append(format_media_frame_rate(properties.FrameRate()));
                     append(format_media_subtype(properties.Subtype()));
@@ -1958,7 +2006,7 @@ namespace winrt::Glance::App::implementation
             for (const auto& field : fields)
             {
                 media_playback_info_ +=
-                    media_playback_info_.empty() ? field : L"  |  " + field;
+                    media_playback_info_.empty() ? field : L" " + field;
             }
             update_media_footer();
         }
@@ -2028,18 +2076,39 @@ namespace winrt::Glance::App::implementation
             case glance::app::FooterField::permissions:
                 append(footer_access_loaded_ ? footer_access_mode_ : L"--");
                 break;
+            case glance::app::FooterField::media_info:
+            {
+                std::wstring media_info;
+                const auto append_media_info = [&media_info](std::wstring_view value) {
+                    if (!value.empty())
+                    {
+                        if (!media_info.empty())
+                        {
+                            media_info.push_back(L' ');
+                        }
+                        media_info.append(value);
+                    }
+                };
+                if (current_kind_ == glance::app::PreviewKind::image &&
+                    image_pixel_width_ > 0 && image_pixel_height_ > 0)
+                {
+                    append_media_info(
+                        std::to_wstring(image_pixel_width_) + L"x" +
+                        std::to_wstring(image_pixel_height_));
+                    if (image_bits_per_pixel_ > 0)
+                    {
+                        append_media_info(std::to_wstring(image_bits_per_pixel_) + L"bpp");
+                    }
+                }
+                else if (current_kind_ == glance::app::PreviewKind::media)
+                {
+                    append_media_info(media_dimensions_);
+                    append_media_info(media_playback_info_);
+                }
+                append(std::move(media_info));
+                break;
             }
-        }
-
-        if (current_kind_ == glance::app::PreviewKind::image &&
-            image_pixel_width_ > 0 && image_pixel_height_ > 0)
-        {
-            append(std::to_wstring(image_pixel_width_) + L" x " + std::to_wstring(image_pixel_height_));
-        }
-        if (current_kind_ == glance::app::PreviewKind::media)
-        {
-            append(media_dimensions_);
-            append(media_playback_info_);
+            }
         }
 
         std::wstring metadata;

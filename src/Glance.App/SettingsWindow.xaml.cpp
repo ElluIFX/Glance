@@ -222,6 +222,7 @@ namespace
         if (tag == L"modified") return glance::app::FooterField::modified_time;
         if (tag == L"created") return glance::app::FooterField::creation_time;
         if (tag == L"permissions") return glance::app::FooterField::permissions;
+        if (tag == L"media") return glance::app::FooterField::media_info;
         return std::nullopt;
     }
 }
@@ -459,6 +460,7 @@ namespace winrt::Glance::App::implementation
         set_content(FooterModifiedTimeCheckBox(), L"FooterModifiedTimeCheckBox.Content");
         set_content(FooterCreationTimeCheckBox(), L"FooterCreationTimeCheckBox.Content");
         set_content(FooterPermissionsCheckBox(), L"FooterPermissionsCheckBox.Content");
+        set_content(FooterMediaInfoCheckBox(), L"FooterMediaInfoCheckBox.Content");
         for (const auto field : footer_preferences_.order)
         {
             const auto controls = footer_field_controls(field);
@@ -1143,6 +1145,8 @@ namespace winrt::Glance::App::implementation
             return { FooterCreationTimeRow(), FooterCreationTimeCheckBox(), FooterCreationTimeMoveUpButton(), FooterCreationTimeMoveDownButton() };
         case FooterField::permissions:
             return { FooterPermissionsRow(), FooterPermissionsCheckBox(), FooterPermissionsMoveUpButton(), FooterPermissionsMoveDownButton() };
+        case FooterField::media_info:
+            return { FooterMediaInfoRow(), FooterMediaInfoCheckBox(), FooterMediaInfoMoveUpButton(), FooterMediaInfoMoveDownButton() };
         default:
             return {};
         }

@@ -207,6 +207,9 @@ namespace winrt::Glance::App::implementation
         void set_text_loading(bool loading);
         winrt::fire_and_forget load_image_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_image_metadata_async(std::wstring path, std::uint64_t generation);
+        winrt::fire_and_forget load_image_media_info_async(
+            std::wstring path,
+            std::uint64_t generation);
         winrt::fire_and_forget load_media_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_media_technical_metadata_async(
             std::wstring path,
@@ -377,6 +380,7 @@ namespace winrt::Glance::App::implementation
         double image_rotation_{};
         std::uint32_t image_pixel_width_{};
         std::uint32_t image_pixel_height_{};
+        std::uint32_t image_bits_per_pixel_{};
         double image_pan_horizontal_offset_{};
         double image_pan_vertical_offset_{};
         Windows::Foundation::Point image_pan_start_{};

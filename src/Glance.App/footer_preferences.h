@@ -12,9 +12,10 @@ namespace glance::app
         modified_time,
         creation_time,
         permissions,
+        media_info,
     };
 
-    constexpr std::size_t footer_field_count = 4;
+    constexpr std::size_t footer_field_count = 5;
 
     struct FooterPreferences
     {
@@ -23,10 +24,12 @@ namespace glance::app
             FooterField::modified_time,
             FooterField::creation_time,
             FooterField::permissions,
+            FooterField::media_info,
         };
         std::uint32_t enabled_mask{
             (1U << static_cast<std::uint32_t>(FooterField::size)) |
-            (1U << static_cast<std::uint32_t>(FooterField::modified_time))
+            (1U << static_cast<std::uint32_t>(FooterField::modified_time)) |
+            (1U << static_cast<std::uint32_t>(FooterField::media_info))
         };
     };
 

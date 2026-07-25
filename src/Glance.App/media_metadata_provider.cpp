@@ -272,11 +272,11 @@ namespace
         std::wostringstream output;
         if (bitrate >= 1000000)
         {
-            output << std::fixed << std::setprecision(1) << bitrate / 1000000.0 << L" Mbps";
+            output << std::fixed << std::setprecision(1) << bitrate / 1000000.0 << L"Mbps";
         }
         else
         {
-            output << (bitrate + 500) / 1000 << L" kbps";
+            output << (bitrate + 500) / 1000 << L"kbps";
         }
         return output.str();
     }
@@ -320,7 +320,7 @@ namespace
         std::wostringstream output;
         output << std::fixed << std::setprecision(
             std::abs(rate - std::round(rate)) < 0.01 ? 0 : 3)
-               << rate << L" fps";
+               << rate << L"fps";
         return output.str();
     }
 
@@ -639,7 +639,7 @@ namespace glance::app
                 append_line(
                     result,
                     localize(L"MediaInfoResolution"),
-                    stream.width + L" x " + stream.height);
+                    stream.width + L"x" + stream.height);
             }
             append_line(result, localize(L"MediaInfoFrameRate"), stream.frame_rate);
             append_line(result, localize(L"MediaInfoPixelFormat"), stream.pixel_format);
@@ -656,7 +656,7 @@ namespace glance::app
                 append_line(
                     result,
                     localize(L"MediaInfoSampleRate"),
-                    rate == 0 ? stream.sample_rate : std::to_wstring(rate) + L" Hz");
+                    rate == 0 ? stream.sample_rate : std::to_wstring(rate) + L"Hz");
             }
             append_line(result, localize(L"MediaInfoSampleFormat"), stream.sample_format);
             if (!stream.channels.empty())

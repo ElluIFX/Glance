@@ -116,7 +116,7 @@
   <data name="MediaInfoSampleRate" xml:space="preserve"><value>Sample rate</value></data>
   <data name="MediaInfoSampleFormat" xml:space="preserve"><value>Sample format</value></data>
   <data name="MediaInfoChannels" xml:space="preserve"><value>Channels</value></data>
-  <data name="MediaFooterChannelsFormat" xml:space="preserve"><value>{0} ch</value></data>
+  <data name="MediaFooterChannelsFormat" xml:space="preserve"><value>{0}ch</value></data>
   <data name="MediaInfoBitrate" xml:space="preserve"><value>Bitrate</value></data>
   <data name="MediaInfoFrames" xml:space="preserve"><value>Frames</value></data>
   <data name="MediaInfoLanguage" xml:space="preserve"><value>Language</value></data>
@@ -154,6 +154,7 @@
   <data name="FooterModifiedTimeCheckBox.Content" xml:space="preserve"><value>Modified time</value></data>
   <data name="FooterCreationTimeCheckBox.Content" xml:space="preserve"><value>Created time</value></data>
   <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>Permissions (RWXD)</value></data>
+  <data name="FooterMediaInfoCheckBox.Content" xml:space="preserve"><value>Media information</value></data>
   <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>Move up</value></data>
   <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>Move down</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>Save diagnostic information</value></data>

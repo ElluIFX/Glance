@@ -123,4 +123,18 @@ namespace glance::app
         }
         return result;
     }
+
+    std::uint32_t load_image_bit_depth(const std::wstring& path) noexcept
+    {
+        ComPtr<IShellItem2> item;
+        if (FAILED(SHCreateItemFromParsingName(path.c_str(), nullptr, IID_PPV_ARGS(&item))))
+        {
+            return 0;
+        }
+
+        ULONG bit_depth{};
+        return SUCCEEDED(item->GetUInt32(PKEY_Image_BitDepth, &bit_depth))
+            ? bit_depth
+            : 0;
+    }
 }

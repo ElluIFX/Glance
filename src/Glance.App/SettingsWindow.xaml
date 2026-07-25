@@ -531,6 +531,18 @@
                                         <Button x:Name="FooterPermissionsMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="permissions" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
                                     </Grid>
                                 </Border>
+                                <Border x:Name="FooterMediaInfoRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                                    <Grid MinHeight="44" Padding="16,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="FooterMediaInfoCheckBox" x:Uid="FooterMediaInfoCheckBox" VerticalAlignment="Center" Tag="media" Click="FooterFieldCheckBox_Click" Content="Media information" />
+                                        <Button x:Name="FooterMediaInfoMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="media" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
+                                        <Button x:Name="FooterMediaInfoMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="media" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
+                                    </Grid>
+                                </Border>
                             </StackPanel>
                         </StackPanel>
                     </Border>
