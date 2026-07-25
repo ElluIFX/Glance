@@ -69,6 +69,7 @@
     <ClInclude Include="media_preview_preferences.h" />
     <ClInclude Include="office_availability.h" />
     <ClInclude Include="office_pdf_service.h" />
+    <ClInclude Include="pan_interaction.h" />
     <ClInclude Include="path_copy_preferences.h" />
     <ClInclude Include="pdf_render_client.h" />
     <ClInclude Include="pch.h" />

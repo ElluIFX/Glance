@@ -480,7 +480,12 @@
                         MinZoomFactor="1"
                         VerticalScrollBarVisibility="Auto"
                         VerticalScrollMode="Enabled"
-                        ZoomMode="Enabled">
+                        ZoomMode="Enabled"
+                        PointerCanceled="PdfScroller_PointerCanceled"
+                        PointerCaptureLost="PdfScroller_PointerCaptureLost"
+                        PointerMoved="PdfScroller_PointerMoved"
+                        PointerPressed="PdfScroller_PointerPressed"
+                        PointerReleased="PdfScroller_PointerReleased">
                         <Grid
                             x:Name="PdfFitSurface"
                             Background="Transparent"

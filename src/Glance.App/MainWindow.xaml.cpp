@@ -9,6 +9,7 @@
 #include "media_metadata_provider.h"
 #include "office_availability.h"
 #include "office_pdf_service.h"
+#include "pan_interaction.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "shell_icon_provider.h"
@@ -899,6 +900,7 @@ namespace winrt::Glance::App::implementation
         image_panning_ = false;
         image_pixel_width_ = 0;
         image_pixel_height_ = 0;
+        pdf_panning_ = false;
         pdf_page_index_ = 0;
         pdf_page_count_ = 0;
         pdf_thumbnail_items_built_ = 0;
@@ -1287,6 +1289,7 @@ namespace winrt::Glance::App::implementation
         pdf_thumbnail_images_.clear();
         pdf_thumbnail_items_built_ = 0;
         pdf_outline_.clear();
+        pdf_panning_ = false;
         pdf_page_index_ = 0;
         pdf_page_count_ = 0;
         const auto& file = files_[index];
@@ -4361,6 +4364,7 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        pdf_panning_ = false;
         pdf_page_index_ = page_index;
         static_cast<void>(PdfScroller().ChangeView(nullptr, nullptr, 1.0F, true));
         render_pdf_page_async(page_index, content_generation_, true);
@@ -4484,6 +4488,87 @@ namespace winrt::Glance::App::implementation
             }
             pdf_wheel_delta_ = 0;
         }
+        args.Handled(true);
+    }
+
+    void MainWindow::PdfScroller_PointerPressed(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        const auto point = args.GetCurrentPoint(PdfScroller());
+        if (!point.Properties().IsLeftButtonPressed() ||
+            !glance::app::zoom_allows_pan(PdfScroller().ZoomFactor()))
+        {
+            return;
+        }
+        if (!PdfScroller().CapturePointer(args.Pointer()))
+        {
+            return;
+        }
+        pdf_panning_ = true;
+        pdf_pan_start_ = point.Position();
+        pdf_pan_horizontal_offset_ = PdfScroller().HorizontalOffset();
+        pdf_pan_vertical_offset_ = PdfScroller().VerticalOffset();
+        args.Handled(true);
+    }
+
+    void MainWindow::PdfScroller_PointerMoved(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        if (!pdf_panning_)
+        {
+            return;
+        }
+        const auto point = args.GetCurrentPoint(PdfScroller());
+        if (!point.Properties().IsLeftButtonPressed())
+        {
+            end_pdf_pan(args);
+            return;
+        }
+        const auto position = point.Position();
+        const auto offsets = glance::app::calculate_pan_offsets(
+            { pdf_pan_horizontal_offset_, pdf_pan_vertical_offset_ },
+            { pdf_pan_start_.X, pdf_pan_start_.Y },
+            { position.X, position.Y });
+        static_cast<void>(PdfScroller().ChangeView(
+            offsets.horizontal,
+            offsets.vertical,
+            nullptr,
+            true));
+        args.Handled(true);
+    }
+
+    void MainWindow::end_pdf_pan(PointerRoutedEventArgs const& args)
+    {
+        if (!pdf_panning_)
+        {
+            return;
+        }
+        pdf_panning_ = false;
+        PdfScroller().ReleasePointerCapture(args.Pointer());
+        args.Handled(true);
+    }
+
+    void MainWindow::PdfScroller_PointerReleased(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        end_pdf_pan(args);
+    }
+
+    void MainWindow::PdfScroller_PointerCanceled(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        end_pdf_pan(args);
+    }
+
+    void MainWindow::PdfScroller_PointerCaptureLost(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        pdf_panning_ = false;
         args.Handled(true);
     }
 

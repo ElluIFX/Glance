@@ -78,6 +78,21 @@ namespace winrt::Glance::App::implementation
         void PdfScroller_PointerWheelChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void PdfScroller_PointerPressed(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void PdfScroller_PointerMoved(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void PdfScroller_PointerReleased(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void PdfScroller_PointerCanceled(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void PdfScroller_PointerCaptureLost(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void ImageExifButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ImageScroller_PointerWheelChanged(
             IInspectable const&,
@@ -312,6 +327,7 @@ namespace winrt::Glance::App::implementation
         void update_image_metadata_visibility();
         void set_image_zoom(float zoom, Windows::Foundation::Point anchor);
         void end_image_pan(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
+        void end_pdf_pan(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         void update_state();
         void update_window_action_visibility();
         void set_topmost(bool enabled);
@@ -394,7 +410,11 @@ namespace winrt::Glance::App::implementation
         std::uint32_t pdf_page_count_{};
         std::uint32_t pdf_thumbnail_items_built_{};
         bool pdf_thumbnail_selection_updating_{};
+        bool pdf_panning_{};
         std::uint32_t pdf_page_index_{};
+        double pdf_pan_horizontal_offset_{};
+        double pdf_pan_vertical_offset_{};
+        Windows::Foundation::Point pdf_pan_start_{};
         std::atomic_uint64_t pdf_render_request_{};
         int pdf_wheel_delta_{};
         int media_seek_wheel_delta_{};
