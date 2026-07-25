@@ -55,7 +55,7 @@ namespace
     constexpr std::size_t text_chunk_bytes = 256U * 1024U;
     constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
     constexpr std::size_t retained_preview_buffer_limit_bytes = 8U * 1024U * 1024U;
-    constexpr auto web_view_idle_timeout = std::chrono::minutes(5);
+    constexpr auto web_view_idle_timeout = std::chrono::minutes(1);
 
     std::optional<std::wstring> file_url_from_path(const std::wstring& path)
     {
@@ -681,6 +681,7 @@ namespace winrt::Glance::App::implementation
         {
             glance::contracts::log_event(L"MainWindow received WM_NCDESTROY.");
             self->text_editor_.reset();
+            self->release_web_view_control();
             RemoveWindowSubclass(window, window_subclass, 1);
             self->stop_detached_focus_monitor();
             if (self->media_timer_ != nullptr)
@@ -2866,7 +2867,9 @@ namespace winrt::Glance::App::implementation
         try
         {
             const auto web_view = ensure_web_view_control();
-            co_await web_view.EnsureCoreWebView2Async();
+            const auto environment =
+                co_await glance::app::shared_webview_environment_async();
+            co_await web_view.EnsureCoreWebView2Async(environment);
             if (generation != content_generation_)
             {
                 co_return;
@@ -2904,7 +2907,9 @@ namespace winrt::Glance::App::implementation
             }
 
             const auto web_view = ensure_web_view_control();
-            co_await web_view.EnsureCoreWebView2Async();
+            const auto environment =
+                co_await glance::app::shared_webview_environment_async();
+            co_await web_view.EnsureCoreWebView2Async(environment);
             if (generation != content_generation_ ||
                 current_kind_ != glance::app::PreviewKind::web)
             {
