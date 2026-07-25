@@ -4,6 +4,14 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.07.25.1] - 2026-07-25
+
+### Fixed
+
+- Prepared the preview window before its first visible frame to prevent black title and status bars during opening.
+- Prevented stale WebView2 content from flashing while reopening or switching Markdown previews.
+- Reduced Markdown preview latency and improved README rendering with GitHub-style layout, relative images, and embedded HTML.
+
 ## [2026.07.25] - 2026-07-25
 
 ### Changed
