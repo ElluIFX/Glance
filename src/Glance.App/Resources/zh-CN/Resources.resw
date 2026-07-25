@@ -24,25 +24,25 @@
   <data name="FontSizeOverlayFormat" xml:space="preserve"><value>{0} px</value></data>
   <data name="LineNumbersTooltip" xml:space="preserve"><value>显示行号</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>自动换行时无法显示行号</value></data>
-  <data name="NoImageMetadata" xml:space="preserve"><value>没有内嵌的图像元数据。</value></data>
-  <data name="NoMediaMetadata" xml:space="preserve"><value>没有可用的媒体信息。</value></data>
-  <data name="ImageDecodeError" xml:space="preserve"><value>无法解码图像。{0}</value></data>
-  <data name="MediaOpenError" xml:space="preserve"><value>无法打开媒体文件。{0}</value></data>
-  <data name="PdfEmptyError" xml:space="preserve"><value>PDF 中没有页面。</value></data>
-  <data name="PdfOpenError" xml:space="preserve"><value>无法打开 PDF。</value></data>
-  <data name="PdfComponentMissingError" xml:space="preserve"><value>PDF 渲染组件不可用。</value></data>
-  <data name="PdfRenderError" xml:space="preserve"><value>无法渲染 PDF 页面。</value></data>
-  <data name="PdfRenderErrorDetail" xml:space="preserve"><value>无法渲染 PDF 页面。{0}</value></data>
+  <data name="NoImageMetadata" xml:space="preserve"><value>没有内嵌的图像元数据</value></data>
+  <data name="NoMediaMetadata" xml:space="preserve"><value>没有可用的媒体信息</value></data>
+  <data name="ImageDecodeError" xml:space="preserve"><value>无法解码图像：{0}</value></data>
+  <data name="MediaOpenError" xml:space="preserve"><value>无法打开媒体文件：{0}</value></data>
+  <data name="PdfEmptyError" xml:space="preserve"><value>PDF 中没有页面</value></data>
+  <data name="PdfOpenError" xml:space="preserve"><value>无法打开 PDF</value></data>
+  <data name="PdfComponentMissingError" xml:space="preserve"><value>PDF 渲染组件不可用</value></data>
+  <data name="PdfRenderError" xml:space="preserve"><value>无法渲染 PDF 页面</value></data>
+  <data name="PdfRenderErrorDetail" xml:space="preserve"><value>无法渲染 PDF 页面：{0}</value></data>
   <data name="PasswordPromptTitle" xml:space="preserve"><value>输入文件密码</value></data>
-  <data name="PasswordIncorrect" xml:space="preserve"><value>密码错误。</value></data>
-  <data name="OfficeConvertError" xml:space="preserve"><value>Microsoft Office 无法将此文档转换为 PDF。</value></data>
-  <data name="CloudLoadError" xml:space="preserve"><value>无法加载文件。错误 {0}。</value></data>
-  <data name="TextFileOpenError" xml:space="preserve"><value>无法打开文件。</value></data>
-  <data name="TextFileSizeError" xml:space="preserve"><value>无法读取文件大小。</value></data>
-  <data name="TextDecodeError" xml:space="preserve"><value>无法解码文本编码。</value></data>
-  <data name="TextBinaryError" xml:space="preserve"><value>该文件不是可识别的文本格式。</value></data>
-  <data name="ArchiveReadError" xml:space="preserve"><value>无法读取压缩包内容。</value></data>
-  <data name="FolderReadError" xml:space="preserve"><value>无法读取文件夹。</value></data>
+  <data name="PasswordIncorrect" xml:space="preserve"><value>密码错误</value></data>
+  <data name="OfficeConvertError" xml:space="preserve"><value>Microsoft Office 无法将此文档转换为 PDF</value></data>
+  <data name="CloudLoadError" xml:space="preserve"><value>无法加载文件：错误 {0}</value></data>
+  <data name="TextFileOpenError" xml:space="preserve"><value>无法打开文件</value></data>
+  <data name="TextFileSizeError" xml:space="preserve"><value>无法读取文件大小</value></data>
+  <data name="TextDecodeError" xml:space="preserve"><value>无法解码文本编码</value></data>
+  <data name="TextBinaryError" xml:space="preserve"><value>该文件不是可识别的文本格式</value></data>
+  <data name="ArchiveReadError" xml:space="preserve"><value>无法读取压缩包内容</value></data>
+  <data name="FolderReadError" xml:space="preserve"><value>无法读取文件夹</value></data>
   <data name="FolderType" xml:space="preserve"><value>文件夹</value></data>
   <data name="FileType" xml:space="preserve"><value>文件</value></data>
   <data name="ExtensionFileType" xml:space="preserve"><value>{0} 文件</value></data>
@@ -257,12 +257,12 @@
   <data name="ResetAllSettingsDescription.Text" xml:space="preserve"><value>清除已保存的设置并退出 Glance</value></data>
   <data name="ResetAllSettingsButton.Content" xml:space="preserve"><value>重置</value></data>
   <data name="ResetAllSettingsConfirmationTitle" xml:space="preserve"><value>重置所有设置？</value></data>
-  <data name="ResetAllSettingsConfirmationMessage" xml:space="preserve"><value>所有已保存的 Glance 偏好将被清空，应用随后退出。你需要手动重新启动 Glance。</value></data>
+  <data name="ResetAllSettingsConfirmationMessage" xml:space="preserve"><value>所有已保存的 Glance 偏好将被清空，应用随后退出。你需要手动重新启动 Glance</value></data>
   <data name="ResetAllSettingsConfirmationPrimary" xml:space="preserve"><value>重置并退出</value></data>
   <data name="ResetAllSettingsFailedTitle" xml:space="preserve"><value>无法重置设置</value></data>
-  <data name="ResetAllSettingsFailedMessage" xml:space="preserve"><value>部分设置无法清除，Glance 将保持运行。</value></data>
+  <data name="ResetAllSettingsFailedMessage" xml:space="preserve"><value>部分设置无法清除，Glance 将保持运行</value></data>
   <data name="OK" xml:space="preserve"><value>确定</value></data>
-  <data name="DuplicateInstanceMessage" xml:space="preserve"><value>Glance 已在运行，按空格即可预览文件。</value></data>
+  <data name="DuplicateInstanceMessage" xml:space="preserve"><value>Glance 已在运行，按空格即可预览文件</value></data>
   <data name="ResetWindowSizesButton.Content" xml:space="preserve"><value>重置</value></data>
   <data name="AboutPageTitle.Text" xml:space="preserve"><value>关于</value></data>
   <data name="AboutPageDescription.Text" xml:space="preserve"><value>应用信息</value></data>
@@ -274,13 +274,13 @@
   <data name="UpdateAvailableMessage" xml:space="preserve"><value>最新版本为 {0}，是否打开 Release 页面？</value></data>
   <data name="UpdateAvailablePrimary" xml:space="preserve"><value>打开 Release</value></data>
   <data name="UpdateUpToDateTitle" xml:space="preserve"><value>Glance 已是最新版本</value></data>
-  <data name="UpdateUpToDateMessage" xml:space="preserve"><value>当前使用的 {0} 已是最新版本。</value></data>
+  <data name="UpdateUpToDateMessage" xml:space="preserve"><value>当前使用的 {0} 已是最新版本</value></data>
   <data name="UpdateCheckFailedTitle" xml:space="preserve"><value>无法检查更新</value></data>
-  <data name="UpdateRateLimitedMessage" xml:space="preserve"><value>GitHub 请求次数已达上限，请稍后重试。</value></data>
-  <data name="UpdateNoReleaseMessage" xml:space="preserve"><value>未找到已发布的版本。</value></data>
-  <data name="UpdateCheckFailedMessage" xml:space="preserve"><value>无法访问 GitHub，请检查网络连接后重试。</value></data>
+  <data name="UpdateRateLimitedMessage" xml:space="preserve"><value>GitHub 请求次数已达上限，请稍后重试</value></data>
+  <data name="UpdateNoReleaseMessage" xml:space="preserve"><value>未找到已发布的版本</value></data>
+  <data name="UpdateCheckFailedMessage" xml:space="preserve"><value>无法访问 GitHub，请检查网络连接后重试</value></data>
   <data name="ExitConfirmationTitle" xml:space="preserve"><value>退出 Glance？</value></data>
-  <data name="ExitConfirmationMessage" xml:space="preserve"><value>重新启动 Glance 前，预览快捷键将停止工作。</value></data>
+  <data name="ExitConfirmationMessage" xml:space="preserve"><value>重新启动 Glance 前，预览快捷键将停止工作</value></data>
   <data name="ExitConfirmationPrimary" xml:space="preserve"><value>退出</value></data>
   <data name="Cancel" xml:space="preserve"><value>取消</value></data>
   <data name="ExitButtonText.Text" xml:space="preserve"><value>退出 Glance</value></data>
