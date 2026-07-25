@@ -22,6 +22,7 @@
 #endif
 
 #include <microsoft.ui.xaml.window.h>
+#include <dwmapi.h>
 #include <dwrite.h>
 #include <shellapi.h>
 #include <shlobj_core.h>
@@ -607,9 +608,6 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"Assigning the window title.");
         const std::wstring window_title = glance::app::localize(L"AppName");
         SetWindowTextW(window_, window_title.c_str());
-        glance::contracts::log_event(L"Priming the hidden preview window.");
-        ShowWindow(window_, SW_SHOWNOACTIVATE);
-        ShowWindow(window_, SW_HIDE);
     }
 
     LRESULT CALLBACK MainWindow::window_subclass(
@@ -1008,7 +1006,7 @@ namespace winrt::Glance::App::implementation
             position.y,
             width,
             height,
-            SWP_NOACTIVATE | (defer_auto_fit_show_ ? 0U : SWP_SHOWWINDOW));
+            SWP_NOACTIVATE);
         if (!topmost_)
         {
             SetWindowPos(
@@ -1019,6 +1017,10 @@ namespace winrt::Glance::App::implementation
                 0,
                 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+        if (!defer_auto_fit_show_)
+        {
+            show_prepared_window();
         }
     }
 
@@ -1048,6 +1050,27 @@ namespace winrt::Glance::App::implementation
             (kind == glance::app::PreviewKind::media && !is_audio_path(file.path));
     }
 
+    void MainWindow::show_prepared_window() noexcept
+    {
+        if (window_ == nullptr)
+        {
+            return;
+        }
+
+        BOOL cloaked = TRUE;
+        const bool cloak_applied = SUCCEEDED(
+            DwmSetWindowAttribute(window_, DWMWA_CLOAK, &cloaked, sizeof(cloaked)));
+        ShowWindow(window_, SW_SHOWNOACTIVATE);
+        UpdateWindow(window_);
+        if (cloak_applied)
+        {
+            static_cast<void>(DwmFlush());
+            cloaked = FALSE;
+            static_cast<void>(
+                DwmSetWindowAttribute(window_, DWMWA_CLOAK, &cloaked, sizeof(cloaked)));
+        }
+    }
+
     void MainWindow::reveal_deferred_preview() noexcept
     {
         if (!defer_auto_fit_show_ || window_ == nullptr)
@@ -1055,17 +1078,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
         defer_auto_fit_show_ = false;
-        if (!SetWindowPos(
-                window_,
-                nullptr,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW))
-        {
-            ShowWindow(window_, SW_SHOWNOACTIVATE);
-        }
+        show_prepared_window();
     }
 
     bool MainWindow::auto_fit_applies(bool dynamic_update) const noexcept
@@ -1197,9 +1210,12 @@ namespace winrt::Glance::App::implementation
             position.y,
             width,
             height,
-            SWP_NOACTIVATE | SWP_NOZORDER | (reveal_after_resize ? SWP_SHOWWINDOW : 0U)))
+            SWP_NOACTIVATE | SWP_NOZORDER))
         {
-            defer_auto_fit_show_ = false;
+            if (reveal_after_resize)
+            {
+                reveal_deferred_preview();
+            }
         }
         else if (reveal_after_resize)
         {

@@ -171,6 +171,7 @@ namespace winrt::Glance::App::implementation
         void configure_window();
         void position_initial_window(bool ignore_saved_size = false);
         [[nodiscard]] bool should_defer_auto_fit_show() const noexcept;
+        void show_prepared_window() noexcept;
         void reveal_deferred_preview() noexcept;
         void auto_fit_window_to_content(
             double width,
