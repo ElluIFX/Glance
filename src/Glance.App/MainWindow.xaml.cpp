@@ -1635,6 +1635,10 @@ namespace winrt::Glance::App::implementation
             {
                 web_preview_.Opacity(0.0);
             }
+            if (markdown && !web_view_ready_)
+            {
+                initialize_markdown_web_view_async(content_generation_);
+            }
         }
         return true;
     }
@@ -1670,7 +1674,10 @@ namespace winrt::Glance::App::implementation
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
-        auto preview = glance::app::load_text_preview(path, text_chunk_bytes, encoding);
+        const auto initial_bytes = markdown
+            ? static_cast<std::size_t>(maximum_preview_as_text_bytes)
+            : text_chunk_bytes;
+        auto preview = glance::app::load_text_preview(path, initial_bytes, encoding);
         static_cast<void>(dispatcher.TryEnqueue(
             [lifetime, preview = std::move(preview), markdown, web, generation, preview_as_text_attempt]() mutable {
                 lifetime->apply_text_preview(
@@ -2781,7 +2788,7 @@ namespace winrt::Glance::App::implementation
 
         if (markdown)
         {
-            if (web_preview_available_ && !current_text_has_more_)
+            if (web_preview_available_ && web_view_ready_ && !current_text_has_more_)
             {
                 render_markdown();
             }
@@ -2848,6 +2855,7 @@ namespace winrt::Glance::App::implementation
                 if (lifetime->current_text_markdown_)
                 {
                     if (lifetime->web_preview_available_ &&
+                        lifetime->web_view_ready_ &&
                         !lifetime->current_text_has_more_)
                     {
                         lifetime->render_markdown();
@@ -2859,25 +2867,66 @@ namespace winrt::Glance::App::implementation
             }));
     }
 
-    void MainWindow::render_markdown()
+    fire_and_forget MainWindow::render_markdown()
     {
-        if (!web_preview_available_)
+        if (!web_preview_available_ || !web_view_ready_)
         {
-            return;
+            co_return;
         }
-        const auto html = glance::app::render_markdown_html(
-            current_text_,
-            RootGrid().ActualTheme() == ElementTheme::Dark);
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        const auto markdown = current_text_;
+        const bool dark_theme = RootGrid().ActualTheme() == ElementTheme::Dark;
         const auto generation = content_generation_;
-        const auto weak = get_weak();
-        static_cast<void>(DispatcherQueue().TryEnqueue(
-            [weak, html, generation] {
-                if (const auto self = weak.get();
-                    self != nullptr && generation == self->content_generation_)
+        co_await resume_background();
+        auto html = glance::app::render_markdown_html(markdown, dark_theme);
+        static_cast<void>(dispatcher.TryEnqueue(
+            [lifetime, html = std::move(html), generation]() mutable {
+                if (generation == lifetime->content_generation_ &&
+                    lifetime->web_view_ready_)
                 {
-                    self->render_markdown_async(html, generation);
+                    lifetime->render_markdown_async(std::move(html), generation);
                 }
             }));
+    }
+
+    fire_and_forget MainWindow::initialize_markdown_web_view_async(std::uint64_t generation)
+    {
+        if (web_view_ready_ || web_view_initializing_)
+        {
+            co_return;
+        }
+
+        const auto lifetime = get_strong();
+        web_view_initializing_ = true;
+        try
+        {
+            const auto web_view = ensure_web_view_control();
+            const auto environment =
+                co_await glance::app::shared_webview_environment_async();
+            co_await web_view.EnsureCoreWebView2Async(environment);
+            configure_web_view_core(web_view.CoreWebView2());
+            web_view_ready_ = true;
+            web_view_initializing_ = false;
+            if (current_text_markdown_ && web_preview_available_ &&
+                !text_chunk_loading_ && !current_text_has_more_)
+            {
+                render_markdown();
+            }
+        }
+        catch (const hresult_error& error)
+        {
+            web_view_initializing_ = false;
+            glance::contracts::log_event(
+                L"Markdown WebView initialization failed: " + std::wstring(error.message()));
+            if (generation == content_generation_ || current_text_markdown_)
+            {
+                web_preview_available_ = false;
+                MarkdownModeButtons().Visibility(Visibility::Collapsed);
+                MarkdownPreviewButton().IsEnabled(false);
+                set_markdown_preview_mode(false);
+            }
+        }
     }
 
     fire_and_forget MainWindow::render_markdown_async(std::wstring html, std::uint64_t generation)
@@ -2885,17 +2934,30 @@ namespace winrt::Glance::App::implementation
         const auto lifetime = get_strong();
         try
         {
-            const auto web_view = ensure_web_view_control();
-            const auto environment =
-                co_await glance::app::shared_webview_environment_async();
-            co_await web_view.EnsureCoreWebView2Async(environment);
-            if (generation != content_generation_)
+            if (generation != content_generation_ || !web_view_ready_ ||
+                web_preview_ == nullptr)
             {
                 co_return;
             }
+
+            const auto web_view = web_preview_;
+            const auto core = web_view.CoreWebView2();
+            const auto parent = std::filesystem::path(current_text_path_).parent_path();
+            if (!parent.empty())
+            {
+                core.SetVirtualHostNameToFolderMapping(
+                    L"glance-markdown-assets.invalid",
+                    parent.c_str(),
+                    Microsoft::Web::WebView2::Core::
+                        CoreWebView2HostResourceAccessKind::DenyCors);
+            }
+            web_content_ready_ = false;
+            web_navigation_generation_ = generation;
+            web_navigation_id_ = 0;
+            web_view.Opacity(0.0);
+            WebPreviewHost().Visibility(Visibility::Collapsed);
             web_view.NavigateToString(html);
             web_preview_available_ = true;
-            web_view.Opacity(1.0);
             update_web_view_idle_state();
         }
         catch (const hresult_error& error)
@@ -2929,6 +2991,8 @@ namespace winrt::Glance::App::implementation
             const auto environment =
                 co_await glance::app::shared_webview_environment_async();
             co_await web_view.EnsureCoreWebView2Async(environment);
+            configure_web_view_core(web_view.CoreWebView2());
+            web_view_ready_ = true;
             if (generation != content_generation_ ||
                 current_kind_ != glance::app::PreviewKind::web)
             {
@@ -2936,14 +3000,14 @@ namespace winrt::Glance::App::implementation
             }
 
             const auto core = web_view.CoreWebView2();
-            const auto settings = core.Settings();
-            settings.AreDefaultContextMenusEnabled(false);
-            settings.AreDevToolsEnabled(false);
-            settings.IsStatusBarEnabled(false);
+            web_content_ready_ = false;
+            web_navigation_generation_ = generation;
+            web_navigation_id_ = 0;
+            web_view.Opacity(0.0);
+            WebPreviewHost().Visibility(Visibility::Collapsed);
             core.Navigate(*url);
             web_preview_available_ = true;
             MarkdownPreviewButton().IsEnabled(true);
-            web_view.Opacity(1.0);
             update_web_view_idle_state();
         }
         catch (const hresult_error& error)
@@ -2978,9 +3042,54 @@ namespace winrt::Glance::App::implementation
         return web_preview_;
     }
 
+    void MainWindow::configure_web_view_core(
+        Microsoft::Web::WebView2::Core::CoreWebView2 const& core)
+    {
+        const auto settings = core.Settings();
+        settings.AreDefaultContextMenusEnabled(false);
+        settings.AreDevToolsEnabled(false);
+        settings.IsStatusBarEnabled(false);
+        if (web_view_handlers_registered_)
+        {
+            return;
+        }
+
+        const auto weak = get_weak();
+        core.NavigationStarting(
+            [weak](auto const&, auto const& args) {
+                if (const auto self = weak.get();
+                    self != nullptr &&
+                    self->web_navigation_generation_ == self->content_generation_)
+                {
+                    self->web_navigation_id_ = args.NavigationId();
+                }
+            });
+        core.ContentLoading(
+            [weak](auto const&, auto const& args) {
+                const auto self = weak.get();
+                if (self == nullptr ||
+                    self->web_navigation_generation_ != self->content_generation_ ||
+                    self->web_navigation_id_ == 0 ||
+                    args.NavigationId() != self->web_navigation_id_)
+                {
+                    return;
+                }
+
+                self->web_content_ready_ = true;
+                self->web_preview_.Opacity(1.0);
+                self->WebPreviewHost().Visibility(
+                    self->markdown_preview_ ? Visibility::Visible : Visibility::Collapsed);
+                self->update_web_view_idle_state();
+            });
+        web_view_handlers_registered_ = true;
+    }
+
     void MainWindow::clear_web_view_content() noexcept
     {
         web_preview_available_ = false;
+        web_content_ready_ = false;
+        web_navigation_generation_ = 0;
+        web_navigation_id_ = 0;
         try
         {
             if (web_preview_ != nullptr)
@@ -2988,7 +3097,6 @@ namespace winrt::Glance::App::implementation
                 if (const auto core = web_preview_.CoreWebView2())
                 {
                     core.Stop();
-                    core.Navigate(L"about:blank");
                 }
                 web_preview_.Opacity(0.0);
             }
@@ -3033,6 +3141,12 @@ namespace winrt::Glance::App::implementation
         }
         const auto web_view = web_preview_;
         web_preview_ = nullptr;
+        web_view_initializing_ = false;
+        web_view_ready_ = false;
+        web_view_handlers_registered_ = false;
+        web_content_ready_ = false;
+        web_navigation_generation_ = 0;
+        web_navigation_id_ = 0;
         try
         {
             WebPreviewHost().Visibility(Visibility::Collapsed);
@@ -3579,7 +3693,8 @@ namespace winrt::Glance::App::implementation
         MarkdownCodeButton().IsChecked(!preview);
         MarkdownPreviewButton().FontWeight(preview ? Windows::UI::Text::FontWeights::SemiBold() : Windows::UI::Text::FontWeights::Normal());
         MarkdownCodeButton().FontWeight(preview ? Windows::UI::Text::FontWeights::Normal() : Windows::UI::Text::FontWeights::SemiBold());
-        WebPreviewHost().Visibility(preview ? Visibility::Visible : Visibility::Collapsed);
+        WebPreviewHost().Visibility(
+            preview && web_content_ready_ ? Visibility::Visible : Visibility::Collapsed);
         update_text_editor_visibility();
         update_web_view_idle_state();
     }
@@ -3592,16 +3707,20 @@ namespace winrt::Glance::App::implementation
             return;
         }
         set_markdown_preview_mode(true);
-        if (web_preview_ == nullptr)
+        if (current_text_markdown_ && !current_text_has_more_)
         {
-            if (current_text_markdown_ && !current_text_has_more_)
+            if (web_view_ready_)
             {
                 render_markdown();
             }
-            else if (current_text_web_ && !current_text_path_.empty())
+            else
             {
-                render_web_document_async(current_text_path_, content_generation_);
+                initialize_markdown_web_view_async(content_generation_);
             }
+        }
+        else if (web_preview_ == nullptr && current_text_web_ && !current_text_path_.empty())
+        {
+            render_web_document_async(current_text_path_, content_generation_);
         }
     }
 

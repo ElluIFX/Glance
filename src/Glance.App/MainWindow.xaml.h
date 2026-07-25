@@ -282,10 +282,13 @@ namespace winrt::Glance::App::implementation
             bool web,
             std::uint64_t generation,
             bool preview_as_text_attempt);
-        void render_markdown();
+        winrt::fire_and_forget render_markdown();
+        winrt::fire_and_forget initialize_markdown_web_view_async(std::uint64_t generation);
         winrt::fire_and_forget render_markdown_async(std::wstring html, std::uint64_t generation);
         winrt::fire_and_forget render_web_document_async(std::wstring path, std::uint64_t generation);
         Microsoft::UI::Xaml::Controls::WebView2 ensure_web_view_control();
+        void configure_web_view_core(
+            Microsoft::Web::WebView2::Core::CoreWebView2 const& core);
         void clear_web_view_content() noexcept;
         void update_web_view_idle_state();
         void release_web_view_control() noexcept;
@@ -363,6 +366,12 @@ namespace winrt::Glance::App::implementation
         std::uint32_t media_controls_idle_ticks_{};
         bool markdown_preview_{};
         bool web_preview_available_{};
+        bool web_view_initializing_{};
+        bool web_view_ready_{};
+        bool web_view_handlers_registered_{};
+        bool web_content_ready_{};
+        std::uint64_t web_navigation_generation_{};
+        std::uint64_t web_navigation_id_{};
         bool image_metadata_visible_{};
         bool image_panning_{};
         double image_rotation_{};
