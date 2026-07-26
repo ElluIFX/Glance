@@ -3,8 +3,7 @@
 #include "appearance_preferences.h"
 #include "localization.h"
 #include "MainWindow.xaml.h"
-#include "office_availability.h"
-#include "office_pdf_service.h"
+#include "component_loader.h"
 #include "pdf_render_client.h"
 #include "resource.h"
 #include "SettingsWindow.xaml.h"
@@ -250,7 +249,6 @@ namespace winrt::Glance::App::implementation
         }
 
         glance::app::initialize_webview_availability();
-        glance::app::initialize_office_availability();
         glance::app::prewarm_pdf_render_client();
         glance::contracts::log_event(L"Creating the initial preview window.");
         create_active_window();
@@ -717,7 +715,7 @@ namespace winrt::Glance::App::implementation
             active_window_.Close();
             active_window_ = nullptr;
         }
-        glance::app::shutdown_office_pdf_service();
+        glance::app::shutdown_components();
         Microsoft::UI::Xaml::Application::Current().Exit();
     }
 

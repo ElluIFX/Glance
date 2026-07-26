@@ -59,8 +59,6 @@
   <data name="CoreNotRunning" xml:space="preserve"><value>Not running</value></data>
   <data name="MediaComponentsAvailable" xml:space="preserve"><value>ffprobe available</value></data>
   <data name="MediaComponentsUnavailable" xml:space="preserve"><value>ffprobe not found</value></data>
-  <data name="OfficeComAvailable" xml:space="preserve"><value>COM automation available</value></data>
-  <data name="OfficeComUnavailable" xml:space="preserve"><value>COM automation not found</value></data>
   <data name="AdministratorAccessAvailable" xml:space="preserve"><value>Acquired</value></data>
   <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>Not acquired</value></data>
   <data name="SizesReset" xml:space="preserve"><value>Saved sizes reset</value></data>
@@ -245,7 +243,6 @@
   <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 availability</value></data>
   <data name="WebViewAvailable" xml:space="preserve"><value>Runtime available</value></data>
   <data name="WebViewUnavailable" xml:space="preserve"><value>Runtime not found</value></data>
-  <data name="OfficeAvailabilityLabel.Text" xml:space="preserve"><value>Office availability</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>Administrator access</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>Export diagnostic package</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>Export</value></data>
@@ -333,4 +330,21 @@
   <data name="AccentPurpleText.Text" xml:space="preserve"><value>Purple</value></data>
   <data name="EncodingSelector.Content" xml:space="preserve"><value>Detecting...</value></data>
   <data name="LineNumbersButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show line numbers</value></data>
+  <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>Components</value></data>
+  <data name="AppearanceGroupTitle.Text" xml:space="preserve"><value>Appearance</value></data>
+  <data name="StartupGroupTitle.Text" xml:space="preserve"><value>Startup</value></data>
+  <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>Components</value></data>
+  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>Optional preview support and runtime status</value></data>
+  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>Location</value></data>
+  <data name="ComponentFolderLabel.Text" xml:space="preserve"><value>Component folder</value></data>
+  <data name="ComponentFolderDescription.Text" xml:space="preserve"><value>Components are loaded from this folder after restart</value></data>
+  <data name="OpenComponentsFolderButton.Content" xml:space="preserve"><value>Open folder</value></data>
+  <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>Component status</value></data>
+  <data name="OfficeComponentName" xml:space="preserve"><value>Microsoft Office preview</value></data>
+  <data name="ComponentStateHealthy" xml:space="preserve"><value>Available</value></data>
+  <data name="ComponentStateWarning" xml:space="preserve"><value>Warning</value></data>
+  <data name="ComponentStateError" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="ComponentStateIncompatible" xml:space="preserve"><value>Version incompatible with this Glance release</value></data>
+  <data name="ComponentStateDamaged" xml:space="preserve"><value>Component is damaged</value></data>
+  <data name="ComponentStateNotInstalled" xml:space="preserve"><value>Not installed</value></data>
 </root>

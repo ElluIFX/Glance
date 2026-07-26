@@ -1,6 +1,6 @@
 #include <winres.h>
 #include "version.h"
-#include "Glance.App\\resource.h"
+#include "Glance.App\\common\\resource.h"
 
 IDI_GLANCE_APP ICON "Glance.App\\Assets\\AppIcon.ico"
 

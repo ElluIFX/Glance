@@ -16,7 +16,7 @@
     <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <TargetName>Glance.DialogHook32</TargetName>
-    <OutDir>$(SolutionDir)bin\$(Configuration)\x64\</OutDir>
+    <OutDir>$(GlanceOutputRoot)</OutDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>

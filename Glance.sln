@@ -20,7 +20,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.DialogBroker32", "sr
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.App", "src\Glance.App\Glance.App.vcxproj", "{6BDE157B-E23C-40D5-9EB3-437C5D8FFA74}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.OfficeHost", "src\Glance.OfficeHost\Glance.OfficeHost.vcxproj", "{D890E6BE-551D-498E-94EC-E219044D3B77}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.OfficeHost", "src\Glance.Components\Office\host\Glance.OfficeHost.vcxproj", "{D890E6BE-551D-498E-94EC-E219044D3B77}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.OfficeComponent", "src\Glance.Components\Office\Glance.OfficeComponent.vcxproj", "{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.RenderHost", "src\Glance.RenderHost\Glance.RenderHost.vcxproj", "{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}"
 EndProject
@@ -60,6 +62,10 @@ Global
 		{D890E6BE-551D-498E-94EC-E219044D3B77}.Debug|x64.Build.0 = Debug|x64
 		{D890E6BE-551D-498E-94EC-E219044D3B77}.Release|x64.ActiveCfg = Release|x64
 		{D890E6BE-551D-498E-94EC-E219044D3B77}.Release|x64.Build.0 = Release|x64
+		{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}.Debug|x64.ActiveCfg = Debug|x64
+		{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}.Debug|x64.Build.0 = Debug|x64
+		{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}.Release|x64.ActiveCfg = Release|x64
+		{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}.Release|x64.Build.0 = Release|x64
 		{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}.Debug|x64.ActiveCfg = Debug|x64
 		{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}.Debug|x64.Build.0 = Debug|x64
 		{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}.Release|x64.ActiveCfg = Release|x64

@@ -5,7 +5,9 @@
     <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
     <PlatformToolset>v145</PlatformToolset>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
-    <OutDir>$(SolutionDir)bin\$(Configuration)\$(Platform)\</OutDir>
+    <GlanceOutputRoot Condition="'$(GlanceOutputRoot)'=='' and '$(Platform)'=='Win32'">$(SolutionDir)bin\$(Configuration)\x64\</GlanceOutputRoot>
+    <GlanceOutputRoot Condition="'$(GlanceOutputRoot)'==''">$(SolutionDir)bin\$(Configuration)\$(Platform)\</GlanceOutputRoot>
+    <OutDir>$(GlanceOutputRoot)</OutDir>
     <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup>

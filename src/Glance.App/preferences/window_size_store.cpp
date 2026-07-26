@@ -27,7 +27,7 @@ namespace
             return L"Pdf";
         case PreviewKind::archive:
             return L"Archive";
-        case PreviewKind::office:
+        case PreviewKind::component:
             return L"Office";
         default:
             return L"Generic";

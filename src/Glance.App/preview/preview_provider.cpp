@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "component_catalog.h"
 #include "localization.h"
 #include "preview_provider.h"
 
@@ -745,10 +746,6 @@ namespace glance::app
             std::wstring_view(L".xz"), std::wstring_view(L".tgz"), std::wstring_view(L".tbz"),
             std::wstring_view(L".tbz2"), std::wstring_view(L".txz"), std::wstring_view(L".zst"),
             std::wstring_view(L".cab") };
-        static constexpr std::array office_extensions{
-            std::wstring_view(L".doc"), std::wstring_view(L".docx"), std::wstring_view(L".xls"),
-            std::wstring_view(L".xlsx"), std::wstring_view(L".ppt"), std::wstring_view(L".pptx") };
-
         if (extension == L".md" || extension == L".markdown")
         {
             return PreviewKind::markdown;
@@ -783,9 +780,9 @@ namespace glance::app
         {
             return PreviewKind::archive;
         }
-        if (contains(extension, office_extensions))
+        if (find_component_for_extension(extension) != nullptr)
         {
-            return PreviewKind::office;
+            return PreviewKind::component;
         }
         return sniff_unknown_file(path);
     }

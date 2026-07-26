@@ -128,6 +128,12 @@ namespace glance::app
         return available_components.load(std::memory_order_acquire) != 0;
     }
 
+    unsigned int office_available_components() noexcept
+    {
+        initialize_office_availability();
+        return available_components.load(std::memory_order_acquire);
+    }
+
     bool office_preview_available(std::wstring_view path) noexcept
     {
         initialize_office_availability();

@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "update_checker.h"
-#include "../version.h"
+#include "../../version.h"
 
 #include <winhttp.h>
 

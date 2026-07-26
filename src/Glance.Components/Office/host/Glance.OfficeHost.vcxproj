@@ -15,11 +15,12 @@
     <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
     <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
+    <OutDir>$(GlanceOutputRoot)components\office\</OutDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\Glance.Contracts\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\Glance.Contracts\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>
@@ -37,7 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
-    <ResourceCompile Include="..\version.rc">
+    <ResourceCompile Include="..\..\..\version.rc">
       <PreprocessorDefinitions>GLANCE_BINARY_KIND=3;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
   </ItemGroup>

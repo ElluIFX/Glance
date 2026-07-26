@@ -38,6 +38,15 @@ if (-not $installer) {
 }
 Copy-Item -LiteralPath $installer.FullName -Destination $releaseDirectory -Force
 
+$componentArchives = @(Get-ChildItem -LiteralPath (Join-Path $artifactsDirectory "components") `
+    -Filter "Glance-Component-*-$Platform.zip" -File)
+if (-not $componentArchives) {
+    throw "No component archives were generated."
+}
+foreach ($archive in $componentArchives) {
+    Copy-Item -LiteralPath $archive.FullName -Destination $releaseDirectory -Force
+}
+
 $portableName = "Glance-$($version.Version)-$Platform"
 $portableRoot = Join-Path $stagingDirectory $portableName
 New-Item -ItemType Directory -Path $portableRoot -Force | Out-Null

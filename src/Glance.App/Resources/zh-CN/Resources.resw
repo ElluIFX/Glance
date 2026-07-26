@@ -59,8 +59,6 @@
   <data name="CoreNotRunning" xml:space="preserve"><value>未运行</value></data>
   <data name="MediaComponentsAvailable" xml:space="preserve"><value>ffprobe 可用</value></data>
   <data name="MediaComponentsUnavailable" xml:space="preserve"><value>未检测到 ffprobe</value></data>
-  <data name="OfficeComAvailable" xml:space="preserve"><value>COM 自动化可用</value></data>
-  <data name="OfficeComUnavailable" xml:space="preserve"><value>未检测到 COM 自动化</value></data>
   <data name="AdministratorAccessAvailable" xml:space="preserve"><value>已获取</value></data>
   <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>未获取</value></data>
   <data name="SizesReset" xml:space="preserve"><value>已重置保存的窗口尺寸</value></data>
@@ -245,7 +243,6 @@
   <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 可用性</value></data>
   <data name="WebViewAvailable" xml:space="preserve"><value>运行时可用</value></data>
   <data name="WebViewUnavailable" xml:space="preserve"><value>未检测到运行时</value></data>
-  <data name="OfficeAvailabilityLabel.Text" xml:space="preserve"><value>Office 可用性</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>管理员权限</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>导出诊断包</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>导出</value></data>
@@ -333,4 +330,21 @@
   <data name="AccentPurpleText.Text" xml:space="preserve"><value>紫色</value></data>
   <data name="EncodingSelector.Content" xml:space="preserve"><value>正在检测...</value></data>
   <data name="LineNumbersButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示行号</value></data>
+  <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>组件</value></data>
+  <data name="AppearanceGroupTitle.Text" xml:space="preserve"><value>外观</value></data>
+  <data name="StartupGroupTitle.Text" xml:space="preserve"><value>启动</value></data>
+  <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>组件</value></data>
+  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>可选预览支持与运行状态</value></data>
+  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>位置</value></data>
+  <data name="ComponentFolderLabel.Text" xml:space="preserve"><value>组件文件夹</value></data>
+  <data name="ComponentFolderDescription.Text" xml:space="preserve"><value>重启后从此文件夹加载组件</value></data>
+  <data name="OpenComponentsFolderButton.Content" xml:space="preserve"><value>打开文件夹</value></data>
+  <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>组件状态</value></data>
+  <data name="OfficeComponentName" xml:space="preserve"><value>Microsoft Office 预览</value></data>
+  <data name="ComponentStateHealthy" xml:space="preserve"><value>可用</value></data>
+  <data name="ComponentStateWarning" xml:space="preserve"><value>警告</value></data>
+  <data name="ComponentStateError" xml:space="preserve"><value>不可用</value></data>
+  <data name="ComponentStateIncompatible" xml:space="preserve"><value>版本与当前 Glance 不兼容</value></data>
+  <data name="ComponentStateDamaged" xml:space="preserve"><value>组件已损坏</value></data>
+  <data name="ComponentStateNotInstalled" xml:space="preserve"><value>未安装</value></data>
 </root>

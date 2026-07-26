@@ -91,6 +91,7 @@ $artifactsDirectory = Join-Path $repositoryRoot "artifacts"
 $payloadDirectory = Join-Path $artifactsDirectory "package\payload"
 $symbolsDirectory = Join-Path $artifactsDirectory "package\symbols"
 $installerOutputDirectory = Join-Path $artifactsDirectory "installer"
+$componentOutputDirectory = Join-Path $artifactsDirectory "components"
 $installerScript = Join-Path $repositoryRoot "installer\Glance.iss"
 $version = Get-GlanceVersion
 
@@ -117,7 +118,6 @@ $requiredFiles = @(
     "Glance.DialogBroker32.exe",
     "Glance.DialogHook.dll",
     "Glance.DialogHook32.dll",
-    "Glance.OfficeHost.exe",
     "Glance.RenderHost.exe",
     "pdfium.dll",
     "Lexilla.dll",
@@ -156,6 +156,23 @@ foreach ($symbol in $symbolFiles) {
     $destination = Join-Path $symbolsDirectory $relativePath
     New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
     Copy-Item -LiteralPath $symbol.FullName -Destination $destination -Force
+}
+
+& (Join-Path $PSScriptRoot "package-components.ps1") `
+    -BuildOutput $payloadDirectory `
+    -OutputDirectory $componentOutputDirectory `
+    -Platform $Platform
+
+Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory "components")
+Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory "plugins")
+
+$componentResidue = Get-ChildItem -LiteralPath $payloadDirectory -File | Where-Object {
+    $_.Name -eq "component.json" -or
+    $_.Name -like "Glance.*Component.*" -or
+    $_.Name -eq "Glance.OfficeHost.exe"
+}
+if ($componentResidue) {
+    throw "Component files entered the main package payload: $($componentResidue.Name -join ', ')"
 }
 
 $developmentArtifacts = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File | Where-Object {
@@ -201,6 +218,7 @@ if ($forbiddenRuntimeFiles) {
 $compiler = Get-InnoSetupCompiler
 $environment = @{
     GLANCE_SOURCE_DIR = $payloadDirectory
+    GLANCE_COMPONENTS_DIR = (Join-Path $componentOutputDirectory "installer")
     GLANCE_OUTPUT_DIR = $installerOutputDirectory
     GLANCE_REPO_ROOT = $repositoryRoot
     GLANCE_VERSION = $version.Version

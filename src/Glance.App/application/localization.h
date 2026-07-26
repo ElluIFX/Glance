@@ -8,6 +8,7 @@ namespace glance::app
 {
     [[nodiscard]] std::wstring resolve_ui_language(std::wstring_view saved_language);
     void apply_ui_language(std::wstring_view language);
+    [[nodiscard]] std::wstring current_ui_language();
     [[nodiscard]] std::wstring localize(std::wstring_view key);
     [[nodiscard]] std::wstring localize_format(
         std::wstring_view key,

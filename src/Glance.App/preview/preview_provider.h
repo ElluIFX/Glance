@@ -18,7 +18,7 @@ namespace glance::app
         media,
         pdf,
         archive,
-        office,
+        component,
     };
 
     struct TextPreview

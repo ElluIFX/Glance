@@ -22,6 +22,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\glance\contracts\component_api.h" />
     <ClInclude Include="include\glance\contracts\file_descriptor.h" />
     <ClInclude Include="include\glance\contracts\diagnostics.h" />
     <ClInclude Include="include\glance\contracts\ipc_protocol.h" />

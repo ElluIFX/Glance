@@ -258,7 +258,7 @@ namespace winrt::Glance::App::implementation
             std::uint64_t generation,
             std::wstring password = {});
         winrt::fire_and_forget load_directory_async(std::wstring path, std::uint64_t generation);
-        winrt::fire_and_forget load_office_async(
+        winrt::fire_and_forget load_component_async(
             std::wstring path,
             std::uint64_t generation);
         struct ArchiveIconTarget

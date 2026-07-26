@@ -41,7 +41,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\Glance.Contracts\include;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IntDir)generated;$(ProjectDir)..\Glance.Contracts\include;$(ProjectDir);$(ProjectDir)application;$(ProjectDir)components;$(ProjectDir)preferences;$(ProjectDir)preview;$(ProjectDir)ui;$(ProjectDir)common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -56,41 +56,41 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="archive_provider.h" />
-    <ClInclude Include="footer_preferences.h" />
-    <ClInclude Include="folder_preview_preferences.h" />
-    <ClInclude Include="generic_file_info.h" />
-    <ClInclude Include="generic_preview_preferences.h" />
-    <ClInclude Include="appearance_preferences.h" />
-    <ClInclude Include="image_metadata_provider.h" />
-    <ClInclude Include="localization.h" />
-    <ClInclude Include="markdown_renderer.h" />
-    <ClInclude Include="media_metadata_provider.h" />
-    <ClInclude Include="media_preview_preferences.h" />
-    <ClInclude Include="office_availability.h" />
-    <ClInclude Include="office_pdf_service.h" />
-    <ClInclude Include="pan_interaction.h" />
-    <ClInclude Include="path_copy_preferences.h" />
-    <ClInclude Include="pdf_render_client.h" />
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="resource.h" />
-    <ClInclude Include="shell_icon_provider.h" />
+    <ClInclude Include="preview\archive_provider.h" />
+    <ClInclude Include="components\component_catalog.h" />
+    <ClInclude Include="components\component_loader.h" />
+    <ClInclude Include="preferences\footer_preferences.h" />
+    <ClInclude Include="preferences\folder_preview_preferences.h" />
+    <ClInclude Include="preview\generic_file_info.h" />
+    <ClInclude Include="preferences\generic_preview_preferences.h" />
+    <ClInclude Include="preferences\appearance_preferences.h" />
+    <ClInclude Include="preview\image_metadata_provider.h" />
+    <ClInclude Include="application\localization.h" />
+    <ClInclude Include="preview\markdown_renderer.h" />
+    <ClInclude Include="preview\media_metadata_provider.h" />
+    <ClInclude Include="preferences\media_preview_preferences.h" />
+    <ClInclude Include="preview\pan_interaction.h" />
+    <ClInclude Include="preferences\path_copy_preferences.h" />
+    <ClInclude Include="preview\pdf_render_client.h" />
+    <ClInclude Include="common\pch.h" />
+    <ClInclude Include="common\resource.h" />
+    <ClInclude Include="preview\shell_icon_provider.h" />
     <ClInclude Include="App.xaml.h"><DependentUpon>App.xaml</DependentUpon></ClInclude>
-    <ClInclude Include="MainWindow.xaml.h"><DependentUpon>MainWindow.xaml</DependentUpon></ClInclude>
-    <ClInclude Include="SettingsWindow.xaml.h"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClInclude>
-    <ClInclude Include="pipe_client.h" />
-    <ClInclude Include="preview_file.h" />
-    <ClInclude Include="preview_provider.h" />
-    <ClInclude Include="scintilla_text_view.h" />
-    <ClInclude Include="syntax_theme.h" />
-    <ClInclude Include="startup_registration.h" />
-    <ClInclude Include="text_font_fallback.h" />
-    <ClInclude Include="text_preferences.h" />
-    <ClInclude Include="tray_icon.h" />
-    <ClInclude Include="update_checker.h" />
-    <ClInclude Include="webview_availability.h" />
-    <ClInclude Include="window_size_store.h" />
-    <ClInclude Include="window_preferences.h" />
+    <ClInclude Include="ui\MainWindow.xaml.h"><DependentUpon>MainWindow.xaml</DependentUpon></ClInclude>
+    <ClInclude Include="ui\SettingsWindow.xaml.h"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClInclude>
+    <ClInclude Include="application\pipe_client.h" />
+    <ClInclude Include="preview\preview_file.h" />
+    <ClInclude Include="preview\preview_provider.h" />
+    <ClInclude Include="preview\scintilla_text_view.h" />
+    <ClInclude Include="preview\syntax_theme.h" />
+    <ClInclude Include="application\startup_registration.h" />
+    <ClInclude Include="preview\text_font_fallback.h" />
+    <ClInclude Include="preferences\text_preferences.h" />
+    <ClInclude Include="application\tray_icon.h" />
+    <ClInclude Include="application\update_checker.h" />
+    <ClInclude Include="preview\webview_availability.h" />
+    <ClInclude Include="preferences\window_size_store.h" />
+    <ClInclude Include="preferences\window_preferences.h" />
     <ClInclude Include="third_party\md4c\entity.h" />
     <ClInclude Include="third_party\md4c\md4c.h" />
     <ClInclude Include="third_party\md4c\md4c-html.h" />
@@ -102,41 +102,41 @@
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
-    <Page Include="MainWindow.xaml" />
-    <Page Include="SettingsWindow.xaml" />
+    <Page Include="ui\MainWindow.xaml"><Link>MainWindow.xaml</Link></Page>
+    <Page Include="ui\SettingsWindow.xaml"><Link>SettingsWindow.xaml</Link></Page>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="archive_provider.cpp" />
-    <ClCompile Include="footer_preferences.cpp" />
-    <ClCompile Include="folder_preview_preferences.cpp" />
-    <ClCompile Include="generic_file_info.cpp" />
-    <ClCompile Include="generic_preview_preferences.cpp" />
-    <ClCompile Include="appearance_preferences.cpp" />
-    <ClCompile Include="image_metadata_provider.cpp" />
-    <ClCompile Include="localization.cpp" />
-    <ClCompile Include="markdown_renderer.cpp" />
-    <ClCompile Include="media_metadata_provider.cpp" />
-    <ClCompile Include="media_preview_preferences.cpp" />
-    <ClCompile Include="office_availability.cpp" />
-    <ClCompile Include="office_pdf_service.cpp" />
-    <ClCompile Include="path_copy_preferences.cpp" />
-    <ClCompile Include="pdf_render_client.cpp" />
-    <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
+    <ClCompile Include="preview\archive_provider.cpp" />
+    <ClCompile Include="components\component_catalog.cpp" />
+    <ClCompile Include="components\component_loader.cpp" />
+    <ClCompile Include="preferences\footer_preferences.cpp" />
+    <ClCompile Include="preferences\folder_preview_preferences.cpp" />
+    <ClCompile Include="preview\generic_file_info.cpp" />
+    <ClCompile Include="preferences\generic_preview_preferences.cpp" />
+    <ClCompile Include="preferences\appearance_preferences.cpp" />
+    <ClCompile Include="preview\image_metadata_provider.cpp" />
+    <ClCompile Include="application\localization.cpp" />
+    <ClCompile Include="preview\markdown_renderer.cpp" />
+    <ClCompile Include="preview\media_metadata_provider.cpp" />
+    <ClCompile Include="preferences\media_preview_preferences.cpp" />
+    <ClCompile Include="preferences\path_copy_preferences.cpp" />
+    <ClCompile Include="preview\pdf_render_client.cpp" />
+    <ClCompile Include="common\pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="App.xaml.cpp"><DependentUpon>App.xaml</DependentUpon></ClCompile>
-    <ClCompile Include="MainWindow.xaml.cpp"><DependentUpon>MainWindow.xaml</DependentUpon></ClCompile>
-    <ClCompile Include="SettingsWindow.xaml.cpp"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClCompile>
-    <ClCompile Include="pipe_client.cpp" />
-    <ClCompile Include="preview_provider.cpp" />
-    <ClCompile Include="scintilla_text_view.cpp" />
-    <ClCompile Include="shell_icon_provider.cpp" />
-    <ClCompile Include="syntax_theme.cpp" />
-    <ClCompile Include="startup_registration.cpp" />
-    <ClCompile Include="text_preferences.cpp" />
-    <ClCompile Include="tray_icon.cpp" />
-    <ClCompile Include="update_checker.cpp" />
-    <ClCompile Include="webview_availability.cpp" />
-    <ClCompile Include="window_size_store.cpp" />
-    <ClCompile Include="window_preferences.cpp" />
+    <ClCompile Include="ui\MainWindow.xaml.cpp"><DependentUpon>MainWindow.xaml</DependentUpon></ClCompile>
+    <ClCompile Include="ui\SettingsWindow.xaml.cpp"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClCompile>
+    <ClCompile Include="application\pipe_client.cpp" />
+    <ClCompile Include="preview\preview_provider.cpp" />
+    <ClCompile Include="preview\scintilla_text_view.cpp" />
+    <ClCompile Include="preview\shell_icon_provider.cpp" />
+    <ClCompile Include="preview\syntax_theme.cpp" />
+    <ClCompile Include="application\startup_registration.cpp" />
+    <ClCompile Include="preferences\text_preferences.cpp" />
+    <ClCompile Include="application\tray_icon.cpp" />
+    <ClCompile Include="application\update_checker.cpp" />
+    <ClCompile Include="preview\webview_availability.cpp" />
+    <ClCompile Include="preferences\window_size_store.cpp" />
+    <ClCompile Include="preferences\window_preferences.cpp" />
     <ClCompile Include="third_party\md4c\entity.c">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <CompileAs>CompileAsC</CompileAs>
@@ -175,15 +175,15 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <Midl Include="MainWindow.idl"><SubType>Code</SubType><DependentUpon>MainWindow.xaml</DependentUpon></Midl>
-    <Midl Include="SettingsWindow.idl"><SubType>Code</SubType><DependentUpon>SettingsWindow.xaml</DependentUpon></Midl>
+    <Midl Include="ui\MainWindow.idl"><Link>MainWindow.idl</Link><SubType>Code</SubType><DependentUpon>MainWindow.xaml</DependentUpon></Midl>
+    <Midl Include="ui\SettingsWindow.idl"><Link>SettingsWindow.idl</Link><SubType>Code</SubType><DependentUpon>SettingsWindow.xaml</DependentUpon></Midl>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Glance.Contracts\Glance.Contracts.vcxproj">
       <Project>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Glance.OfficeHost\Glance.OfficeHost.vcxproj">
-      <Project>{D890E6BE-551D-498E-94EC-E219044D3B77}</Project>
+    <ProjectReference Include="..\Glance.Components\Office\Glance.OfficeComponent.vcxproj">
+      <Project>{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
     <ProjectReference Include="..\Glance.RenderHost\Glance.RenderHost.vcxproj">
@@ -200,5 +200,14 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
     <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
   </ItemGroup>
+  <Target Name="GenerateComponentCatalog" BeforeTargets="ClCompile">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(SolutionDir)scripts\generate-component-metadata.ps1&quot; -RepositoryRoot &quot;$(ProjectDir)..\..&quot; -OutputDirectory &quot;$(IntDir)generated&quot;" />
+  </Target>
+  <Target Name="MirrorCategorizedXamlGeneratedHeaders" AfterTargets="MarkupCompilePass2">
+    <MakeDir Directories="$(GeneratedFilesDir)ui" />
+    <Copy
+      SourceFiles="$(GeneratedFilesDir)MainWindow.xaml.g.hpp;$(GeneratedFilesDir)SettingsWindow.xaml.g.hpp"
+      DestinationFiles="$(GeneratedFilesDir)ui\MainWindow.xaml.g.hpp;$(GeneratedFilesDir)ui\SettingsWindow.xaml.g.hpp" />
+  </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

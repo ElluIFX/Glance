@@ -118,10 +118,20 @@ namespace
         output.insert(output.end(), begin, begin + size);
     }
 
-    std::wstring executable_directory()
+    std::wstring component_directory()
     {
+        HMODULE module{};
+        if (!GetModuleHandleExW(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                    GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                reinterpret_cast<LPCWSTR>(&component_directory),
+                &module))
+        {
+            return {};
+        }
         std::wstring path(32768, L'\0');
-        const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+        const DWORD length =
+            GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
         path.resize(length);
         return std::filesystem::path(path).parent_path().wstring();
     }
@@ -576,7 +586,8 @@ namespace
         const std::filesystem::path& output,
         const std::shared_ptr<ConversionJob>& job)
     {
-        const auto host_path = std::filesystem::path(executable_directory()) / L"Glance.OfficeHost.exe";
+        const auto host_path =
+            std::filesystem::path(component_directory()) / L"Glance.OfficeHost.exe";
         std::error_code error;
         if (!std::filesystem::is_regular_file(host_path, error))
         {

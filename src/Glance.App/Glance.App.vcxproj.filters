@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Application"><UniqueIdentifier>{06B95C7D-9091-4C70-9C71-EBC62D88045D}</UniqueIdentifier></Filter>
+    <Filter Include="Components"><UniqueIdentifier>{84CE4F93-1461-4F97-99FB-24CD7C4510AA}</UniqueIdentifier></Filter>
+    <Filter Include="Preferences"><UniqueIdentifier>{CDDA0A04-8DB4-4296-A4AE-530C6B78CE3B}</UniqueIdentifier></Filter>
+    <Filter Include="Preview"><UniqueIdentifier>{5E555F4E-CBD8-40A6-B6BC-1FB3BDC16A1F}</UniqueIdentifier></Filter>
+    <Filter Include="UI"><UniqueIdentifier>{B9697B61-ABF4-40EC-8792-4F6D50D1A6EE}</UniqueIdentifier></Filter>
+    <Filter Include="Common"><UniqueIdentifier>{2FD839A7-7308-4BE7-9B09-C83BDB8D01D2}</UniqueIdentifier></Filter>
+    <Filter Include="Third Party"><UniqueIdentifier>{06071C63-B6A2-4B92-B678-6540F2452623}</UniqueIdentifier></Filter>
+    <Filter Include="Resources"><UniqueIdentifier>{9D6E5B79-68A1-4EE8-BDD2-A5B6E020BE09}</UniqueIdentifier></Filter>
+    <Filter Include="Assets"><UniqueIdentifier>{D35EAF0B-5790-4088-948A-BF80179A0D39}</UniqueIdentifier></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="App.xaml.h"><Filter>Application</Filter></ClInclude>
+    <ClInclude Include="application\localization.h"><Filter>Application</Filter></ClInclude>
+    <ClInclude Include="application\pipe_client.h"><Filter>Application</Filter></ClInclude>
+    <ClInclude Include="application\startup_registration.h"><Filter>Application</Filter></ClInclude>
+    <ClInclude Include="application\tray_icon.h"><Filter>Application</Filter></ClInclude>
+    <ClInclude Include="application\update_checker.h"><Filter>Application</Filter></ClInclude>
+    <ClInclude Include="components\component_catalog.h"><Filter>Components</Filter></ClInclude>
+    <ClInclude Include="components\component_loader.h"><Filter>Components</Filter></ClInclude>
+    <ClInclude Include="preferences\appearance_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\folder_preview_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\footer_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\generic_preview_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\media_preview_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\path_copy_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\text_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\window_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\window_size_store.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preview\archive_provider.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\generic_file_info.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\image_metadata_provider.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\markdown_renderer.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\media_metadata_provider.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\pan_interaction.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\pdf_render_client.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\preview_file.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\preview_provider.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\scintilla_text_view.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\shell_icon_provider.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\syntax_theme.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\text_font_fallback.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\webview_availability.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="ui\MainWindow.xaml.h"><Filter>UI</Filter></ClInclude>
+    <ClInclude Include="ui\SettingsWindow.xaml.h"><Filter>UI</Filter></ClInclude>
+    <ClInclude Include="common\pch.h"><Filter>Common</Filter></ClInclude>
+    <ClInclude Include="common\resource.h"><Filter>Common</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="App.xaml.cpp"><Filter>Application</Filter></ClCompile>
+    <ClCompile Include="application\localization.cpp"><Filter>Application</Filter></ClCompile>
+    <ClCompile Include="application\pipe_client.cpp"><Filter>Application</Filter></ClCompile>
+    <ClCompile Include="application\startup_registration.cpp"><Filter>Application</Filter></ClCompile>
+    <ClCompile Include="application\tray_icon.cpp"><Filter>Application</Filter></ClCompile>
+    <ClCompile Include="application\update_checker.cpp"><Filter>Application</Filter></ClCompile>
+    <ClCompile Include="components\component_catalog.cpp"><Filter>Components</Filter></ClCompile>
+    <ClCompile Include="components\component_loader.cpp"><Filter>Components</Filter></ClCompile>
+    <ClCompile Include="preferences\appearance_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\folder_preview_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\footer_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\generic_preview_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\media_preview_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\path_copy_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\text_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\window_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\window_size_store.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preview\archive_provider.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\generic_file_info.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\image_metadata_provider.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\markdown_renderer.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\media_metadata_provider.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\pdf_render_client.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\preview_provider.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\scintilla_text_view.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\shell_icon_provider.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\syntax_theme.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\webview_availability.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="ui\MainWindow.xaml.cpp"><Filter>UI</Filter></ClCompile>
+    <ClCompile Include="ui\SettingsWindow.xaml.cpp"><Filter>UI</Filter></ClCompile>
+    <ClCompile Include="common\pch.cpp"><Filter>Common</Filter></ClCompile>
+    <ClCompile Include="third_party\md4c\entity.c"><Filter>Third Party</Filter></ClCompile>
+    <ClCompile Include="third_party\md4c\md4c.c"><Filter>Third Party</Filter></ClCompile>
+    <ClCompile Include="third_party\md4c\md4c-html.c"><Filter>Third Party</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml"><Filter>Application</Filter></ApplicationDefinition>
+    <Page Include="ui\MainWindow.xaml"><Filter>UI</Filter></Page>
+    <Page Include="ui\SettingsWindow.xaml"><Filter>UI</Filter></Page>
+    <Midl Include="ui\MainWindow.idl"><Filter>UI</Filter></Midl>
+    <Midl Include="ui\SettingsWindow.idl"><Filter>UI</Filter></Midl>
+    <PRIResource Include="Resources\en-US\Resources.resw"><Filter>Resources</Filter></PRIResource>
+    <PRIResource Include="Resources\zh-CN\Resources.resw"><Filter>Resources</Filter></PRIResource>
+    <Content Include="Assets\AppIcon.png"><Filter>Assets</Filter></Content>
+  </ItemGroup>
+</Project>

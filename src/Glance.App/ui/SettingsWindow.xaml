@@ -124,6 +124,15 @@
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
             <NavigationViewItem
+                x:Name="ComponentsNavigationItem"
+                x:Uid="ComponentsNavigationItem"
+                Content="Components"
+                Tag="components">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE950;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
                 x:Name="MaintenanceNavigationItem"
                 x:Uid="MaintenanceNavigationItem"
                 Content="Maintenance"
@@ -172,8 +181,10 @@
                         <TextBlock x:Name="GeneralPageTitle" x:Uid="GeneralPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="General" />
                         <TextBlock x:Name="GeneralPageDescription" x:Uid="GeneralPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Appearance and application startup" />
                     </StackPanel>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
-                        <StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="AppearanceGroupTitle" x:Uid="AppearanceGroupTitle" FontWeight="SemiBold" Text="Appearance" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -276,10 +287,13 @@
                                     </ComboBoxItem>
                                 </ComboBox>
                             </Grid>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
-                        <StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="StartupGroupTitle" x:Uid="StartupGroupTitle" FontWeight="SemiBold" Text="Startup" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -298,8 +312,9 @@
                                     VerticalAlignment="Center"
                                     Toggled="LaunchAtSignInToggle_Toggled" />
                             </Grid>
-                        </StackPanel>
-                    </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
@@ -803,6 +818,41 @@
             </ScrollViewer>
 
             <ScrollViewer
+                x:Name="ComponentsSettingsPanel"
+                HorizontalContentAlignment="Stretch"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="ComponentsPageTitle" x:Uid="ComponentsPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Components" />
+                        <TextBlock x:Name="ComponentsPageDescription" x:Uid="ComponentsPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Install and manage optional preview support" />
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="ComponentLocationGroupTitle" x:Uid="ComponentLocationGroupTitle" FontWeight="SemiBold" Text="Location" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="ComponentFolderLabel" x:Uid="ComponentFolderLabel" Text="Component folder" />
+                                    <TextBlock x:Name="ComponentFolderDescription" x:Uid="ComponentFolderDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Components are loaded from this folder after restart" />
+                                </StackPanel>
+                                <Button x:Name="OpenComponentsFolderButton" x:Uid="OpenComponentsFolderButton" Grid.Column="1" Click="OpenComponentsFolderButton_Click" Content="Open folder" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="ComponentStatusGroupTitle" x:Uid="ComponentStatusGroupTitle" FontWeight="SemiBold" Text="Component status" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <StackPanel x:Name="ComponentStatusList" />
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer
                 x:Name="MaintenanceSettingsPanel"
                 HorizontalContentAlignment="Stretch"
                 VerticalScrollBarVisibility="Auto"
@@ -848,18 +898,6 @@
                                     <TextBlock x:Name="WebViewAvailabilityStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>
                                 <FontIcon x:Name="WebViewAvailabilityStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="OfficeAvailabilityLabel" x:Uid="OfficeAvailabilityLabel" Text="Office availability" />
-                                    <TextBlock x:Name="OfficeAvailabilityStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
-                                </StackPanel>
-                                <FontIcon x:Name="OfficeAvailabilityStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">

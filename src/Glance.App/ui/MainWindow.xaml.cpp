@@ -7,8 +7,7 @@
 #include "localization.h"
 #include "markdown_renderer.h"
 #include "media_metadata_provider.h"
-#include "office_availability.h"
-#include "office_pdf_service.h"
+#include "component_loader.h"
 #include "pan_interaction.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
@@ -1244,7 +1243,7 @@ namespace winrt::Glance::App::implementation
         }
         return current_kind_ == glance::app::PreviewKind::image ||
             current_kind_ == glance::app::PreviewKind::pdf ||
-            current_kind_ == glance::app::PreviewKind::office ||
+            current_kind_ == glance::app::PreviewKind::component ||
             (current_kind_ == glance::app::PreviewKind::media && !media_is_audio_);
     }
 
@@ -1289,7 +1288,7 @@ namespace winrt::Glance::App::implementation
             0,
             current_width - static_cast<int>(std::lround(panel.ActualWidth())));
         if (current_kind_ == glance::app::PreviewKind::pdf ||
-            current_kind_ == glance::app::PreviewKind::office)
+            current_kind_ == glance::app::PreviewKind::component)
         {
             horizontal_chrome += static_cast<int>(std::lround(PdfNavigationColumn().ActualWidth()));
         }
@@ -1505,8 +1504,8 @@ namespace winrt::Glance::App::implementation
         }
 
         const auto kind = glance::app::resolve_preview_kind(file.path);
-        if (kind == glance::app::PreviewKind::office &&
-            !glance::app::office_preview_available(file.path))
+        if (kind == glance::app::PreviewKind::component &&
+            !glance::app::component_can_preview(file.path))
         {
             content_preview_kind_ = glance::app::PreviewKind::generic;
             update_preview_mode_button();
@@ -1600,7 +1599,7 @@ namespace winrt::Glance::App::implementation
             FolderEntryList().Items().Clear();
             load_archive_async(file.path, generation);
             break;
-        case glance::app::PreviewKind::office:
+        case glance::app::PreviewKind::component:
             show_content_panel(glance::app::PreviewKind::pdf);
             PdfPageImage().Source(nullptr);
             pdf_wheel_delta_ = 0;
@@ -1608,7 +1607,7 @@ namespace winrt::Glance::App::implementation
             PdfLoadingText().Text(glance::app::localize(L"PreparingOfficePreview"));
             PdfLoadingText().Visibility(Visibility::Visible);
             PdfLoadingOverlay().Visibility(Visibility::Visible);
-            load_office_async(file.path, generation);
+            load_component_async(file.path, generation);
             break;
         default:
             present_generic(file, true, true);
@@ -3070,7 +3069,7 @@ namespace winrt::Glance::App::implementation
         dispatch_updates();
     }
 
-    fire_and_forget MainWindow::load_office_async(
+    fire_and_forget MainWindow::load_component_async(
         std::wstring path,
         std::uint64_t generation)
     {
@@ -3078,15 +3077,7 @@ namespace winrt::Glance::App::implementation
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
 
-        glance::app::OfficePdfResult result;
-        try
-        {
-            result = glance::app::prepare_office_pdf(path);
-        }
-        catch (...)
-        {
-            result.status = glance::app::OfficePdfStatus::conversion_failed;
-        }
+        auto result = glance::app::prepare_component_preview(path);
 
         static_cast<void>(dispatcher.TryEnqueue([
             weak,
@@ -3095,14 +3086,16 @@ namespace winrt::Glance::App::implementation
             const auto lifetime = weak.get();
             if (lifetime == nullptr ||
                 generation != lifetime->content_generation_ ||
-                lifetime->current_kind_ != glance::app::PreviewKind::office)
+                lifetime->current_kind_ != glance::app::PreviewKind::component)
             {
                 return;
             }
-            if (result.status != glance::app::OfficePdfStatus::success ||
-                result.pdf_path.empty())
+            if (result.status !=
+                    glance::contracts::components::PrepareStatus::success ||
+                result.output_path.empty())
             {
-                if (result.status != glance::app::OfficePdfStatus::cancelled)
+                if (result.status !=
+                    glance::contracts::components::PrepareStatus::cancelled)
                 {
                     lifetime->show_provider_error(
                         glance::app::localize(L"OfficeConvertError"),
@@ -3113,7 +3106,7 @@ namespace winrt::Glance::App::implementation
 
             lifetime->PdfLoadingText().Text(
                 glance::app::localize(L"LoadingConvertedDocument"));
-            lifetime->load_pdf_async(result.pdf_path, generation);
+            lifetime->load_pdf_async(result.output_path, generation);
         }));
     }
 

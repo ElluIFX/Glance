@@ -1,10 +1,11 @@
 #include "pch.h"
 #include "SettingsWindow.xaml.h"
 #include "appearance_preferences.h"
+#include "component_catalog.h"
+#include "component_loader.h"
 #include "footer_preferences.h"
 #include "localization.h"
 #include "media_metadata_provider.h"
-#include "office_availability.h"
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "startup_registration.h"
@@ -14,12 +15,13 @@
 #include "webview_availability.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
-#include "../version.h"
+#include "../../version.h"
 #if __has_include("SettingsWindow.g.cpp")
 #include "SettingsWindow.g.cpp"
 #endif
 
 #include <microsoft.ui.xaml.window.h>
+#include <shellapi.h>
 #include <algorithm>
 #include <array>
 #include <filesystem>
@@ -32,6 +34,7 @@ using namespace winrt;
 using namespace Microsoft::UI::Xaml;
 namespace Controls = Microsoft::UI::Xaml::Controls;
 namespace Media = Microsoft::UI::Xaml::Media;
+namespace Shapes = Microsoft::UI::Xaml::Shapes;
 
 namespace
 {
@@ -420,6 +423,7 @@ namespace winrt::Glance::App::implementation
         set_content(FooterNavigationItem(), L"FooterNavigationItem.Content");
         set_content(TextPreviewNavigationItem(), L"TextPreviewNavigationItem.Content");
         set_content(MediaPreviewNavigationItem(), L"MediaPreviewNavigationItem.Content");
+        set_content(ComponentsNavigationItem(), L"ComponentsNavigationItem.Content");
         set_content(MaintenanceNavigationItem(), L"MaintenanceNavigationItem.Content");
         set_content(AboutNavigationItem(), L"AboutNavigationItem.Content");
         set_text(ExitButtonText(), L"ExitButtonText.Text");
@@ -566,12 +570,20 @@ namespace winrt::Glance::App::implementation
         set_text(QuoteCopiedPathDescription(), L"QuoteCopiedPathDescription.Text");
         set_text(UnixPathSeparatorsLabel(), L"UnixPathSeparatorsLabel.Text");
         set_text(UnixPathSeparatorsDescription(), L"UnixPathSeparatorsDescription.Text");
+        set_text(ComponentsPageTitle(), L"ComponentsPageTitle.Text");
+        set_text(ComponentsPageDescription(), L"ComponentsPageDescription.Text");
+        set_text(AppearanceGroupTitle(), L"AppearanceGroupTitle.Text");
+        set_text(StartupGroupTitle(), L"StartupGroupTitle.Text");
+        set_text(ComponentLocationGroupTitle(), L"ComponentLocationGroupTitle.Text");
+        set_text(ComponentFolderLabel(), L"ComponentFolderLabel.Text");
+        set_text(ComponentFolderDescription(), L"ComponentFolderDescription.Text");
+        set_content(OpenComponentsFolderButton(), L"OpenComponentsFolderButton.Content");
+        set_text(ComponentStatusGroupTitle(), L"ComponentStatusGroupTitle.Text");
         set_text(MaintenancePageTitle(), L"MaintenancePageTitle.Text");
         set_text(MaintenancePageDescription(), L"MaintenancePageDescription.Text");
         set_text(InputCoreLabel(), L"InputCoreLabel.Text");
         set_text(MediaComponentsLabel(), L"MediaComponentsLabel.Text");
         set_text(WebViewAvailabilityLabel(), L"WebViewAvailabilityLabel.Text");
-        set_text(OfficeAvailabilityLabel(), L"OfficeAvailabilityLabel.Text");
         set_text(AdministratorAccessLabel(), L"AdministratorAccessLabel.Text");
         set_text(DiagnosticBundleLabel(), L"DiagnosticBundleLabel.Text");
         set_content(ExportDiagnosticBundleButton(), L"ExportDiagnosticBundleButton.Content");
@@ -588,6 +600,7 @@ namespace winrt::Glance::App::implementation
         AboutVersionText().Text(glance::app::localize_format(
             L"VersionFormat", { GLANCE_VERSION_WSTRING }));
         refresh_runtime_statuses();
+        refresh_component_statuses();
     }
 
     bool SettingsWindow::launch_at_sign_in_enabled() const
@@ -631,17 +644,120 @@ namespace winrt::Glance::App::implementation
             L"WebViewAvailable",
             L"WebViewUnavailable");
         set_status_indicator(
-            OfficeAvailabilityStatusIcon(),
-            OfficeAvailabilityStatusText(),
-            glance::app::office_com_available(),
-            L"OfficeComAvailable",
-            L"OfficeComUnavailable");
-        set_status_indicator(
             AdministratorAccessStatusIcon(),
             AdministratorAccessStatusText(),
             core_running && named_mutex_exists(L"Local\\Glance.Core.Elevated"),
             L"AdministratorAccessAvailable",
             L"AdministratorAccessUnavailable");
+    }
+
+    void SettingsWindow::refresh_component_statuses()
+    {
+        ComponentStatusList().Children().Clear();
+        const auto statuses = glance::app::component_statuses();
+        const auto row_style =
+            SettingsNavigation().Resources().Lookup(box_value(L"SettingsRowStyle")).as<Style>();
+        for (std::size_t index = 0; index < statuses.size(); ++index)
+        {
+            const auto& status = statuses[index];
+            if (index != 0)
+            {
+                Shapes::Rectangle divider;
+                divider.Height(1);
+                divider.Fill(
+                    Application::Current().Resources().TryLookup(
+                        box_value(L"DividerStrokeColorDefaultBrush")).try_as<Media::Brush>());
+                ComponentStatusList().Children().Append(divider);
+            }
+
+            Controls::Grid row;
+            row.Style(row_style);
+            Controls::ColumnDefinition content_column;
+            content_column.Width(GridLength{ 1, GridUnitType::Star });
+            row.ColumnDefinitions().Append(content_column);
+            Controls::ColumnDefinition icon_column;
+            icon_column.Width(GridLengthHelper::Auto());
+            row.ColumnDefinitions().Append(icon_column);
+
+            Controls::StackPanel content;
+            content.Spacing(3);
+            const auto* descriptor = glance::app::find_supported_component(status.id);
+            Controls::TextBlock title;
+            title.Text(descriptor == nullptr
+                ? status.id
+                : glance::app::localize(descriptor->display_name_resource));
+            content.Children().Append(title);
+
+            std::wstring state_key;
+            Windows::UI::Color color{ 255, 96, 94, 92 };
+            std::wstring glyph = L"\xE946";
+            switch (status.state)
+            {
+            case glance::app::ComponentState::healthy:
+                state_key = L"ComponentStateHealthy";
+                color = { 255, 16, 124, 16 };
+                glyph = L"\xE8FB";
+                break;
+            case glance::app::ComponentState::warning:
+                state_key = L"ComponentStateWarning";
+                color = { 255, 157, 93, 0 };
+                glyph = L"\xE7BA";
+                break;
+            case glance::app::ComponentState::error:
+                state_key = L"ComponentStateError";
+                color = { 255, 196, 43, 28 };
+                glyph = L"\xE711";
+                break;
+            case glance::app::ComponentState::incompatible:
+                state_key = L"ComponentStateIncompatible";
+                color = { 255, 196, 43, 28 };
+                glyph = L"\xE7BA";
+                break;
+            case glance::app::ComponentState::damaged:
+                state_key = L"ComponentStateDamaged";
+                color = { 255, 196, 43, 28 };
+                glyph = L"\xE711";
+                break;
+            default:
+                state_key = L"ComponentStateNotInstalled";
+                break;
+            }
+
+            if (status.health.detail[0] == L'\0')
+            {
+                Controls::TextBlock details;
+                details.Style(
+                    SettingsNavigation().Resources()
+                        .Lookup(box_value(L"SettingsDescriptionStyle"))
+                        .as<Style>());
+                details.Text(glance::app::localize(state_key));
+                content.Children().Append(details);
+            }
+            else
+            {
+                Controls::TextBlock health_detail;
+                health_detail.Style(
+                    SettingsNavigation().Resources()
+                        .Lookup(box_value(L"SettingsDescriptionStyle"))
+                        .as<Style>());
+                health_detail.Text(status.health.detail);
+                health_detail.TextWrapping(TextWrapping::Wrap);
+                content.Children().Append(health_detail);
+            }
+            row.Children().Append(content);
+
+            Controls::FontIcon status_icon;
+            status_icon.Glyph(glyph);
+            status_icon.FontSize(18);
+            status_icon.Foreground(Media::SolidColorBrush(color));
+            status_icon.VerticalAlignment(VerticalAlignment::Center);
+            Controls::Grid::SetColumn(status_icon, 1);
+            Controls::ToolTipService::SetToolTip(
+                status_icon,
+                box_value(glance::app::localize(state_key)));
+            row.Children().Append(status_icon);
+            ComponentStatusList().Children().Append(row);
+        }
     }
 
     void SettingsWindow::refresh_diagnostic_bundle_status()
@@ -1034,6 +1150,27 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void SettingsWindow::OpenComponentsFolderButton_Click(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        try
+        {
+            const auto path = glance::app::application_component_root();
+            std::filesystem::create_directories(path);
+            static_cast<void>(ShellExecuteW(
+                nullptr,
+                L"open",
+                path.c_str(),
+                nullptr,
+                nullptr,
+                SW_SHOWNORMAL));
+        }
+        catch (...)
+        {
+        }
+    }
+
     void SettingsWindow::ResetWindowSizesButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         WindowResetStatusText().Text(
@@ -1302,6 +1439,7 @@ namespace winrt::Glance::App::implementation
         FooterSettingsPanel().Visibility(tag == L"footer" ? Visibility::Visible : Visibility::Collapsed);
         TextPreviewSettingsPanel().Visibility(tag == L"text" ? Visibility::Visible : Visibility::Collapsed);
         MediaPreviewSettingsPanel().Visibility(tag == L"media" ? Visibility::Visible : Visibility::Collapsed);
+        ComponentsSettingsPanel().Visibility(tag == L"components" ? Visibility::Visible : Visibility::Collapsed);
         MaintenanceSettingsPanel().Visibility(tag == L"maintenance" ? Visibility::Visible : Visibility::Collapsed);
         AboutSettingsPanel().Visibility(tag == L"about" ? Visibility::Visible : Visibility::Collapsed);
         if (tag == L"general")
@@ -1312,6 +1450,10 @@ namespace winrt::Glance::App::implementation
         {
             glance::app::refresh_webview_availability();
             refresh_runtime_statuses();
+        }
+        if (tag == L"components")
+        {
+            refresh_component_statuses();
         }
     }
 

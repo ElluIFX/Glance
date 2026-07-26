@@ -43,12 +43,14 @@ if ($SelfContained) {
     $arguments += "/p:WindowsAppSDKSelfContained=true"
 }
 
+$outputRoot = Join-Path $repositoryRoot "bin\$Configuration\$Platform"
 if ($OutputDirectory) {
-    $resolvedOutput = Resolve-GlanceWorkspacePath -Path $OutputDirectory
-    New-Item -ItemType Directory -Path $resolvedOutput -Force | Out-Null
-    $resolvedOutput = $resolvedOutput.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
-    $arguments += "/p:OutDir=$resolvedOutput"
+    $outputRoot = Resolve-GlanceWorkspacePath -Path $OutputDirectory
+    New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
+    $outputProperty = $outputRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    $arguments += "/p:GlanceOutputRoot=$outputProperty"
 }
+Remove-GlanceWorkspaceItem -Path (Join-Path $outputRoot "plugins")
 
 Write-Host "Building Glance $Configuration|$Platform ($target)..."
 & $msbuild @arguments

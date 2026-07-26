@@ -44,7 +44,8 @@ namespace
         ResourceStore()
             : manager_(resource_file_path().wstring()),
               resources_(manager_.MainResourceMap().GetSubtree(L"Resources")),
-              context_(manager_.CreateResourceContext())
+              context_(manager_.CreateResourceContext()),
+              language_(L"en-US")
         {
         }
 
@@ -55,6 +56,13 @@ namespace
                 winrt::Microsoft::Windows::ApplicationModel::Resources::
                     KnownResourceQualifierName::Language(),
                 winrt::hstring(language));
+            language_ = language;
+        }
+
+        std::wstring language()
+        {
+            std::scoped_lock lock(mutex_);
+            return language_;
         }
 
         std::wstring get(std::wstring_view key)
@@ -76,6 +84,7 @@ namespace
         winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceManager manager_;
         winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceMap resources_;
         winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceContext context_;
+        std::wstring language_;
     };
 
     ResourceStore& resource_store()
@@ -120,6 +129,11 @@ namespace glance::app
         winrt::Microsoft::Windows::Globalization::ApplicationLanguages::PrimaryLanguageOverride(
             resolved);
         resource_store().set_language(resolved);
+    }
+
+    std::wstring current_ui_language()
+    {
+        return resource_store().language();
     }
 
     std::wstring localize(std::wstring_view key)

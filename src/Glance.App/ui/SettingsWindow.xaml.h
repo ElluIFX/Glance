@@ -8,6 +8,7 @@
 #include "text_preferences.h"
 #include "window_preferences.h"
 
+#include <filesystem>
 #include <functional>
 
 namespace winrt::Glance::App::implementation
@@ -69,6 +70,9 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget CheckForUpdatesButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void OpenComponentsFolderButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ResetWindowSizesButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -127,6 +131,7 @@ namespace winrt::Glance::App::implementation
 
         void configure_window();
         void refresh_runtime_statuses();
+        void refresh_component_statuses();
         void refresh_diagnostic_bundle_status();
         void refresh_launch_at_sign_in();
         [[nodiscard]] bool launch_at_sign_in_enabled() const;
