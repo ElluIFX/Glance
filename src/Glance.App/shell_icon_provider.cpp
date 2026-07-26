@@ -4,10 +4,12 @@
 #include <commoncontrols.h>
 #include <robuffer.h>
 #include <shellapi.h>
+#include <shobjidl_core.h>
 #include <wincodec.h>
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <mutex>
 #include <optional>
 #include <unordered_map>
@@ -73,6 +75,43 @@ namespace glance::app
 
         private:
             HICON value_{};
+        };
+
+        class unique_bitmap
+        {
+        public:
+            unique_bitmap() noexcept = default;
+            explicit unique_bitmap(HBITMAP value) noexcept : value_(value) {}
+            ~unique_bitmap()
+            {
+                reset();
+            }
+
+            unique_bitmap(const unique_bitmap&) = delete;
+            unique_bitmap& operator=(const unique_bitmap&) = delete;
+
+            [[nodiscard]] HBITMAP get() const noexcept
+            {
+                return value_;
+            }
+
+            HBITMAP* put() noexcept
+            {
+                reset();
+                return &value_;
+            }
+
+            void reset(HBITMAP value = nullptr) noexcept
+            {
+                if (value_ != nullptr)
+                {
+                    DeleteObject(value_);
+                }
+                value_ = value;
+            }
+
+        private:
+            HBITMAP value_{};
         };
 
         class scoped_com_apartment
@@ -351,6 +390,78 @@ namespace glance::app
             }
             return result;
         }
+
+        ShellIconBitmapPtr convert_thumbnail(HBITMAP bitmap)
+        {
+            winrt::com_ptr<IWICImagingFactory> factory;
+            if (FAILED(CoCreateInstance(
+                    CLSID_WICImagingFactory2,
+                    nullptr,
+                    CLSCTX_INPROC_SERVER,
+                    IID_PPV_ARGS(factory.put()))))
+            {
+                return nullptr;
+            }
+
+            winrt::com_ptr<IWICBitmap> source;
+            if (FAILED(factory->CreateBitmapFromHBITMAP(
+                    bitmap,
+                    nullptr,
+                    WICBitmapUsePremultipliedAlpha,
+                    source.put())))
+            {
+                return nullptr;
+            }
+
+            UINT width{};
+            UINT height{};
+            if (FAILED(source->GetSize(&width, &height)) || width == 0 || height == 0)
+            {
+                return nullptr;
+            }
+
+            winrt::com_ptr<IWICFormatConverter> converter;
+            if (FAILED(factory->CreateFormatConverter(converter.put())) ||
+                FAILED(converter->Initialize(
+                    source.get(),
+                    GUID_WICPixelFormat32bppPBGRA,
+                    WICBitmapDitherTypeNone,
+                    nullptr,
+                    0.0,
+                    WICBitmapPaletteTypeCustom)))
+            {
+                return nullptr;
+            }
+
+            const UINT stride = width * 4U;
+            const UINT byte_count = stride * height;
+            auto result = std::make_shared<ShellIconBitmap>();
+            result->width = width;
+            result->height = height;
+            result->pixels.resize(byte_count);
+            if (FAILED(converter->CopyPixels(
+                    nullptr,
+                    stride,
+                    byte_count,
+                    result->pixels.data())))
+            {
+                return nullptr;
+            }
+            bool has_visible_pixels{};
+            for (std::size_t index = 3; index < result->pixels.size(); index += 4)
+            {
+                if (result->pixels[index] != 0)
+                {
+                    has_visible_pixels = true;
+                    break;
+                }
+            }
+            if (!has_visible_pixels)
+            {
+                return nullptr;
+            }
+            return result;
+        }
     }
 
     ShellIconBitmapPtr load_shell_icon(
@@ -411,6 +522,45 @@ namespace glance::app
         }
         const auto iterator = icon_cache.emplace(key, std::move(bitmap)).first;
         return iterator->second;
+    }
+    catch (...)
+    {
+        return nullptr;
+    }
+
+    ShellIconBitmapPtr load_shell_thumbnail(
+        std::wstring_view path,
+        std::uint32_t pixel_size) noexcept try
+    {
+        if (path.empty() || pixel_size == 0 ||
+            pixel_size > static_cast<std::uint32_t>(std::numeric_limits<LONG>::max()))
+        {
+            return nullptr;
+        }
+
+        const scoped_com_apartment apartment;
+        winrt::com_ptr<IShellItemImageFactory> image_factory;
+        const std::wstring path_value(path);
+        if (FAILED(SHCreateItemFromParsingName(
+                path_value.c_str(),
+                nullptr,
+                IID_PPV_ARGS(image_factory.put()))))
+        {
+            return nullptr;
+        }
+
+        unique_bitmap bitmap;
+        const SIZE size{
+            static_cast<LONG>(pixel_size),
+            static_cast<LONG>(pixel_size) };
+        if (FAILED(image_factory->GetImage(
+                size,
+                SIIGBF_THUMBNAILONLY,
+                bitmap.put())))
+        {
+            return nullptr;
+        }
+        return convert_thumbnail(bitmap.get());
     }
     catch (...)
     {

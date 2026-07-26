@@ -25,6 +25,10 @@ namespace glance::app
         std::uint32_t pixel_size,
         bool use_file_attributes = false) noexcept;
 
+    [[nodiscard]] ShellIconBitmapPtr load_shell_thumbnail(
+        std::wstring_view path,
+        std::uint32_t pixel_size) noexcept;
+
     [[nodiscard]] winrt::Microsoft::UI::Xaml::Media::ImageSource create_shell_icon_source(
         const ShellIconBitmap& bitmap);
 }

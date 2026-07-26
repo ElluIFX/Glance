@@ -252,6 +252,7 @@ namespace winrt::Glance::App::implementation
         void hide_password_prompt();
         void set_password_prompt_activation(bool enabled) noexcept;
         void submit_password();
+        void cancel_archive_icon_load() noexcept;
         winrt::fire_and_forget load_archive_async(
             std::wstring path,
             std::uint64_t generation,
@@ -264,9 +265,15 @@ namespace winrt::Glance::App::implementation
         {
             std::wstring path;
             std::wstring cache_key;
+            std::size_t control_index{};
+            std::uint32_t pixel_size{};
             bool is_folder{};
-            winrt::weak_ref<Microsoft::UI::Xaml::Controls::Image> image;
-            winrt::weak_ref<Microsoft::UI::Xaml::Controls::FontIcon> fallback;
+            bool thumbnail_candidate{};
+        };
+        struct ArchiveIconControl
+        {
+            Microsoft::UI::Xaml::Controls::Image image{ nullptr };
+            Microsoft::UI::Xaml::Controls::FontIcon fallback{ nullptr };
         };
         struct PendingArchiveNode
         {
@@ -278,6 +285,7 @@ namespace winrt::Glance::App::implementation
             glance::app::ArchivePreview preview;
             std::deque<PendingArchiveNode> pending;
             std::vector<ArchiveIconTarget> icon_targets;
+            std::vector<ArchiveIconControl> icon_controls;
             std::wstring status;
             std::uint64_t generation{};
         };
@@ -295,7 +303,8 @@ namespace winrt::Glance::App::implementation
         void update_archive_header_state();
         winrt::fire_and_forget load_archive_icons_async(
             std::vector<ArchiveIconTarget> targets,
-            std::uint64_t generation);
+            std::uint64_t generation,
+            std::shared_ptr<std::atomic_bool> cancellation);
         void apply_text_preview(
             glance::app::TextPreview preview,
             bool markdown,
@@ -417,6 +426,7 @@ namespace winrt::Glance::App::implementation
         glance::app::FolderPreviewPreferences folder_preview_preferences_{};
         glance::app::GenericPreviewPreferences generic_preview_preferences_{};
         std::shared_ptr<ArchiveRenderState> archive_render_state_;
+        std::shared_ptr<std::atomic_bool> archive_icon_cancellation_;
         std::vector<PreviewNavigationEntry> preview_navigation_;
         std::wstring pending_folder_selection_path_;
         double pending_folder_scroll_offset_{};

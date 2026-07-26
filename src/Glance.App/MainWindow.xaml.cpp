@@ -57,6 +57,9 @@ namespace
     constexpr std::size_t text_chunk_bytes = 256U * 1024U;
     constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
     constexpr std::size_t retained_preview_buffer_limit_bytes = 8U * 1024U * 1024U;
+    constexpr std::uint32_t folder_icon_pixel_size = 20;
+    constexpr std::uint32_t folder_thumbnail_pixel_size = 32;
+    constexpr std::size_t thumbnail_update_batch_size = 8;
     constexpr auto web_view_idle_timeout = std::chrono::minutes(1);
 
     std::optional<std::wstring> file_url_from_path(const std::wstring& path)
@@ -930,6 +933,7 @@ namespace winrt::Glance::App::implementation
     {
         defer_auto_fit_show_ = false;
         cancel_pdf_render();
+        cancel_archive_icon_load();
         glance::app::cancel_text_preview_read(current_text_reader_);
         ++content_generation_;
         stop_media_playback();
@@ -1429,6 +1433,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
         cancel_pdf_render();
+        cancel_archive_icon_load();
         hide_password_prompt();
         current_index_ = index;
         basic_info_mode_ = false;
@@ -2542,6 +2547,7 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        cancel_archive_icon_load();
         if (preview.password_required || preview.invalid_password)
         {
             show_password_prompt(
@@ -2583,6 +2589,7 @@ namespace winrt::Glance::App::implementation
         state->preview = std::move(preview);
         state->generation = generation;
         state->icon_targets.reserve(state->preview.entry_count);
+        state->icon_controls.reserve(state->preview.entry_count);
         for (const auto& entry : state->preview.entries)
         {
             state->pending.push_back(PendingArchiveNode{ &entry, nullptr });
@@ -2680,9 +2687,11 @@ namespace winrt::Glance::App::implementation
             icon_host.VerticalAlignment(VerticalAlignment::Center);
             Grid::SetColumn(icon_host, 0);
 
+            const std::uint32_t icon_pixel_size =
+                archive_preview_is_directory_ ? folder_icon_pixel_size : 16;
             Image icon_image;
-            icon_image.Width(16);
-            icon_image.Height(16);
+            icon_image.Width(icon_pixel_size);
+            icon_image.Height(icon_pixel_size);
             icon_image.Stretch(Media::Stretch::Uniform);
             icon_image.Visibility(Visibility::Collapsed);
             icon_host.Children().Append(icon_image);
@@ -2714,12 +2723,22 @@ namespace winrt::Glance::App::implementation
             {
                 extension = L":file";
             }
+            const auto control_index = state->icon_controls.size();
+            state->icon_controls.push_back(ArchiveIconControl{
+                icon_image,
+                fallback_icon });
             state->icon_targets.push_back(ArchiveIconTarget{
                 icon_path,
                 std::move(extension),
+                control_index,
+                icon_pixel_size,
                 entry.is_folder,
-                make_weak(icon_image),
-                make_weak(fallback_icon) });
+                archive_preview_is_directory_ &&
+                    !entry.is_folder &&
+                    (entry.attributes &
+                        (FILE_ATTRIBUTE_OFFLINE |
+                         FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS |
+                         FILE_ATTRIBUTE_RECALL_ON_OPEN)) == 0 });
 
             const auto append_text = [&row](std::wstring_view value, int column, TextAlignment alignment = TextAlignment::Left) {
                 TextBlock text;
@@ -2864,46 +2883,81 @@ namespace winrt::Glance::App::implementation
         }
         if (!state->icon_targets.empty())
         {
-            load_archive_icons_async(std::move(state->icon_targets), state->generation);
+            auto cancellation = std::make_shared<std::atomic_bool>(false);
+            archive_icon_cancellation_ = cancellation;
+            load_archive_icons_async(
+                std::move(state->icon_targets),
+                state->generation,
+                std::move(cancellation));
+        }
+    }
+
+    void MainWindow::cancel_archive_icon_load() noexcept
+    {
+        if (archive_icon_cancellation_ != nullptr)
+        {
+            archive_icon_cancellation_->store(true, std::memory_order_release);
+            archive_icon_cancellation_.reset();
         }
     }
 
     fire_and_forget MainWindow::load_archive_icons_async(
         std::vector<ArchiveIconTarget> targets,
-        std::uint64_t generation)
+        std::uint64_t generation,
+        std::shared_ptr<std::atomic_bool> cancellation)
     {
-        std::unordered_map<std::wstring, std::vector<ArchiveIconTarget>> groups;
-        for (auto& target : targets)
-        {
-            groups[target.cache_key].push_back(std::move(target));
-        }
-
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
+
+        std::vector<ArchiveIconTarget> thumbnail_targets;
+        std::unordered_map<std::wstring, std::vector<ArchiveIconTarget>> groups;
+        for (auto& target : targets)
+        {
+            if (target.thumbnail_candidate)
+            {
+                thumbnail_targets.push_back(target);
+            }
+            groups[target.cache_key].push_back(std::move(target));
+        }
         for (auto& [cache_key, group] : groups)
         {
+            if (cancellation->load(std::memory_order_acquire))
+            {
+                co_return;
+            }
             static_cast<void>(cache_key);
             const auto& representative = group.front();
             auto bitmap = glance::app::load_shell_icon(
                 representative.path,
                 representative.is_folder,
-                16,
+                representative.pixel_size,
                 true);
             if (bitmap == nullptr)
             {
                 continue;
             }
 
+            auto targets_for_ui = group;
             static_cast<void>(dispatcher.TryEnqueue(
-                [lifetime, bitmap = std::move(bitmap), group = std::move(group), generation]() mutable {
-                    if (generation != lifetime->content_generation_ ||
+                [lifetime,
+                 cancellation,
+                 bitmap = std::move(bitmap),
+                 group = std::move(targets_for_ui),
+                 generation]() mutable {
+                    if (cancellation->load(std::memory_order_acquire) ||
+                        generation != lifetime->content_generation_ ||
                         lifetime->current_kind_ != glance::app::PreviewKind::archive)
                     {
                         return;
                     }
                     try
                     {
+                        const auto state = lifetime->archive_render_state_;
+                        if (state == nullptr || state->generation != generation)
+                        {
+                            return;
+                        }
                         const auto source = glance::app::create_shell_icon_source(*bitmap);
                         if (source == nullptr)
                         {
@@ -2911,15 +2965,15 @@ namespace winrt::Glance::App::implementation
                         }
                         for (auto& target : group)
                         {
-                            const auto image = target.image.get();
-                            const auto fallback = target.fallback.get();
-                            if (image == nullptr || fallback == nullptr)
+                            if (target.control_index >= state->icon_controls.size())
                             {
                                 continue;
                             }
-                            image.Source(source);
-                            image.Visibility(Visibility::Visible);
-                            fallback.Visibility(Visibility::Collapsed);
+                            const auto& controls =
+                                state->icon_controls[target.control_index];
+                            controls.image.Source(source);
+                            controls.image.Visibility(Visibility::Visible);
+                            controls.fallback.Visibility(Visibility::Collapsed);
                         }
                     }
                     catch (...)
@@ -2927,6 +2981,93 @@ namespace winrt::Glance::App::implementation
                     }
                 }));
         }
+
+        struct ThumbnailUpdate
+        {
+            ArchiveIconTarget target;
+            glance::app::ShellIconBitmapPtr bitmap;
+        };
+        std::vector<ThumbnailUpdate> updates;
+        updates.reserve(thumbnail_update_batch_size);
+        const auto dispatch_updates = [&]() {
+            if (updates.empty())
+            {
+                return;
+            }
+            auto pending = std::move(updates);
+            updates.clear();
+            updates.reserve(thumbnail_update_batch_size);
+            static_cast<void>(dispatcher.TryEnqueue(
+                [lifetime,
+                 cancellation,
+                 pending = std::move(pending),
+                 generation]() mutable {
+                    if (generation != lifetime->content_generation_ ||
+                        cancellation->load(std::memory_order_acquire) ||
+                        lifetime->current_kind_ != glance::app::PreviewKind::archive ||
+                        !lifetime->archive_preview_is_directory_)
+                    {
+                        return;
+                    }
+                    const auto state = lifetime->archive_render_state_;
+                    if (state == nullptr || state->generation != generation)
+                    {
+                        return;
+                    }
+                    for (auto& update : pending)
+                    {
+                        try
+                        {
+                            if (update.target.control_index >=
+                                state->icon_controls.size())
+                            {
+                                continue;
+                            }
+                            const auto source =
+                                glance::app::create_shell_icon_source(*update.bitmap);
+                            if (source == nullptr)
+                            {
+                                continue;
+                            }
+                            const auto& controls =
+                                state->icon_controls[update.target.control_index];
+                            controls.image.Source(source);
+                            controls.image.Visibility(Visibility::Visible);
+                            controls.fallback.Visibility(Visibility::Collapsed);
+                        }
+                        catch (...)
+                        {
+                        }
+                    }
+                }));
+        };
+
+        for (auto& target : thumbnail_targets)
+        {
+            if (cancellation->load(std::memory_order_acquire))
+            {
+                co_return;
+            }
+            auto bitmap = glance::app::load_shell_thumbnail(
+                target.path,
+                folder_thumbnail_pixel_size);
+            if (cancellation->load(std::memory_order_acquire))
+            {
+                co_return;
+            }
+            if (bitmap == nullptr)
+            {
+                continue;
+            }
+            updates.push_back(ThumbnailUpdate{
+                std::move(target),
+                std::move(bitmap) });
+            if (updates.size() >= thumbnail_update_batch_size)
+            {
+                dispatch_updates();
+            }
+        }
+        dispatch_updates();
     }
 
     fire_and_forget MainWindow::load_office_async(
