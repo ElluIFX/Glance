@@ -11,15 +11,27 @@
 
         <Grid Grid.Row="0" Padding="12,0,6,0">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+            <Button
+                x:Name="BackButton"
+                x:Uid="BackButton"
+                Grid.Column="0"
+                Style="{StaticResource IconButtonStyle}"
+                Margin="0,0,4,0"
+                Click="BackButton_Click"
+                ToolTipService.ToolTip="Back"
+                Visibility="Collapsed">
+                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE72B;" />
+            </Button>
             <Grid
                 x:Name="TitleBarDragRegion"
-                Grid.Column="0"
+                Grid.Column="1"
                 Background="Transparent">
                 <TextBlock
                     x:Name="TitleText"
@@ -30,7 +42,7 @@
             </Grid>
             <ToggleButton
                 x:Name="PreviewModeButton"
-                Grid.Column="1"
+                Grid.Column="2"
                 Style="{StaticResource IconToggleButtonStyle}"
                 Margin="4,0,0,0"
                 Click="PreviewModeButton_Click"
@@ -40,7 +52,7 @@
             <ToggleButton
                 x:Name="PinButton"
                 x:Uid="PinButton"
-                Grid.Column="2"
+                Grid.Column="3"
                 Style="{StaticResource IconToggleButtonStyle}"
                 Margin="4,0,0,0"
                 Click="PinButton_Click"
@@ -50,7 +62,7 @@
             <ToggleButton
                 x:Name="TopmostButton"
                 x:Uid="TopmostButton"
-                Grid.Column="3"
+                Grid.Column="4"
                 Style="{StaticResource IconToggleButtonStyle}"
                 Margin="4,0,0,0"
                 Click="TopmostButton_Click"
@@ -60,7 +72,7 @@
             <Button
                 x:Name="ClosePreviewButton"
                 x:Uid="ClosePreviewButton"
-                Grid.Column="4"
+                Grid.Column="5"
                 Style="{StaticResource IconButtonStyle}"
                 Margin="4,0,0,0"
                 Click="ClosePreviewButton_Click"
@@ -597,7 +609,8 @@
                         x:Name="FolderEntryList"
                         Grid.Row="2"
                         Margin="6,2"
-                        SelectionMode="None"
+                        SelectionMode="Single"
+                        DoubleTapped="FolderEntryList_DoubleTapped"
                         Visibility="Collapsed">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">

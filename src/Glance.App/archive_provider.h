@@ -16,7 +16,9 @@ namespace glance::app
         std::wstring type_name;
         std::uint64_t compressed_size{};
         std::uint64_t original_size{};
+        std::uint64_t creation_time{};
         std::uint64_t modified_time{};
+        std::uint32_t attributes{};
         bool compressed_size_known{};
         bool original_size_known{};
         bool is_folder{};

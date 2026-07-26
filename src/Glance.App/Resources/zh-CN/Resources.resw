@@ -70,6 +70,7 @@
 
   <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>始终显示</value></data>
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>钉住文件</value></data>
+  <data name="BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>返回上一级</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭预览</value></data>
   <data name="PreviewModeShowInfoTooltip" xml:space="preserve"><value>显示基础信息</value></data>
   <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>显示内容预览</value></data>

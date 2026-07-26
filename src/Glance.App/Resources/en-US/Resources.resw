@@ -70,6 +70,7 @@
 
   <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>Always visible</value></data>
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>Pin file</value></data>
+  <data name="BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close preview</value></data>
   <data name="PreviewModeShowInfoTooltip" xml:space="preserve"><value>Show basic information</value></data>
   <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>Show content preview</value></data>

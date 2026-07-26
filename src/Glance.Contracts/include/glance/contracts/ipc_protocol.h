@@ -23,8 +23,15 @@ namespace glance::contracts
         close_active_preview = 11,
         preview_state_changed = 12,
         detach_preview = 13,
+        preview_input = 14,
         shutdown = 20,
         terminate_unresponsive = 21,
+    };
+
+    enum class PreviewInputAction : std::uint32_t
+    {
+        activate_selection = 1,
+        navigate_back = 2,
     };
 
     struct FrameHeader

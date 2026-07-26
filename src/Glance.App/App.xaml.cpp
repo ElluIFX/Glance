@@ -768,6 +768,11 @@ namespace winrt::Glance::App::implementation
             {
                 close_active_preview();
             }
+            else if (type == glance::contracts::MessageType::preview_input)
+            {
+                handle_preview_input(
+                    static_cast<glance::contracts::PreviewInputAction>(flags));
+            }
         });
     }
 
@@ -924,6 +929,34 @@ namespace winrt::Glance::App::implementation
         if (active_window_ != nullptr)
         {
             get_self<implementation::MainWindow>(active_window_)->HidePreview();
+        }
+    }
+
+    void App::handle_preview_input(glance::contracts::PreviewInputAction action)
+    {
+        if (active_window_ == nullptr)
+        {
+            return;
+        }
+
+        const auto window = get_self<implementation::MainWindow>(active_window_);
+        bool handled = false;
+        if (action == glance::contracts::PreviewInputAction::activate_selection)
+        {
+            handled = window->ActivateSelectedFolderEntry();
+        }
+        else if (action == glance::contracts::PreviewInputAction::navigate_back)
+        {
+            handled = window->NavigateBack();
+        }
+        else
+        {
+            return;
+        }
+
+        if (!handled)
+        {
+            window->HidePreview();
         }
     }
 }

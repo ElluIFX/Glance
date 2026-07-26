@@ -215,6 +215,29 @@ namespace
         });
     }
 
+    ScrollViewer find_scroll_viewer(const DependencyObject& root)
+    {
+        if (root == nullptr)
+        {
+            return nullptr;
+        }
+        if (const auto viewer = root.try_as<ScrollViewer>())
+        {
+            return viewer;
+        }
+        const int child_count =
+            Microsoft::UI::Xaml::Media::VisualTreeHelper::GetChildrenCount(root);
+        for (int index = 0; index < child_count; ++index)
+        {
+            if (const auto viewer = find_scroll_viewer(
+                    Microsoft::UI::Xaml::Media::VisualTreeHelper::GetChild(root, index)))
+            {
+                return viewer;
+            }
+        }
+        return nullptr;
+    }
+
     Microsoft::UI::Xaml::Media::Imaging::WriteableBitmap create_pdf_bitmap(
         const glance::app::PdfRenderResult& rendered)
     {
@@ -422,6 +445,7 @@ namespace winrt::Glance::App::implementation
 
         set_tooltip(TopmostButton(), L"TopmostButton.ToolTipService.ToolTip");
         set_tooltip(PinButton(), L"PinButton.ToolTipService.ToolTip");
+        set_tooltip(BackButton(), L"BackButton.ToolTipService.ToolTip");
         set_tooltip(ClosePreviewButton(), L"ClosePreviewButton.ToolTipService.ToolTip");
         update_preview_mode_button();
         set_tooltip(
@@ -722,6 +746,10 @@ namespace winrt::Glance::App::implementation
         const bool new_session = !visible_;
         const bool replace_deferred_session = defer_auto_fit_show_;
         stop_detached_focus_monitor();
+        preview_navigation_.clear();
+        pending_folder_selection_path_.clear();
+        pending_folder_scroll_offset_valid_ = false;
+        pending_folder_focus_restore_ = false;
         files_ = std::move(files);
         source_kind_ = source_kind;
         source_window_ = source_window;
@@ -747,15 +775,9 @@ namespace winrt::Glance::App::implementation
         }
         if (files_.size() > 1)
         {
-            FileListColumn().Width(GridLength{ 220, GridUnitType::Pixel });
-            FileList().Visibility(Visibility::Visible);
             FileList().SelectedIndex(static_cast<int>(current_index_));
         }
-        else
-        {
-            FileListColumn().Width(GridLength{ 0, GridUnitType::Pixel });
-            FileList().Visibility(Visibility::Collapsed);
-        }
+        update_preview_navigation_ui();
 
         present_file(current_index_);
         if (!topmost_ && (new_session || !user_sized_))
@@ -800,6 +822,108 @@ namespace winrt::Glance::App::implementation
         {
             state_callback_(instance_id_, state_);
         }
+    }
+
+    bool MainWindow::ActivateSelectedFolderEntry()
+    {
+        const auto* entry = selected_folder_entry();
+        if (entry == nullptr || current_index_ >= files_.size())
+        {
+            return false;
+        }
+
+        glance::app::PreviewFile child;
+        child.display_name = entry->name;
+        child.path = entry->path;
+        child.parsing_name = entry->path;
+        child.size = entry->original_size_known ? entry->original_size : 0;
+        child.creation_time = entry->creation_time;
+        child.last_write_time = entry->modified_time;
+        child.attributes = entry->attributes;
+        child.is_filesystem = true;
+        child.is_cloud_placeholder =
+            (entry->attributes &
+                (FILE_ATTRIBUTE_OFFLINE |
+                 FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS |
+                 FILE_ATTRIBUTE_RECALL_ON_OPEN)) != 0;
+
+        PreviewNavigationEntry parent{
+            std::move(files_[current_index_]),
+            entry->path };
+        parent.window_bounds_valid =
+            GetWindowRect(window_, &parent.window_bounds) != FALSE;
+        if (const auto scroller = find_scroll_viewer(FolderEntryList()))
+        {
+            parent.folder_scroll_offset = scroller.VerticalOffset();
+            parent.folder_scroll_offset_valid = true;
+        }
+        preview_navigation_.push_back(std::move(parent));
+        files_[current_index_] = std::move(child);
+        pending_folder_selection_path_.clear();
+        pending_folder_scroll_offset_valid_ = false;
+        pending_folder_focus_restore_ = false;
+        update_preview_navigation_ui();
+        present_file(current_index_);
+        return true;
+    }
+
+    bool MainWindow::NavigateBack()
+    {
+        if (preview_navigation_.empty() || current_index_ >= files_.size())
+        {
+            return false;
+        }
+
+        auto parent = std::move(preview_navigation_.back());
+        preview_navigation_.pop_back();
+        files_[current_index_] = std::move(parent.file);
+        pending_folder_selection_path_ = std::move(parent.selected_path);
+        pending_folder_scroll_offset_ = parent.folder_scroll_offset;
+        pending_folder_scroll_offset_valid_ = parent.folder_scroll_offset_valid;
+        pending_folder_focus_restore_ = true;
+        update_preview_navigation_ui();
+        present_file(current_index_);
+        if (parent.window_bounds_valid)
+        {
+            SetWindowPos(
+                window_,
+                nullptr,
+                parent.window_bounds.left,
+                parent.window_bounds.top,
+                parent.window_bounds.right - parent.window_bounds.left,
+                parent.window_bounds.bottom - parent.window_bounds.top,
+                SWP_NOACTIVATE | SWP_NOZORDER);
+        }
+        return true;
+    }
+
+    void MainWindow::update_preview_navigation_ui()
+    {
+        BackButton().Visibility(
+            preview_navigation_.empty() ? Visibility::Collapsed : Visibility::Visible);
+        const bool show_file_list = preview_navigation_.empty() && files_.size() > 1;
+        FileListColumn().Width(GridLength{
+            show_file_list ? 220.0 : 0.0,
+            GridUnitType::Pixel });
+        FileList().Visibility(show_file_list ? Visibility::Visible : Visibility::Collapsed);
+    }
+
+    const glance::app::ArchiveEntry* MainWindow::selected_folder_entry() noexcept
+    {
+        if (!archive_preview_is_directory_ || archive_render_state_ == nullptr)
+        {
+            return nullptr;
+        }
+
+        const int selected_index = FolderEntryList().SelectedIndex();
+        if (selected_index < 0 ||
+            static_cast<std::size_t>(selected_index) >=
+                archive_render_state_->preview.entries.size())
+        {
+            return nullptr;
+        }
+        return &archive_render_state_->preview.entries[
+            static_cast<std::size_t>(selected_index)];
     }
 
     void MainWindow::clear_preview_content()
@@ -849,6 +973,11 @@ namespace winrt::Glance::App::implementation
         ArchiveEntryTree().RootNodes().Clear();
         FolderEntryList().Items().Clear();
         ArchiveStatusText().Text(L"");
+        preview_navigation_.clear();
+        pending_folder_selection_path_.clear();
+        pending_folder_scroll_offset_valid_ = false;
+        pending_folder_focus_restore_ = false;
+        BackButton().Visibility(Visibility::Collapsed);
         FileList().Items().Clear();
         FileList().Visibility(Visibility::Collapsed);
         FileListColumn().Width(GridLength{ 0, GridUnitType::Pixel });
@@ -2646,6 +2775,22 @@ namespace winrt::Glance::App::implementation
                 ListViewItem item;
                 item.Content(row);
                 folder_items.Append(item);
+                if (!pending_folder_selection_path_.empty() &&
+                    CompareStringOrdinal(
+                        entry.path.c_str(),
+                        -1,
+                        pending_folder_selection_path_.c_str(),
+                        -1,
+                        TRUE) == CSTR_EQUAL)
+                {
+                    FolderEntryList().SelectedIndex(
+                        static_cast<int>(folder_items.Size() - 1));
+                    if (!pending_folder_focus_restore_)
+                    {
+                        FolderEntryList().ScrollIntoView(item);
+                    }
+                    pending_folder_selection_path_.clear();
+                }
             }
             else
             {
@@ -2676,6 +2821,47 @@ namespace winrt::Glance::App::implementation
         }
 
         ArchiveStatusText().Text(state->status);
+        if (archive_preview_is_directory_ && pending_folder_focus_restore_)
+        {
+            FolderEntryList().UpdateLayout();
+            if (pending_folder_scroll_offset_valid_)
+            {
+                if (const auto scroller = find_scroll_viewer(FolderEntryList()))
+                {
+                    static_cast<void>(scroller.ChangeView(
+                        nullptr,
+                        pending_folder_scroll_offset_,
+                        nullptr,
+                        true));
+                }
+            }
+            pending_folder_scroll_offset_valid_ = false;
+            pending_folder_focus_restore_ = false;
+
+            const auto lifetime = get_strong();
+            const auto focus_generation = state->generation;
+            static_cast<void>(DispatcherQueue().TryEnqueue([lifetime, focus_generation] {
+                if (focus_generation != lifetime->content_generation_ ||
+                    !lifetime->archive_preview_is_directory_)
+                {
+                    return;
+                }
+                const int selected_index = lifetime->FolderEntryList().SelectedIndex();
+                const auto target = selected_index >= 0
+                    ? lifetime->FolderEntryList()
+                        .ContainerFromIndex(selected_index)
+                        .try_as<Control>()
+                    : nullptr;
+                if (target != nullptr)
+                {
+                    target.Focus(FocusState::Programmatic);
+                }
+                else
+                {
+                    lifetime->FolderEntryList().Focus(FocusState::Programmatic);
+                }
+            }));
+        }
         if (!state->icon_targets.empty())
         {
             load_archive_icons_async(std::move(state->icon_targets), state->generation);
@@ -3755,6 +3941,11 @@ namespace winrt::Glance::App::implementation
         HidePreview();
     }
 
+    void MainWindow::BackButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        static_cast<void>(NavigateBack());
+    }
+
     void MainWindow::set_markdown_preview_mode(bool preview)
     {
         markdown_preview_ = preview;
@@ -3884,12 +4075,27 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
+        const auto* selected_entry = selected_folder_entry();
+        pending_folder_selection_path_ =
+            selected_entry == nullptr ? std::wstring{} : selected_entry->path;
+        pending_folder_scroll_offset_valid_ = false;
+        pending_folder_focus_restore_ = false;
         auto preview = std::move(archive_render_state_->preview);
         archive_render_state_.reset();
         ArchiveEntryTree().RootNodes().Clear();
         FolderEntryList().Items().Clear();
         ArchiveStatusText().Text(glance::app::localize(L"LoadingFolder"));
         apply_archive_preview(std::move(preview), content_generation_);
+    }
+
+    void MainWindow::FolderEntryList_DoubleTapped(
+        IInspectable const&,
+        DoubleTappedRoutedEventArgs const& args)
+    {
+        if (ActivateSelectedFolderEntry())
+        {
+            args.Handled(true);
+        }
     }
 
     void MainWindow::EncodingOption_Click(IInspectable const& sender, RoutedEventArgs const&)

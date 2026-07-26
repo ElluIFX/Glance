@@ -49,6 +49,8 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool IsPreviewingFile(const std::wstring& path) const noexcept;
         void CloseForReplacement();
         void HidePreview();
+        [[nodiscard]] bool ActivateSelectedFolderEntry();
+        [[nodiscard]] bool NavigateBack();
         void ApplyAppearancePreferences();
         void ApplyWindowPreferences();
         void ApplyLocalizedResources();
@@ -59,6 +61,7 @@ namespace winrt::Glance::App::implementation
         void TopmostButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PreviewModeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ClosePreviewButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void BackButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PinButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MarkdownPreviewButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MarkdownCodeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -66,6 +69,9 @@ namespace winrt::Glance::App::implementation
         void SyntaxHighlightButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void WordWrapButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ArchiveHeaderButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void FolderEntryList_DoubleTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::DoubleTappedRoutedEventArgs const&);
         void EncodingOption_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void TextEditorHost_Loaded(
             IInspectable const&,
@@ -180,6 +186,8 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool auto_fit_applies(bool dynamic_update = false) const noexcept;
         void save_current_window_placement() const noexcept;
         void clear_preview_content();
+        void update_preview_navigation_ui();
+        [[nodiscard]] const glance::app::ArchiveEntry* selected_folder_entry() noexcept;
         void cancel_pdf_render() noexcept;
         void reset_hidden_window_size() noexcept;
         void present_file(std::uint32_t index);
@@ -272,6 +280,15 @@ namespace winrt::Glance::App::implementation
             std::vector<ArchiveIconTarget> icon_targets;
             std::wstring status;
             std::uint64_t generation{};
+        };
+        struct PreviewNavigationEntry
+        {
+            glance::app::PreviewFile file;
+            std::wstring selected_path;
+            RECT window_bounds{};
+            bool window_bounds_valid{};
+            double folder_scroll_offset{};
+            bool folder_scroll_offset_valid{};
         };
         void apply_archive_preview(glance::app::ArchivePreview preview, std::uint64_t generation);
         void render_archive_batch(const std::shared_ptr<ArchiveRenderState>& state);
@@ -400,6 +417,11 @@ namespace winrt::Glance::App::implementation
         glance::app::FolderPreviewPreferences folder_preview_preferences_{};
         glance::app::GenericPreviewPreferences generic_preview_preferences_{};
         std::shared_ptr<ArchiveRenderState> archive_render_state_;
+        std::vector<PreviewNavigationEntry> preview_navigation_;
+        std::wstring pending_folder_selection_path_;
+        double pending_folder_scroll_offset_{};
+        bool pending_folder_scroll_offset_valid_{};
+        bool pending_folder_focus_restore_{};
         bool archive_preview_is_directory_{};
         bool archive_entry_compressed_size_available_{};
         std::wstring archive_source_path_;

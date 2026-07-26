@@ -1031,13 +1031,13 @@ namespace glance::core
 
         if (input_state_.preview_active.load(std::memory_order_acquire))
         {
-            if (pipe_server_.send(glance::contracts::MessageType::close_active_preview))
-            {
-                preview_state_.store(
-                    glance::contracts::PreviewWindowState::hidden,
-                    std::memory_order_release);
-                input_state_.preview_active.store(false, std::memory_order_release);
-            }
+            const auto input_action = action == HookAction::toggle_preview
+                ? glance::contracts::PreviewInputAction::activate_selection
+                : glance::contracts::PreviewInputAction::navigate_back;
+            static_cast<void>(pipe_server_.send(
+                glance::contracts::MessageType::preview_input,
+                {},
+                static_cast<std::uint32_t>(input_action)));
             return;
         }
 

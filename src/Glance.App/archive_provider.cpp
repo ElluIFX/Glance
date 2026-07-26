@@ -1306,6 +1306,7 @@ namespace glance::app
                 ArchiveEntry entry;
                 entry.name = name;
                 entry.path = (std::filesystem::path(path) / entry.name).wstring();
+                entry.attributes = data.dwFileAttributes;
                 entry.is_folder = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
                 if (!entry.is_folder)
                 {
@@ -1324,6 +1325,9 @@ namespace glance::app
                 {
                     entry.type_name = localize(L"FolderType");
                 }
+                entry.creation_time =
+                    (static_cast<std::uint64_t>(data.ftCreationTime.dwHighDateTime) << 32U) |
+                    data.ftCreationTime.dwLowDateTime;
                 entry.modified_time =
                     (static_cast<std::uint64_t>(data.ftLastWriteTime.dwHighDateTime) << 32U) |
                     data.ftLastWriteTime.dwLowDateTime;

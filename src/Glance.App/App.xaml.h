@@ -48,6 +48,7 @@ namespace winrt::Glance::App::implementation
             std::uint64_t instance_id,
             glance::contracts::PreviewWindowState state);
         void open_preview(std::string_view payload);
+        void handle_preview_input(glance::contracts::PreviewInputAction action);
         void close_active_preview();
 
         HANDLE instance_mutex_{};
