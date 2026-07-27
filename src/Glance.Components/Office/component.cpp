@@ -1,51 +1,142 @@
 #include "pch.h"
 
-#include "component_metadata.generated.h"
 #include "glance/contracts/component_api.h"
 #include "office_availability.h"
 #include "office_pdf_service.h"
+#include "../Common/component_localization.h"
 #include "../../version.h"
 
 #include <algorithm>
+#include <array>
 #include <cwchar>
 
 namespace
 {
     using namespace glance::contracts::components;
 
-    BOOL WINAPI query_health(const wchar_t* language_tag, HealthResult* result) noexcept
+    constexpr std::array office_extensions{
+        L".doc", L".docx", L".xls", L".xlsx", L".ppt", L".pptx" };
+
+    constexpr wchar_t display_name_key[] = L"Component.DisplayName";
+    constexpr wchar_t status_available_key[] = L"Status.Available";
+    constexpr wchar_t status_unavailable_key[] = L"Status.Unavailable";
+    constexpr wchar_t status_partial_key[] = L"Status.Partial";
+    constexpr wchar_t loading_key[] = L"Preview.Loading";
+    constexpr wchar_t office_unavailable_key[] = L"Preview.OfficeUnavailable";
+    constexpr wchar_t prepare_failed_key[] = L"Preview.PrepareFailed";
+
+    glance::components::ComponentResourceStore component_resources;
+
+    template <std::size_t Size>
+    bool localize(
+        const wchar_t* key,
+        const wchar_t* language_tag,
+        wchar_t (&destination)[Size]) noexcept
     {
-        if (result == nullptr || result->size < sizeof(HealthResult))
+        return component_resources.copy(
+            key,
+            language_tag,
+            destination,
+            Size);
+    }
+
+    BOOL WINAPI initialize(
+        const ComponentRegistrar* registrar,
+        ComponentRegistration* registration) noexcept
+    {
+        if (registrar == nullptr ||
+            registrar->size < sizeof(ComponentRegistrar) ||
+            registrar->register_extension == nullptr ||
+            registration == nullptr ||
+            registration->size < sizeof(ComponentRegistration))
+        {
+            return FALSE;
+        }
+
+        if (!component_resources.initialize())
+        {
+            return FALSE;
+        }
+
+        glance::app::initialize_office_availability();
+        for (const auto* extension : office_extensions)
+        {
+            if (!registrar->register_extension(registrar->context, extension))
+            {
+                return FALSE;
+            }
+        }
+
+        ComponentRegistration result;
+        wcscpy_s(result.component_id, L"office");
+        wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
+        result.preferred_kind = PreviewContentKind::document;
+        result.preferred_format = PreviewContentFormat::pdf;
+        *registration = result;
+        return TRUE;
+    }
+
+    BOOL WINAPI query_status(
+        const wchar_t* language_tag,
+        ComponentStatusResult* result) noexcept
+    {
+        if (result == nullptr || result->size < sizeof(ComponentStatusResult))
         {
             return FALSE;
         }
 
         const auto mask = glance::app::office_available_components();
-        result->severity = mask == glance::app::office_all_components
+        ComponentStatusResult status;
+        status.severity = mask == glance::app::office_all_components
             ? HealthSeverity::healthy
             : HealthSeverity::warning;
-        result->code = 0;
-        result->capability_mask = mask;
-        const bool chinese = language_tag != nullptr &&
-            (_wcsnicmp(language_tag, L"zh", 2) == 0);
-        const wchar_t* detail = nullptr;
+        status.code = 0;
+        status.capability_mask = mask;
+        if (!localize(display_name_key, language_tag, status.display_name))
+        {
+            return FALSE;
+        }
+
+        const wchar_t* detail_key{};
         if (mask == glance::app::office_all_components)
         {
-            detail = chinese ? L"Office COM 自动化可用" : L"Office COM automation available";
+            detail_key = status_available_key;
         }
         else if (mask == 0)
         {
-            detail = chinese
-                ? L"未检测到可用的 Office COM 自动化"
-                : L"Office COM automation unavailable";
+            detail_key = status_unavailable_key;
         }
         else
         {
-            detail = chinese
-                ? L"部分 Office COM 自动化不可用"
-                : L"Some Office COM applications are unavailable";
+            detail_key = status_partial_key;
         }
-        wcscpy_s(result->detail, detail);
+        if (!localize(detail_key, language_tag, status.detail))
+        {
+            return FALSE;
+        }
+
+        *result = status;
+        return TRUE;
+    }
+
+    BOOL WINAPI query_loading_text(
+        const wchar_t* path,
+        const wchar_t* language_tag,
+        ComponentLoadingTextResult* result) noexcept
+    {
+        if (path == nullptr ||
+            result == nullptr ||
+            result->size < sizeof(ComponentLoadingTextResult))
+        {
+            return FALSE;
+        }
+
+        ComponentLoadingTextResult loading_text;
+        if (!localize(loading_key, language_tag, loading_text.text))
+        {
+            return FALSE;
+        }
+        *result = loading_text;
         return TRUE;
     }
 
@@ -56,10 +147,10 @@ namespace
 
     PrepareStatus WINAPI prepare_preview(
         const wchar_t* path,
-        wchar_t* output_path,
-        std::uint32_t output_path_capacity) noexcept
+        const wchar_t* language_tag,
+        PreparedPreview* preview) noexcept
     {
-        if (path == nullptr || output_path == nullptr || output_path_capacity == 0)
+        if (path == nullptr || preview == nullptr || preview->size < sizeof(PreparedPreview))
         {
             return PrepareStatus::failed;
         }
@@ -70,30 +161,59 @@ namespace
             switch (result.status)
             {
             case glance::app::OfficePdfStatus::success:
-                if (result.pdf_path.size() + 1 > output_path_capacity)
+            {
+                if (result.pdf_path.size() + 1 > preview_path_capacity)
                 {
                     return PrepareStatus::failed;
                 }
-                std::copy(result.pdf_path.begin(), result.pdf_path.end(), output_path);
-                output_path[result.pdf_path.size()] = L'\0';
+                PreparedPreview prepared;
+                prepared.kind = PreviewContentKind::document;
+                prepared.format = PreviewContentFormat::pdf;
+                std::copy(result.pdf_path.begin(), result.pdf_path.end(), prepared.path);
+                prepared.path[result.pdf_path.size()] = L'\0';
+                *preview = prepared;
                 return PrepareStatus::success;
+            }
             case glance::app::OfficePdfStatus::unavailable:
+                localize(
+                    office_unavailable_key,
+                    language_tag,
+                    preview->error_detail);
                 return PrepareStatus::unavailable;
             case glance::app::OfficePdfStatus::cancelled:
                 return PrepareStatus::cancelled;
             default:
+                localize(prepare_failed_key, language_tag, preview->error_detail);
                 return PrepareStatus::failed;
             }
         }
         catch (...)
         {
+            localize(prepare_failed_key, language_tag, preview->error_detail);
             return PrepareStatus::failed;
         }
+    }
+
+    void WINAPI release_preview(std::uint64_t) noexcept
+    {
+    }
+
+    BOOL WINAPI query_interface(
+        const GUID*,
+        std::uint32_t,
+        void** interface_pointer) noexcept
+    {
+        if (interface_pointer != nullptr)
+        {
+            *interface_pointer = nullptr;
+        }
+        return FALSE;
     }
 
     void WINAPI shutdown() noexcept
     {
         glance::app::shutdown_office_pdf_service();
+        component_resources.shutdown();
     }
 }
 
@@ -108,12 +228,13 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     }
 
     ComponentApi result;
-    wcscpy_s(result.component_id, GLANCE_COMPONENT_ID_WSTRING);
-    wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
-    result.output_kind = PreviewOutputKind::pdf_file;
-    result.query_health = query_health;
+    result.initialize = initialize;
+    result.query_status = query_status;
+    result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
     result.prepare_preview = prepare_preview;
+    result.release_preview = release_preview;
+    result.query_interface = query_interface;
     result.shutdown = shutdown;
     *api = result;
     return TRUE;

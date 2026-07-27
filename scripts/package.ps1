@@ -168,8 +168,7 @@ Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory "plugins")
 
 $componentResidue = Get-ChildItem -LiteralPath $payloadDirectory -File | Where-Object {
     $_.Name -eq "component.json" -or
-    $_.Name -like "Glance.*Component.*" -or
-    $_.Name -eq "Glance.OfficeHost.exe"
+    $_.Name -like "Glance.*Component.*"
 }
 if ($componentResidue) {
     throw "Component files entered the main package payload: $($componentResidue.Name -join ', ')"
@@ -219,6 +218,7 @@ $compiler = Get-InnoSetupCompiler
 $environment = @{
     GLANCE_SOURCE_DIR = $payloadDirectory
     GLANCE_COMPONENTS_DIR = (Join-Path $componentOutputDirectory "installer")
+    GLANCE_COMPONENT_INNO_DIR = (Join-Path $componentOutputDirectory "inno")
     GLANCE_OUTPUT_DIR = $installerOutputDirectory
     GLANCE_REPO_ROOT = $repositoryRoot
     GLANCE_VERSION = $version.Version

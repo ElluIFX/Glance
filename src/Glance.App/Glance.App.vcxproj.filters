@@ -18,7 +18,6 @@
     <ClInclude Include="application\startup_registration.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\tray_icon.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\update_checker.h"><Filter>Application</Filter></ClInclude>
-    <ClInclude Include="components\component_catalog.h"><Filter>Components</Filter></ClInclude>
     <ClInclude Include="components\component_loader.h"><Filter>Components</Filter></ClInclude>
     <ClInclude Include="preferences\appearance_preferences.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preferences\folder_preview_preferences.h"><Filter>Preferences</Filter></ClInclude>
@@ -55,7 +54,6 @@
     <ClCompile Include="application\startup_registration.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\tray_icon.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\update_checker.cpp"><Filter>Application</Filter></ClCompile>
-    <ClCompile Include="components\component_catalog.cpp"><Filter>Components</Filter></ClCompile>
     <ClCompile Include="components\component_loader.cpp"><Filter>Components</Filter></ClCompile>
     <ClCompile Include="preferences\appearance_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
     <ClCompile Include="preferences\folder_preview_preferences.cpp"><Filter>Preferences</Filter></ClCompile>

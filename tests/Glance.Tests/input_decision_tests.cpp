@@ -4,6 +4,7 @@
 #include "text_font_fallback.h"
 #include "../../src/version.h"
 
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -23,6 +24,16 @@ namespace
             std::cerr << "FAILED: " << name << '\n';
             ++failures;
         }
+    }
+
+    BOOL WINAPI collect_extension(void* context, const wchar_t* extension) noexcept
+    {
+        if (context == nullptr || extension == nullptr)
+        {
+            return FALSE;
+        }
+        static_cast<std::vector<std::wstring>*>(context)->emplace_back(extension);
+        return TRUE;
     }
 }
 
@@ -95,9 +106,11 @@ int main()
     const auto component_path = component_directory / L"Glance.OfficeComponent.dll";
     const auto host_path = component_directory / L"Glance.OfficeHost.exe";
     const auto descriptor_path = component_directory / L"component.json";
+    const auto resource_path = component_directory / L"resources.pri";
     expect(std::filesystem::is_regular_file(component_path), "Office component DLL output");
     expect(std::filesystem::is_regular_file(host_path), "Office component host output");
     expect(std::filesystem::is_regular_file(descriptor_path), "Office component descriptor output");
+    expect(std::filesystem::is_regular_file(resource_path), "Office component resource output");
 
     std::ifstream descriptor_input(descriptor_path, std::ios::binary);
     const std::string descriptor{
@@ -109,11 +122,19 @@ int main()
     expect(
         descriptor.find("\"version\"") == std::string::npos,
         "Office descriptor has no independent version");
+    expect(
+        descriptor.find("\"extensions\"") == std::string::npos,
+        "Office descriptor has no extension catalog");
+    expect(
+        descriptor.find("\"resources.pri\"") != std::string::npos,
+        "Office descriptor resource payload");
 
     const HMODULE component = LoadLibraryExW(
         component_path.c_str(),
         nullptr,
-        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+        LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+            LOAD_LIBRARY_SEARCH_SYSTEM32);
     expect(component != nullptr, "load Office component DLL");
     if (component != nullptr)
     {
@@ -125,22 +146,162 @@ int main()
         {
             ComponentApi api;
             expect(get_api(abi_version, &api) != FALSE, "Office component ABI negotiation");
-            expect(std::wstring_view(api.component_id) == L"office", "Office component API id");
+            expect(api.initialize != nullptr, "Office component initialize function");
+            expect(api.query_status != nullptr, "Office component status function");
             expect(
-                std::wstring_view(api.target_app_version) == GLANCE_VERSION_WSTRING,
-                "Office component target app version");
-            expect(api.output_kind == PreviewOutputKind::pdf_file, "Office component output kind");
-            expect(api.query_health != nullptr, "Office component health function");
+                api.query_loading_text != nullptr,
+                "Office component loading text function");
             expect(api.can_preview != nullptr, "Office component preview function");
             expect(api.prepare_preview != nullptr, "Office component prepare function");
+            expect(api.release_preview != nullptr, "Office component release function");
+            expect(api.query_interface != nullptr, "Office component extension function");
             expect(api.shutdown != nullptr, "Office component shutdown function");
-            if (api.query_health != nullptr)
+            if (api.initialize != nullptr)
             {
-                HealthResult health;
+                std::vector<std::wstring> extensions;
+                ComponentRegistrar registrar{
+                    .context = &extensions,
+                    .register_extension = collect_extension };
+                ComponentRegistration registration;
                 expect(
-                    api.query_health(L"en-US", &health) != FALSE,
-                    "Office component health query");
-                expect(health.detail[0] != L'\0', "Office component health detail");
+                    api.initialize(&registrar, &registration) != FALSE,
+                    "Office component registration");
+                expect(
+                    std::wstring_view(registration.component_id) == L"office",
+                    "Office component API id");
+                expect(
+                    std::wstring_view(registration.target_app_version) ==
+                        GLANCE_VERSION_WSTRING,
+                    "Office component target app version");
+                expect(
+                    registration.preferred_kind == PreviewContentKind::document &&
+                        registration.preferred_format == PreviewContentFormat::pdf,
+                    "Office component preferred output");
+                expect(extensions.size() == 6, "Office component extension count");
+            }
+            if (api.query_status != nullptr)
+            {
+                ComponentStatusResult english_status;
+                expect(
+                    api.query_status(L"en-US", &english_status) != FALSE,
+                    "Office component English status query");
+                expect(
+                    std::wstring_view(english_status.display_name) ==
+                        L"Microsoft Office preview",
+                    "Office component English display name");
+                const std::wstring_view expected_english_detail =
+                    english_status.severity == HealthSeverity::healthy
+                    ? L"Office COM automation available"
+                    : english_status.capability_mask == 0
+                        ? L"Office COM automation unavailable"
+                        : L"Some Office COM applications are unavailable";
+                expect(
+                    std::wstring_view(english_status.detail) ==
+                        expected_english_detail,
+                    "Office component English status detail");
+
+                ComponentStatusResult chinese_status;
+                expect(
+                    api.query_status(L"zh-CN", &chinese_status) != FALSE,
+                    "Office component Chinese status query");
+                expect(
+                    std::wstring_view(chinese_status.display_name) ==
+                        L"Microsoft Office 预览",
+                    "Office component Chinese display name");
+                const std::wstring_view expected_chinese_detail =
+                    chinese_status.severity == HealthSeverity::healthy
+                    ? L"Office COM 自动化可用"
+                    : chinese_status.capability_mask == 0
+                        ? L"未检测到可用的 Office COM 自动化"
+                        : L"部分 Office COM 自动化不可用";
+                expect(
+                    std::wstring_view(chinese_status.detail) ==
+                        expected_chinese_detail,
+                    "Office component Chinese status detail");
+
+                ComponentStatusResult fallback_status;
+                expect(
+                    api.query_status(L"not_a_locale", &fallback_status) != FALSE,
+                    "Office component fallback status query");
+                expect(
+                    std::wstring_view(fallback_status.display_name) ==
+                        L"Microsoft Office preview",
+                    "Office component invalid language fallback");
+            }
+            if (api.query_loading_text != nullptr)
+            {
+                static constexpr std::array office_extensions{
+                    L".doc", L".docx", L".xls", L".xlsx", L".ppt", L".pptx" };
+                for (const auto* extension : office_extensions)
+                {
+                    ComponentLoadingTextResult loading_text;
+                    const auto path = L"C:\\GlanceComponentTest\\sample" +
+                        std::wstring(extension);
+                    expect(
+                        api.query_loading_text(
+                            path.c_str(),
+                            L"en-US",
+                            &loading_text) != FALSE,
+                        "Office component loading text query");
+                    expect(
+                        std::wstring_view(loading_text.text) ==
+                            L"Preparing this file preview in the background, you can return later",
+                        "Office component English loading text");
+                }
+
+                ComponentLoadingTextResult chinese_loading_text;
+                expect(
+                    api.query_loading_text(
+                        L"C:\\GlanceComponentTest\\sample.docx",
+                        L"zh-CN",
+                        &chinese_loading_text) != FALSE,
+                    "Office component Chinese loading text query");
+                expect(
+                    std::wstring_view(chinese_loading_text.text) ==
+                        L"正在后台准备该文件的预览，可稍后返回",
+                    "Office component Chinese loading text");
+
+                ComponentLoadingTextResult alias_loading_text;
+                expect(
+                    api.query_loading_text(
+                        L"C:\\GlanceComponentTest\\sample.docx",
+                        L"zh",
+                        &alias_loading_text) != FALSE,
+                    "Office component language alias query");
+                expect(
+                    std::wstring_view(alias_loading_text.text) ==
+                        L"正在后台准备该文件的预览，可稍后返回",
+                    "Office component language alias");
+
+                ComponentLoadingTextResult fallback_loading_text;
+                expect(
+                    api.query_loading_text(
+                        L"C:\\GlanceComponentTest\\sample.docx",
+                        nullptr,
+                        &fallback_loading_text) != FALSE,
+                    "Office component default language query");
+                expect(
+                    std::wstring_view(fallback_loading_text.text) ==
+                        L"Preparing this file preview in the background, you can return later",
+                    "Office component default language fallback");
+                expect(
+                    api.query_loading_text(
+                        nullptr,
+                        L"en-US",
+                        &chinese_loading_text) == FALSE,
+                    "Office component loading text rejects null path");
+            }
+            if (api.query_interface != nullptr)
+            {
+                void* interface_pointer = reinterpret_cast<void*>(1);
+                const GUID unknown_interface{};
+                expect(
+                    api.query_interface(
+                        &unknown_interface,
+                        1,
+                        &interface_pointer) == FALSE &&
+                        interface_pointer == nullptr,
+                    "Office component unknown extension interface");
             }
             api.shutdown();
         }

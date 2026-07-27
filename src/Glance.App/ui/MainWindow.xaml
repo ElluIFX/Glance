@@ -175,6 +175,13 @@
                         </Button.Content>
                     </Button>
                     <TextBlock
+                        x:Name="ComponentLoadingText"
+                        MaxWidth="620"
+                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+                    <TextBlock
                         x:Name="ErrorText"
                         MaxWidth="620"
                         Foreground="{ThemeResource SystemFillColorCriticalBrush}"

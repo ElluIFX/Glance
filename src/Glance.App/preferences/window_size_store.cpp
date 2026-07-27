@@ -28,7 +28,7 @@ namespace
         case PreviewKind::archive:
             return L"Archive";
         case PreviewKind::component:
-            return L"Office";
+            return L"Component";
         default:
             return L"Generic";
         }

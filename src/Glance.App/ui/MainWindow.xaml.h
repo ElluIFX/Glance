@@ -3,6 +3,7 @@
 #include "MainWindow.g.h"
 #include "appearance_preferences.h"
 #include "archive_provider.h"
+#include "component_loader.h"
 #include "footer_preferences.h"
 #include "folder_preview_preferences.h"
 #include "generic_preview_preferences.h"
@@ -261,6 +262,16 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget load_component_async(
             std::wstring path,
             std::uint64_t generation);
+        winrt::fire_and_forget refresh_component_loading_text_async(
+            std::wstring path,
+            std::uint64_t generation);
+        void present_resolved_file(
+            const glance::app::PreviewFile& file,
+            glance::app::PreviewKind kind,
+            std::uint64_t generation);
+        void apply_component_preview(
+            glance::app::ComponentPreviewResult result,
+            std::uint64_t generation);
         struct ArchiveIconTarget
         {
             std::wstring path;
@@ -449,6 +460,8 @@ namespace winrt::Glance::App::implementation
         std::uint64_t media_playback_generation_{};
         glance::app::MediaTechnicalMetadata media_metadata_;
         std::shared_ptr<glance::app::PdfRenderClient> pdf_render_client_;
+        std::shared_ptr<void> active_component_preview_;
+        std::wstring component_loading_language_;
         std::wstring pdf_source_path_;
         std::wstring pdf_password_;
         std::vector<glance::app::PdfOutlineEntry> pdf_outline_;

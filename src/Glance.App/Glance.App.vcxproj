@@ -57,7 +57,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="preview\archive_provider.h" />
-    <ClInclude Include="components\component_catalog.h" />
     <ClInclude Include="components\component_loader.h" />
     <ClInclude Include="preferences\footer_preferences.h" />
     <ClInclude Include="preferences\folder_preview_preferences.h" />
@@ -107,7 +106,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="preview\archive_provider.cpp" />
-    <ClCompile Include="components\component_catalog.cpp" />
     <ClCompile Include="components\component_loader.cpp" />
     <ClCompile Include="preferences\footer_preferences.cpp" />
     <ClCompile Include="preferences\folder_preview_preferences.cpp" />
@@ -182,10 +180,6 @@
     <ProjectReference Include="..\Glance.Contracts\Glance.Contracts.vcxproj">
       <Project>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Glance.Components\Office\Glance.OfficeComponent.vcxproj">
-      <Project>{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}</Project>
-      <LinkLibraryDependencies>false</LinkLibraryDependencies>
-    </ProjectReference>
     <ProjectReference Include="..\Glance.RenderHost\Glance.RenderHost.vcxproj">
       <Project>{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
@@ -200,9 +194,6 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
     <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
   </ItemGroup>
-  <Target Name="GenerateComponentCatalog" BeforeTargets="ClCompile">
-    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(SolutionDir)scripts\generate-component-metadata.ps1&quot; -RepositoryRoot &quot;$(ProjectDir)..\..&quot; -OutputDirectory &quot;$(IntDir)generated&quot;" />
-  </Target>
   <Target Name="MirrorCategorizedXamlGeneratedHeaders" AfterTargets="MarkupCompilePass2">
     <MakeDir Directories="$(GeneratedFilesDir)ui" />
     <Copy

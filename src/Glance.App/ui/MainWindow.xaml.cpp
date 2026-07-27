@@ -459,6 +459,15 @@ namespace winrt::Glance::App::implementation
         {
             TextLoadingText().Text(glance::app::localize(L"Loading"));
         }
+        if (current_kind_ == glance::app::PreviewKind::component &&
+            current_index_ < files_.size() &&
+            component_loading_language_ != glance::app::current_ui_language())
+        {
+            ComponentLoadingText().Visibility(Visibility::Collapsed);
+            refresh_component_loading_text_async(
+                files_[current_index_].path,
+                content_generation_);
+        }
         if (preview_notice_active_)
         {
             PreviewErrorInfoBar().Message(glance::app::localize(preview_notice_resource_key_));
@@ -934,6 +943,8 @@ namespace winrt::Glance::App::implementation
         cancel_pdf_render();
         cancel_archive_icon_load();
         glance::app::cancel_text_preview_read(current_text_reader_);
+        active_component_preview_.reset();
+        component_loading_language_.clear();
         ++content_generation_;
         stop_media_playback();
 
@@ -1003,6 +1014,8 @@ namespace winrt::Glance::App::implementation
         PreviewModeButton().IsChecked(false);
         ErrorText().Text(L"");
         ErrorText().Visibility(Visibility::Collapsed);
+        ComponentLoadingText().Text(L"");
+        ComponentLoadingText().Visibility(Visibility::Collapsed);
         GenericPanel().Visibility(Visibility::Visible);
         TextPanel().Visibility(Visibility::Collapsed);
         ImagePanel().Visibility(Visibility::Collapsed);
@@ -1243,7 +1256,6 @@ namespace winrt::Glance::App::implementation
         }
         return current_kind_ == glance::app::PreviewKind::image ||
             current_kind_ == glance::app::PreviewKind::pdf ||
-            current_kind_ == glance::app::PreviewKind::component ||
             (current_kind_ == glance::app::PreviewKind::media && !media_is_audio_);
     }
 
@@ -1287,8 +1299,7 @@ namespace winrt::Glance::App::implementation
         int horizontal_chrome = std::max(
             0,
             current_width - static_cast<int>(std::lround(panel.ActualWidth())));
-        if (current_kind_ == glance::app::PreviewKind::pdf ||
-            current_kind_ == glance::app::PreviewKind::component)
+        if (current_kind_ == glance::app::PreviewKind::pdf)
         {
             horizontal_chrome += static_cast<int>(std::lround(PdfNavigationColumn().ActualWidth()));
         }
@@ -1431,10 +1442,12 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        auto previous_component_preview = std::move(active_component_preview_);
         cancel_pdf_render();
         cancel_archive_icon_load();
         hide_password_prompt();
         current_index_ = index;
+        component_loading_language_.clear();
         basic_info_mode_ = false;
         content_preview_kind_ = glance::app::PreviewKind::generic;
         generic_text_preview_allowed_ = false;
@@ -1504,15 +1517,23 @@ namespace winrt::Glance::App::implementation
         }
 
         const auto kind = glance::app::resolve_preview_kind(file.path);
-        if (kind == glance::app::PreviewKind::component &&
-            !glance::app::component_can_preview(file.path))
+        if (kind == glance::app::PreviewKind::component)
         {
-            content_preview_kind_ = glance::app::PreviewKind::generic;
+            present_generic(file, false, false);
+            content_preview_kind_ = kind;
+            current_kind_ = kind;
             update_preview_mode_button();
-            current_kind_ = glance::app::PreviewKind::generic;
-            present_generic(file, false, true);
+            load_component_async(file.path, generation);
             return;
         }
+        present_resolved_file(file, kind, generation);
+    }
+
+    void MainWindow::present_resolved_file(
+        const glance::app::PreviewFile& file,
+        glance::app::PreviewKind kind,
+        std::uint64_t generation)
+    {
         content_preview_kind_ = kind;
         update_preview_mode_button();
         current_kind_ = kind;
@@ -1599,16 +1620,6 @@ namespace winrt::Glance::App::implementation
             FolderEntryList().Items().Clear();
             load_archive_async(file.path, generation);
             break;
-        case glance::app::PreviewKind::component:
-            show_content_panel(glance::app::PreviewKind::pdf);
-            PdfPageImage().Source(nullptr);
-            pdf_wheel_delta_ = 0;
-            PdfPageText().Text(L"1 / 1");
-            PdfLoadingText().Text(glance::app::localize(L"PreparingOfficePreview"));
-            PdfLoadingText().Visibility(Visibility::Visible);
-            PdfLoadingOverlay().Visibility(Visibility::Visible);
-            load_component_async(file.path, generation);
-            break;
         default:
             present_generic(file, true, true);
             break;
@@ -1620,6 +1631,7 @@ namespace winrt::Glance::App::implementation
         bool allow_text_preview,
         bool allow_advanced_info)
     {
+        auto previous_component_preview = std::move(active_component_preview_);
         current_kind_ = glance::app::PreviewKind::generic;
         show_content_panel(glance::app::PreviewKind::generic);
         FileNameText().Text(file.display_name);
@@ -1642,6 +1654,7 @@ namespace winrt::Glance::App::implementation
         GenericAdvancedInfoButton().Visibility(
             advanced_info_available ? Visibility::Visible : Visibility::Collapsed);
         ErrorText().Visibility(Visibility::Collapsed);
+        ComponentLoadingText().Visibility(Visibility::Collapsed);
         const auto icon_path = !file.path.empty() ? file.path : file.parsing_name;
         if (!icon_path.empty())
         {
@@ -3075,9 +3088,34 @@ namespace winrt::Glance::App::implementation
     {
         const auto weak = get_weak();
         const auto dispatcher = DispatcherQueue();
+        const auto language = glance::app::current_ui_language();
         co_await resume_background();
 
-        auto result = glance::app::prepare_component_preview(path);
+        auto result = glance::app::prepare_component_preview(
+            path,
+            language,
+            [weak, dispatcher, generation, language](std::wstring text) mutable {
+                static_cast<void>(dispatcher.TryEnqueue([
+                    weak,
+                    text = std::move(text),
+                    generation,
+                    language]() mutable {
+                    const auto lifetime = weak.get();
+                    if (lifetime == nullptr ||
+                        generation != lifetime->content_generation_ ||
+                        lifetime->current_kind_ != glance::app::PreviewKind::component ||
+                        language != glance::app::current_ui_language())
+                    {
+                        return;
+                    }
+                    lifetime->component_loading_language_ = language;
+                    lifetime->ComponentLoadingText().Text(
+                        text.empty()
+                            ? glance::app::localize(L"Loading")
+                            : std::move(text));
+                    lifetime->ComponentLoadingText().Visibility(Visibility::Visible);
+                }));
+            });
 
         static_cast<void>(dispatcher.TryEnqueue([
             weak,
@@ -3098,16 +3136,115 @@ namespace winrt::Glance::App::implementation
                     glance::contracts::components::PrepareStatus::cancelled)
                 {
                     lifetime->show_provider_error(
-                        glance::app::localize(L"OfficeConvertError"),
+                        result.error_detail.empty()
+                            ? glance::app::localize(L"ComponentStateError")
+                            : std::move(result.error_detail),
                         generation);
+                }
+                else
+                {
+                    lifetime->ComponentLoadingText().Visibility(Visibility::Collapsed);
                 }
                 return;
             }
 
-            lifetime->PdfLoadingText().Text(
-                glance::app::localize(L"LoadingConvertedDocument"));
-            lifetime->load_pdf_async(result.output_path, generation);
+            lifetime->apply_component_preview(std::move(result), generation);
         }));
+    }
+
+    fire_and_forget MainWindow::refresh_component_loading_text_async(
+        std::wstring path,
+        std::uint64_t generation)
+    {
+        const auto weak = get_weak();
+        const auto dispatcher = DispatcherQueue();
+        const auto language = glance::app::current_ui_language();
+        co_await resume_background();
+
+        auto message = glance::app::component_loading_text(path, language);
+        static_cast<void>(dispatcher.TryEnqueue([
+            weak,
+            message = std::move(message),
+            generation,
+            language]() mutable {
+            const auto lifetime = weak.get();
+            if (lifetime == nullptr ||
+                generation != lifetime->content_generation_ ||
+                lifetime->current_kind_ != glance::app::PreviewKind::component ||
+                language != glance::app::current_ui_language())
+            {
+                return;
+            }
+
+            lifetime->component_loading_language_ = language;
+            if (!message.component_found)
+            {
+                lifetime->ComponentLoadingText().Visibility(Visibility::Collapsed);
+                return;
+            }
+            lifetime->ComponentLoadingText().Text(
+                message.text.empty()
+                    ? glance::app::localize(L"Loading")
+                    : std::move(message.text));
+            lifetime->ComponentLoadingText().Visibility(Visibility::Visible);
+        }));
+    }
+
+    void MainWindow::apply_component_preview(
+        glance::app::ComponentPreviewResult result,
+        std::uint64_t generation)
+    {
+        using glance::contracts::components::PreviewContentFormat;
+        using glance::contracts::components::PreviewContentKind;
+
+        glance::app::PreviewKind kind = glance::app::PreviewKind::generic;
+        if (result.kind == PreviewContentKind::text &&
+            result.format == PreviewContentFormat::plain_text)
+        {
+            kind = glance::app::PreviewKind::text;
+        }
+        else if (result.kind == PreviewContentKind::text &&
+                 result.format == PreviewContentFormat::markdown)
+        {
+            kind = glance::app::PreviewKind::markdown;
+        }
+        else if (result.kind == PreviewContentKind::image &&
+                 result.format == PreviewContentFormat::image_file)
+        {
+            kind = glance::app::PreviewKind::image;
+        }
+        else if (result.kind == PreviewContentKind::media &&
+                 result.format == PreviewContentFormat::media_file)
+        {
+            kind = glance::app::PreviewKind::media;
+        }
+        else if (result.kind == PreviewContentKind::document &&
+                 result.format == PreviewContentFormat::pdf)
+        {
+            kind = glance::app::PreviewKind::pdf;
+        }
+        else if (result.kind == PreviewContentKind::web &&
+                 result.format == PreviewContentFormat::html)
+        {
+            kind = glance::app::PreviewKind::web;
+        }
+
+        if (kind == glance::app::PreviewKind::generic ||
+            generation != content_generation_ ||
+            current_index_ >= files_.size())
+        {
+            show_provider_error(glance::app::localize(L"ComponentStateError"), generation);
+            return;
+        }
+
+        active_component_preview_ = std::move(result.lease);
+        ComponentLoadingText().Visibility(Visibility::Collapsed);
+        auto prepared_file = files_[current_index_];
+        prepared_file.path = std::move(result.output_path);
+        prepared_file.parsing_name = prepared_file.path;
+        prepared_file.is_filesystem = true;
+        prepared_file.is_cloud_placeholder = false;
+        present_resolved_file(prepared_file, kind, generation);
     }
 
     void MainWindow::apply_text_preview(

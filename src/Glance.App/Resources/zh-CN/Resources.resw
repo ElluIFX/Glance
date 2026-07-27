@@ -17,8 +17,6 @@
   <data name="LoadingFolder" xml:space="preserve"><value>正在加载文件夹...</value></data>
   <data name="LoadingArchive" xml:space="preserve"><value>正在读取目录...</value></data>
   <data name="LoadingPdf" xml:space="preserve"><value>正在加载 PDF...</value></data>
-  <data name="PreparingOfficePreview" xml:space="preserve"><value>正在后台准备预览</value></data>
-  <data name="LoadingConvertedDocument" xml:space="preserve"><value>正在加载转换后的文档...</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>正在检测...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>未知</value></data>
   <data name="FontSizeOverlayFormat" xml:space="preserve"><value>{0} px</value></data>
@@ -35,7 +33,6 @@
   <data name="PdfRenderErrorDetail" xml:space="preserve"><value>无法渲染 PDF 页面：{0}</value></data>
   <data name="PasswordPromptTitle" xml:space="preserve"><value>输入文件密码</value></data>
   <data name="PasswordIncorrect" xml:space="preserve"><value>密码错误</value></data>
-  <data name="OfficeConvertError" xml:space="preserve"><value>Microsoft Office 无法将此文档转换为 PDF</value></data>
   <data name="CloudLoadError" xml:space="preserve"><value>无法加载文件：错误 {0}</value></data>
   <data name="TextFileOpenError" xml:space="preserve"><value>无法打开文件</value></data>
   <data name="TextFileSizeError" xml:space="preserve"><value>无法读取文件大小</value></data>
@@ -337,14 +334,12 @@
   <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>可选预览支持与运行状态</value></data>
   <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>位置</value></data>
   <data name="ComponentFolderLabel.Text" xml:space="preserve"><value>组件文件夹</value></data>
-  <data name="ComponentFolderDescription.Text" xml:space="preserve"><value>重启后从此文件夹加载组件</value></data>
+  <data name="ComponentFolderDescription.Text" xml:space="preserve"><value>Glance 启动时将从此目录加载组件</value></data>
   <data name="OpenComponentsFolderButton.Content" xml:space="preserve"><value>打开文件夹</value></data>
   <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>组件状态</value></data>
-  <data name="OfficeComponentName" xml:space="preserve"><value>Microsoft Office 预览</value></data>
+  <data name="ComponentEmptyTitle.Text" xml:space="preserve"><value>未安装任何组件</value></data>
+  <data name="ComponentEmptyDescription.Text" xml:space="preserve"><value>安装可选组件以支持更多文件格式</value></data>
   <data name="ComponentStateHealthy" xml:space="preserve"><value>可用</value></data>
   <data name="ComponentStateWarning" xml:space="preserve"><value>警告</value></data>
   <data name="ComponentStateError" xml:space="preserve"><value>不可用</value></data>
-  <data name="ComponentStateIncompatible" xml:space="preserve"><value>版本与当前 Glance 不兼容</value></data>
-  <data name="ComponentStateDamaged" xml:space="preserve"><value>组件已损坏</value></data>
-  <data name="ComponentStateNotInstalled" xml:space="preserve"><value>未安装</value></data>
 </root>

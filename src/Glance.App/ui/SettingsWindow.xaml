@@ -404,7 +404,7 @@
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" Text="Media auto fit" />
-                                    <TextBlock x:Name="AdaptiveMediaSizeSectionDescription" x:Uid="AdaptiveMediaSizeSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Window sizing for images, video, and Office documents" />
+                                    <TextBlock x:Name="AdaptiveMediaSizeSectionDescription" x:Uid="AdaptiveMediaSizeSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Window sizing for images, video, and documents" />
                                 </StackPanel>
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
@@ -606,7 +606,7 @@
                 <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="TextPreviewPageTitle" x:Uid="TextPreviewPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Document preview" />
-                        <TextBlock x:Name="TextPreviewPageDescription" x:Uid="TextPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Plain text and Office document behavior" />
+                        <TextBlock x:Name="TextPreviewPageDescription" x:Uid="TextPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Plain text document appearance and behavior" />
                     </StackPanel>
                     <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
@@ -837,7 +837,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="ComponentFolderLabel" x:Uid="ComponentFolderLabel" Text="Component folder" />
-                                    <TextBlock x:Name="ComponentFolderDescription" x:Uid="ComponentFolderDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Components are loaded from this folder after restart" />
+                                    <TextBlock x:Name="ComponentFolderDescription" x:Uid="ComponentFolderDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Glance loads components from this folder at startup" />
                                 </StackPanel>
                                 <Button x:Name="OpenComponentsFolderButton" x:Uid="OpenComponentsFolderButton" Grid.Column="1" Click="OpenComponentsFolderButton_Click" Content="Open folder" />
                             </Grid>
@@ -846,7 +846,38 @@
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="ComponentStatusGroupTitle" x:Uid="ComponentStatusGroupTitle" FontWeight="SemiBold" Text="Component status" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
-                            <StackPanel x:Name="ComponentStatusList" />
+                            <Grid>
+                                <Grid
+                                    x:Name="ComponentEmptyState"
+                                    MinHeight="160">
+                                    <StackPanel
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Spacing="8">
+                                        <FontIcon
+                                            HorizontalAlignment="Center"
+                                            FontSize="32"
+                                            Glyph="&#xE950;"
+                                            Opacity="0.65" />
+                                        <TextBlock
+                                            x:Name="ComponentEmptyTitle"
+                                            x:Uid="ComponentEmptyTitle"
+                                            HorizontalAlignment="Center"
+                                            FontWeight="SemiBold"
+                                            Text="No components installed" />
+                                        <TextBlock
+                                            x:Name="ComponentEmptyDescription"
+                                            x:Uid="ComponentEmptyDescription"
+                                            MaxWidth="360"
+                                            HorizontalAlignment="Center"
+                                            Style="{StaticResource SettingsDescriptionStyle}"
+                                            Text="Install optional components to add support for more file formats"
+                                            TextAlignment="Center"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel x:Name="ComponentStatusList" />
+                            </Grid>
                         </Border>
                     </StackPanel>
                 </StackPanel>

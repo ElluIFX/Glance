@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "SettingsWindow.xaml.h"
 #include "appearance_preferences.h"
-#include "component_catalog.h"
 #include "component_loader.h"
 #include "footer_preferences.h"
 #include "localization.h"
@@ -654,7 +653,12 @@ namespace winrt::Glance::App::implementation
     void SettingsWindow::refresh_component_statuses()
     {
         ComponentStatusList().Children().Clear();
-        const auto statuses = glance::app::component_statuses();
+        const auto statuses =
+            glance::app::component_statuses(glance::app::current_ui_language());
+        ComponentEmptyState().Visibility(
+            statuses.empty() ? Visibility::Visible : Visibility::Collapsed);
+        ComponentStatusList().Visibility(
+            statuses.empty() ? Visibility::Collapsed : Visibility::Visible);
         const auto row_style =
             SettingsNavigation().Resources().Lookup(box_value(L"SettingsRowStyle")).as<Style>();
         for (std::size_t index = 0; index < statuses.size(); ++index)
@@ -681,11 +685,8 @@ namespace winrt::Glance::App::implementation
 
             Controls::StackPanel content;
             content.Spacing(3);
-            const auto* descriptor = glance::app::find_supported_component(status.id);
             Controls::TextBlock title;
-            title.Text(descriptor == nullptr
-                ? status.id
-                : glance::app::localize(descriptor->display_name_resource));
+            title.Text(status.display_name);
             content.Children().Append(title);
 
             std::wstring state_key;
@@ -708,39 +709,19 @@ namespace winrt::Glance::App::implementation
                 color = { 255, 196, 43, 28 };
                 glyph = L"\xE711";
                 break;
-            case glance::app::ComponentState::incompatible:
-                state_key = L"ComponentStateIncompatible";
-                color = { 255, 196, 43, 28 };
-                glyph = L"\xE7BA";
-                break;
-            case glance::app::ComponentState::damaged:
-                state_key = L"ComponentStateDamaged";
-                color = { 255, 196, 43, 28 };
-                glyph = L"\xE711";
-                break;
             default:
-                state_key = L"ComponentStateNotInstalled";
+                state_key = L"ComponentStateError";
                 break;
             }
 
-            if (status.health.detail[0] == L'\0')
-            {
-                Controls::TextBlock details;
-                details.Style(
-                    SettingsNavigation().Resources()
-                        .Lookup(box_value(L"SettingsDescriptionStyle"))
-                        .as<Style>());
-                details.Text(glance::app::localize(state_key));
-                content.Children().Append(details);
-            }
-            else
+            if (!status.detail.empty())
             {
                 Controls::TextBlock health_detail;
                 health_detail.Style(
                     SettingsNavigation().Resources()
                         .Lookup(box_value(L"SettingsDescriptionStyle"))
                         .as<Style>());
-                health_detail.Text(status.health.detail);
+                health_detail.Text(status.detail);
                 health_detail.TextWrapping(TextWrapping::Wrap);
                 content.Children().Append(health_detail);
             }

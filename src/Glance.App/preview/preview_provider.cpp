@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "component_catalog.h"
+#include "component_loader.h"
 #include "localization.h"
 #include "preview_provider.h"
 
@@ -780,7 +780,7 @@ namespace glance::app
         {
             return PreviewKind::archive;
         }
-        if (find_component_for_extension(extension) != nullptr)
+        if (component_has_extension(extension))
         {
             return PreviewKind::component;
         }

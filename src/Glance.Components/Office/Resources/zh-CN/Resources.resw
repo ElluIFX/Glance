@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="Component.DisplayName" xml:space="preserve"><value>Microsoft Office 预览</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>Office COM 自动化可用</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>未检测到可用的 Office COM 自动化</value></data>
+  <data name="Status.Partial" xml:space="preserve"><value>部分 Office COM 自动化不可用</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在后台准备该文件的预览，可稍后返回</value></data>
+  <data name="Preview.OfficeUnavailable" xml:space="preserve"><value>当前文档所需的 Office COM 自动化不可用</value></data>
+  <data name="Preview.PrepareFailed" xml:space="preserve"><value>Microsoft Office 无法准备此文档</value></data>
+</root>

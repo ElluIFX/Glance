@@ -1,5 +1,6 @@
 #define PayloadDir GetEnv("GLANCE_SOURCE_DIR")
 #define ComponentsDir GetEnv("GLANCE_COMPONENTS_DIR")
+#define ComponentInnoDir GetEnv("GLANCE_COMPONENT_INNO_DIR")
 #define OutputDir GetEnv("GLANCE_OUTPUT_DIR")
 #define RepoRoot GetEnv("GLANCE_REPO_ROOT")
 #define AppVersion GetEnv("GLANCE_VERSION")
@@ -51,7 +52,6 @@ english.DeleteUserData=Also delete Glance settings, logs, crash dumps, and cache
 english.FullInstallation=Full installation
 english.CoreInstallation=Core only
 english.CustomInstallation=Custom installation
-english.OfficeComponent=Microsoft Office preview
 chinesesimplified.AdditionalTasks=其他选项：
 chinesesimplified.CreateStartMenuShortcut=创建开始菜单快捷方式
 chinesesimplified.CreateDesktopShortcut=创建桌面快捷方式
@@ -60,7 +60,7 @@ chinesesimplified.DeleteUserData=同时删除 Glance 设置、日志、崩溃转
 chinesesimplified.FullInstallation=完整安装
 chinesesimplified.CoreInstallation=仅核心程序
 chinesesimplified.CustomInstallation=自定义安装
-chinesesimplified.OfficeComponent=Microsoft Office 预览
+#include ComponentInnoDir + "\component-messages.iss"
 
 [Types]
 Name: "full"; Description: "{cm:FullInstallation}"
@@ -68,7 +68,7 @@ Name: "core"; Description: "{cm:CoreInstallation}"
 Name: "custom"; Description: "{cm:CustomInstallation}"; Flags: iscustom
 
 [Components]
-Name: "office"; Description: "{cm:OfficeComponent}"; Types: full
+#include ComponentInnoDir + "\component-definitions.iss"
 
 [Tasks]
 Name: "startmenuicon"; Description: "{cm:CreateStartMenuShortcut}"; GroupDescription: "{cm:AdditionalTasks}"
@@ -77,7 +77,7 @@ Name: "startup"; Description: "{cm:StartAtSignIn}"; GroupDescription: "{cm:Addit
 
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Excludes: "*.exp,*.ilk,*.lib,*.pdb,Glance.Tests.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#ComponentsDir}\office\*"; DestDir: "{app}\components\office"; Components: office; Flags: ignoreversion recursesubdirs createallsubdirs
+#include ComponentInnoDir + "\component-files.iss"
 Source: "{#RepoRoot}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
@@ -89,7 +89,7 @@ Name: "{autodesktop}\Glance"; Filename: "{app}\Glance.exe"; Tasks: desktopicon
 
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\plugins"
-Type: filesandordirs; Name: "{app}\components\office"
+#include ComponentInnoDir + "\component-delete.iss"
 Type: files; Name: "{group}\Glance.lnk"; Tasks: not startmenuicon
 Type: files; Name: "{autodesktop}\Glance.lnk"; Tasks: not desktopicon
 
