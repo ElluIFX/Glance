@@ -2483,6 +2483,33 @@ namespace winrt::Glance::App::implementation
                     rendered.page_width_points,
                     rendered.page_height_points,
                     dynamic_update);
+                if (!dynamic_update)
+                {
+                    const auto weak = lifetime->get_weak();
+                    static_cast<void>(lifetime->DispatcherQueue().TryEnqueue(
+                        Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
+                        [weak, generation] {
+                            const auto self = weak.get();
+                            if (self == nullptr ||
+                                generation != self->content_generation_ ||
+                                self->current_kind_ != glance::app::PreviewKind::pdf)
+                            {
+                                return;
+                            }
+                            const auto scroller = self->PdfScroller();
+                            scroller.CancelDirectManipulations();
+                            scroller.ReleasePointerCaptures();
+                            self->pdf_panning_ = false;
+                            scroller.UpdateLayout();
+                            const bool accepted =
+                                scroller.ChangeView(0.0, 0.0, 1.0F, true);
+                            glance::contracts::log_event(
+                                L"PDF view reset after layout: accepted=" +
+                                std::to_wstring(accepted) +
+                                L", zoom=" +
+                                std::to_wstring(scroller.ZoomFactor()));
+                        }));
+                }
             }
             catch (const hresult_error& error)
             {
