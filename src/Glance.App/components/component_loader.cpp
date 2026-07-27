@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "component_loader.h"
 
+#include "localization.h"
+#include "webview_availability.h"
 #include "glance/contracts/diagnostics.h"
 #include "../../version.h"
 
@@ -879,10 +881,19 @@ namespace glance::app
                 {
                     state = ComponentState::warning;
                 }
+                std::wstring detail = status.detail;
+                if (component->registration.preferred_kind ==
+                        PreviewContentKind::web &&
+                    component->web_preview.has_value() &&
+                    !glance::app::webview_runtime_available())
+                {
+                    state = ComponentState::error;
+                    detail = glance::app::localize(L"ComponentWebViewUnavailable");
+                }
                 statuses.push_back(ComponentStatus{
                     .id = component->id,
                     .display_name = status.display_name,
-                    .detail = status.detail,
+                    .detail = std::move(detail),
                     .state = state });
             }
             catch (...)

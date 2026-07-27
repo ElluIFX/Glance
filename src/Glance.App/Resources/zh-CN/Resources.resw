@@ -347,4 +347,5 @@
   <data name="ComponentStateHealthy" xml:space="preserve"><value>可用</value></data>
   <data name="ComponentStateWarning" xml:space="preserve"><value>警告</value></data>
   <data name="ComponentStateError" xml:space="preserve"><value>不可用</value></data>
+  <data name="ComponentWebViewUnavailable" xml:space="preserve"><value>未检测到 WebView2 运行时</value></data>
 </root>
