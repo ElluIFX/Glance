@@ -28,6 +28,10 @@ namespace
     using glance::contracts::components::PreviewContentKind;
     using glance::contracts::components::PreviewNoticeApi;
     using glance::contracts::components::ProgressivePreviewApi;
+    using glance::contracts::components::WebPreviewApi;
+    using glance::contracts::components::WebPreviewDescriptor;
+    using glance::contracts::components::WebPreviewOptions;
+    using glance::contracts::components::WebResourceAccessKind;
 
     struct ComponentManifest
     {
@@ -44,6 +48,7 @@ namespace
         std::optional<ConfigurablePreviewApi> configurable_preview;
         std::optional<ProgressivePreviewApi> progressive_preview;
         std::optional<PreviewNoticeApi> preview_notice;
+        std::optional<WebPreviewApi> web_preview;
         std::vector<std::wstring> extensions;
 
         ~LoadedComponent()
@@ -346,6 +351,23 @@ namespace
                 component->preview_notice = *interface_api;
             }
         }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::web_preview_api_id,
+                glance::contracts::components::web_preview_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const WebPreviewApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(WebPreviewApi) &&
+                interface_api->version ==
+                    glance::contracts::components::web_preview_api_version &&
+                interface_api->query_preview != nullptr)
+            {
+                component->web_preview = *interface_api;
+            }
+        }
         std::ranges::sort(component->extensions);
         return component;
     }
@@ -507,6 +529,99 @@ namespace
             preview.lease_token);
         return result;
     }
+
+    bool valid_web_host(std::wstring_view host) noexcept
+    {
+        if (host.empty() ||
+            host.size() >= glance::contracts::components::web_resource_host_capacity ||
+            host.front() == L'.' ||
+            host.back() == L'.')
+        {
+            return false;
+        }
+        return std::ranges::all_of(host, [](wchar_t character) {
+            return (character >= L'a' && character <= L'z') ||
+                (character >= L'0' && character <= L'9') ||
+                character == L'-' ||
+                character == L'.';
+        });
+    }
+
+    std::shared_ptr<glance::app::ComponentWebPreview> materialize_web_preview(
+        const LoadedComponent& component,
+        std::uint64_t lease_token,
+        glance::contracts::components::PreviewColorScheme color_scheme)
+    {
+        if (!component.web_preview.has_value() || lease_token == 0)
+        {
+            return {};
+        }
+
+        WebPreviewOptions options{ .color_scheme = color_scheme };
+        auto descriptor = std::make_unique<WebPreviewDescriptor>();
+        if (!component.web_preview->query_preview(
+                lease_token,
+                &options,
+                descriptor.get()) ||
+            descriptor->size < sizeof(WebPreviewDescriptor) ||
+            descriptor->mapping_count == 0 ||
+            descriptor->mapping_count >
+                glance::contracts::components::maximum_web_resource_mappings)
+        {
+            return {};
+        }
+
+        const auto navigation_length = wcsnlen_s(
+            descriptor->navigation_uri,
+            std::size(descriptor->navigation_uri));
+        if (navigation_length == std::size(descriptor->navigation_uri))
+        {
+            return {};
+        }
+
+        auto result = std::make_shared<glance::app::ComponentWebPreview>();
+        result->navigation_uri.assign(
+            descriptor->navigation_uri,
+            navigation_length);
+        std::unordered_set<std::wstring> hosts;
+        for (std::uint32_t index = 0; index < descriptor->mapping_count; ++index)
+        {
+            const auto& mapping = descriptor->mappings[index];
+            const auto host_length =
+                wcsnlen_s(mapping.host_name, std::size(mapping.host_name));
+            const auto folder_length =
+                wcsnlen_s(mapping.folder_path, std::size(mapping.folder_path));
+            if (host_length == std::size(mapping.host_name) ||
+                folder_length == std::size(mapping.folder_path))
+            {
+                return {};
+            }
+            std::wstring host(mapping.host_name, host_length);
+            std::wstring folder(mapping.folder_path, folder_length);
+            std::error_code error;
+            if (!valid_web_host(host) ||
+                !hosts.insert(host).second ||
+                !std::filesystem::path(folder).is_absolute() ||
+                !std::filesystem::is_directory(folder, error) ||
+                (mapping.access_kind != WebResourceAccessKind::deny_cors &&
+                 mapping.access_kind != WebResourceAccessKind::allow))
+            {
+                return {};
+            }
+            result->mappings.push_back(glance::app::ComponentWebResourceMapping{
+                .host_name = std::move(host),
+                .folder_path = std::move(folder),
+                .access_kind = mapping.access_kind });
+        }
+
+        const winrt::Windows::Foundation::Uri navigation(result->navigation_uri);
+        if (_wcsicmp(navigation.SchemeName().c_str(), L"https") != 0 ||
+            !hosts.contains(std::wstring(navigation.Host())))
+        {
+            return {};
+        }
+        return result;
+    }
 }
 
 namespace glance::app
@@ -575,6 +690,7 @@ namespace glance::app
         const std::wstring& path,
         std::wstring_view language_tag,
         glance::contracts::components::PreviewPreparationOptions options,
+        glance::contracts::components::PreviewColorScheme color_scheme,
         const ComponentLoadingTextCallback& loading_callback) noexcept
     {
         ComponentPreviewResult result;
@@ -628,6 +744,21 @@ namespace glance::app
                     glance::contracts::components::PrepareStatus::success)
                 {
                     return result;
+                }
+                if (preview.kind == PreviewContentKind::web &&
+                    preview.format == PreviewContentFormat::html &&
+                    component->web_preview.has_value())
+                {
+                    result.web_preview = materialize_web_preview(
+                        *component,
+                        preview.lease_token,
+                        color_scheme);
+                    if (result.web_preview == nullptr)
+                    {
+                        result.status =
+                            glance::contracts::components::PrepareStatus::failed;
+                        return result;
+                    }
                 }
                 if (preview.lease_token != 0 &&
                     component->preview_notice.has_value())

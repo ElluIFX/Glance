@@ -34,6 +34,20 @@ namespace glance::app
         std::wstring text;
     };
 
+    struct ComponentWebResourceMapping
+    {
+        std::wstring host_name;
+        std::wstring folder_path;
+        glance::contracts::components::WebResourceAccessKind access_kind{
+            glance::contracts::components::WebResourceAccessKind::deny_cors };
+    };
+
+    struct ComponentWebPreview
+    {
+        std::wstring navigation_uri;
+        std::vector<ComponentWebResourceMapping> mappings;
+    };
+
     struct ComponentPreviewResult
     {
         glance::contracts::components::PrepareStatus status{
@@ -46,6 +60,7 @@ namespace glance::app
         std::wstring error_detail;
         std::shared_ptr<void> lease;
         std::shared_ptr<void> refinement;
+        std::shared_ptr<ComponentWebPreview> web_preview;
         std::wstring refinement_text;
         std::wstring notice;
     };
@@ -60,6 +75,7 @@ namespace glance::app
         const std::wstring& path,
         std::wstring_view language_tag,
         glance::contracts::components::PreviewPreparationOptions options,
+        glance::contracts::components::PreviewColorScheme color_scheme,
         const ComponentLoadingTextCallback& loading_callback) noexcept;
     [[nodiscard]] ComponentPreviewResult refine_component_preview(
         const std::shared_ptr<void>& refinement,

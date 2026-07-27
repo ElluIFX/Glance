@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "id": "model3d",
+  "architecture": "x64",
+  "entry_point": "Glance.Model3DComponent.dll",
+  "payload_files": [
+    "resources.pri",
+    "three-LICENSE.txt",
+    "web/index.html",
+    "web/viewer.css",
+    "web/vendor/draco/draco_decoder.wasm",
+    "web/vendor/draco/draco_wasm_wrapper.js"
+  ],
+  "installer_names": {
+    "en-US": "3D model preview",
+    "zh-CN": "3D 模型预览"
+  }
+}

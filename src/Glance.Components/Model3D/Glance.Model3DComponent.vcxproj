@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project
+  DefaultTargets="Build"
+  TreatAsLocalProperty="WindowsAppSDKSelfContained"
+  xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{86B871A5-AE16-49D8-A9B0-C081735810F6}</ProjectGuid>
+    <RootNamespace>Glance.Model3DComponent</RootNamespace>
+    <ProjectName>Glance.Model3DComponent</ProjectName>
+    <TargetName>Glance.Model3DComponent</TargetName>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <AppxPackage>false</AppxPackage>
+    <WindowsPackageType>None</WindowsPackageType>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <PrependPriInitialPath>false</PrependPriInitialPath>
+    <ProjectPriFileName>resources.pri</ProjectPriFileName>
+    <ThreeRoot>$(ProjectDir)third_party\three\bin\r184\package\</ThreeRoot>
+    <GeneratedWebRoot>$(ProjectDir)third_party\web\bin\</GeneratedWebRoot>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <OutDir>$(GlanceOutputRoot)components\model3d\</OutDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\Glance.Contracts\include;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>Advapi32.lib;Bcrypt.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Common\component_localization.h" />
+    <ClInclude Include="pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Common\component_localization.cpp" />
+    <ClCompile Include="component.cpp" />
+    <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <PRIResource Include="Resources\en-US\Resources.resw" />
+    <PRIResource Include="Resources\zh-CN\Resources.resw" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(GeneratedWebRoot)index.html"><TargetPath>web\index.html</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="web\viewer.css"><TargetPath>web\viewer.css</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="$(ThreeRoot)examples\jsm\libs\draco\gltf\draco_decoder.wasm"><TargetPath>web\vendor\draco\draco_decoder.wasm</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="$(ThreeRoot)examples\jsm\libs\draco\gltf\draco_wasm_wrapper.js"><TargetPath>web\vendor\draco\draco_wasm_wrapper.js</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.5" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.3" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.251221100" />
+  </ItemGroup>
+  <Target Name="CopyComponentManifest" AfterTargets="Build">
+    <Copy SourceFiles="$(ProjectDir)component.json" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(ThreeRoot)LICENSE" DestinationFiles="$(OutDir)three-LICENSE.txt" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="ValidateComponentResources" BeforeTargets="_GenerateProjectPriFile">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)..\Common\validate-resources.ps1&quot; -ResourceRoot &quot;$(ProjectDir)Resources&quot;" />
+  </Target>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

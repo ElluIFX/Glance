@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    document.documentElement.dataset.theme =
+      new URLSearchParams(location.search).get("theme") === "dark" ? "dark" : "light";
+    window.reportViewerError = (message) => {
+      window.chrome?.webview?.postMessage(`model3d: ${message}`);
+    };
+    window.addEventListener("error", (event) => {
+      const source = event.filename || event.target?.src || event.target?.href || "";
+      window.reportViewerError(`${event.message || "resource load failed"} ${source}`.trim());
+    }, true);
+    window.addEventListener("unhandledrejection", (event) => {
+      window.reportViewerError(event.reason?.message || String(event.reason));
+    });
+  </script>
+  <link rel="stylesheet" href="./viewer.css">
+</head>
+<body>
+  <main id="viewport">
+    <canvas id="canvas"></canvas>
+    <div id="toolbar" role="toolbar">
+      <button id="fit" type="button"><span>&#xE80F;</span></button>
+      <button id="grid" type="button" aria-pressed="true"><span>&#xE80A;</span></button>
+      <button id="wireframe" type="button" aria-pressed="false"><span>&#xE809;</span></button>
+    </div>
+    <div id="status">
+      <div id="spinner"></div>
+      <div id="status-text"></div>
+      <div id="progress-track"><div id="progress-value"></div></div>
+    </div>
+  </main>
+  <!-- GLANCE_VIEWER_SCRIPT -->
+</body>
+</html>

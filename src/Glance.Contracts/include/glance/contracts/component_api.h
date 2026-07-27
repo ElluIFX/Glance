@@ -19,6 +19,9 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t configurable_preview_api_version = 1;
     inline constexpr std::uint32_t progressive_preview_api_version = 1;
     inline constexpr std::uint32_t preview_notice_api_version = 1;
+    inline constexpr std::uint32_t web_preview_api_version = 1;
+    inline constexpr std::size_t web_resource_host_capacity = 64;
+    inline constexpr std::size_t maximum_web_resource_mappings = 4;
     inline constexpr GUID configurable_preview_api_id{
         0x950742e7,
         0x0af2,
@@ -34,6 +37,11 @@ namespace glance::contracts::components
         0x0485,
         0x4a6c,
         { 0x9b, 0x96, 0x46, 0x27, 0xf5, 0x2c, 0xdd, 0x14 } };
+    inline constexpr GUID web_preview_api_id{
+        0x934213d4,
+        0x840d,
+        0x49f5,
+        { 0xa7, 0xbc, 0x77, 0xe0, 0x2d, 0x49, 0xd6, 0x28 } };
 
     enum class PreviewContentKind : std::uint32_t
     {
@@ -69,6 +77,18 @@ namespace glance::contracts::components
         healthy = 0,
         warning = 1,
         error = 2,
+    };
+
+    enum class PreviewColorScheme : std::uint32_t
+    {
+        light = 0,
+        dark = 1,
+    };
+
+    enum class WebResourceAccessKind : std::uint32_t
+    {
+        deny_cors = 0,
+        allow = 1,
     };
 
     using RegisterExtensionFunction = BOOL(WINAPI*)(
@@ -123,6 +143,27 @@ namespace glance::contracts::components
         std::uint32_t maximum_dimension{ 4096 };
     };
 
+    struct WebPreviewOptions
+    {
+        std::uint32_t size{ sizeof(WebPreviewOptions) };
+        PreviewColorScheme color_scheme{ PreviewColorScheme::light };
+    };
+
+    struct WebResourceMapping
+    {
+        wchar_t host_name[web_resource_host_capacity]{};
+        wchar_t folder_path[preview_path_capacity]{};
+        WebResourceAccessKind access_kind{ WebResourceAccessKind::deny_cors };
+    };
+
+    struct WebPreviewDescriptor
+    {
+        std::uint32_t size{ sizeof(WebPreviewDescriptor) };
+        wchar_t navigation_uri[preview_path_capacity]{};
+        std::uint32_t mapping_count{};
+        WebResourceMapping mappings[maximum_web_resource_mappings]{};
+    };
+
     using InitializeFunction = BOOL(WINAPI*)(
         const ComponentRegistrar* registrar,
         ComponentRegistration* registration) noexcept;
@@ -159,6 +200,10 @@ namespace glance::contracts::components
         std::uint64_t lease_token,
         const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept;
+    using QueryWebPreviewFunction = BOOL(WINAPI*)(
+        std::uint64_t lease_token,
+        const WebPreviewOptions* options,
+        WebPreviewDescriptor* descriptor) noexcept;
     using QueryInterfaceFunction = BOOL(WINAPI*)(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -186,6 +231,13 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(PreviewNoticeApi) };
         std::uint32_t version{ preview_notice_api_version };
         QueryPreviewNoticeFunction query_preview_notice{};
+    };
+
+    struct WebPreviewApi
+    {
+        std::uint32_t size{ sizeof(WebPreviewApi) };
+        std::uint32_t version{ web_preview_api_version };
+        QueryWebPreviewFunction query_preview{};
     };
 
     struct ComponentApi

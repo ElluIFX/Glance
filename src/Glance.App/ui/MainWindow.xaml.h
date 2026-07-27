@@ -338,6 +338,8 @@ namespace winrt::Glance::App::implementation
         Microsoft::UI::Xaml::Controls::WebView2 ensure_web_view_control();
         void configure_web_view_core(
             Microsoft::Web::WebView2::Core::CoreWebView2 const& core);
+        void clear_web_resource_mappings(
+            Microsoft::Web::WebView2::Core::CoreWebView2 const& core) noexcept;
         void clear_web_view_content() noexcept;
         void update_web_view_idle_state();
         void release_web_view_control() noexcept;
@@ -475,6 +477,7 @@ namespace winrt::Glance::App::implementation
         std::shared_ptr<glance::app::PdfRenderClient> pdf_render_client_;
         std::shared_ptr<void> active_component_preview_;
         std::shared_ptr<void> active_component_refinement_;
+        std::shared_ptr<glance::app::ComponentWebPreview> active_component_web_preview_;
         std::wstring component_refinement_text_;
         std::wstring component_loading_language_;
         std::wstring pdf_source_path_;
@@ -502,6 +505,7 @@ namespace winrt::Glance::App::implementation
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_hide_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer web_view_idle_timer_{ nullptr };
         Microsoft::UI::Xaml::Controls::WebView2 web_preview_{ nullptr };
+        std::vector<std::wstring> web_resource_mapping_hosts_;
         bool preview_notice_active_{};
         bool preview_notice_hiding_{};
         std::wstring preview_notice_resource_key_;

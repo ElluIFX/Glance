@@ -948,6 +948,8 @@ namespace winrt::Glance::App::implementation
         cancel_pdf_render();
         cancel_archive_icon_load();
         glance::app::cancel_text_preview_read(current_text_reader_);
+        clear_web_view_content();
+        active_component_web_preview_.reset();
         active_component_preview_.reset();
         active_component_refinement_.reset();
         component_refinement_text_.clear();
@@ -972,7 +974,6 @@ namespace winrt::Glance::App::implementation
         PdfThumbnailList().Items().Clear();
         PdfOutlineTree().RootNodes().Clear();
         hide_password_prompt();
-        clear_web_view_content();
         if (text_editor_ != nullptr)
         {
             text_editor_->clear();
@@ -1452,6 +1453,7 @@ namespace winrt::Glance::App::implementation
         }
         auto previous_component_preview = std::move(active_component_preview_);
         auto previous_component_refinement = std::move(active_component_refinement_);
+        active_component_web_preview_.reset();
         component_refinement_text_.clear();
         component_refinement_started_ = false;
         cancel_pdf_render();
@@ -1644,6 +1646,7 @@ namespace winrt::Glance::App::implementation
     {
         auto previous_component_preview = std::move(active_component_preview_);
         auto previous_component_refinement = std::move(active_component_refinement_);
+        active_component_web_preview_.reset();
         component_refinement_text_.clear();
         component_refinement_started_ = false;
         current_kind_ = glance::app::PreviewKind::generic;
@@ -1810,7 +1813,12 @@ namespace winrt::Glance::App::implementation
             syntax_highlighting_,
             RootGrid().ActualTheme() == ElementTheme::Dark);
         set_text_loading(true);
-        MarkdownModeButtons().Visibility(web_preview_available_ ? Visibility::Visible : Visibility::Collapsed);
+        const bool component_web =
+            web && active_component_web_preview_ != nullptr;
+        MarkdownModeButtons().Visibility(
+            web_preview_available_ && !component_web
+                ? Visibility::Visible
+                : Visibility::Collapsed);
         MarkdownPreviewButton().IsEnabled(web_preview_available_);
         MarkdownCodeButton().IsEnabled(true);
         set_markdown_preview_mode(web_preview_available_);
@@ -1840,6 +1848,11 @@ namespace winrt::Glance::App::implementation
         if (web && web_preview_available_)
         {
             render_web_document_async(file.path, content_generation_);
+        }
+        if (web && active_component_web_preview_ != nullptr)
+        {
+            set_text_loading(false);
+            return;
         }
         load_text_async(file.path, markdown, web, content_generation_, current_text_encoding_);
     }
@@ -3101,6 +3114,10 @@ namespace winrt::Glance::App::implementation
         const auto weak = get_weak();
         const auto dispatcher = DispatcherQueue();
         const auto language = glance::app::current_ui_language();
+        const auto color_scheme =
+            RootGrid().ActualTheme() == ElementTheme::Dark
+            ? glance::contracts::components::PreviewColorScheme::dark
+            : glance::contracts::components::PreviewColorScheme::light;
         glance::contracts::components::PreviewPreparationOptions options{
             .maximum_dimension =
                 glance::app::load_media_preview_preferences()
@@ -3111,6 +3128,7 @@ namespace winrt::Glance::App::implementation
             path,
             language,
             options,
+            color_scheme,
             [weak, dispatcher, generation, language](std::wstring text) mutable {
                 static_cast<void>(dispatcher.TryEnqueue([
                     weak,
@@ -3255,6 +3273,7 @@ namespace winrt::Glance::App::implementation
         }
 
         active_component_preview_ = std::move(result.lease);
+        active_component_web_preview_ = std::move(result.web_preview);
         active_component_refinement_ =
             kind == glance::app::PreviewKind::image
             ? std::move(result.refinement)
@@ -3641,14 +3660,18 @@ namespace winrt::Glance::App::implementation
 
             const auto web_view = web_preview_;
             const auto core = web_view.CoreWebView2();
+            clear_web_resource_mappings(core);
             const auto parent = std::filesystem::path(current_text_path_).parent_path();
             if (!parent.empty())
             {
+                constexpr wchar_t markdown_host[] =
+                    L"glance-markdown-assets.invalid";
                 core.SetVirtualHostNameToFolderMapping(
-                    L"glance-markdown-assets.invalid",
+                    markdown_host,
                     parent.c_str(),
                     Microsoft::Web::WebView2::Core::
                         CoreWebView2HostResourceAccessKind::DenyCors);
+                web_resource_mapping_hosts_.emplace_back(markdown_host);
             }
             web_content_ready_ = false;
             web_navigation_generation_ = generation;
@@ -3678,10 +3701,13 @@ namespace winrt::Glance::App::implementation
         std::uint64_t generation)
     {
         const auto lifetime = get_strong();
+        const auto component_web_preview = active_component_web_preview_;
         try
         {
-            const auto url = file_url_from_path(path);
-            if (!url.has_value())
+            const auto file_url = component_web_preview == nullptr
+                ? file_url_from_path(path)
+                : std::optional<std::wstring>{};
+            if (component_web_preview == nullptr && !file_url.has_value())
             {
                 throw hresult_error(E_INVALIDARG, L"Unable to create a file URL.");
             }
@@ -3699,12 +3725,33 @@ namespace winrt::Glance::App::implementation
             }
 
             const auto core = web_view.CoreWebView2();
+            clear_web_resource_mappings(core);
+            if (component_web_preview != nullptr)
+            {
+                for (const auto& mapping : component_web_preview->mappings)
+                {
+                    core.SetVirtualHostNameToFolderMapping(
+                        mapping.host_name,
+                        mapping.folder_path,
+                        mapping.access_kind ==
+                                glance::contracts::components::
+                                    WebResourceAccessKind::allow
+                            ? Microsoft::Web::WebView2::Core::
+                                CoreWebView2HostResourceAccessKind::Allow
+                            : Microsoft::Web::WebView2::Core::
+                                CoreWebView2HostResourceAccessKind::DenyCors);
+                    web_resource_mapping_hosts_.push_back(mapping.host_name);
+                }
+            }
             web_content_ready_ = false;
             web_navigation_generation_ = generation;
             web_navigation_id_ = 0;
             web_view.Opacity(0.0);
             WebPreviewHost().Visibility(Visibility::Collapsed);
-            core.Navigate(*url);
+            core.Navigate(
+                component_web_preview != nullptr
+                    ? component_web_preview->navigation_uri
+                    : *file_url);
             web_preview_available_ = true;
             MarkdownPreviewButton().IsEnabled(true);
             update_web_view_idle_state();
@@ -3731,13 +3778,16 @@ namespace winrt::Glance::App::implementation
             web_preview_ = WebView2();
             web_preview_.HorizontalAlignment(HorizontalAlignment::Stretch);
             web_preview_.VerticalAlignment(VerticalAlignment::Stretch);
-            web_preview_.DefaultBackgroundColor(
-                current_text_web_
-                    ? Windows::UI::Color{ 255, 255, 255, 255 }
-                    : Windows::UI::Color{ 0, 0, 0, 0 });
             web_preview_.Opacity(0.0);
             WebPreviewHost().Children().Append(web_preview_);
         }
+        const bool dark_theme = RootGrid().ActualTheme() == ElementTheme::Dark;
+        web_preview_.DefaultBackgroundColor(
+            current_text_web_
+                ? dark_theme
+                    ? Windows::UI::Color{ 255, 32, 32, 32 }
+                    : Windows::UI::Color{ 255, 255, 255, 255 }
+                : Windows::UI::Color{ 0, 0, 0, 0 });
         return web_preview_;
     }
 
@@ -3780,7 +3830,55 @@ namespace winrt::Glance::App::implementation
                     self->markdown_preview_ ? Visibility::Visible : Visibility::Collapsed);
                 self->update_web_view_idle_state();
             });
+        core.NavigationCompleted(
+            [weak](auto const&, auto const& args) {
+                const auto self = weak.get();
+                if (self == nullptr ||
+                    self->web_navigation_generation_ != self->content_generation_ ||
+                    args.NavigationId() != self->web_navigation_id_ ||
+                    args.IsSuccess())
+                {
+                    return;
+                }
+
+                glance::contracts::log_event(
+                    L"Web preview navigation failed. Status=" +
+                    std::to_wstring(static_cast<int>(args.WebErrorStatus())));
+            });
+        core.WebMessageReceived(
+            [weak](auto const&, auto const& args) {
+                if (const auto self = weak.get();
+                    self != nullptr &&
+                    self->web_navigation_generation_ == self->content_generation_)
+                {
+                    try
+                    {
+                        glance::contracts::log_event(
+                            L"Web preview: " +
+                            std::wstring(args.TryGetWebMessageAsString()));
+                    }
+                    catch (...)
+                    {
+                    }
+                }
+            });
         web_view_handlers_registered_ = true;
+    }
+
+    void MainWindow::clear_web_resource_mappings(
+        Microsoft::Web::WebView2::Core::CoreWebView2 const& core) noexcept
+    {
+        for (const auto& host : web_resource_mapping_hosts_)
+        {
+            try
+            {
+                core.ClearVirtualHostNameToFolderMapping(host);
+            }
+            catch (...)
+            {
+            }
+        }
+        web_resource_mapping_hosts_.clear();
     }
 
     void MainWindow::clear_web_view_content() noexcept
@@ -3796,6 +3894,7 @@ namespace winrt::Glance::App::implementation
                 if (const auto core = web_preview_.CoreWebView2())
                 {
                     core.Stop();
+                    clear_web_resource_mappings(core);
                 }
                 web_preview_.Opacity(0.0);
             }
@@ -3848,6 +3947,10 @@ namespace winrt::Glance::App::implementation
         web_navigation_id_ = 0;
         try
         {
+            if (const auto core = web_view.CoreWebView2())
+            {
+                clear_web_resource_mappings(core);
+            }
             WebPreviewHost().Visibility(Visibility::Collapsed);
             WebPreviewHost().Children().Clear();
         }
@@ -4078,6 +4181,9 @@ namespace winrt::Glance::App::implementation
         const bool text = kind == glance::app::PreviewKind::text ||
             kind == glance::app::PreviewKind::markdown ||
             kind == glance::app::PreviewKind::web;
+        const bool component_web =
+            kind == glance::app::PreviewKind::web &&
+            active_component_web_preview_ != nullptr;
         GenericPanel().Visibility(kind == glance::app::PreviewKind::generic ? Visibility::Visible : Visibility::Collapsed);
         TextPanel().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         ImagePanel().Visibility(kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
@@ -4090,10 +4196,14 @@ namespace winrt::Glance::App::implementation
             kind == glance::app::PreviewKind::media && glance::app::media_probe_available()
                 ? Visibility::Visible
                 : Visibility::Collapsed);
-        TextStatusControls().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
-        LineNumbersButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
-        SyntaxHighlightButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
-        WordWrapButton().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
+        TextStatusControls().Visibility(
+            text && !component_web ? Visibility::Visible : Visibility::Collapsed);
+        LineNumbersButton().Visibility(
+            text && !component_web ? Visibility::Visible : Visibility::Collapsed);
+        SyntaxHighlightButton().Visibility(
+            text && !component_web ? Visibility::Visible : Visibility::Collapsed);
+        WordWrapButton().Visibility(
+            text && !component_web ? Visibility::Visible : Visibility::Collapsed);
         if (kind != glance::app::PreviewKind::generic)
         {
             GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
