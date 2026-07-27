@@ -4,6 +4,27 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.07.27] - 2026-07-27
+
+### Added
+
+- Added configurable media information to the preview footer, including image bit depth.
+- Added nested folder navigation with Space or double-click, Escape navigation to the parent folder, and restoration of the previous selection and scroll position.
+- Added background system thumbnails for folder entries with Fluent icons retained as fallback.
+- Added an isolated optional component framework with component status reporting, installer selection, and standalone component archives.
+- Added progressive Photoshop document previews, PDF-compatible Illustrator previews, and configurable rich-document rendering resolution.
+- Added interactive 3D previews for common mesh formats and STEP, IGES, and BREP CAD files.
+
+### Changed
+
+- Moved Microsoft Office preview support into an optional component while retaining its existing conversion cache and isolated host.
+- The installer selects all optional components by default, while the portable package contains only the core application.
+- Component health now reflects required host capabilities such as WebView2 availability.
+
+### Fixed
+
+- Reset PDF and converted document zoom and scroll position after the new document completes its final layout.
+
 ## [2026.07.25.1] - 2026-07-25
 
 ### Fixed
@@ -111,6 +132,8 @@ The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 - Improved preview switching, pinned-window lifecycle, adaptive sizing, image rotation, large-text rendering, and archive enumeration stability.
 - Prevented stalled Shell selection queries and expensive directory rendering from taking down the preview workflow.
 
+[2026.07.27]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.27
+[2026.07.25.1]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.25.1
 [2026.07.25]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.25
 [2026.07.24.1]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.24.1
 [2026.07.24]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.24
