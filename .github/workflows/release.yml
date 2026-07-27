@@ -18,10 +18,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Prepare native dependencies
-        shell: pwsh
-        run: .\scripts\prepare-dependencies.ps1
-
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress --yes
