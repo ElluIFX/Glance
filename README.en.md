@@ -41,7 +41,7 @@ Compared with similar tools, Glance prioritizes stability and reliability — <b
 ## Highlights
 
 - Launch previews quickly from File Explorer, common file dialogs, and Everything
-- Supports text, code, Markdown, images, audio/video, PDF, archives, Office, and more
+- Supports text, code, Markdown, images, audio/video, PDF, archives, and more complex formats
 - Efficient, reliable long-text preview with flexible image zoom and pan — modern essentials covered
 - Pin preview windows and open multiple independent previews — turn files into sticky notes
 - Remember window size and position by content type to match your workflow
@@ -54,11 +54,18 @@ Compared with similar tools, Glance prioritizes stability and reliability — <b
 
 Download and install Glance from [Releases](https://github.com/ElluIFX/Glance/releases). After launch, select a file and press Space to preview. Settings and Exit are available from the system tray.
 
-#### Optional dependencies
+### Optional components
 
-- **Microsoft Edge WebView2 Runtime** — Required for some formats such as Markdown. Usually included with Windows 11; if missing, install it from the [Microsoft site](https://developer.microsoft.com/en-us/microsoft-edge/webview2)
-- **Microsoft Office** — Required for Word / Excel / PowerPoint preview; the corresponding components must be installed
-- **ffprobe.exe** — Used for extended media metadata. Get it from the [FFmpeg download page](https://ffmpeg.org/download.html), then place it in the Glance install directory or add it to `PATH`; basic audio/video preview still works without it
+Support for complex formats is provided by isolated components, kept separate from the Glance core, and can be freely omitted during installation.
+
+- **Microsoft Office preview** — Previews Word, PowerPoint, and Excel files; requires the corresponding locally installed Office application
+- **Adobe document preview** — Previews Photoshop and Illustrator project files without requiring locally installed Adobe applications
+- **3D model preview** — Previews common 3D files such as STEP, STL, and OBJ
+
+### Optional dependencies
+
+- **Microsoft Edge WebView2 Runtime** — Required for some formats such as Markdown. Usually included with Windows 11; if missing, download and install it from [here](https://developer.microsoft.com/en-us/microsoft-edge/webview2)
+- **ffprobe.exe** — Enables extended media metadata. Get it from the [FFmpeg download page](https://ffmpeg.org/download.html), then place it in the Glance install directory or add it to `PATH`; basic audio/video preview still works without it
 
 ## Development
 

@@ -41,7 +41,7 @@
 ## 软件特色
 
 - 可从资源管理器、文件选择窗口和 Everything 快速发起预览
-- 支持文本、代码、Markdown、图片、音视频、PDF、压缩包和 Office 等各类格式
+- 支持文本、代码、Markdown、图片、音视频、PDF、压缩包以及更多复杂格式
 - 高效可靠的长文本预览，灵活的图片缩放与拖动，现代预览能力齐备
 - 钉住预览窗口，并可同时打开多个独立预览，让文件成为便签
 - 按内容类型记忆窗口尺寸与位置，贴合使用习惯
@@ -54,11 +54,18 @@
 
 从 [Releases](https://github.com/ElluIFX/Glance/releases) 下载并安装 Glance。运行后，选中文件并按下空格即可预览；设置与退出入口位于系统托盘
 
-#### 可选依赖
+### 可选组件
+
+复杂格式支持以独立组件提供，与 Glance 主程序保持隔离，在安装时可自由裁剪
+
+- **Microsoft Office 预览** — 支持预览 Word、PowerPoint 与 Excel 文件，需要本机安装对应的 Office 应用
+- **Adobe 文档预览** — 支持预览 PS、AI 工程文件，不依赖本机安装 Adobe 应用
+- **3D 模型预览** — 支持预览常见 3D 文件，如 STEP、STL、OBJ 等
+
+### 可选依赖
 
 - **Microsoft Edge WebView2 Runtime** — Markdown 等部分格式预览所需，Windows 11 通常已内置，若缺失可从[此处](https://developer.microsoft.com/en-us/microsoft-edge/webview2)下载安装
-- **Microsoft Office** — 预览 Word / Excel / PowerPoint 时，需已安装对应组件
-- **ffprobe.exe** — 用于显示扩展媒体元数据，可从 [FFmpeg 官网](https://ffmpeg.org/download.html) 获取，放入 Glance 安装目录或加入 `PATH`，缺失不影响基础音视频预览
+- **ffprobe.exe** — 允许显示扩展媒体元数据，可从 [FFmpeg 官网](https://ffmpeg.org/download.html) 获取，放入 Glance 安装目录或加入 `PATH`，缺失不影响基础音视频预览
 
 ## 开发
 
