@@ -20,6 +20,7 @@
     <PrependPriInitialPath>false</PrependPriInitialPath>
     <ProjectPriFileName>resources.pri</ProjectPriFileName>
     <ThreeRoot>$(ProjectDir)third_party\three\bin\r184\package\</ThreeRoot>
+    <OcctRoot>$(ProjectDir)third_party\occt-import-js\bin\0.0.23\package\</OcctRoot>
     <GeneratedWebRoot>$(ProjectDir)third_party\web\bin\</GeneratedWebRoot>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -57,9 +58,11 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="$(GeneratedWebRoot)index.html"><TargetPath>web\index.html</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="$(GeneratedWebRoot)cad.html"><TargetPath>web\cad.html</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
     <Content Include="web\viewer.css"><TargetPath>web\viewer.css</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
     <Content Include="$(ThreeRoot)examples\jsm\libs\draco\gltf\draco_decoder.wasm"><TargetPath>web\vendor\draco\draco_decoder.wasm</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
     <Content Include="$(ThreeRoot)examples\jsm\libs\draco\gltf\draco_wasm_wrapper.js"><TargetPath>web\vendor\draco\draco_wasm_wrapper.js</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="$(OcctRoot)dist\occt-import-js.wasm"><TargetPath>web\vendor\occt\occt-import-js.wasm</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.5" />
@@ -70,6 +73,7 @@
   <Target Name="CopyComponentManifest" AfterTargets="Build">
     <Copy SourceFiles="$(ProjectDir)component.json" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="$(ThreeRoot)LICENSE" DestinationFiles="$(OutDir)three-LICENSE.txt" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(OcctRoot)LICENSE.md" DestinationFiles="$(OutDir)occt-import-js-LICENSE.md" SkipUnchangedFiles="true" />
   </Target>
   <Target Name="ValidateComponentResources" BeforeTargets="_GenerateProjectPriFile">
     <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)..\Common\validate-resources.ps1&quot; -ResourceRoot &quot;$(ProjectDir)Resources&quot;" />

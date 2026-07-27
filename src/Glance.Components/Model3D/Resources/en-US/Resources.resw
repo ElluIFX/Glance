@@ -12,10 +12,12 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
 
   <data name="Component.DisplayName" xml:space="preserve"><value>3D model preview</value></data>
-  <data name="Status.Available" xml:space="preserve"><value>STL, 3MF, OBJ, PLY, glTF, GLB, and FBX are supported</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>Supports previewing common 3D files</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>Preparing the 3D model preview</value></data>
+  <data name="Preview.LoadingCad" xml:space="preserve"><value>Preparing the CAD model preview</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Unable to prepare the 3D model preview</value></data>
   <data name="Viewer.Loading" xml:space="preserve"><value>Loading 3D model</value></data>
+  <data name="Viewer.LoadingCad" xml:space="preserve"><value>Converting CAD model</value></data>
   <data name="Viewer.Failed" xml:space="preserve"><value>Unable to load this 3D model</value></data>
   <data name="Viewer.Empty" xml:space="preserve"><value>The model contains no visible geometry</value></data>
   <data name="Viewer.Fit" xml:space="preserve"><value>Fit model</value></data>

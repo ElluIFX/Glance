@@ -26,14 +26,24 @@ namespace
         L".ply",
         L".gltf",
         L".glb",
-        L".fbx" };
+        L".fbx",
+        L".step",
+        L".stp",
+        L".iges",
+        L".igs",
+        L".brep",
+        L".brp" };
     constexpr wchar_t viewer_host[] = L"glance-model-viewer.invalid";
     constexpr wchar_t model_host[] = L"glance-model-source.invalid";
+    constexpr wchar_t standard_viewer_file[] = L"index.html";
+    constexpr wchar_t cad_viewer_file[] = L"cad.html";
     constexpr wchar_t display_name_key[] = L"Component.DisplayName";
     constexpr wchar_t status_key[] = L"Status.Available";
     constexpr wchar_t loading_key[] = L"Preview.Loading";
+    constexpr wchar_t cad_loading_key[] = L"Preview.LoadingCad";
     constexpr wchar_t failed_key[] = L"Preview.Failed";
     constexpr wchar_t viewer_loading_key[] = L"Viewer.Loading";
+    constexpr wchar_t viewer_cad_loading_key[] = L"Viewer.LoadingCad";
     constexpr wchar_t viewer_failed_key[] = L"Viewer.Failed";
     constexpr wchar_t viewer_empty_key[] = L"Viewer.Empty";
     constexpr wchar_t fit_key[] = L"Viewer.Fit";
@@ -110,6 +120,16 @@ namespace
             }
         }
         return false;
+    }
+
+    bool cad_extension(std::wstring_view extension) noexcept
+    {
+        return extension == L".step" ||
+            extension == L".stp" ||
+            extension == L".iges" ||
+            extension == L".igs" ||
+            extension == L".brep" ||
+            extension == L".brp";
     }
 
     std::string utf8_from_wide(std::wstring_view value)
@@ -253,7 +273,17 @@ namespace
             return FALSE;
         }
         ComponentLoadingTextResult loading;
-        if (!localize(loading_key, language_tag, loading.text))
+        try
+        {
+            const auto key = cad_extension(lower_extension(path))
+                ? cad_loading_key
+                : loading_key;
+            if (!localize(key, language_tag, loading.text))
+            {
+                return FALSE;
+            }
+        }
+        catch (...)
         {
             return FALSE;
         }
@@ -294,7 +324,12 @@ namespace
         }
         try
         {
-            const auto viewer_path = component_directory() / L"web" / L"index.html";
+            const std::filesystem::path source(path);
+            const auto viewer_path = component_directory() /
+                L"web" /
+                (cad_extension(lower_extension(source))
+                    ? cad_viewer_file
+                    : standard_viewer_file);
             std::error_code error;
             if (!std::filesystem::is_regular_file(viewer_path, error))
             {
@@ -314,7 +349,7 @@ namespace
                 leases.insert_or_assign(
                     lease_token,
                     PreviewLease{
-                        .source_path = std::filesystem::absolute(path),
+                        .source_path = std::filesystem::absolute(source),
                         .language_tag =
                             language_tag != nullptr ? language_tag : L"" });
             }
@@ -387,8 +422,12 @@ namespace
                 return FALSE;
             }
 
-            const auto loading =
-                localized_string(viewer_loading_key, lease.language_tag.c_str());
+            const auto extension = lower_extension(lease.source_path);
+            const auto loading = localized_string(
+                cad_extension(extension)
+                    ? viewer_cad_loading_key
+                    : viewer_loading_key,
+                lease.language_tag.c_str());
             const auto failed =
                 localized_string(viewer_failed_key, lease.language_tag.c_str());
             const auto empty =
@@ -413,12 +452,17 @@ namespace
                 std::wstring(L"https://") + model_host + L"/" +
                 url_encode(lease.source_path.filename().wstring());
             std::wstring navigation =
-                std::wstring(L"https://") + viewer_host + L"/index.html";
+                std::wstring(L"https://") +
+                viewer_host +
+                L"/" +
+                (cad_extension(extension)
+                    ? cad_viewer_file
+                    : standard_viewer_file);
             append_parameter(navigation, L"model", model_uri);
             append_parameter(
                 navigation,
                 L"extension",
-                lower_extension(lease.source_path));
+                extension);
             append_parameter(
                 navigation,
                 L"theme",

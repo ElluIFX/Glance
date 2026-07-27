@@ -127,6 +127,82 @@ else {
     Write-Host "Three.js r184 model preview dependencies are ready."
 }
 
+$occtDestination = Join-Path $repositoryRoot `
+    "src\Glance.Components\Model3D\third_party\occt-import-js\bin\0.0.23\package"
+$occtFiles = @(
+    @{ Name = "dist\occt-import-js.js"; Sha256 = "3FB44CE11D00611F9B3F3C5775D520EBAB48930C1F08279B7B1316F05F0D3379" },
+    @{ Name = "dist\occt-import-js.wasm"; Sha256 = "33391FC9D94EA5C869A6718488BF0A9A464222BAC9BDC764DFE1690CEF281952" },
+    @{ Name = "LICENSE.md"; Sha256 = "20C17D8B8C48A600800DFD14F95D5CB9FF47066A9641DDEAB48DC54AEC96E331" }
+)
+$occtAvailable = $true
+foreach ($file in $occtFiles) {
+    if (-not (Test-Dependency `
+            -Path (Join-Path $occtDestination $file.Name) `
+            -Sha256 $file.Sha256)) {
+        $occtAvailable = $false
+        break
+    }
+}
+
+if ($occtAvailable) {
+    Write-Host "occt-import-js 0.0.23 model preview dependencies are available."
+}
+else {
+    $occtArchiveUri =
+        "https://registry.npmjs.org/occt-import-js/-/occt-import-js-0.0.23.tgz"
+    $occtArchiveSha256 =
+        "EAAB9CA7BF02799360D8FC70468DC8BF78EB2073C3FAFB1FF982006E558FC1F3"
+    $occtLicenseUri =
+        "https://raw.githubusercontent.com/kovacsv/occt-import-js/c2148e54b456b571238d35cac037d304053d64b2/LICENSE.md"
+    $occtTemporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) (
+        "Glance.OcctImport." + [Guid]::NewGuid().ToString("N"))
+    $occtArchivePath = Join-Path $occtTemporaryDirectory "occt-import-js-0.0.23.tgz"
+    $occtExpandedDirectory = Join-Path $occtTemporaryDirectory "expanded"
+    $occtLicensePath = Join-Path $occtTemporaryDirectory "LICENSE.md"
+    try {
+        New-Item -ItemType Directory -Path $occtExpandedDirectory -Force | Out-Null
+        Write-Host "Downloading occt-import-js 0.0.23 model preview dependencies..."
+        Invoke-WebRequest -Uri $occtArchiveUri -OutFile $occtArchivePath
+        $actualArchiveHash =
+            (Get-FileHash -LiteralPath $occtArchivePath -Algorithm SHA256).Hash
+        if ($actualArchiveHash -ne $occtArchiveSha256) {
+            throw "occt-import-js archive SHA-256 mismatch. Expected $occtArchiveSha256, got $actualArchiveHash."
+        }
+
+        & "$env:SystemRoot\System32\tar.exe" `
+            -xf $occtArchivePath `
+            -C $occtExpandedDirectory
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to extract the occt-import-js archive."
+        }
+        Invoke-WebRequest -Uri $occtLicenseUri -OutFile $occtLicensePath
+
+        foreach ($file in $occtFiles) {
+            $sourcePath = if ($file.Name -eq "LICENSE.md") {
+                $occtLicensePath
+            }
+            else {
+                Join-Path (Join-Path $occtExpandedDirectory "package") $file.Name
+            }
+            if (-not (Test-Dependency -Path $sourcePath -Sha256 $file.Sha256)) {
+                throw "occt-import-js dependency '$($file.Name)' is missing or failed SHA-256 validation."
+            }
+            $destinationPath = Join-Path $occtDestination $file.Name
+            New-Item -ItemType Directory `
+                -Path (Split-Path -Parent $destinationPath) `
+                -Force |
+                Out-Null
+            Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $occtTemporaryDirectory) {
+            Remove-Item -LiteralPath $occtTemporaryDirectory -Recurse -Force
+        }
+    }
+    Write-Host "occt-import-js 0.0.23 model preview dependencies are ready."
+}
+
 $esbuildDestination = Join-Path $repositoryRoot `
     "src\Glance.Components\Model3D\third_party\esbuild\bin\0.25.6\esbuild.exe"
 $esbuildSha256 = "95D5529236270ADA558C344675C533D863F7760F491CF2B7ACC35C06BA63417D"
@@ -177,6 +253,8 @@ $modelWebRoot = Join-Path $repositoryRoot "src\Glance.Components\Model3D\web"
 $generatedWebRoot = Join-Path $repositoryRoot `
     "src\Glance.Components\Model3D\third_party\web\bin"
 $modelBundlePath = Join-Path $generatedWebRoot "viewer.bundle.js"
+$cadLoaderSourcePath = Join-Path $generatedWebRoot "cad-loader.generated.js"
+$cadLoaderBundlePath = Join-Path $generatedWebRoot "cad-loader.bundle.js"
 New-Item -ItemType Directory -Path $generatedWebRoot -Force | Out-Null
 & $esbuildDestination `
     (Join-Path $modelWebRoot "viewer.js") `
@@ -191,21 +269,59 @@ if ($LASTEXITCODE -ne 0) {
     throw "Unable to build the model preview script."
 }
 
+$occtRuntime = [System.IO.File]::ReadAllText(
+    (Join-Path $occtDestination "dist\occt-import-js.js"))
+$cadWorker = [System.IO.File]::ReadAllText(
+    (Join-Path $modelWebRoot "cad-worker.js"))
+$workerLiteral = ConvertTo-Json -InputObject "$occtRuntime`n$cadWorker" -Compress
+$cadLoaderSource = [System.IO.File]::ReadAllText(
+    (Join-Path $modelWebRoot "cad-loader.js"))
+$workerMarker = '"__GLANCE_OCCT_WORKER_SOURCE__"'
+$generatedCadLoader = $cadLoaderSource.Replace($workerMarker, $workerLiteral)
+if ($generatedCadLoader -eq $cadLoaderSource) {
+    throw "The OCCT worker source marker is missing."
+}
+[System.IO.File]::WriteAllText(
+    $cadLoaderSourcePath,
+    $generatedCadLoader,
+    [System.Text.UTF8Encoding]::new($false))
+& $esbuildDestination `
+    $cadLoaderSourcePath `
+    "--bundle" `
+    "--format=iife" `
+    "--platform=browser" `
+    "--target=es2022" `
+    "--minify" `
+    "--outfile=$cadLoaderBundlePath"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the CAD preview script."
+}
+
 $modelTemplate =
     [System.IO.File]::ReadAllText((Join-Path $modelWebRoot "index.html"))
 $modelBundle = [System.IO.File]::ReadAllText($modelBundlePath)
 $modelBundle = $modelBundle.Replace("</script", "<\/script")
+$cadLoaderBundle = [System.IO.File]::ReadAllText($cadLoaderBundlePath)
+$cadLoaderBundle = $cadLoaderBundle.Replace("</script", "<\/script")
+$scriptMarker = "<!-- GLANCE_VIEWER_SCRIPT -->"
 $modelHtml = $modelTemplate.Replace(
-    "<!-- GLANCE_VIEWER_SCRIPT -->",
+    $scriptMarker,
     "<script>`n$modelBundle`n</script>")
 if ($modelHtml -eq $modelTemplate) {
     throw "The model preview script marker is missing."
 }
+$cadHtml = $modelTemplate.Replace(
+    $scriptMarker,
+    "<script>`n$cadLoaderBundle`n</script>`n<script>`n$modelBundle`n</script>")
 [System.IO.File]::WriteAllText(
     (Join-Path $generatedWebRoot "index.html"),
     $modelHtml,
     [System.Text.UTF8Encoding]::new($false))
-Write-Host "The model preview web bundle is ready."
+[System.IO.File]::WriteAllText(
+    (Join-Path $generatedWebRoot "cad.html"),
+    $cadHtml,
+    [System.Text.UTF8Encoding]::new($false))
+Write-Host "The model preview web bundles are ready."
 
 if ($allAvailable) {
     Write-Host "Scintilla runtime dependencies are available."

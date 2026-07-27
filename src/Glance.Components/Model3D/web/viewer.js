@@ -184,6 +184,16 @@ async function loadModel() {
     }
     case ".fbx":
         return loadWith(new FBXLoader(), modelUrl);
+    case ".step":
+    case ".stp":
+    case ".iges":
+    case ".igs":
+    case ".brep":
+    case ".brp":
+        if (typeof window.loadCadModel !== "function") {
+            throw new Error("CAD loader is unavailable");
+        }
+        return window.loadCadModel(modelUrl, extension, darkTheme, THREE);
     default:
         throw new Error("Unsupported model format");
     }

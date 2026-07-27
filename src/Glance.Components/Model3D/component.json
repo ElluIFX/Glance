@@ -6,10 +6,13 @@
   "payload_files": [
     "resources.pri",
     "three-LICENSE.txt",
+    "occt-import-js-LICENSE.md",
+    "web/cad.html",
     "web/index.html",
     "web/viewer.css",
     "web/vendor/draco/draco_decoder.wasm",
-    "web/vendor/draco/draco_wasm_wrapper.js"
+    "web/vendor/draco/draco_wasm_wrapper.js",
+    "web/vendor/occt/occt-import-js.wasm"
   ],
   "installer_names": {
     "en-US": "3D model preview",
