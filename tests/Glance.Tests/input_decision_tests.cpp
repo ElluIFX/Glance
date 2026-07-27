@@ -265,7 +265,7 @@ int main()
                     "Office component English display name");
                 const std::wstring_view expected_english_detail =
                     english_status.severity == HealthSeverity::healthy
-                    ? L"Office COM automation available"
+                    ? L"Supports previewing Word, PowerPoint, and Excel files"
                     : english_status.capability_mask == 0
                         ? L"Office COM automation unavailable"
                         : L"Some Office COM applications are unavailable";
@@ -284,7 +284,7 @@ int main()
                     "Office component Chinese display name");
                 const std::wstring_view expected_chinese_detail =
                     chinese_status.severity == HealthSeverity::healthy
-                    ? L"Office COM 自动化可用"
+                    ? L"支持预览 Word、PowerPoint 与 Excel 文件"
                     : chinese_status.capability_mask == 0
                         ? L"未检测到可用的 Office COM 自动化"
                         : L"部分 Office COM 自动化不可用";
