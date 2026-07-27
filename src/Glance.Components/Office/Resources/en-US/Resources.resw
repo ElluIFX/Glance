@@ -12,7 +12,7 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
 
   <data name="Component.DisplayName" xml:space="preserve"><value>Microsoft Office preview</value></data>
-  <data name="Status.Available" xml:space="preserve"><value>Office COM automation available</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>Supports previewing Word, PowerPoint, and Excel files</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>Office COM automation unavailable</value></data>
   <data name="Status.Partial" xml:space="preserve"><value>Some Office COM applications are unavailable</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>Preparing this file preview in the background, you can return later</value></data>

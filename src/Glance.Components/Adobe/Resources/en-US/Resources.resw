@@ -12,7 +12,7 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
 
   <data name="Component.DisplayName" xml:space="preserve"><value>Adobe document preview</value></data>
-  <data name="Status.BuiltIn" xml:space="preserve"><value>Built-in PSD, PSB thumbnail, and PDF-compatible AI preview available</value></data>
+  <data name="Status.BuiltIn" xml:space="preserve"><value>Supports previewing Photoshop and Illustrator project files</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>Preparing the Adobe document preview in the background</value></data>
   <data name="Preview.Refining" xml:space="preserve"><value>Preparing a high-resolution preview</value></data>
   <data name="Preview.RefinementFailed" xml:space="preserve"><value>Could not prepare the high-resolution preview</value></data>
