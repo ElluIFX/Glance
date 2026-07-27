@@ -272,6 +272,15 @@ namespace winrt::Glance::App::implementation
         void apply_component_preview(
             glance::app::ComponentPreviewResult result,
             std::uint64_t generation);
+        void begin_component_refinement(std::uint64_t generation);
+        winrt::fire_and_forget refine_component_preview_async(
+            std::shared_ptr<void> refinement,
+            std::wstring notice,
+            std::uint64_t generation);
+        winrt::fire_and_forget apply_component_refinement_async(
+            glance::app::ComponentPreviewResult result,
+            std::shared_ptr<void> refinement,
+            std::uint64_t generation);
         struct ArchiveIconTarget
         {
             std::wstring path;
@@ -349,6 +358,10 @@ namespace winrt::Glance::App::implementation
         void show_content_panel(glance::app::PreviewKind kind);
         void dismiss_preview_info_bar();
         void show_preview_notice(std::wstring resource_key);
+        void show_preview_message(
+            std::wstring message,
+            Microsoft::UI::Xaml::Controls::InfoBarSeverity severity,
+            bool auto_hide);
         void animate_preview_info_bar(bool opening);
         void show_text_preview_error(std::wstring message);
         void show_provider_error(std::wstring message, std::uint64_t generation);
@@ -461,6 +474,8 @@ namespace winrt::Glance::App::implementation
         glance::app::MediaTechnicalMetadata media_metadata_;
         std::shared_ptr<glance::app::PdfRenderClient> pdf_render_client_;
         std::shared_ptr<void> active_component_preview_;
+        std::shared_ptr<void> active_component_refinement_;
+        std::wstring component_refinement_text_;
         std::wstring component_loading_language_;
         std::wstring pdf_source_path_;
         std::wstring pdf_password_;
@@ -469,6 +484,7 @@ namespace winrt::Glance::App::implementation
         std::uint32_t pdf_page_count_{};
         std::uint32_t pdf_thumbnail_items_built_{};
         bool pdf_thumbnail_selection_updating_{};
+        bool component_refinement_started_{};
         bool pdf_panning_{};
         std::uint32_t pdf_page_index_{};
         double pdf_pan_horizontal_offset_{};

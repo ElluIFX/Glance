@@ -280,6 +280,21 @@ namespace winrt::Glance::App::implementation
         media_preview_preferences_ = glance::app::load_media_preview_preferences();
         DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
         DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
+        switch (media_preview_preferences_.rich_document_render_dimension)
+        {
+        case 1024:
+            RichDocumentRenderResolutionComboBox().SelectedIndex(0);
+            break;
+        case 2048:
+            RichDocumentRenderResolutionComboBox().SelectedIndex(1);
+            break;
+        case 8192:
+            RichDocumentRenderResolutionComboBox().SelectedIndex(3);
+            break;
+        default:
+            RichDocumentRenderResolutionComboBox().SelectedIndex(2);
+            break;
+        }
         AutoplayAudioToggle().IsOn(media_preview_preferences_.autoplay_audio);
         AutoplayVideoToggle().IsOn(media_preview_preferences_.autoplay_video);
         ReverseSeekWheelToggle().IsOn(media_preview_preferences_.reverse_seek_wheel);
@@ -458,7 +473,6 @@ namespace winrt::Glance::App::implementation
         set_text(FooterPageTitle(), L"FooterPageTitle.Text");
         set_text(FooterPageDescription(), L"FooterPageDescription.Text");
         set_text(FooterFieldsLabel(), L"FooterFieldsLabel.Text");
-        set_text(FooterFieldsDescription(), L"FooterFieldsDescription.Text");
         set_content(FooterSizeCheckBox(), L"FooterSizeCheckBox.Content");
         set_content(FooterModifiedTimeCheckBox(), L"FooterModifiedTimeCheckBox.Content");
         set_content(FooterCreationTimeCheckBox(), L"FooterCreationTimeCheckBox.Content");
@@ -475,7 +489,6 @@ namespace winrt::Glance::App::implementation
         set_text(WindowPageTitle(), L"WindowPageTitle.Text");
         set_text(WindowPageDescription(), L"WindowPageDescription.Text");
         set_text(WindowBehaviorSectionTitle(), L"WindowBehaviorSectionTitle.Text");
-        set_text(WindowBehaviorSectionDescription(), L"WindowBehaviorSectionDescription.Text");
         set_text(DefaultWindowSizeLabel(), L"DefaultWindowSizeLabel.Text");
         set_text(DefaultWindowSizeDescription(), L"DefaultWindowSizeDescription.Text");
         set_text(RememberWindowSizeLabel(), L"RememberWindowSizeLabel.Text");
@@ -485,7 +498,6 @@ namespace winrt::Glance::App::implementation
         set_text(ShowAfterAutoFitLabel(), L"ShowAfterAutoFitLabel.Text");
         set_text(ShowAfterAutoFitDescription(), L"ShowAfterAutoFitDescription.Text");
         set_text(AdaptiveMediaSizeSectionTitle(), L"AdaptiveMediaSizeSectionTitle.Text");
-        set_text(AdaptiveMediaSizeSectionDescription(), L"AdaptiveMediaSizeSectionDescription.Text");
         set_text(DynamicAutoFitLabel(), L"DynamicAutoFitLabel.Text");
         set_text(DynamicAutoFitDescription(), L"DynamicAutoFitDescription.Text");
         set_text(AdaptiveSizeRangeLabel(), L"AdaptiveSizeRangeLabel.Text");
@@ -502,6 +514,7 @@ namespace winrt::Glance::App::implementation
         set_text(WindowOpacityDescription(), L"WindowOpacityDescription.Text");
         set_text(MediaPreviewPageTitle(), L"MediaPreviewPageTitle.Text");
         set_text(MediaPreviewPageDescription(), L"MediaPreviewPageDescription.Text");
+        set_text(AudioVideoPreviewGroupTitle(), L"AudioVideoPreviewGroupTitle.Text");
         set_text(DefaultAudioVolumeLabel(), L"DefaultAudioVolumeLabel.Text");
         set_text(DefaultAudioVolumeDescription(), L"DefaultAudioVolumeDescription.Text");
         set_text(DefaultVideoVolumeLabel(), L"DefaultVideoVolumeLabel.Text");
@@ -512,10 +525,28 @@ namespace winrt::Glance::App::implementation
         set_text(AutoplayVideoDescription(), L"AutoplayVideoDescription.Text");
         set_text(ReverseSeekWheelLabel(), L"ReverseSeekWheelLabel.Text");
         set_text(ReverseSeekWheelDescription(), L"ReverseSeekWheelDescription.Text");
+        set_text(RichDocumentPreviewGroupTitle(), L"RichDocumentPreviewGroupTitle.Text");
+        set_text(
+            RichDocumentRenderResolutionLabel(),
+            L"RichDocumentRenderResolutionLabel.Text");
+        set_text(
+            RichDocumentRenderResolutionDescription(),
+            L"RichDocumentRenderResolutionDescription.Text");
+        set_content(
+            RichDocumentResolution1024Item(),
+            L"RichDocumentResolution1024Item.Content");
+        set_content(
+            RichDocumentResolution2048Item(),
+            L"RichDocumentResolution2048Item.Content");
+        set_content(
+            RichDocumentResolution4096Item(),
+            L"RichDocumentResolution4096Item.Content");
+        set_content(
+            RichDocumentResolution8192Item(),
+            L"RichDocumentResolution8192Item.Content");
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
         set_text(PlainTextPreviewSectionTitle(), L"PlainTextPreviewSectionTitle.Text");
-        set_text(PlainTextPreviewSectionDescription(), L"PlainTextPreviewSectionDescription.Text");
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
         set_text(FontFamilyDescription(), L"FontFamilyDescription.Text");
         set_text(FontSizeLabel(), L"FontSizeLabel.Text");
@@ -564,7 +595,6 @@ namespace winrt::Glance::App::implementation
         set_text(WordWrapLabel(), L"WordWrapLabel.Text");
         set_text(WordWrapDescription(), L"WordWrapDescription.Text");
         set_text(PathCopyGroupLabel(), L"PathCopyGroupLabel.Text");
-        set_text(PathCopyGroupDescription(), L"PathCopyGroupDescription.Text");
         set_text(QuoteCopiedPathLabel(), L"QuoteCopiedPathLabel.Text");
         set_text(QuoteCopiedPathDescription(), L"QuoteCopiedPathDescription.Text");
         set_text(UnixPathSeparatorsLabel(), L"UnixPathSeparatorsLabel.Text");
@@ -580,6 +610,8 @@ namespace winrt::Glance::App::implementation
         set_text(ComponentStatusGroupTitle(), L"ComponentStatusGroupTitle.Text");
         set_text(MaintenancePageTitle(), L"MaintenancePageTitle.Text");
         set_text(MaintenancePageDescription(), L"MaintenancePageDescription.Text");
+        set_text(RuntimeStatusGroupTitle(), L"RuntimeStatusGroupTitle.Text");
+        set_text(MaintenanceActionsGroupTitle(), L"MaintenanceActionsGroupTitle.Text");
         set_text(InputCoreLabel(), L"InputCoreLabel.Text");
         set_text(MediaComponentsLabel(), L"MediaComponentsLabel.Text");
         set_text(WebViewAvailabilityLabel(), L"WebViewAvailabilityLabel.Text");
@@ -943,6 +975,27 @@ namespace winrt::Glance::App::implementation
         media_preview_preferences_.autoplay_audio = AutoplayAudioToggle().IsOn();
         media_preview_preferences_.autoplay_video = AutoplayVideoToggle().IsOn();
         media_preview_preferences_.reverse_seek_wheel = ReverseSeekWheelToggle().IsOn();
+        glance::app::save_media_preview_preferences(media_preview_preferences_);
+    }
+
+    void SettingsWindow::RichDocumentRenderResolutionComboBox_SelectionChanged(
+        IInspectable const&,
+        Controls::SelectionChangedEventArgs const&)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+
+        static constexpr std::array<std::uint32_t, 4> dimensions{
+            1024, 2048, 4096, 8192 };
+        const int selected = RichDocumentRenderResolutionComboBox().SelectedIndex();
+        if (selected < 0 || selected >= static_cast<int>(dimensions.size()))
+        {
+            return;
+        }
+        media_preview_preferences_.rich_document_render_dimension =
+            dimensions[static_cast<std::size_t>(selected)];
         glance::app::save_media_preview_preferences(media_preview_preferences_);
     }
 

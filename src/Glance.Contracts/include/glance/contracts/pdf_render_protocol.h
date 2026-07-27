@@ -5,10 +5,10 @@
 namespace glance::contracts::pdf
 {
     inline constexpr std::uint32_t protocol_magic = 0x46504447U;
-    inline constexpr std::uint32_t protocol_version = 3U;
+    inline constexpr std::uint32_t protocol_version = 4U;
     inline constexpr std::uint32_t maximum_payload_size = 8U * 1024U * 1024U;
-    inline constexpr std::uint32_t shared_bitmap_size = 64U * 1024U * 1024U;
-    inline constexpr std::uint32_t maximum_bitmap_dimension = 4096U;
+    inline constexpr std::uint32_t shared_bitmap_size = 256U * 1024U * 1024U;
+    inline constexpr std::uint32_t maximum_bitmap_dimension = 8192U;
 
     enum class Command : std::uint32_t
     {

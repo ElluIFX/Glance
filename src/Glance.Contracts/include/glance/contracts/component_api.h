@@ -16,6 +16,24 @@ namespace glance::contracts::components
     inline constexpr std::size_t loading_text_capacity = 256;
     inline constexpr std::size_t preview_path_capacity = 32768;
     inline constexpr std::size_t preview_error_capacity = 256;
+    inline constexpr std::uint32_t configurable_preview_api_version = 1;
+    inline constexpr std::uint32_t progressive_preview_api_version = 1;
+    inline constexpr std::uint32_t preview_notice_api_version = 1;
+    inline constexpr GUID configurable_preview_api_id{
+        0x950742e7,
+        0x0af2,
+        0x49a1,
+        { 0xa0, 0xb3, 0xe5, 0x76, 0xe4, 0x23, 0x24, 0xc5 } };
+    inline constexpr GUID progressive_preview_api_id{
+        0xf9037d7d,
+        0xe9e8,
+        0x4065,
+        { 0xa9, 0x47, 0x20, 0xe2, 0xae, 0xf2, 0xb8, 0x57 } };
+    inline constexpr GUID preview_notice_api_id{
+        0xa0b393b6,
+        0x0485,
+        0x4a6c,
+        { 0x9b, 0x96, 0x46, 0x27, 0xf5, 0x2c, 0xdd, 0x14 } };
 
     enum class PreviewContentKind : std::uint32_t
     {
@@ -99,6 +117,12 @@ namespace glance::contracts::components
         wchar_t error_detail[preview_error_capacity]{};
     };
 
+    struct PreviewPreparationOptions
+    {
+        std::uint32_t size{ sizeof(PreviewPreparationOptions) };
+        std::uint32_t maximum_dimension{ 4096 };
+    };
+
     using InitializeFunction = BOOL(WINAPI*)(
         const ComponentRegistrar* registrar,
         ComponentRegistration* registration) noexcept;
@@ -115,11 +139,54 @@ namespace glance::contracts::components
         const wchar_t* language_tag,
         PreparedPreview* preview) noexcept;
     using ReleasePreviewFunction = void(WINAPI*)(std::uint64_t lease_token) noexcept;
+    using PreparePreviewWithOptionsFunction = PrepareStatus(WINAPI*)(
+        const wchar_t* path,
+        const wchar_t* language_tag,
+        const PreviewPreparationOptions* options,
+        PreparedPreview* preview) noexcept;
+    using CanRefinePreviewFunction = BOOL(WINAPI*)(
+        std::uint64_t lease_token) noexcept;
+    using QueryRefinementTextFunction = BOOL(WINAPI*)(
+        std::uint64_t lease_token,
+        const wchar_t* language_tag,
+        ComponentLoadingTextResult* result) noexcept;
+    using PrepareRefinedPreviewFunction = PrepareStatus(WINAPI*)(
+        std::uint64_t lease_token,
+        const wchar_t* language_tag,
+        const PreviewPreparationOptions* options,
+        PreparedPreview* preview) noexcept;
+    using QueryPreviewNoticeFunction = BOOL(WINAPI*)(
+        std::uint64_t lease_token,
+        const wchar_t* language_tag,
+        ComponentLoadingTextResult* result) noexcept;
     using QueryInterfaceFunction = BOOL(WINAPI*)(
         const GUID* interface_id,
         std::uint32_t minimum_version,
         void** interface_pointer) noexcept;
     using ShutdownFunction = void(WINAPI*)() noexcept;
+
+    struct ConfigurablePreviewApi
+    {
+        std::uint32_t size{ sizeof(ConfigurablePreviewApi) };
+        std::uint32_t version{ configurable_preview_api_version };
+        PreparePreviewWithOptionsFunction prepare_preview{};
+    };
+
+    struct ProgressivePreviewApi
+    {
+        std::uint32_t size{ sizeof(ProgressivePreviewApi) };
+        std::uint32_t version{ progressive_preview_api_version };
+        CanRefinePreviewFunction can_refine{};
+        QueryRefinementTextFunction query_refinement_text{};
+        PrepareRefinedPreviewFunction prepare_refined_preview{};
+    };
+
+    struct PreviewNoticeApi
+    {
+        std::uint32_t size{ sizeof(PreviewNoticeApi) };
+        std::uint32_t version{ preview_notice_api_version };
+        QueryPreviewNoticeFunction query_preview_notice{};
+    };
 
     struct ComponentApi
     {

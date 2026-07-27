@@ -940,7 +940,23 @@
             IsClosable="True"
             IsIconVisible="True"
             IsOpen="False"
-            Severity="Error"
-            Title="Unable to preview as text" />
+            Severity="Informational"
+            Title="Unable to preview as text">
+            <InfoBar.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="InfoBarInformationalSeverityIconBackground" Color="#005FB8" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Dark">
+                            <SolidColorBrush x:Key="InfoBarInformationalSeverityIconBackground" Color="#60CDFF" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="HighContrast">
+                            <StaticResource x:Key="InfoBarInformationalSeverityIconBackground" ResourceKey="SystemColorHighlightColorBrush" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+            </InfoBar.Resources>
+        </InfoBar>
     </Grid>
 </Window>

@@ -6,6 +6,7 @@
 #include "image_metadata_provider.h"
 #include "localization.h"
 #include "markdown_renderer.h"
+#include "media_preview_preferences.h"
 #include "media_metadata_provider.h"
 #include "component_loader.h"
 #include "pan_interaction.h"
@@ -470,7 +471,11 @@ namespace winrt::Glance::App::implementation
         }
         if (preview_notice_active_)
         {
-            PreviewErrorInfoBar().Message(glance::app::localize(preview_notice_resource_key_));
+            if (!preview_notice_resource_key_.empty())
+            {
+                PreviewErrorInfoBar().Message(
+                    glance::app::localize(preview_notice_resource_key_));
+            }
         }
         else
         {
@@ -944,6 +949,9 @@ namespace winrt::Glance::App::implementation
         cancel_archive_icon_load();
         glance::app::cancel_text_preview_read(current_text_reader_);
         active_component_preview_.reset();
+        active_component_refinement_.reset();
+        component_refinement_text_.clear();
+        component_refinement_started_ = false;
         component_loading_language_.clear();
         ++content_generation_;
         stop_media_playback();
@@ -1443,6 +1451,9 @@ namespace winrt::Glance::App::implementation
             return;
         }
         auto previous_component_preview = std::move(active_component_preview_);
+        auto previous_component_refinement = std::move(active_component_refinement_);
+        component_refinement_text_.clear();
+        component_refinement_started_ = false;
         cancel_pdf_render();
         cancel_archive_icon_load();
         hide_password_prompt();
@@ -1632,6 +1643,9 @@ namespace winrt::Glance::App::implementation
         bool allow_advanced_info)
     {
         auto previous_component_preview = std::move(active_component_preview_);
+        auto previous_component_refinement = std::move(active_component_refinement_);
+        component_refinement_text_.clear();
+        component_refinement_started_ = false;
         current_kind_ = glance::app::PreviewKind::generic;
         show_content_panel(glance::app::PreviewKind::generic);
         FileNameText().Text(file.display_name);
@@ -1884,6 +1898,7 @@ namespace winrt::Glance::App::implementation
                 lifetime->fit_image_to_viewport();
                 lifetime->update_footer_metadata();
                 lifetime->auto_fit_window_to_content(width, height);
+                lifetime->begin_component_refinement(generation);
             }));
         }
         catch (const hresult_error& error)
@@ -2409,20 +2424,17 @@ namespace winrt::Glance::App::implementation
             PdfLoadingText().Visibility(Visibility::Collapsed);
         }
         PdfLoadingOverlay().Visibility(Visibility::Visible);
-        const auto width = static_cast<std::uint32_t>(std::clamp(
-            std::lround(std::max(512.0, PdfScroller().ActualWidth()) * 2.0),
-            1024L,
-            4096L));
-        const auto height = static_cast<std::uint32_t>(std::clamp(
-            std::lround(std::max(512.0, PdfScroller().ActualHeight()) * 2.0),
-            1024L,
-            4096L));
+        const auto render_dimension =
+            glance::app::load_media_preview_preferences().rich_document_render_dimension;
         co_await resume_background();
         if (request != pdf_render_request_.load(std::memory_order_relaxed))
         {
             co_return;
         }
-        auto rendered = session->render(page_index, width, height);
+        auto rendered = session->render(
+            page_index,
+            render_dimension,
+            render_dimension);
         static_cast<void>(dispatcher.TryEnqueue([
             lifetime,
             session,
@@ -3089,11 +3101,16 @@ namespace winrt::Glance::App::implementation
         const auto weak = get_weak();
         const auto dispatcher = DispatcherQueue();
         const auto language = glance::app::current_ui_language();
+        glance::contracts::components::PreviewPreparationOptions options{
+            .maximum_dimension =
+                glance::app::load_media_preview_preferences()
+                    .rich_document_render_dimension };
         co_await resume_background();
 
         auto result = glance::app::prepare_component_preview(
             path,
             language,
+            options,
             [weak, dispatcher, generation, language](std::wstring text) mutable {
                 static_cast<void>(dispatcher.TryEnqueue([
                     weak,
@@ -3238,6 +3255,13 @@ namespace winrt::Glance::App::implementation
         }
 
         active_component_preview_ = std::move(result.lease);
+        active_component_refinement_ =
+            kind == glance::app::PreviewKind::image
+            ? std::move(result.refinement)
+            : nullptr;
+        component_refinement_text_ = std::move(result.refinement_text);
+        component_refinement_started_ = false;
+        auto component_notice = std::move(result.notice);
         ComponentLoadingText().Visibility(Visibility::Collapsed);
         auto prepared_file = files_[current_index_];
         prepared_file.path = std::move(result.output_path);
@@ -3245,6 +3269,155 @@ namespace winrt::Glance::App::implementation
         prepared_file.is_filesystem = true;
         prepared_file.is_cloud_placeholder = false;
         present_resolved_file(prepared_file, kind, generation);
+        if (!component_notice.empty())
+        {
+            show_preview_message(
+                std::move(component_notice),
+                InfoBarSeverity::Informational,
+                true);
+        }
+    }
+
+    void MainWindow::begin_component_refinement(std::uint64_t generation)
+    {
+        if (generation != content_generation_ ||
+            current_kind_ != glance::app::PreviewKind::image ||
+            active_component_refinement_ == nullptr ||
+            component_refinement_started_)
+        {
+            return;
+        }
+
+        component_refinement_started_ = true;
+        auto notice = component_refinement_text_.empty()
+            ? glance::app::localize(L"Loading")
+            : component_refinement_text_;
+        refine_component_preview_async(
+            active_component_refinement_,
+            std::move(notice),
+            generation);
+    }
+
+    fire_and_forget MainWindow::refine_component_preview_async(
+        std::shared_ptr<void> refinement,
+        std::wstring notice,
+        std::uint64_t generation)
+    {
+        const auto weak = get_weak();
+        const auto dispatcher = DispatcherQueue();
+        const auto language = glance::app::current_ui_language();
+        show_preview_message(
+            std::move(notice),
+            InfoBarSeverity::Informational,
+            false);
+        co_await resume_background();
+
+        auto result = glance::app::refine_component_preview(
+            refinement,
+            language);
+        static_cast<void>(dispatcher.TryEnqueue([
+            weak,
+            refinement = std::move(refinement),
+            result = std::move(result),
+            generation]() mutable {
+            const auto lifetime = weak.get();
+            if (lifetime == nullptr ||
+                generation != lifetime->content_generation_ ||
+                refinement != lifetime->active_component_refinement_ ||
+                lifetime->current_kind_ != glance::app::PreviewKind::image)
+            {
+                return;
+            }
+            if (result.status !=
+                    glance::contracts::components::PrepareStatus::success ||
+                result.output_path.empty())
+            {
+                lifetime->active_component_refinement_.reset();
+                lifetime->component_refinement_text_.clear();
+                lifetime->component_refinement_started_ = false;
+                if (result.status ==
+                    glance::contracts::components::PrepareStatus::cancelled)
+                {
+                    lifetime->dismiss_preview_info_bar();
+                    return;
+                }
+                lifetime->show_preview_message(
+                    result.error_detail.empty()
+                        ? glance::app::localize(L"ComponentStateError")
+                        : std::move(result.error_detail),
+                    InfoBarSeverity::Warning,
+                    true);
+                return;
+            }
+            lifetime->apply_component_refinement_async(
+                std::move(result),
+                std::move(refinement),
+                generation);
+        }));
+    }
+
+    fire_and_forget MainWindow::apply_component_refinement_async(
+        glance::app::ComponentPreviewResult result,
+        std::shared_ptr<void> refinement,
+        std::uint64_t generation)
+    {
+        try
+        {
+            const auto path = result.output_path;
+            const auto file =
+                co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
+            const auto properties = co_await file.Properties().GetImagePropertiesAsync();
+            const auto stream = co_await file.OpenReadAsync();
+            Microsoft::UI::Xaml::Media::Imaging::BitmapImage bitmap;
+            co_await bitmap.SetSourceAsync(stream);
+            if (generation != content_generation_ ||
+                refinement != active_component_refinement_ ||
+                current_kind_ != glance::app::PreviewKind::image)
+            {
+                co_return;
+            }
+
+            const auto width = properties.Width() != 0
+                ? properties.Width()
+                : static_cast<std::uint32_t>(bitmap.PixelWidth());
+            const auto height = properties.Height() != 0
+                ? properties.Height()
+                : static_cast<std::uint32_t>(bitmap.PixelHeight());
+            active_component_preview_ = std::move(result.lease);
+            active_component_refinement_.reset();
+            component_refinement_text_.clear();
+            component_refinement_started_ = false;
+            image_pixel_width_ = width;
+            image_pixel_height_ = height;
+            image_bits_per_pixel_ = 0;
+            ImagePreview().Source(bitmap);
+            update_image_fit_surface();
+            update_footer_metadata();
+            auto_fit_window_to_content(width, height);
+            dismiss_preview_info_bar();
+            if (glance::app::footer_field_enabled(
+                    footer_preferences_,
+                    glance::app::FooterField::media_info))
+            {
+                load_image_media_info_async(path, generation);
+            }
+            load_image_metadata_async(path, generation);
+        }
+        catch (...)
+        {
+            if (generation != content_generation_ ||
+                refinement != active_component_refinement_)
+            {
+                co_return;
+            }
+            active_component_refinement_.reset();
+            component_refinement_text_.clear();
+            component_refinement_started_ = false;
+            show_preview_message(
+                glance::app::localize(L"ComponentStateError"),
+                InfoBarSeverity::Warning,
+                true);
+        }
     }
 
     void MainWindow::apply_text_preview(
@@ -3976,16 +4149,32 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::show_preview_notice(std::wstring resource_key)
     {
+        const auto message = glance::app::localize(resource_key);
+        show_preview_message(
+            message,
+            InfoBarSeverity::Informational,
+            true);
+        preview_notice_resource_key_ = std::move(resource_key);
+    }
+
+    void MainWindow::show_preview_message(
+        std::wstring message,
+        InfoBarSeverity severity,
+        bool auto_hide)
+    {
         dismiss_preview_info_bar();
         preview_notice_active_ = true;
-        preview_notice_resource_key_ = std::move(resource_key);
         PreviewErrorInfoBar().Title(L"");
-        PreviewErrorInfoBar().Message(glance::app::localize(preview_notice_resource_key_));
-        PreviewErrorInfoBar().Severity(InfoBarSeverity::Informational);
+        PreviewErrorInfoBar().Message(std::move(message));
+        PreviewErrorInfoBar().Severity(severity);
         PreviewErrorInfoBar().IsClosable(false);
         PreviewErrorInfoBar().IsOpen(true);
         queue_text_editor_occlusion_update();
         animate_preview_info_bar(true);
+        if (!auto_hide)
+        {
+            return;
+        }
         if (preview_notice_timer_ == nullptr)
         {
             preview_notice_timer_ = DispatcherTimer();

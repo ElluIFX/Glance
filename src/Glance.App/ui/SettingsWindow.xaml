@@ -75,6 +75,9 @@
                 <Setter Property="FontSize" Value="24" />
                 <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
+            <Style x:Key="SettingsGroupTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
         </NavigationView.Resources>
         <NavigationView.MenuItems>
             <NavigationViewItem
@@ -182,7 +185,7 @@
                         <TextBlock x:Name="GeneralPageDescription" x:Uid="GeneralPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Appearance and application startup" />
                     </StackPanel>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="AppearanceGroupTitle" x:Uid="AppearanceGroupTitle" FontWeight="SemiBold" Text="Appearance" />
+                        <TextBlock x:Name="AppearanceGroupTitle" x:Uid="AppearanceGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Appearance" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
@@ -291,7 +294,7 @@
                         </Border>
                     </StackPanel>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="StartupGroupTitle" x:Uid="StartupGroupTitle" FontWeight="SemiBold" Text="Startup" />
+                        <TextBlock x:Name="StartupGroupTitle" x:Uid="StartupGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Startup" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
@@ -328,15 +331,10 @@
                         <TextBlock x:Name="WindowPageTitle" x:Uid="WindowPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Window" />
                         <TextBlock x:Name="WindowPageDescription" x:Uid="WindowPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Preview window size, position, and appearance" />
                     </StackPanel>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="WindowBehaviorSectionTitle" x:Uid="WindowBehaviorSectionTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Window behavior" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="WindowBehaviorSectionTitle" x:Uid="WindowBehaviorSectionTitle" Text="Window behavior" />
-                                    <TextBlock x:Name="WindowBehaviorSectionDescription" x:Uid="WindowBehaviorSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Default size, remembered placement, and opacity" />
-                                </StackPanel>
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -398,16 +396,12 @@
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Media auto fit" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" Text="Media auto fit" />
-                                    <TextBlock x:Name="AdaptiveMediaSizeSectionDescription" x:Uid="AdaptiveMediaSizeSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Window sizing for images, video, and documents" />
-                                </StackPanel>
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -473,7 +467,8 @@
                                 <TextBox x:Name="AutoFitIgnoredExtensionsTextBox" x:Uid="AutoFitIgnoredExtensionsTextBox" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" PlaceholderText=".gif; webp; mp4" TextChanged="AutoFitIgnoredExtensionsTextBox_TextChanged" />
                             </Grid>
                         </StackPanel>
-                    </Border>
+                        </Border>
+                    </StackPanel>
                     <TextBlock x:Name="WindowResetStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                 </StackPanel>
             </ScrollViewer>
@@ -488,15 +483,10 @@
                         <TextBlock x:Name="FooterPageTitle" x:Uid="FooterPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Footer" />
                         <TextBlock x:Name="FooterPageDescription" x:Uid="FooterPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Preview metadata and path copying" />
                     </StackPanel>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="FooterFieldsLabel" x:Uid="FooterFieldsLabel" Style="{StaticResource SettingsGroupTitleStyle}" Text="Displayed fields" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="FooterFieldsLabel" x:Uid="FooterFieldsLabel" Text="Displayed fields" />
-                                    <TextBlock x:Name="FooterFieldsDescription" x:Uid="FooterFieldsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Choose and order preview fields" />
-                                </StackPanel>
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <StackPanel x:Name="FooterFieldsPanel">
                                 <Border x:Name="FooterSizeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
                                     <Grid MinHeight="44" Padding="16,4">
@@ -560,16 +550,12 @@
                                 </Border>
                             </StackPanel>
                         </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="PathCopyGroupLabel" x:Uid="PathCopyGroupLabel" Style="{StaticResource SettingsGroupTitleStyle}" Text="Path copying" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="PathCopyGroupLabel" x:Uid="PathCopyGroupLabel" Text="Path copying" />
-                                    <TextBlock x:Name="PathCopyGroupDescription" x:Uid="PathCopyGroupDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Customize copied path output" />
-                                </StackPanel>
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -594,7 +580,8 @@
                                 <ToggleSwitch x:Name="UnixPathSeparatorsToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
                             </Grid>
                         </StackPanel>
-                    </Border>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
@@ -608,15 +595,10 @@
                         <TextBlock x:Name="TextPreviewPageTitle" x:Uid="TextPreviewPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Document preview" />
                         <TextBlock x:Name="TextPreviewPageDescription" x:Uid="TextPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Plain text document appearance and behavior" />
                     </StackPanel>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="PlainTextPreviewSectionTitle" x:Uid="PlainTextPreviewSectionTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Plain text preview" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="PlainTextPreviewSectionTitle" x:Uid="PlainTextPreviewSectionTitle" Text="Plain text preview" />
-                                    <TextBlock x:Name="PlainTextPreviewSectionDescription" x:Uid="PlainTextPreviewSectionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Text appearance, highlighting, and layout" />
-                                </StackPanel>
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -709,7 +691,8 @@
                                 <ToggleSwitch x:Name="WordWrapToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
                         </StackPanel>
-                    </Border>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
@@ -723,7 +706,9 @@
                         <TextBlock x:Name="MediaPreviewPageTitle" x:Uid="MediaPreviewPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Media preview" />
                         <TextBlock x:Name="MediaPreviewPageDescription" x:Uid="MediaPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Playback defaults and window behavior" />
                     </StackPanel>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="AudioVideoPreviewGroupTitle" x:Uid="AudioVideoPreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Audio and video preview" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
@@ -813,7 +798,34 @@
                                     Toggled="MediaPreferenceToggle_Toggled" />
                             </Grid>
                         </StackPanel>
-                    </Border>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="RichDocumentPreviewGroupTitle" x:Uid="RichDocumentPreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Rich document preview" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="RichDocumentRenderResolutionLabel" x:Uid="RichDocumentRenderResolutionLabel" Text="Render resolution" />
+                                    <TextBlock x:Name="RichDocumentRenderResolutionDescription" x:Uid="RichDocumentRenderResolutionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Maximum pixel length of the rendered preview" />
+                                </StackPanel>
+                                <ComboBox
+                                    x:Name="RichDocumentRenderResolutionComboBox"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    SelectionChanged="RichDocumentRenderResolutionComboBox_SelectionChanged">
+                                    <ComboBoxItem x:Name="RichDocumentResolution1024Item" x:Uid="RichDocumentResolution1024Item" Content="1024 px" Tag="1024" />
+                                    <ComboBoxItem x:Name="RichDocumentResolution2048Item" x:Uid="RichDocumentResolution2048Item" Content="2048 px" Tag="2048" />
+                                    <ComboBoxItem x:Name="RichDocumentResolution4096Item" x:Uid="RichDocumentResolution4096Item" Content="4096 px" Tag="4096" />
+                                    <ComboBoxItem x:Name="RichDocumentResolution8192Item" x:Uid="RichDocumentResolution8192Item" Content="8192 px" Tag="8192" />
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
@@ -828,7 +840,7 @@
                         <TextBlock x:Name="ComponentsPageDescription" x:Uid="ComponentsPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Install and manage optional preview support" />
                     </StackPanel>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="ComponentLocationGroupTitle" x:Uid="ComponentLocationGroupTitle" FontWeight="SemiBold" Text="Location" />
+                        <TextBlock x:Name="ComponentLocationGroupTitle" x:Uid="ComponentLocationGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Location" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
@@ -844,7 +856,7 @@
                         </Border>
                     </StackPanel>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="ComponentStatusGroupTitle" x:Uid="ComponentStatusGroupTitle" FontWeight="SemiBold" Text="Component status" />
+                        <TextBlock x:Name="ComponentStatusGroupTitle" x:Uid="ComponentStatusGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Component status" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <Grid>
                                 <Grid
@@ -893,7 +905,9 @@
                         <TextBlock x:Name="MaintenancePageTitle" x:Uid="MaintenancePageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Maintenance" />
                         <TextBlock x:Name="MaintenancePageDescription" x:Uid="MaintenancePageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Runtime status, diagnostics, and saved application state" />
                     </StackPanel>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="RuntimeStatusGroupTitle" x:Uid="RuntimeStatusGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Runtime status" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
@@ -943,8 +957,11 @@
                                 <FontIcon x:Name="AdministratorAccessStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
                         </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SettingsGroupStyle}">
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="MaintenanceActionsGroupTitle" x:Uid="MaintenanceActionsGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Maintenance actions" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
@@ -1005,7 +1022,8 @@
                                     Content="Reset" />
                             </Grid>
                         </StackPanel>
-                    </Border>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 

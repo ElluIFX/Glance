@@ -61,6 +61,9 @@ namespace winrt::Glance::App::implementation
         void MediaPreferenceToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void RichDocumentRenderResolutionComboBox_SelectionChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
         winrt::fire_and_forget ExportDiagnosticBundleButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);

@@ -41,6 +41,22 @@ namespace
             : fallback;
     }
 
+    DWORD read_dword(const wchar_t* name, DWORD fallback) noexcept
+    {
+        DWORD value{};
+        DWORD size = sizeof(value);
+        return RegGetValueW(
+                   HKEY_CURRENT_USER,
+                   registry_path,
+                   name,
+                   RRF_RT_REG_DWORD,
+                   nullptr,
+                   &value,
+                   &size) == ERROR_SUCCESS
+            ? value
+            : fallback;
+    }
+
     void write_volume(HKEY key, const wchar_t* name, std::uint32_t volume) noexcept
     {
         const DWORD value = std::min<std::uint32_t>(volume, 100);
@@ -64,6 +80,17 @@ namespace
             reinterpret_cast<const BYTE*>(&value),
             sizeof(value));
     }
+
+    void write_dword(HKEY key, const wchar_t* name, std::uint32_t value) noexcept
+    {
+        RegSetValueExW(
+            key,
+            name,
+            0,
+            REG_DWORD,
+            reinterpret_cast<const BYTE*>(&value),
+            sizeof(value));
+    }
 }
 
 namespace glance::app
@@ -73,6 +100,10 @@ namespace glance::app
         return {
             .audio_volume_percent = read_volume(L"AudioVolume"),
             .video_volume_percent = read_volume(L"VideoVolume"),
+            .rich_document_render_dimension =
+                normalize_rich_document_render_dimension(read_dword(
+                    L"RichDocumentRenderDimension",
+                    default_rich_document_render_dimension)),
             .autoplay_audio = read_bool(L"AutoplayAudio", true),
             .autoplay_video = read_bool(L"AutoplayVideo", true),
             .reverse_seek_wheel = read_bool(L"ReverseSeekWheel", false),
@@ -98,6 +129,11 @@ namespace glance::app
 
         write_volume(key, L"AudioVolume", preferences.audio_volume_percent);
         write_volume(key, L"VideoVolume", preferences.video_volume_percent);
+        write_dword(
+            key,
+            L"RichDocumentRenderDimension",
+            normalize_rich_document_render_dimension(
+                preferences.rich_document_render_dimension));
         write_bool(key, L"AutoplayAudio", preferences.autoplay_audio);
         write_bool(key, L"AutoplayVideo", preferences.autoplay_video);
         write_bool(key, L"ReverseSeekWheel", preferences.reverse_seek_wheel);

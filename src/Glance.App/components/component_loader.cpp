@@ -10,6 +10,7 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <ranges>
 #include <unordered_map>
 #include <unordered_set>
@@ -19,11 +20,14 @@ namespace
     using glance::contracts::components::ComponentApi;
     using glance::contracts::components::ComponentLoadingTextResult;
     using glance::contracts::components::ComponentRegistration;
+    using glance::contracts::components::ConfigurablePreviewApi;
     using glance::contracts::components::GetApiFunction;
     using glance::contracts::components::HealthSeverity;
     using glance::contracts::components::PreparedPreview;
     using glance::contracts::components::PreviewContentFormat;
     using glance::contracts::components::PreviewContentKind;
+    using glance::contracts::components::PreviewNoticeApi;
+    using glance::contracts::components::ProgressivePreviewApi;
 
     struct ComponentManifest
     {
@@ -37,6 +41,9 @@ namespace
         HMODULE module{};
         ComponentApi api;
         ComponentRegistration registration;
+        std::optional<ConfigurablePreviewApi> configurable_preview;
+        std::optional<ProgressivePreviewApi> progressive_preview;
+        std::optional<PreviewNoticeApi> preview_notice;
         std::vector<std::wstring> extensions;
 
         ~LoadedComponent()
@@ -78,6 +85,17 @@ namespace
                 component->api.release_preview(token);
             }
         }
+    };
+
+    struct RefinementSession
+    {
+        std::shared_ptr<LoadedComponent> component;
+        std::shared_ptr<void> initial_lease;
+        ProgressivePreviewApi api;
+        glance::contracts::components::PreviewPreparationOptions options;
+        PreviewContentKind kind{ PreviewContentKind::none };
+        PreviewContentFormat format{ PreviewContentFormat::none };
+        std::uint64_t token{};
     };
 
     std::once_flag initialization_flag;
@@ -275,6 +293,59 @@ namespace
             return {};
         }
         component->id = manifest.id;
+        void* interface_pointer{};
+        if (component->api.query_interface(
+                &glance::contracts::components::configurable_preview_api_id,
+                glance::contracts::components::configurable_preview_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const ConfigurablePreviewApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(ConfigurablePreviewApi) &&
+                interface_api->version ==
+                    glance::contracts::components::configurable_preview_api_version &&
+                interface_api->prepare_preview != nullptr)
+            {
+                component->configurable_preview = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::progressive_preview_api_id,
+                glance::contracts::components::progressive_preview_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const ProgressivePreviewApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(ProgressivePreviewApi) &&
+                interface_api->version ==
+                    glance::contracts::components::progressive_preview_api_version &&
+                interface_api->can_refine != nullptr &&
+                interface_api->query_refinement_text != nullptr &&
+                interface_api->prepare_refined_preview != nullptr)
+            {
+                component->progressive_preview = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::preview_notice_api_id,
+                glance::contracts::components::preview_notice_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const PreviewNoticeApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(PreviewNoticeApi) &&
+                interface_api->version ==
+                    glance::contracts::components::preview_notice_api_version &&
+                interface_api->query_preview_notice != nullptr)
+            {
+                component->preview_notice = *interface_api;
+            }
+        }
         std::ranges::sort(component->extensions);
         return component;
     }
@@ -386,6 +457,56 @@ namespace
             ? std::wstring{}
             : std::wstring(result.text, length);
     }
+
+    std::wstring query_refinement_text(
+        const RefinementSession& session,
+        const std::wstring& language_tag)
+    {
+        ComponentLoadingTextResult result;
+        if (!session.api.query_refinement_text(
+                session.token,
+                language_tag.c_str(),
+                &result))
+        {
+            return {};
+        }
+        const auto length = wcsnlen_s(result.text, std::size(result.text));
+        return length == std::size(result.text)
+            ? std::wstring{}
+            : std::wstring(result.text, length);
+    }
+
+    glance::app::ComponentPreviewResult materialize_preview(
+        const std::shared_ptr<LoadedComponent>& component,
+        const PreparedPreview& preview)
+    {
+        glance::app::ComponentPreviewResult result;
+        result.status = glance::contracts::components::PrepareStatus::success;
+        if (!valid_content_pair(preview.kind, preview.format) ||
+            preview.path[0] == L'\0')
+        {
+            component->api.release_preview(preview.lease_token);
+            result.status = glance::contracts::components::PrepareStatus::failed;
+            return result;
+        }
+
+        const std::filesystem::path output(preview.path);
+        std::error_code error;
+        if (!output.is_absolute() || !std::filesystem::is_regular_file(output, error))
+        {
+            component->api.release_preview(preview.lease_token);
+            result.status = glance::contracts::components::PrepareStatus::failed;
+            return result;
+        }
+
+        result.kind = preview.kind;
+        result.format = preview.format;
+        result.output_path = output.wstring();
+        result.lease = std::make_shared<PreviewLease>(
+            component,
+            preview.lease_token);
+        return result;
+    }
 }
 
 namespace glance::app
@@ -453,6 +574,7 @@ namespace glance::app
     ComponentPreviewResult prepare_component_preview(
         const std::wstring& path,
         std::wstring_view language_tag,
+        glance::contracts::components::PreviewPreparationOptions options,
         const ComponentLoadingTextCallback& loading_callback) noexcept
     {
         ComponentPreviewResult result;
@@ -478,10 +600,17 @@ namespace glance::app
                 }
 
                 PreparedPreview preview;
-                result.status = component->api.prepare_preview(
-                    path.c_str(),
-                    language.c_str(),
-                    &preview);
+                options.size = sizeof(options);
+                result.status = component->configurable_preview.has_value()
+                    ? component->configurable_preview->prepare_preview(
+                        path.c_str(),
+                        language.c_str(),
+                        &options,
+                        &preview)
+                    : component->api.prepare_preview(
+                        path.c_str(),
+                        language.c_str(),
+                        &preview);
                 result.error_detail = preview.error_detail;
                 if (result.status !=
                     glance::contracts::components::PrepareStatus::success)
@@ -493,32 +622,47 @@ namespace glance::app
                     }
                     return result;
                 }
-                if (!valid_content_pair(preview.kind, preview.format) ||
-                    preview.path[0] == L'\0')
+
+                result = materialize_preview(component, preview);
+                if (result.status !=
+                    glance::contracts::components::PrepareStatus::success)
                 {
-                    component->api.release_preview(preview.lease_token);
-                    result.status =
-                        glance::contracts::components::PrepareStatus::failed;
                     return result;
                 }
-
-                const std::filesystem::path output(preview.path);
-                std::error_code error;
-                if (!output.is_absolute() ||
-                    !std::filesystem::is_regular_file(output, error))
+                if (preview.lease_token != 0 &&
+                    component->preview_notice.has_value())
                 {
-                    component->api.release_preview(preview.lease_token);
-                    result.status =
-                        glance::contracts::components::PrepareStatus::failed;
-                    return result;
+                    ComponentLoadingTextResult notice;
+                    if (component->preview_notice->query_preview_notice(
+                            preview.lease_token,
+                            language.c_str(),
+                            &notice))
+                    {
+                        const auto length =
+                            wcsnlen_s(notice.text, std::size(notice.text));
+                        if (length != std::size(notice.text))
+                        {
+                            result.notice.assign(notice.text, length);
+                        }
+                    }
                 }
-
-                result.kind = preview.kind;
-                result.format = preview.format;
-                result.output_path = output.wstring();
-                result.lease = std::make_shared<PreviewLease>(
-                    component,
-                    preview.lease_token);
+                if (preview.lease_token != 0 &&
+                    component->progressive_preview.has_value() &&
+                    component->progressive_preview->can_refine(
+                        preview.lease_token))
+                {
+                    auto session = std::make_shared<RefinementSession>();
+                    session->component = component;
+                    session->initial_lease = result.lease;
+                    session->api = *component->progressive_preview;
+                    session->options = options;
+                    session->kind = preview.kind;
+                    session->format = preview.format;
+                    session->token = preview.lease_token;
+                    result.refinement_text =
+                        query_refinement_text(*session, language);
+                    result.refinement = std::move(session);
+                }
                 return result;
             }
         }
@@ -527,6 +671,49 @@ namespace glance::app
             result.status = glance::contracts::components::PrepareStatus::failed;
         }
         return result;
+    }
+
+    ComponentPreviewResult refine_component_preview(
+        const std::shared_ptr<void>& refinement,
+        std::wstring_view language_tag) noexcept
+    {
+        ComponentPreviewResult result;
+        if (refinement == nullptr)
+        {
+            result.status = glance::contracts::components::PrepareStatus::failed;
+            return result;
+        }
+        try
+        {
+            const auto session =
+                std::static_pointer_cast<RefinementSession>(refinement);
+            PreparedPreview preview;
+            const std::wstring language(language_tag);
+            result.status = session->api.prepare_refined_preview(
+                session->token,
+                language.c_str(),
+                &session->options,
+                &preview);
+            result.error_detail = preview.error_detail;
+            if (result.status !=
+                glance::contracts::components::PrepareStatus::success)
+            {
+                return result;
+            }
+            if (preview.kind != session->kind || preview.format != session->format)
+            {
+                session->component->api.release_preview(preview.lease_token);
+                result.status =
+                    glance::contracts::components::PrepareStatus::failed;
+                return result;
+            }
+            return materialize_preview(session->component, preview);
+        }
+        catch (...)
+        {
+            result.status = glance::contracts::components::PrepareStatus::failed;
+            return result;
+        }
     }
 
     std::vector<ComponentStatus> component_statuses(

@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "id": "adobe",
+  "architecture": "x64",
+  "entry_point": "Glance.AdobeComponent.dll",
+  "payload_files": [
+    "Glance.AdobeHost.exe",
+    "resources.pri",
+    "stb-LICENSE.txt"
+  ],
+  "installer_names": {
+    "en-US": "Adobe document preview",
+    "zh-CN": "Adobe 文档预览"
+  }
+}

@@ -145,7 +145,6 @@
   <data name="FooterPageTitle.Text" xml:space="preserve"><value>Footer</value></data>
   <data name="FooterPageDescription.Text" xml:space="preserve"><value>Preview metadata and path copying</value></data>
   <data name="FooterFieldsLabel.Text" xml:space="preserve"><value>Displayed fields</value></data>
-  <data name="FooterFieldsDescription.Text" xml:space="preserve"><value>Choose and order preview fields</value></data>
   <data name="FooterSizeCheckBox.Content" xml:space="preserve"><value>Size</value></data>
   <data name="FooterModifiedTimeCheckBox.Content" xml:space="preserve"><value>Modified time</value></data>
   <data name="FooterCreationTimeCheckBox.Content" xml:space="preserve"><value>Created time</value></data>
@@ -158,13 +157,11 @@
   <data name="WindowPageTitle.Text" xml:space="preserve"><value>Window</value></data>
   <data name="WindowPageDescription.Text" xml:space="preserve"><value>Preview window size, position, and appearance</value></data>
   <data name="WindowBehaviorSectionTitle.Text" xml:space="preserve"><value>Window behavior</value></data>
-  <data name="WindowBehaviorSectionDescription.Text" xml:space="preserve"><value>Default size, remembered placement, and opacity</value></data>
   <data name="DefaultWindowSizeLabel.Text" xml:space="preserve"><value>Default window size</value></data>
   <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>Width and height used when no saved size applies</value></data>
   <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>Remember window size</value></data>
   <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>Store the last size separately for each preview type</value></data>
   <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>Media auto fit</value></data>
-  <data name="AdaptiveMediaSizeSectionDescription.Text" xml:space="preserve"><value>Window sizing for images, video, and documents</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
   <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>Fit the window to the media dimensions</value></data>
   <data name="ShowAfterAutoFitLabel.Text" xml:space="preserve"><value>Show after auto fit</value></data>
@@ -182,7 +179,8 @@
   <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>Window opacity</value></data>
   <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>Set the opacity of all preview windows</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>Media preview</value></data>
-  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Playback defaults</value></data>
+  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Audio, video, and rich document preview settings</value></data>
+  <data name="AudioVideoPreviewGroupTitle.Text" xml:space="preserve"><value>Audio and video preview</value></data>
   <data name="DefaultAudioVolumeLabel.Text" xml:space="preserve"><value>Default audio volume</value></data>
   <data name="DefaultAudioVolumeDescription.Text" xml:space="preserve"><value>Initial volume for audio previews</value></data>
   <data name="DefaultVideoVolumeLabel.Text" xml:space="preserve"><value>Default video volume</value></data>
@@ -193,10 +191,16 @@
   <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>Start video playback when a preview opens</value></data>
   <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>Reverse seek wheel direction</value></data>
   <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>Reverse the mouse wheel direction used to seek media</value></data>
+  <data name="RichDocumentPreviewGroupTitle.Text" xml:space="preserve"><value>Rich document preview</value></data>
+  <data name="RichDocumentRenderResolutionLabel.Text" xml:space="preserve"><value>Render resolution</value></data>
+  <data name="RichDocumentRenderResolutionDescription.Text" xml:space="preserve"><value>Maximum pixel length of the rendered preview</value></data>
+  <data name="RichDocumentResolution1024Item.Content" xml:space="preserve"><value>1024 px</value></data>
+  <data name="RichDocumentResolution2048Item.Content" xml:space="preserve"><value>2048 px</value></data>
+  <data name="RichDocumentResolution4096Item.Content" xml:space="preserve"><value>4096 px</value></data>
+  <data name="RichDocumentResolution8192Item.Content" xml:space="preserve"><value>8192 px</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Document preview</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Plain text document appearance and behavior</value></data>
   <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>Plain text preview</value></data>
-  <data name="PlainTextPreviewSectionDescription.Text" xml:space="preserve"><value>Text appearance, highlighting, and layout</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>Font family</value></data>
   <data name="FontFamilyDescription.Text" xml:space="preserve"><value>Font used for plain text and code</value></data>
   <data name="FontSizeLabel.Text" xml:space="preserve"><value>Font size</value></data>
@@ -228,13 +232,14 @@
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>Wrap long lines</value></data>
   <data name="WordWrapDescription.Text" xml:space="preserve"><value>Wrap text to the available viewport width</value></data>
   <data name="PathCopyGroupLabel.Text" xml:space="preserve"><value>Path copying</value></data>
-  <data name="PathCopyGroupDescription.Text" xml:space="preserve"><value>Customize copied path output</value></data>
   <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>Quote copied paths</value></data>
   <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>Wrap copied paths in double quotes</value></data>
   <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix separators</value></data>
   <data name="UnixPathSeparatorsDescription.Text" xml:space="preserve"><value>Replace backslashes with forward slashes</value></data>
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>Maintenance</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>Runtime status, diagnostics, and saved application state</value></data>
+  <data name="RuntimeStatusGroupTitle.Text" xml:space="preserve"><value>Runtime status</value></data>
+  <data name="MaintenanceActionsGroupTitle.Text" xml:space="preserve"><value>Maintenance actions</value></data>
   <data name="InputCoreLabel.Text" xml:space="preserve"><value>Input core</value></data>
   <data name="MediaComponentsLabel.Text" xml:space="preserve"><value>Advanced media information availability</value></data>
   <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 availability</value></data>

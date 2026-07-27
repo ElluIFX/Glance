@@ -1,5 +1,6 @@
 #include "input_decision.h"
 #include "glance/contracts/component_api.h"
+#include "media_preview_preferences.h"
 #include "pan_interaction.h"
 #include "text_font_fallback.h"
 #include "../../src/version.h"
@@ -34,6 +35,68 @@ namespace
         }
         static_cast<std::vector<std::wstring>*>(context)->emplace_back(extension);
         return TRUE;
+    }
+
+    void append_be16(std::vector<unsigned char>& bytes, std::uint16_t value)
+    {
+        bytes.push_back(static_cast<unsigned char>(value >> 8));
+        bytes.push_back(static_cast<unsigned char>(value));
+    }
+
+    void append_be32(std::vector<unsigned char>& bytes, std::uint32_t value)
+    {
+        bytes.push_back(static_cast<unsigned char>(value >> 24));
+        bytes.push_back(static_cast<unsigned char>(value >> 16));
+        bytes.push_back(static_cast<unsigned char>(value >> 8));
+        bytes.push_back(static_cast<unsigned char>(value));
+    }
+
+    std::vector<unsigned char> make_psd_thumbnail_fixture()
+    {
+        static constexpr std::array<unsigned char, 6> jpeg{
+            0xFF, 0xD8, 0xFF, 0xD9, 0x00, 0x00 };
+        std::vector<unsigned char> resource;
+        resource.insert(resource.end(), { '8', 'B', 'I', 'M' });
+        append_be16(resource, 1036);
+        resource.insert(resource.end(), { 0, 0 });
+        append_be32(resource, 28 + static_cast<std::uint32_t>(jpeg.size()));
+        append_be32(resource, 1);
+        append_be32(resource, 1);
+        append_be32(resource, 1);
+        append_be32(resource, 4);
+        append_be32(resource, 4);
+        append_be32(resource, static_cast<std::uint32_t>(jpeg.size()));
+        append_be16(resource, 24);
+        append_be16(resource, 1);
+        resource.insert(resource.end(), jpeg.begin(), jpeg.end());
+
+        std::vector<unsigned char> file;
+        file.insert(file.end(), { '8', 'B', 'P', 'S' });
+        append_be16(file, 1);
+        file.insert(file.end(), 6, 0);
+        append_be16(file, 3);
+        append_be32(file, 1);
+        append_be32(file, 1);
+        append_be16(file, 8);
+        append_be16(file, 3);
+        append_be32(file, 0);
+        append_be32(file, static_cast<std::uint32_t>(resource.size()));
+        file.insert(file.end(), resource.begin(), resource.end());
+        append_be32(file, 0);
+        append_be16(file, 0);
+        file.insert(file.end(), { 0x20, 0x80, 0xE0 });
+        return file;
+    }
+
+    bool write_bytes(
+        const std::filesystem::path& path,
+        const std::vector<unsigned char>& bytes)
+    {
+        std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        output.write(
+            reinterpret_cast<const char*>(bytes.data()),
+            static_cast<std::streamsize>(bytes.size()));
+        return static_cast<bool>(output);
     }
 }
 
@@ -94,6 +157,17 @@ int main()
     expect(
         glance::app::select_default_text_font_family(no_fonts) == L"Cascadia Mono",
         "font fallback keeps primary default");
+
+    expect(
+        glance::app::normalize_rich_document_render_dimension(1024) == 1024 &&
+            glance::app::normalize_rich_document_render_dimension(2048) == 2048 &&
+            glance::app::normalize_rich_document_render_dimension(4096) == 4096 &&
+            glance::app::normalize_rich_document_render_dimension(8192) == 8192,
+        "rich document render dimensions");
+    expect(
+        glance::app::normalize_rich_document_render_dimension(0) == 4096 &&
+            glance::app::normalize_rich_document_render_dimension(16384) == 4096,
+        "rich document render dimension fallback");
 
     std::wstring executable_path(32768, L'\0');
     const DWORD executable_length = GetModuleFileNameW(
@@ -306,6 +380,274 @@ int main()
             api.shutdown();
         }
         FreeLibrary(component);
+    }
+
+    const auto adobe_directory =
+        std::filesystem::path(executable_path).parent_path() / L"components" / L"adobe";
+    const auto adobe_component_path =
+        adobe_directory / L"Glance.AdobeComponent.dll";
+    const auto adobe_host_path = adobe_directory / L"Glance.AdobeHost.exe";
+    const auto adobe_descriptor_path = adobe_directory / L"component.json";
+    const auto adobe_resource_path = adobe_directory / L"resources.pri";
+    expect(
+        std::filesystem::is_regular_file(adobe_component_path),
+        "Adobe component DLL output");
+    expect(
+        std::filesystem::is_regular_file(adobe_host_path),
+        "Adobe component host output");
+    expect(
+        std::filesystem::is_regular_file(adobe_descriptor_path),
+        "Adobe component descriptor output");
+    expect(
+        std::filesystem::is_regular_file(adobe_resource_path),
+        "Adobe component resource output");
+    std::ifstream adobe_descriptor_input(adobe_descriptor_path, std::ios::binary);
+    const std::string adobe_descriptor{
+        std::istreambuf_iterator<char>(adobe_descriptor_input),
+        std::istreambuf_iterator<char>() };
+    expect(
+        adobe_descriptor.find("\"id\": \"adobe\"") != std::string::npos &&
+            adobe_descriptor.find("\"Glance.AdobeHost.exe\"") != std::string::npos &&
+            adobe_descriptor.find("\"resources.pri\"") != std::string::npos &&
+            adobe_descriptor.find("\"extensions\"") == std::string::npos,
+        "Adobe component descriptor");
+
+    const HMODULE adobe_component = LoadLibraryExW(
+        adobe_component_path.c_str(),
+        nullptr,
+        LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+            LOAD_LIBRARY_SEARCH_SYSTEM32);
+    expect(adobe_component != nullptr, "load Adobe component DLL");
+    if (adobe_component != nullptr)
+    {
+        using namespace glance::contracts::components;
+        const auto get_api = reinterpret_cast<GetApiFunction>(
+            GetProcAddress(adobe_component, get_api_export));
+        ComponentApi api;
+        expect(
+            get_api != nullptr && get_api(abi_version, &api) != FALSE,
+            "Adobe component ABI negotiation");
+        if (get_api != nullptr && api.initialize != nullptr)
+        {
+            std::vector<std::wstring> extensions;
+            ComponentRegistrar registrar{
+                .context = &extensions,
+                .register_extension = collect_extension };
+            ComponentRegistration registration;
+            expect(
+                api.initialize(&registrar, &registration) != FALSE,
+                "Adobe component registration");
+            expect(
+                std::wstring_view(registration.component_id) == L"adobe",
+                "Adobe component API id");
+            expect(
+                std::wstring_view(registration.target_app_version) ==
+                    GLANCE_VERSION_WSTRING,
+                "Adobe component target app version");
+            expect(
+                extensions == std::vector<std::wstring>{ L".psd", L".psb", L".ai" },
+                "Adobe component extensions");
+
+            ComponentStatusResult status;
+            expect(
+                api.query_status(L"zh-CN", &status) != FALSE &&
+                    std::wstring_view(status.display_name) == L"Adobe 文档预览" &&
+                    status.detail[0] != L'\0',
+                "Adobe component localized status");
+
+            ComponentLoadingTextResult loading;
+            expect(
+                api.query_loading_text(
+                    L"C:\\GlanceComponentTest\\sample.psd",
+                    L"zh-CN",
+                    &loading) != FALSE &&
+                    std::wstring_view(loading.text) ==
+                        L"正在后台准备 Adobe 文档预览",
+                "Adobe component localized loading text");
+
+            void* configurable_pointer{};
+            expect(
+                api.query_interface(
+                    &configurable_preview_api_id,
+                    configurable_preview_api_version,
+                    &configurable_pointer) != FALSE &&
+                    configurable_pointer != nullptr,
+                "Adobe configurable preview interface");
+            const auto configurable =
+                static_cast<ConfigurablePreviewApi*>(configurable_pointer);
+            void* progressive_pointer{};
+            expect(
+                api.query_interface(
+                    &progressive_preview_api_id,
+                    progressive_preview_api_version,
+                    &progressive_pointer) != FALSE &&
+                    progressive_pointer != nullptr,
+                "Adobe progressive preview interface");
+            const auto progressive =
+                static_cast<ProgressivePreviewApi*>(progressive_pointer);
+            void* notice_pointer{};
+            expect(
+                api.query_interface(
+                    &preview_notice_api_id,
+                    preview_notice_api_version,
+                    &notice_pointer) != FALSE &&
+                    notice_pointer != nullptr,
+                "Adobe preview notice interface");
+            const auto preview_notice =
+                static_cast<PreviewNoticeApi*>(notice_pointer);
+            void* unsupported_pointer = reinterpret_cast<void*>(1);
+            expect(
+                api.query_interface(
+                    &progressive_preview_api_id,
+                    progressive_preview_api_version + 1,
+                    &unsupported_pointer) == FALSE &&
+                    unsupported_pointer == nullptr,
+                "Adobe rejects unsupported interface version");
+
+            const auto test_directory =
+                std::filesystem::temp_directory_path() /
+                L"GlanceAdobeComponentTests";
+            std::error_code cleanup_error;
+            std::filesystem::remove_all(test_directory, cleanup_error);
+            std::filesystem::create_directories(test_directory);
+
+            const auto psd_path = test_directory / L"embedded.psd";
+            expect(
+                write_bytes(psd_path, make_psd_thumbnail_fixture()),
+                "write PSD thumbnail fixture");
+            expect(
+                api.can_preview(psd_path.c_str()) != FALSE,
+                "Adobe component accepts embedded PSD preview");
+            PreparedPreview psd_preview;
+            PreviewPreparationOptions preview_options{
+                .maximum_dimension = 1024 };
+            expect(
+                configurable != nullptr &&
+                    configurable->prepare_preview(
+                    psd_path.c_str(),
+                    L"en-US",
+                    &preview_options,
+                    &psd_preview) == PrepareStatus::success &&
+                    psd_preview.kind == PreviewContentKind::image &&
+                    psd_preview.format == PreviewContentFormat::image_file &&
+                    psd_preview.lease_token != 0 &&
+                    std::filesystem::is_regular_file(psd_preview.path),
+                "Adobe component extracts PSD thumbnail");
+            const std::filesystem::path extracted_path{ psd_preview.path };
+
+            ComponentLoadingTextResult refinement_text;
+            expect(
+                progressive != nullptr &&
+                    progressive->can_refine(psd_preview.lease_token) != FALSE &&
+                    progressive->query_refinement_text(
+                        psd_preview.lease_token,
+                        L"zh-CN",
+                        &refinement_text) != FALSE &&
+                    std::wstring_view(refinement_text.text) ==
+                        L"正在准备高清预览",
+                "Adobe component refinement availability");
+            PreparedPreview refined_preview;
+            expect(
+                progressive != nullptr &&
+                    progressive->prepare_refined_preview(
+                        psd_preview.lease_token,
+                        L"en-US",
+                        &preview_options,
+                        &refined_preview) == PrepareStatus::success &&
+                    refined_preview.kind == PreviewContentKind::image &&
+                    refined_preview.format == PreviewContentFormat::image_file &&
+                    refined_preview.lease_token == 0 &&
+                    std::filesystem::is_regular_file(refined_preview.path),
+                "Adobe component prepares high-resolution PSD preview");
+            if (std::filesystem::is_regular_file(refined_preview.path))
+            {
+                std::ifstream refined_input(
+                    refined_preview.path,
+                    std::ios::binary);
+                std::array<unsigned char, 8> png_signature{};
+                refined_input.read(
+                    reinterpret_cast<char*>(png_signature.data()),
+                    static_cast<std::streamsize>(png_signature.size()));
+                expect(
+                    png_signature == std::array<unsigned char, 8>{
+                        0x89, 0x50, 0x4E, 0x47,
+                        0x0D, 0x0A, 0x1A, 0x0A },
+                    "Adobe refined preview PNG");
+            }
+            api.release_preview(psd_preview.lease_token);
+            expect(
+                !std::filesystem::exists(extracted_path),
+                "Adobe component releases extracted preview");
+            PreparedPreview cached_preview;
+            expect(
+                configurable != nullptr &&
+                    configurable->prepare_preview(
+                        psd_path.c_str(),
+                        L"en-US",
+                        &preview_options,
+                        &cached_preview) == PrepareStatus::success &&
+                    cached_preview.lease_token == 0 &&
+                    std::filesystem::path(cached_preview.path) ==
+                        std::filesystem::path(refined_preview.path),
+                "Adobe component reuses high-resolution preview cache");
+
+            const auto psb_path = test_directory / L"embedded.psb";
+            auto psb_fixture = make_psd_thumbnail_fixture();
+            psb_fixture[5] = 2;
+            expect(
+                write_bytes(psb_path, psb_fixture) &&
+                    api.can_preview(psb_path.c_str()) != FALSE,
+                "Adobe component accepts embedded PSB preview");
+            PreparedPreview psb_preview;
+            expect(
+                api.prepare_preview(
+                    psb_path.c_str(),
+                    L"zh-CN",
+                    &psb_preview) == PrepareStatus::success &&
+                    psb_preview.lease_token != 0 &&
+                    progressive->can_refine(psb_preview.lease_token) == FALSE,
+                "Adobe component limits PSB to embedded preview");
+            ComponentLoadingTextResult psb_notice;
+            expect(
+                preview_notice != nullptr &&
+                    preview_notice->query_preview_notice(
+                        psb_preview.lease_token,
+                        L"zh-CN",
+                        &psb_notice) != FALSE &&
+                    std::wstring_view(psb_notice.text) ==
+                        L"大型文件只支持低清预览",
+                "Adobe component PSB low-resolution notice");
+            api.release_preview(psb_preview.lease_token);
+
+            const auto ai_path = test_directory / L"compatible.ai";
+            const std::vector<unsigned char> ai_fixture{
+                '%', 'P', 'D', 'F', '-', '1', '.', '7', '\n' };
+            expect(
+                write_bytes(ai_path, ai_fixture) &&
+                    api.can_preview(ai_path.c_str()) != FALSE,
+                "Adobe component accepts PDF-compatible AI");
+            PreparedPreview ai_preview;
+            expect(
+                api.prepare_preview(
+                    ai_path.c_str(),
+                    L"en-US",
+                    &ai_preview) == PrepareStatus::success &&
+                    ai_preview.kind == PreviewContentKind::document &&
+                    ai_preview.format == PreviewContentFormat::pdf &&
+                    ai_preview.lease_token == 0 &&
+                    std::filesystem::path(ai_preview.path) == ai_path,
+                "Adobe component passes through PDF-compatible AI");
+
+            const auto invalid_path = test_directory / L"invalid.txt";
+            expect(
+                write_bytes(invalid_path, {}) &&
+                    api.can_preview(invalid_path.c_str()) == FALSE,
+                "Adobe component rejects unrelated files");
+            std::filesystem::remove_all(test_directory, cleanup_error);
+            api.shutdown();
+        }
+        FreeLibrary(adobe_component);
     }
 
     if (failures == 0)

@@ -45,6 +45,9 @@ namespace glance::app
         std::wstring output_path;
         std::wstring error_detail;
         std::shared_ptr<void> lease;
+        std::shared_ptr<void> refinement;
+        std::wstring refinement_text;
+        std::wstring notice;
     };
 
     [[nodiscard]] std::filesystem::path application_component_root();
@@ -56,7 +59,11 @@ namespace glance::app
     [[nodiscard]] ComponentPreviewResult prepare_component_preview(
         const std::wstring& path,
         std::wstring_view language_tag,
+        glance::contracts::components::PreviewPreparationOptions options,
         const ComponentLoadingTextCallback& loading_callback) noexcept;
+    [[nodiscard]] ComponentPreviewResult refine_component_preview(
+        const std::shared_ptr<void>& refinement,
+        std::wstring_view language_tag) noexcept;
     [[nodiscard]] std::vector<ComponentStatus> component_statuses(
         std::wstring_view language_tag) noexcept;
     void shutdown_components() noexcept;

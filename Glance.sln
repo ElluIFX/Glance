@@ -24,6 +24,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.OfficeHost", "src\Gl
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.OfficeComponent", "src\Glance.Components\Office\Glance.OfficeComponent.vcxproj", "{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.AdobeHost", "src\Glance.Components\Adobe\host\Glance.AdobeHost.vcxproj", "{5B6F95CC-5D25-4846-8A0F-C8D7D591A5EF}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.AdobeComponent", "src\Glance.Components\Adobe\Glance.AdobeComponent.vcxproj", "{33D70EC0-D126-48A7-8D65-20BDDB796203}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.RenderHost", "src\Glance.RenderHost\Glance.RenderHost.vcxproj", "{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Tests", "tests\Glance.Tests\Glance.Tests.vcxproj", "{4D728170-2954-4B84-BA44-626E290A361F}"
@@ -66,6 +70,14 @@ Global
 		{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}.Debug|x64.Build.0 = Debug|x64
 		{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}.Release|x64.ActiveCfg = Release|x64
 		{BAF38578-FCEE-4A32-9E30-F43780E7D3D6}.Release|x64.Build.0 = Release|x64
+		{5B6F95CC-5D25-4846-8A0F-C8D7D591A5EF}.Debug|x64.ActiveCfg = Debug|x64
+		{5B6F95CC-5D25-4846-8A0F-C8D7D591A5EF}.Debug|x64.Build.0 = Debug|x64
+		{5B6F95CC-5D25-4846-8A0F-C8D7D591A5EF}.Release|x64.ActiveCfg = Release|x64
+		{5B6F95CC-5D25-4846-8A0F-C8D7D591A5EF}.Release|x64.Build.0 = Release|x64
+		{33D70EC0-D126-48A7-8D65-20BDDB796203}.Debug|x64.ActiveCfg = Debug|x64
+		{33D70EC0-D126-48A7-8D65-20BDDB796203}.Debug|x64.Build.0 = Debug|x64
+		{33D70EC0-D126-48A7-8D65-20BDDB796203}.Release|x64.ActiveCfg = Release|x64
+		{33D70EC0-D126-48A7-8D65-20BDDB796203}.Release|x64.Build.0 = Release|x64
 		{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}.Debug|x64.ActiveCfg = Debug|x64
 		{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}.Debug|x64.Build.0 = Debug|x64
 		{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}.Release|x64.ActiveCfg = Release|x64
