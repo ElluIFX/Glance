@@ -123,6 +123,21 @@ namespace winrt::Glance::App::implementation
         void ImageScroller_PointerCaptureLost(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void ImageZoomMapOverlay_PointerPressed(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void ImageZoomMapOverlay_PointerMoved(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void ImageZoomMapOverlay_PointerReleased(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void ImageZoomMapOverlay_PointerCanceled(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void ImageZoomMapOverlay_PointerCaptureLost(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void ZoomOutButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ZoomOutButton_RightTapped(
             IInspectable const&,
@@ -394,6 +409,9 @@ namespace winrt::Glance::App::implementation
         void update_image_fit_surface();
         void fit_image_to_viewport();
         void update_image_zoom_map();
+        void move_image_viewport_from_zoom_map(Windows::Foundation::Point position);
+        void end_image_zoom_map_pan(
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         void rotate_image(double degrees);
         void flip_image(bool horizontal);
         void update_pdf_fit_surface();
@@ -456,6 +474,7 @@ namespace winrt::Glance::App::implementation
         std::uint64_t web_navigation_id_{};
         bool image_metadata_visible_{};
         bool image_panning_{};
+        bool image_zoom_map_panning_{};
         bool image_zoom_map_enabled_{ true };
         double image_rotation_{};
         double image_scale_x_{ 1.0 };

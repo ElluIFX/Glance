@@ -4503,7 +4503,9 @@ namespace winrt::Glance::App::implementation
     {
         ImageScroller().CancelDirectManipulations();
         ImageScroller().ReleasePointerCaptures();
+        ImageZoomMapOverlay().ReleasePointerCaptures();
         image_panning_ = false;
+        image_zoom_map_panning_ = false;
         update_image_fit_surface();
         static_cast<void>(ImageScroller().ChangeView(0.0, 0.0, 1.0F, true));
         update_image_zoom_map();
@@ -4622,6 +4624,53 @@ namespace winrt::Glance::App::implementation
         Canvas::SetLeft(ImageZoomMapViewportBorder(), viewport_left);
         Canvas::SetTop(ImageZoomMapViewportBorder(), viewport_top);
         ImageZoomMapOverlay().Visibility(Visibility::Visible);
+    }
+
+    void MainWindow::move_image_viewport_from_zoom_map(Windows::Foundation::Point position)
+    {
+        const double map_width = ImageZoomMapCanvas().ActualWidth();
+        const double map_height = ImageZoomMapCanvas().ActualHeight();
+        if (map_width <= 0.0 || map_height <= 0.0)
+        {
+            return;
+        }
+
+        const double zoom = ImageScroller().ZoomFactor();
+        const bool swaps_axes =
+            static_cast<int>(std::lround(image_rotation_)) % 180 != 0;
+        const double displayed_width = swaps_axes
+            ? ImagePreview().Height()
+            : ImagePreview().Width();
+        const double displayed_height = swaps_axes
+            ? ImagePreview().Width()
+            : ImagePreview().Height();
+        const double zoomed_image_left =
+            (ImageFitSurface().Width() - displayed_width) * zoom / 2.0;
+        const double zoomed_image_top =
+            (ImageFitSurface().Height() - displayed_height) * zoom / 2.0;
+        const double viewport_width = std::max(
+            1.0,
+            ImageScroller().ViewportWidth() > 0.0
+                ? ImageScroller().ViewportWidth()
+                : ImageScroller().ActualWidth());
+        const double viewport_height = std::max(
+            1.0,
+            ImageScroller().ViewportHeight() > 0.0
+                ? ImageScroller().ViewportHeight()
+                : ImageScroller().ActualHeight());
+        const double horizontal = zoomed_image_left +
+            std::clamp(static_cast<double>(position.X) / map_width, 0.0, 1.0) *
+                displayed_width * zoom -
+            viewport_width / 2.0;
+        const double vertical = zoomed_image_top +
+            std::clamp(static_cast<double>(position.Y) / map_height, 0.0, 1.0) *
+                displayed_height * zoom -
+            viewport_height / 2.0;
+        static_cast<void>(ImageScroller().ChangeView(
+            std::max(0.0, horizontal),
+            std::max(0.0, vertical),
+            nullptr,
+            true));
     }
 
     void MainWindow::update_pdf_fit_surface()
@@ -5157,6 +5206,76 @@ namespace winrt::Glance::App::implementation
         ScrollViewerViewChangedEventArgs const&)
     {
         update_image_zoom_map();
+    }
+
+    void MainWindow::ImageZoomMapOverlay_PointerPressed(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        const auto point = args.GetCurrentPoint(ImageZoomMapCanvas());
+        if (!point.Properties().IsLeftButtonPressed() ||
+            !ImageZoomMapOverlay().CapturePointer(args.Pointer()))
+        {
+            return;
+        }
+
+        image_zoom_map_panning_ = true;
+        move_image_viewport_from_zoom_map(point.Position());
+        args.Handled(true);
+    }
+
+    void MainWindow::ImageZoomMapOverlay_PointerMoved(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        if (!image_zoom_map_panning_)
+        {
+            return;
+        }
+
+        const auto point = args.GetCurrentPoint(ImageZoomMapCanvas());
+        if (!point.Properties().IsLeftButtonPressed())
+        {
+            end_image_zoom_map_pan(args);
+            return;
+        }
+
+        move_image_viewport_from_zoom_map(point.Position());
+        args.Handled(true);
+    }
+
+    void MainWindow::end_image_zoom_map_pan(PointerRoutedEventArgs const& args)
+    {
+        if (!image_zoom_map_panning_)
+        {
+            return;
+        }
+
+        image_zoom_map_panning_ = false;
+        ImageZoomMapOverlay().ReleasePointerCapture(args.Pointer());
+        args.Handled(true);
+    }
+
+    void MainWindow::ImageZoomMapOverlay_PointerReleased(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        end_image_zoom_map_pan(args);
+    }
+
+    void MainWindow::ImageZoomMapOverlay_PointerCanceled(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        end_image_zoom_map_pan(args);
+    }
+
+    void MainWindow::ImageZoomMapOverlay_PointerCaptureLost(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        image_zoom_map_panning_ = false;
+        args.Handled(true);
     }
 
     void MainWindow::rotate_image(double degrees)

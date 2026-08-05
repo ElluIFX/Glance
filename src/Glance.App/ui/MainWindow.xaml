@@ -258,7 +258,11 @@
                         VerticalAlignment="Top"
                         Background="#99000000"
                         CornerRadius="4"
-                        IsHitTestVisible="False"
+                        PointerCanceled="ImageZoomMapOverlay_PointerCanceled"
+                        PointerCaptureLost="ImageZoomMapOverlay_PointerCaptureLost"
+                        PointerMoved="ImageZoomMapOverlay_PointerMoved"
+                        PointerPressed="ImageZoomMapOverlay_PointerPressed"
+                        PointerReleased="ImageZoomMapOverlay_PointerReleased"
                         Visibility="Collapsed">
                         <Canvas x:Name="ImageZoomMapCanvas">
                             <Border
@@ -295,9 +299,8 @@
                             <Border
                                 x:Name="ImageZoomMapViewportBorder"
                                 Background="#18FFFFFF"
-                                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
-                                BorderThickness="2"
-                                CornerRadius="4" />
+                                BorderBrush="{ThemeResource AccentFillColorSecondaryBrush}"
+                                BorderThickness="2" />
                         </Canvas>
                     </Border>
                     <Border
