@@ -35,6 +35,32 @@ function Test-Dependency {
     return $actualHash -eq $Sha256
 }
 
+function Invoke-DependencyDownload {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Uri,
+
+        [Parameter(Mandatory)]
+        [string] $OutFile
+    )
+
+    $attempts = 3
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $Uri -OutFile $OutFile -ErrorAction Stop
+            return
+        }
+        catch {
+            Remove-Item -LiteralPath $OutFile -Force -ErrorAction SilentlyContinue
+            if ($attempt -eq $attempts) {
+                throw
+            }
+            Write-Warning "Dependency download failed; retrying ($attempt/$attempts)"
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    }
+}
+
 $allAvailable = $true
 foreach ($dependency in $dependencies) {
     $path = Join-Path $destinationDirectory $dependency.Name
@@ -91,7 +117,7 @@ else {
     try {
         New-Item -ItemType Directory -Path $threeExpandedDirectory -Force | Out-Null
         Write-Host "Downloading Three.js r184 model preview dependencies..."
-        Invoke-WebRequest -Uri $threeArchiveUri -OutFile $threeArchivePath
+        Invoke-DependencyDownload -Uri $threeArchiveUri -OutFile $threeArchivePath
         $actualArchiveHash =
             (Get-FileHash -LiteralPath $threeArchivePath -Algorithm SHA256).Hash
         if ($actualArchiveHash -ne $threeArchiveSha256) {
@@ -162,7 +188,7 @@ else {
     try {
         New-Item -ItemType Directory -Path $occtExpandedDirectory -Force | Out-Null
         Write-Host "Downloading occt-import-js 0.0.23 model preview dependencies..."
-        Invoke-WebRequest -Uri $occtArchiveUri -OutFile $occtArchivePath
+        Invoke-DependencyDownload -Uri $occtArchiveUri -OutFile $occtArchivePath
         $actualArchiveHash =
             (Get-FileHash -LiteralPath $occtArchivePath -Algorithm SHA256).Hash
         if ($actualArchiveHash -ne $occtArchiveSha256) {
@@ -175,7 +201,7 @@ else {
         if ($LASTEXITCODE -ne 0) {
             throw "Unable to extract the occt-import-js archive."
         }
-        Invoke-WebRequest -Uri $occtLicenseUri -OutFile $occtLicensePath
+        Invoke-DependencyDownload -Uri $occtLicenseUri -OutFile $occtLicensePath
 
         foreach ($file in $occtFiles) {
             $sourcePath = if ($file.Name -eq "LICENSE.md") {
@@ -218,7 +244,7 @@ if (-not (Test-Dependency -Path $esbuildDestination -Sha256 $esbuildSha256)) {
     try {
         New-Item -ItemType Directory -Path $esbuildExpandedDirectory -Force | Out-Null
         Write-Host "Downloading esbuild 0.25.6 for the model preview bundle..."
-        Invoke-WebRequest -Uri $esbuildArchiveUri -OutFile $esbuildArchivePath
+        Invoke-DependencyDownload -Uri $esbuildArchiveUri -OutFile $esbuildArchivePath
         $actualArchiveHash =
             (Get-FileHash -LiteralPath $esbuildArchivePath -Algorithm SHA256).Hash
         if ($actualArchiveHash -ne $esbuildArchiveSha256) {
@@ -339,7 +365,7 @@ try {
     New-Item -ItemType Directory -Path $temporaryDirectory -Force | Out-Null
 
     Write-Host "Downloading Scintilla 5.6.4 and Lexilla 5.5.1..."
-    Invoke-WebRequest -Uri $downloadUri -OutFile $archivePath
+    Invoke-DependencyDownload -Uri $downloadUri -OutFile $archivePath
 
     $actualArchiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash
     if ($actualArchiveHash -ne $archiveSha256) {
