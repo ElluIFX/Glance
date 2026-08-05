@@ -299,8 +299,9 @@
                             <Border
                                 x:Name="ImageZoomMapViewportBorder"
                                 Background="#18FFFFFF"
-                                BorderBrush="{ThemeResource AccentFillColorSecondaryBrush}"
-                                BorderThickness="2" />
+                                BorderBrush="White"
+                                BorderThickness="2"
+                                Opacity="0.75" />
                         </Canvas>
                     </Border>
                     <Border
