@@ -175,6 +175,9 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
         void CopyPathButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        winrt::fire_and_forget CopyPathButton_RightTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void OpenFolderButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OpenDefaultButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OpenDefaultButton_RightTapped(
@@ -185,6 +188,7 @@ namespace winrt::Glance::App::implementation
         void GenericAdvancedInfoButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
+        void show_copy_feedback();
         static LRESULT CALLBACK window_subclass(
             HWND window,
             UINT message,

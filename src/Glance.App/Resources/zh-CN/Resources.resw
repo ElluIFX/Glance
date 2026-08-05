@@ -128,7 +128,7 @@
   <data name="MediaTypeAttachment" xml:space="preserve"><value>附件</value></data>
   <data name="MediaTypeData" xml:space="preserve"><value>数据</value></data>
   <data name="WordWrapButton.ToolTipService.ToolTip" xml:space="preserve"><value>自动换行</value></data>
-  <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>复制路径</value></data>
+  <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>复制路径&#xA;右键复制文件</value></data>
   <data name="OpenFolderButton.ToolTipService.ToolTip" xml:space="preserve"><value>打开所在文件夹</value></data>
   <data name="OpenDefaultButton.ToolTipService.ToolTip" xml:space="preserve"><value>使用默认应用打开&#xA;右键选择打开方式</value></data>
 

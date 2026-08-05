@@ -941,7 +941,8 @@
                 Grid.Column="5"
                 Style="{StaticResource IconButtonStyle}"
                 Click="CopyPathButton_Click"
-                ToolTipService.ToolTip="Copy path">
+                RightTapped="CopyPathButton_RightTapped"
+                ToolTipService.ToolTip="Copy path&#xA;Right-click to copy file">
                 <FontIcon x:Name="CopyPathIcon" FontSize="14" Glyph="&#xE8C8;" />
             </Button>
             <Button

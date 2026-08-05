@@ -5953,32 +5953,81 @@ namespace winrt::Glance::App::implementation
             package.SetText(path);
             Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
             Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
-
-            CopyPathIcon().Glyph(L"\xE73E");
-            CopyPathIcon().Foreground(Application::Current().Resources().Lookup(
-                box_value(L"AccentTextFillColorPrimaryBrush")).as<Media::Brush>());
-            if (copy_feedback_timer_ == nullptr)
-            {
-                copy_feedback_timer_ = DispatcherTimer();
-                copy_feedback_timer_.Interval(std::chrono::milliseconds(1200));
-                const auto weak = get_weak();
-                copy_feedback_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
-                    if (const auto self = weak.get())
-                    {
-                        self->copy_feedback_timer_.Stop();
-                        self->CopyPathIcon().Glyph(L"\xE8C8");
-                        self->CopyPathIcon().ClearValue(IconElement::ForegroundProperty());
-                    }
-                });
-            }
-            copy_feedback_timer_.Stop();
-            copy_feedback_timer_.Start();
+            show_copy_feedback();
         }
         catch (const hresult_error& error)
         {
             glance::contracts::log_event(
                 L"Copy path failed: " + std::wstring(error.message()));
         }
+    }
+
+    fire_and_forget MainWindow::CopyPathButton_RightTapped(
+        IInspectable const&,
+        RightTappedRoutedEventArgs const& args)
+    {
+        args.Handled(true);
+        if (current_index_ >= files_.size())
+        {
+            co_return;
+        }
+
+        const auto lifetime = get_strong();
+        const auto path = !files_[current_index_].path.empty()
+            ? files_[current_index_].path
+            : files_[current_index_].parsing_name;
+        const bool is_directory =
+            (files_[current_index_].attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+        try
+        {
+            Windows::Storage::IStorageItem item{ nullptr };
+            if (is_directory)
+            {
+                item = co_await Windows::Storage::StorageFolder::GetFolderFromPathAsync(path);
+            }
+            else
+            {
+                item = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
+            }
+            auto items = single_threaded_vector<Windows::Storage::IStorageItem>();
+            items.Append(std::move(item));
+
+            Windows::ApplicationModel::DataTransfer::DataPackage package;
+            package.RequestedOperation(
+                Windows::ApplicationModel::DataTransfer::DataPackageOperation::Copy);
+            package.SetStorageItems(items);
+            Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
+            Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
+            show_copy_feedback();
+        }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(
+                L"Copy file failed: " + std::wstring(error.message()));
+        }
+    }
+
+    void MainWindow::show_copy_feedback()
+    {
+        CopyPathIcon().Glyph(L"\xE73E");
+        CopyPathIcon().Foreground(Application::Current().Resources().Lookup(
+            box_value(L"AccentTextFillColorPrimaryBrush")).as<Media::Brush>());
+        if (copy_feedback_timer_ == nullptr)
+        {
+            copy_feedback_timer_ = DispatcherTimer();
+            copy_feedback_timer_.Interval(std::chrono::milliseconds(1200));
+            const auto weak = get_weak();
+            copy_feedback_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+                if (const auto self = weak.get())
+                {
+                    self->copy_feedback_timer_.Stop();
+                    self->CopyPathIcon().Glyph(L"\xE8C8");
+                    self->CopyPathIcon().ClearValue(IconElement::ForegroundProperty());
+                }
+            });
+        }
+        copy_feedback_timer_.Stop();
+        copy_feedback_timer_.Start();
     }
 
     void MainWindow::OpenFolderButton_Click(IInspectable const&, RoutedEventArgs const&)
