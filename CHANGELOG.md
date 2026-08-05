@@ -4,6 +4,23 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.06] - 2026-08-06
+
+### Added
+
+- Added counterclockwise image rotation, horizontal and vertical flipping, and fine-grained right-click zoom controls.
+- Added an optional image zoom map with click-and-drag viewport navigation.
+- Added right-click file copying to the footer's copy-path command.
+
+### Changed
+
+- Improved process watchdog timing, stalled selection recovery, component cache maintenance, and component host cleanup.
+
+### Fixed
+
+- Reset image zoom and transform state when switching or reopening images.
+- Added an effective transaction timeout for stalled PDF rendering and corrected pipe and Adobe host handle cleanup.
+
 ## [2026.07.27] - 2026-07-27
 
 ### Added
