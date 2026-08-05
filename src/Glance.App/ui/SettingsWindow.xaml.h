@@ -6,10 +6,14 @@
 #include "media_preview_preferences.h"
 #include "path_copy_preferences.h"
 #include "text_preferences.h"
+#include "update_checker.h"
 #include "window_preferences.h"
 
+#include <atomic>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <memory>
 
 namespace winrt::Glance::App::implementation
 {
@@ -71,6 +75,9 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         winrt::fire_and_forget CheckForUpdatesButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void CancelUpdateButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OpenComponentsFolderButton_Click(
@@ -145,6 +152,13 @@ namespace winrt::Glance::App::implementation
         void update_auto_fit_controls_enabled() noexcept;
         void rebuild_footer_field_rows();
         [[nodiscard]] FooterFieldControls footer_field_controls(glance::app::FooterField field);
+        winrt::fire_and_forget download_and_install_update(glance::app::UpdateInstallerAsset asset);
+        void show_update_download_card(std::wstring_view version);
+        void set_update_progress(std::uint64_t downloaded, std::uint64_t total);
+        void advance_update_progress();
+        void show_update_installing_card();
+        void cancel_update_download();
+        void hide_update_card();
         void set_media_volume(
             Microsoft::UI::Xaml::Controls::NumberBox const& control,
             double value,
@@ -154,6 +168,16 @@ namespace winrt::Glance::App::implementation
         bool exit_confirmation_open_{};
         bool reset_confirmation_open_{};
         bool update_check_in_progress_{};
+        bool update_download_in_progress_{};
+        bool update_installing_{};
+        bool update_animations_enabled_{ true };
+        std::shared_ptr<std::atomic_bool> update_download_cancellation_;
+        Microsoft::UI::Xaml::DispatcherTimer update_progress_timer_{ nullptr };
+        double update_displayed_progress_{};
+        double update_start_progress_{};
+        double update_target_progress_{};
+        ULONGLONG update_animation_started_ms_{};
+        std::uint64_t update_total_bytes_{};
         DiagnosticBundleState diagnostic_bundle_state_{};
         std::wstring diagnostic_bundle_path_;
         glance::app::TextPreferences text_preferences_{};

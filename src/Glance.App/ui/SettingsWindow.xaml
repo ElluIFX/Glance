@@ -1091,5 +1091,69 @@
             </ScrollViewer>
         </Grid>
         </NavigationView>
+        <Grid
+            x:Name="UpdateOverlay"
+            Grid.Row="1"
+            Background="{ThemeResource SmokeFillColorDefaultBrush}"
+            Visibility="Collapsed">
+            <Border
+                x:Name="UpdateCard"
+                Width="360"
+                Padding="28,26"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+                <StackPanel HorizontalAlignment="Stretch" Spacing="10">
+                    <Grid
+                        Width="104"
+                        Height="104"
+                        HorizontalAlignment="Center">
+                        <ProgressRing
+                            x:Name="UpdateProgressRing"
+                            Width="96"
+                            Height="96"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                            IsActive="True"
+                            IsIndeterminate="False"
+                            Maximum="100"
+                            Minimum="0" />
+                        <TextBlock
+                            x:Name="UpdateProgressPercentText"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="16"
+                            FontWeight="SemiBold"
+                            Text="0%" />
+                    </Grid>
+                    <TextBlock
+                        x:Name="UpdateCardTitle"
+                        HorizontalAlignment="Center"
+                        FontSize="18"
+                        FontWeight="SemiBold"
+                        TextAlignment="Center" />
+                    <TextBlock
+                        x:Name="UpdateCardMessage"
+                        HorizontalAlignment="Stretch"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="UpdateProgressBytesText"
+                        HorizontalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextAlignment="Center" />
+                    <Button
+                        x:Name="CancelUpdateButton"
+                        HorizontalAlignment="Center"
+                        Click="CancelUpdateButton_Click"
+                        Content="Cancel" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

@@ -37,6 +37,32 @@ namespace Shapes = Microsoft::UI::Xaml::Shapes;
 
 namespace
 {
+    constexpr wchar_t latest_release_url[] =
+        L"https://github.com/ElluIFX/Glance/releases/latest";
+
+    std::wstring safe_release_url(std::wstring_view value)
+    {
+        constexpr std::wstring_view release_prefix =
+            L"https://github.com/ElluIFX/Glance/releases/";
+        return value.starts_with(release_prefix)
+            ? std::wstring(value)
+            : std::wstring(latest_release_url);
+    }
+
+    std::wstring format_megabytes(std::uint64_t bytes)
+    {
+        wchar_t text[32]{};
+        swprintf_s(text, L"%.1f", static_cast<double>(bytes) / (1024.0 * 1024.0));
+        return text;
+    }
+
+    bool client_animations_enabled() noexcept
+    {
+        BOOL enabled = TRUE;
+        return !SystemParametersInfoW(
+                   SPI_GETCLIENTAREAANIMATION, 0, &enabled, 0) || enabled != FALSE;
+    }
+
     void disable_number_box_clear_button(DependencyObject const& root)
     {
         const int count = Media::VisualTreeHelper::GetChildrenCount(root);
@@ -241,6 +267,22 @@ namespace winrt::Glance::App::implementation
     SettingsWindow::SettingsWindow()
     {
         InitializeComponent();
+        update_animations_enabled_ = client_animations_enabled();
+        update_progress_timer_ = DispatcherTimer();
+        update_progress_timer_.Interval(std::chrono::milliseconds(33));
+        const auto weak = get_weak();
+        update_progress_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+            if (const auto self = weak.get())
+            {
+                self->advance_update_progress();
+            }
+        });
+        Closed([weak](IInspectable const&, WindowEventArgs const&) {
+            if (const auto self = weak.get())
+            {
+                self->cancel_update_download();
+            }
+        });
         ApplyLocalizedResources();
         ApplyAppearancePreferences();
         configure_window();
@@ -632,6 +674,7 @@ namespace winrt::Glance::App::implementation
         set_text(AboutLicenseText(), L"AboutLicenseText.Text");
         set_content(AboutProjectLink(), L"AboutProjectLink.Content");
         set_content(CheckForUpdatesButton(), L"CheckForUpdatesButton.Content");
+        set_content(CancelUpdateButton(), L"Cancel");
         AboutVersionText().Text(glance::app::localize_format(
             L"VersionFormat", { GLANCE_VERSION_WSTRING }));
         refresh_runtime_statuses();
@@ -1121,16 +1164,9 @@ namespace winrt::Glance::App::implementation
 
         apartment_context ui_thread;
         glance::app::UpdateCheckResult result;
-        try
-        {
-            co_await resume_background();
-            result = glance::app::check_for_updates(GLANCE_VERSION_WSTRING);
-            co_await ui_thread;
-        }
-        catch (...)
-        {
-            co_return;
-        }
+        co_await resume_background();
+        result = glance::app::check_for_updates(GLANCE_VERSION_WSTRING);
+        co_await ui_thread;
 
         lifetime->update_check_in_progress_ = false;
         lifetime->CheckForUpdatesButton().IsEnabled(true);
@@ -1147,16 +1183,28 @@ namespace winrt::Glance::App::implementation
             dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
             dialog.CloseButtonText(glance::app::localize(L"OK"));
             dialog.DefaultButton(Controls::ContentDialogButton::Close);
+            const bool installer_available = static_cast<bool>(result.installer);
+            const bool prefer_install = installer_available && glance::app::managed_installation();
 
             switch (result.status)
             {
             case glance::app::UpdateCheckStatus::update_available:
+            {
                 dialog.Title(box_value(glance::app::localize(L"UpdateAvailableTitle")));
                 dialog.Content(box_value(glance::app::localize_format(
                     L"UpdateAvailableMessage", { result.latest_version })));
-                dialog.PrimaryButtonText(glance::app::localize(L"UpdateAvailablePrimary"));
+                dialog.PrimaryButtonText(glance::app::localize(
+                    installer_available ? L"UpdateDownloadAndInstall" : L"UpdateOpenRelease"));
+                if (installer_available)
+                {
+                    dialog.SecondaryButtonText(glance::app::localize(L"UpdateOpenRelease"));
+                }
                 dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+                dialog.DefaultButton(installer_available && !prefer_install
+                    ? Controls::ContentDialogButton::Secondary
+                    : Controls::ContentDialogButton::Primary);
                 break;
+            }
             case glance::app::UpdateCheckStatus::up_to_date:
                 dialog.Title(box_value(glance::app::localize(L"UpdateUpToDateTitle")));
                 dialog.Content(box_value(glance::app::localize_format(
@@ -1177,16 +1225,302 @@ namespace winrt::Glance::App::implementation
             }
 
             const auto dialog_result = co_await dialog.ShowAsync();
-            if (result.status == glance::app::UpdateCheckStatus::update_available &&
-                dialog_result == Controls::ContentDialogResult::Primary)
+            if (result.status != glance::app::UpdateCheckStatus::update_available)
+            {
+                co_return;
+            }
+
+            if (installer_available && dialog_result == Controls::ContentDialogResult::Primary)
+            {
+                lifetime->download_and_install_update(std::move(result.installer));
+            }
+            else if ((!installer_available &&
+                      dialog_result == Controls::ContentDialogResult::Primary) ||
+                     dialog_result == Controls::ContentDialogResult::Secondary)
             {
                 static_cast<void>(co_await Windows::System::Launcher::LaunchUriAsync(
-                    Windows::Foundation::Uri(L"https://github.com/ElluIFX/Glance/releases/latest")));
+                    Windows::Foundation::Uri(safe_release_url(result.release_url))));
             }
         }
         catch (...)
         {
         }
+    }
+
+    fire_and_forget SettingsWindow::download_and_install_update(
+        glance::app::UpdateInstallerAsset asset)
+    {
+        const auto lifetime = get_strong();
+        if (update_download_in_progress_ || !asset)
+        {
+            co_return;
+        }
+
+        update_download_in_progress_ = true;
+        update_installing_ = false;
+        update_total_bytes_ = asset.size;
+        const auto cancellation = std::make_shared<std::atomic_bool>(false);
+        update_download_cancellation_ = cancellation;
+        show_update_download_card(asset.version);
+
+        const auto dispatcher = DispatcherQueue();
+        const auto weak = get_weak();
+        apartment_context ui_thread;
+        glance::app::UpdateDownloadResult download_result;
+        co_await resume_background();
+        download_result = glance::app::download_update_installer(
+            asset,
+            *cancellation,
+            [dispatcher, weak, cancellation](std::uint64_t downloaded, std::uint64_t total) {
+                static_cast<void>(dispatcher.TryEnqueue([weak, cancellation, downloaded, total] {
+                    if (const auto self = weak.get();
+                        self != nullptr &&
+                        self->RootGrid().XamlRoot() != nullptr &&
+                        self->update_download_cancellation_ == cancellation)
+                    {
+                        self->set_update_progress(downloaded, total);
+                    }
+                }));
+            });
+        co_await ui_thread;
+
+        if (lifetime->RootGrid().XamlRoot() == nullptr)
+        {
+            lifetime->update_download_in_progress_ = false;
+            co_return;
+        }
+        if (download_result.status == glance::app::UpdateDownloadStatus::cancelled)
+        {
+            lifetime->hide_update_card();
+            co_return;
+        }
+        if (download_result.status != glance::app::UpdateDownloadStatus::succeeded)
+        {
+            const wchar_t* message_key = L"UpdateDownloadNetworkFailedMessage";
+            if (download_result.status == glance::app::UpdateDownloadStatus::file_error)
+            {
+                message_key = L"UpdateDownloadFileFailedMessage";
+            }
+            else if (download_result.status == glance::app::UpdateDownloadStatus::integrity_error)
+            {
+                message_key = L"UpdateDownloadIntegrityFailedMessage";
+            }
+            lifetime->hide_update_card();
+
+            try
+            {
+                Controls::ContentDialog dialog;
+                dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
+                dialog.Title(box_value(glance::app::localize(L"UpdateDownloadFailedTitle")));
+                dialog.Content(box_value(glance::app::localize(message_key)));
+                dialog.PrimaryButtonText(glance::app::localize(L"UpdateRetry"));
+                dialog.SecondaryButtonText(glance::app::localize(L"UpdateOpenRelease"));
+                dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+                dialog.DefaultButton(Controls::ContentDialogButton::Primary);
+                const auto result = co_await dialog.ShowAsync();
+                if (result == Controls::ContentDialogResult::Primary)
+                {
+                    lifetime->download_and_install_update(std::move(asset));
+                }
+                else if (result == Controls::ContentDialogResult::Secondary)
+                {
+                    static_cast<void>(co_await Windows::System::Launcher::LaunchUriAsync(
+                        Windows::Foundation::Uri(latest_release_url)));
+                }
+            }
+            catch (...)
+            {
+            }
+            co_return;
+        }
+
+        lifetime->set_update_progress(asset.size, asset.size);
+        co_await resume_after(std::chrono::milliseconds(450));
+        co_await ui_thread;
+        if (lifetime->RootGrid().XamlRoot() == nullptr ||
+            cancellation->load(std::memory_order_acquire))
+        {
+            co_return;
+        }
+
+        lifetime->show_update_installing_card();
+        glance::app::UpdateLaunchStatus launch_status{};
+        co_await resume_background();
+        launch_status = glance::app::launch_update_installer(download_result.installer_path);
+        co_await ui_thread;
+        if (launch_status == glance::app::UpdateLaunchStatus::launched ||
+            lifetime->RootGrid().XamlRoot() == nullptr)
+        {
+            co_return;
+        }
+
+        lifetime->hide_update_card();
+        try
+        {
+            Controls::ContentDialog dialog;
+            dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
+            dialog.Title(box_value(glance::app::localize(
+                launch_status == glance::app::UpdateLaunchStatus::cancelled
+                    ? L"UpdateLaunchCancelledTitle"
+                    : L"UpdateLaunchFailedTitle")));
+            dialog.Content(box_value(glance::app::localize(
+                launch_status == glance::app::UpdateLaunchStatus::cancelled
+                    ? L"UpdateLaunchCancelledMessage"
+                    : L"UpdateLaunchFailedMessage")));
+            dialog.PrimaryButtonText(glance::app::localize(L"UpdateRetry"));
+            dialog.SecondaryButtonText(glance::app::localize(L"UpdateOpenRelease"));
+            dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+            dialog.DefaultButton(Controls::ContentDialogButton::Primary);
+            const auto result = co_await dialog.ShowAsync();
+            if (result == Controls::ContentDialogResult::Primary)
+            {
+                lifetime->download_and_install_update(std::move(asset));
+            }
+            else if (result == Controls::ContentDialogResult::Secondary)
+            {
+                static_cast<void>(co_await Windows::System::Launcher::LaunchUriAsync(
+                    Windows::Foundation::Uri(latest_release_url)));
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
+    void SettingsWindow::show_update_download_card(std::wstring_view version)
+    {
+        update_displayed_progress_ = 0;
+        update_start_progress_ = 0;
+        update_target_progress_ = 0;
+        update_animation_started_ms_ = GetTickCount64();
+        SettingsNavigation().IsEnabled(false);
+        UpdateOverlay().Visibility(Visibility::Visible);
+        UpdateProgressRing().IsActive(true);
+        UpdateProgressRing().IsIndeterminate(false);
+        UpdateProgressRing().Value(0);
+        UpdateProgressPercentText().Text(L"0%");
+        UpdateProgressPercentText().Visibility(Visibility::Visible);
+        UpdateCardTitle().Text(glance::app::localize(L"UpdateDownloadTitle"));
+        UpdateCardMessage().Text(glance::app::localize_format(
+            L"UpdateDownloadMessage", { version }));
+        UpdateProgressBytesText().Text(glance::app::localize_format(
+            L"UpdateDownloadBytesFormat",
+            { format_megabytes(0), format_megabytes(update_total_bytes_) }));
+        UpdateProgressBytesText().Visibility(Visibility::Visible);
+        CancelUpdateButton().Content(box_value(glance::app::localize(L"Cancel")));
+        CancelUpdateButton().IsEnabled(true);
+        CancelUpdateButton().Visibility(Visibility::Visible);
+    }
+
+    void SettingsWindow::set_update_progress(std::uint64_t downloaded, std::uint64_t total)
+    {
+        if (!update_download_in_progress_ || update_installing_ || total == 0)
+        {
+            return;
+        }
+
+        downloaded = std::min(downloaded, total);
+        update_total_bytes_ = total;
+        UpdateProgressBytesText().Text(glance::app::localize_format(
+            L"UpdateDownloadBytesFormat",
+            { format_megabytes(downloaded), format_megabytes(total) }));
+        const double target = std::max(
+            update_target_progress_,
+            static_cast<double>(downloaded) * 100.0 / static_cast<double>(total));
+        if (!update_animations_enabled_)
+        {
+            update_displayed_progress_ = target;
+            update_target_progress_ = target;
+            UpdateProgressRing().Value(target);
+            UpdateProgressPercentText().Text(
+                std::to_wstring(static_cast<int>(std::floor(target))) + L"%");
+            return;
+        }
+
+        if (update_progress_timer_.IsEnabled())
+        {
+            advance_update_progress();
+        }
+        update_start_progress_ = update_displayed_progress_;
+        update_target_progress_ = target;
+        update_animation_started_ms_ = GetTickCount64();
+        if (!update_progress_timer_.IsEnabled())
+        {
+            update_progress_timer_.Start();
+        }
+    }
+
+    void SettingsWindow::advance_update_progress()
+    {
+        if (!update_download_in_progress_ || update_installing_)
+        {
+            update_progress_timer_.Stop();
+            return;
+        }
+
+        constexpr double animation_duration_ms = 400.0;
+        const double elapsed = static_cast<double>(GetTickCount64() - update_animation_started_ms_);
+        const double progress = std::clamp(elapsed / animation_duration_ms, 0.0, 1.0);
+        const double eased = 1.0 - std::pow(1.0 - progress, 3.0);
+        update_displayed_progress_ = update_start_progress_ +
+            (update_target_progress_ - update_start_progress_) * eased;
+        UpdateProgressRing().Value(update_displayed_progress_);
+        const int percentage = progress >= 1.0 && update_target_progress_ >= 100.0
+            ? 100
+            : static_cast<int>(std::floor(update_displayed_progress_));
+        UpdateProgressPercentText().Text(std::to_wstring(percentage) + L"%");
+        if (progress >= 1.0)
+        {
+            update_progress_timer_.Stop();
+        }
+    }
+
+    void SettingsWindow::show_update_installing_card()
+    {
+        update_installing_ = true;
+        update_progress_timer_.Stop();
+        UpdateProgressRing().IsIndeterminate(true);
+        UpdateProgressPercentText().Visibility(Visibility::Collapsed);
+        UpdateProgressBytesText().Visibility(Visibility::Collapsed);
+        CancelUpdateButton().Visibility(Visibility::Collapsed);
+        UpdateCardTitle().Text(glance::app::localize(L"UpdateInstallingTitle"));
+        UpdateCardMessage().Text(glance::app::localize(L"UpdateInstallingMessage"));
+    }
+
+    void SettingsWindow::cancel_update_download()
+    {
+        if (!update_download_in_progress_ || update_installing_ || !update_download_cancellation_)
+        {
+            return;
+        }
+
+        update_download_cancellation_->store(true, std::memory_order_release);
+        update_progress_timer_.Stop();
+        UpdateProgressRing().IsIndeterminate(true);
+        UpdateProgressPercentText().Visibility(Visibility::Collapsed);
+        UpdateProgressBytesText().Visibility(Visibility::Collapsed);
+        CancelUpdateButton().Visibility(Visibility::Collapsed);
+        UpdateCardTitle().Text(glance::app::localize(L"UpdateCancellingTitle"));
+        UpdateCardMessage().Text(glance::app::localize(L"UpdateCancellingMessage"));
+    }
+
+    void SettingsWindow::hide_update_card()
+    {
+        update_progress_timer_.Stop();
+        update_download_in_progress_ = false;
+        update_installing_ = false;
+        update_download_cancellation_.reset();
+        update_total_bytes_ = 0;
+        UpdateProgressRing().IsActive(false);
+        UpdateOverlay().Visibility(Visibility::Collapsed);
+        SettingsNavigation().IsEnabled(true);
+    }
+
+    void SettingsWindow::CancelUpdateButton_Click(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        cancel_update_download();
     }
 
     void SettingsWindow::OpenComponentsFolderButton_Click(
@@ -1529,6 +1863,7 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::CloseSettingsButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
+        cancel_update_download();
         Close();
     }
 }

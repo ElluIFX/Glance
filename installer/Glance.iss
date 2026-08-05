@@ -5,6 +5,7 @@
 #define RepoRoot GetEnv("GLANCE_REPO_ROOT")
 #define AppVersion GetEnv("GLANCE_VERSION")
 #define AppFileVersion GetEnv("GLANCE_FILE_VERSION")
+#include ComponentInnoDir + "\component-catalog.iss"
 
 [Setup]
 AppId={{F4A2E1FC-BA77-4A24-83BF-A1D5B90A3E13}
@@ -97,6 +98,7 @@ Type: files; Name: "{autodesktop}\Glance.lnk"; Tasks: not desktopicon
 Filename: "{app}\Glance.exe"; Parameters: "--set-startup=enabled"; Flags: runasoriginaluser runhidden; Tasks: startup
 Filename: "{app}\Glance.exe"; Parameters: "--set-startup=disabled"; Flags: runasoriginaluser runhidden; Tasks: not startup
 Filename: "{app}\Glance.exe"; Description: "{cm:LaunchProgram,Glance}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Glance.exe"; Flags: runasoriginaluser runhidden nowait; Check: IsAutomaticUpdate
 
 [UninstallRun]
 Filename: "{app}\Glance.exe"; Parameters: "--cleanup-startup"; RunOnceId: "CleanupGlanceStartup"; Flags: runhidden skipifdoesntexist
@@ -104,6 +106,7 @@ Filename: "{app}\Glance.exe"; Parameters: "--cleanup-startup"; RunOnceId: "Clean
 [Code]
 const
   GlanceMutexName = 'Local\Glance.App';
+  LegacyComponentCatalog = 'adobe,model3d,office';
   ShutdownWaitAttempts = 100;
   ShutdownWaitInterval = 100;
 
@@ -124,6 +127,43 @@ begin
       Exit;
     end;
   end;
+end;
+
+function IsAutomaticUpdate: Boolean;
+begin
+  Result := HasCommandLineParameter('/GLANCEUPDATE');
+end;
+
+function ComponentCatalogContains(
+  const Catalog: String;
+  const ComponentName: String): Boolean;
+begin
+  Result := Pos(
+    ',' + Lowercase(ComponentName) + ',',
+    ',' + Lowercase(Catalog) + ',') > 0;
+end;
+
+procedure SelectComponentIfNew(
+  const ComponentName: String;
+  const PreviousComponentCatalog: String);
+begin
+  if not ComponentCatalogContains(PreviousComponentCatalog, ComponentName) then
+    WizardSelectComponents(ComponentName);
+end;
+
+procedure InitializeWizard;
+var
+  PreviousComponentCatalog: String;
+begin
+  PreviousComponentCatalog := GetPreviousData(
+    'KnownComponents', LegacyComponentCatalog);
+#include ComponentInnoDir + "\component-select-new.iss"
+end;
+
+procedure RegisterPreviousData(PreviousDataKey: Integer);
+begin
+  SetPreviousData(
+    PreviousDataKey, 'KnownComponents', '{#CurrentComponentCatalog}');
 end;
 
 function WaitForGlanceExit: Boolean;

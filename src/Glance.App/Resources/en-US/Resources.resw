@@ -275,8 +275,25 @@
   <data name="AboutProjectLink.Content" xml:space="preserve"><value>GitHub repository</value></data>
   <data name="CheckForUpdatesButton.Content" xml:space="preserve"><value>Check for updates</value></data>
   <data name="UpdateAvailableTitle" xml:space="preserve"><value>Update available</value></data>
-  <data name="UpdateAvailableMessage" xml:space="preserve"><value>Version {0} is available. Open the release page?</value></data>
-  <data name="UpdateAvailablePrimary" xml:space="preserve"><value>Open release</value></data>
+  <data name="UpdateAvailableMessage" xml:space="preserve"><value>Version {0} is available</value></data>
+  <data name="UpdateDownloadAndInstall" xml:space="preserve"><value>Download and update</value></data>
+  <data name="UpdateOpenRelease" xml:space="preserve"><value>Open release</value></data>
+  <data name="UpdateDownloadTitle" xml:space="preserve"><value>Downloading update</value></data>
+  <data name="UpdateDownloadMessage" xml:space="preserve"><value>Preparing version {0}</value></data>
+  <data name="UpdateDownloadBytesFormat" xml:space="preserve"><value>{0}MB / {1}MB</value></data>
+  <data name="UpdateCancellingTitle" xml:space="preserve"><value>Cancelling download</value></data>
+  <data name="UpdateCancellingMessage" xml:space="preserve"><value>Removing the incomplete update</value></data>
+  <data name="UpdateInstallingTitle" xml:space="preserve"><value>Installing update</value></data>
+  <data name="UpdateInstallingMessage" xml:space="preserve"><value>Glance will restart automatically</value></data>
+  <data name="UpdateDownloadFailedTitle" xml:space="preserve"><value>Could not download update</value></data>
+  <data name="UpdateDownloadNetworkFailedMessage" xml:space="preserve"><value>The update could not be downloaded. Check your connection and try again</value></data>
+  <data name="UpdateDownloadFileFailedMessage" xml:space="preserve"><value>The update could not be saved. Check available disk space and try again</value></data>
+  <data name="UpdateDownloadIntegrityFailedMessage" xml:space="preserve"><value>The downloaded installer did not match the published checksum</value></data>
+  <data name="UpdateLaunchCancelledTitle" xml:space="preserve"><value>Installation cancelled</value></data>
+  <data name="UpdateLaunchCancelledMessage" xml:space="preserve"><value>Administrator approval was not granted</value></data>
+  <data name="UpdateLaunchFailedTitle" xml:space="preserve"><value>Could not start installer</value></data>
+  <data name="UpdateLaunchFailedMessage" xml:space="preserve"><value>The verified installer could not be started</value></data>
+  <data name="UpdateRetry" xml:space="preserve"><value>Retry</value></data>
   <data name="UpdateUpToDateTitle" xml:space="preserve"><value>Glance is up to date</value></data>
   <data name="UpdateUpToDateMessage" xml:space="preserve"><value>You are using the latest version ({0}).</value></data>
   <data name="UpdateCheckFailedTitle" xml:space="preserve"><value>Could not check for updates</value></data>

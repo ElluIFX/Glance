@@ -275,8 +275,25 @@
   <data name="AboutProjectLink.Content" xml:space="preserve"><value>GitHub 仓库</value></data>
   <data name="CheckForUpdatesButton.Content" xml:space="preserve"><value>检查更新</value></data>
   <data name="UpdateAvailableTitle" xml:space="preserve"><value>发现新版本</value></data>
-  <data name="UpdateAvailableMessage" xml:space="preserve"><value>最新版本为 {0}，是否打开 Release 页面？</value></data>
-  <data name="UpdateAvailablePrimary" xml:space="preserve"><value>打开 Release</value></data>
+  <data name="UpdateAvailableMessage" xml:space="preserve"><value>最新版本为 {0}</value></data>
+  <data name="UpdateDownloadAndInstall" xml:space="preserve"><value>下载并更新</value></data>
+  <data name="UpdateOpenRelease" xml:space="preserve"><value>打开 Release</value></data>
+  <data name="UpdateDownloadTitle" xml:space="preserve"><value>正在下载更新</value></data>
+  <data name="UpdateDownloadMessage" xml:space="preserve"><value>正在准备版本 {0}</value></data>
+  <data name="UpdateDownloadBytesFormat" xml:space="preserve"><value>{0}MB / {1}MB</value></data>
+  <data name="UpdateCancellingTitle" xml:space="preserve"><value>正在取消下载</value></data>
+  <data name="UpdateCancellingMessage" xml:space="preserve"><value>正在清理未完成的更新</value></data>
+  <data name="UpdateInstallingTitle" xml:space="preserve"><value>正在安装更新</value></data>
+  <data name="UpdateInstallingMessage" xml:space="preserve"><value>Glance 将自动重新启动</value></data>
+  <data name="UpdateDownloadFailedTitle" xml:space="preserve"><value>无法下载更新</value></data>
+  <data name="UpdateDownloadNetworkFailedMessage" xml:space="preserve"><value>无法下载安装包，请检查网络连接后重试</value></data>
+  <data name="UpdateDownloadFileFailedMessage" xml:space="preserve"><value>无法保存安装包，请检查可用磁盘空间后重试</value></data>
+  <data name="UpdateDownloadIntegrityFailedMessage" xml:space="preserve"><value>下载的安装包与发布校验值不一致</value></data>
+  <data name="UpdateLaunchCancelledTitle" xml:space="preserve"><value>已取消安装</value></data>
+  <data name="UpdateLaunchCancelledMessage" xml:space="preserve"><value>未授予管理员权限</value></data>
+  <data name="UpdateLaunchFailedTitle" xml:space="preserve"><value>无法启动安装程序</value></data>
+  <data name="UpdateLaunchFailedMessage" xml:space="preserve"><value>无法启动已验证的安装程序</value></data>
+  <data name="UpdateRetry" xml:space="preserve"><value>重试</value></data>
   <data name="UpdateUpToDateTitle" xml:space="preserve"><value>Glance 已是最新版本</value></data>
   <data name="UpdateUpToDateMessage" xml:space="preserve"><value>当前使用的 {0} 已是最新版本</value></data>
   <data name="UpdateCheckFailedTitle" xml:space="preserve"><value>无法检查更新</value></data>

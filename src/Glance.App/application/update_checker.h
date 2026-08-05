@@ -1,5 +1,9 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
 #include <string>
 #include <string_view>
 
@@ -14,11 +18,60 @@ namespace glance::app
         unavailable,
     };
 
+    struct UpdateInstallerAsset
+    {
+        std::wstring version;
+        std::wstring file_name;
+        std::wstring download_url;
+        std::wstring sha256;
+        std::uint64_t size{};
+
+        [[nodiscard]] explicit operator bool() const noexcept
+        {
+            return !version.empty() && !file_name.empty() && !download_url.empty() &&
+                sha256.size() == 64 && size > 0;
+        }
+    };
+
     struct UpdateCheckResult
     {
         UpdateCheckStatus status{ UpdateCheckStatus::unavailable };
         std::wstring latest_version;
+        std::wstring release_url;
+        UpdateInstallerAsset installer;
     };
 
+    enum class UpdateDownloadStatus
+    {
+        succeeded,
+        cancelled,
+        network_error,
+        file_error,
+        integrity_error,
+    };
+
+    struct UpdateDownloadResult
+    {
+        UpdateDownloadStatus status{ UpdateDownloadStatus::network_error };
+        std::filesystem::path installer_path;
+    };
+
+    enum class UpdateLaunchStatus
+    {
+        launched,
+        cancelled,
+        failed,
+    };
+
+    using UpdateProgressCallback =
+        std::function<void(std::uint64_t downloaded, std::uint64_t total)>;
+
     [[nodiscard]] UpdateCheckResult check_for_updates(std::wstring_view current_version) noexcept;
+    [[nodiscard]] bool managed_installation() noexcept;
+    [[nodiscard]] UpdateDownloadResult download_update_installer(
+        const UpdateInstallerAsset& asset,
+        const std::atomic_bool& cancelled,
+        const UpdateProgressCallback& progress) noexcept;
+    [[nodiscard]] UpdateLaunchStatus launch_update_installer(
+        const std::filesystem::path& installer_path) noexcept;
 }

@@ -36,6 +36,8 @@ $messageLines = [System.Collections.Generic.List[string]]::new()
 $definitionLines = [System.Collections.Generic.List[string]]::new()
 $fileLines = [System.Collections.Generic.List[string]]::new()
 $deleteLines = [System.Collections.Generic.List[string]]::new()
+$selectNewLines = [System.Collections.Generic.List[string]]::new()
+$componentIdList = [System.Collections.Generic.List[string]]::new()
 $componentIds = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase)
 foreach ($manifestPath in $manifests) {
@@ -47,6 +49,7 @@ foreach ($manifestPath in $manifests) {
     if ($id -notmatch '^[a-z][a-z0-9-]*$' -or -not $componentIds.Add($id)) {
         throw "Component manifest '$manifestPath' has an invalid or duplicate id."
     }
+    $componentIdList.Add($id)
     if ([string] $descriptor.architecture -ne $Platform) {
         throw "Component '$id' does not support platform '$Platform'."
     }
@@ -105,9 +108,15 @@ foreach ($manifestPath in $manifests) {
         "Source: `"{#ComponentsDir}\$id\*`"; DestDir: `"{app}\components\$id`"; Components: $id; Flags: ignoreversion recursesubdirs createallsubdirs")
     $deleteLines.Add(
         "Type: filesandordirs; Name: `"{app}\components\$id`"")
+    $selectNewLines.Add(
+        "  SelectComponentIfNew('$id', PreviousComponentCatalog);")
 }
 
 $utf8 = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllLines(
+    (Join-Path $innoRoot "component-catalog.iss"),
+    @("#define CurrentComponentCatalog `"$($componentIdList -join ',')`""),
+    $utf8)
 [System.IO.File]::WriteAllLines(
     (Join-Path $innoRoot "component-messages.iss"),
     $messageLines,
@@ -123,4 +132,8 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllLines(
     (Join-Path $innoRoot "component-delete.iss"),
     $deleteLines,
+    $utf8)
+[System.IO.File]::WriteAllLines(
+    (Join-Path $innoRoot "component-select-new.iss"),
+    $selectNewLines,
     $utf8)
