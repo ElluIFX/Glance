@@ -501,6 +501,7 @@ namespace winrt::Glance::App::implementation
         set_tooltip(ZoomOutButton(), L"ZoomOutButton.ToolTipService.ToolTip");
         set_tooltip(ZoomInButton(), L"ZoomInButton.ToolTipService.ToolTip");
         set_tooltip(RotateButton(), L"RotateButton.ToolTipService.ToolTip");
+        set_tooltip(FlipButton(), L"FlipButton.ToolTipService.ToolTip");
         set_tooltip(ImageExifButton(), L"ImageExifButton.ToolTipService.ToolTip");
         set_tooltip(WordWrapButton(), L"WordWrapButton.ToolTipService.ToolTip");
         set_tooltip(CopyPathButton(), L"CopyPathButton.ToolTipService.ToolTip");
@@ -1567,7 +1568,11 @@ namespace winrt::Glance::App::implementation
             break;
         case glance::app::PreviewKind::image:
             show_content_panel(kind);
+            image_zoom_map_enabled_ =
+                glance::app::load_media_preview_preferences().show_image_zoom_map;
             image_rotation_ = 0;
+            image_scale_x_ = 1.0;
+            image_scale_y_ = 1.0;
             image_panning_ = false;
             image_pixel_width_ = 0;
             image_pixel_height_ = 0;
@@ -1575,11 +1580,14 @@ namespace winrt::Glance::App::implementation
             image_metadata_.clear();
             image_metadata_visible_ = false;
             ImageTransform().Rotation(image_rotation_);
+            ImageTransform().ScaleX(image_scale_x_);
+            ImageTransform().ScaleY(image_scale_y_);
             ImagePreview().Source(nullptr);
             ImageExifButton().IsChecked(false);
             ImageMetadataText().Text(L"");
             ImageMetadataOverlay().Visibility(Visibility::Collapsed);
-            static_cast<void>(ImageScroller().ChangeView(nullptr, nullptr, 1.0F, true));
+            ImageZoomMapOverlay().Visibility(Visibility::Collapsed);
+            fit_image_to_viewport();
             load_image_async(file.path, generation);
             if (glance::app::footer_field_enabled(
                     footer_preferences_, glance::app::FooterField::media_info))
@@ -1915,6 +1923,19 @@ namespace winrt::Glance::App::implementation
                 lifetime->fit_image_to_viewport();
                 lifetime->update_footer_metadata();
                 lifetime->auto_fit_window_to_content(width, height);
+                const auto weak = lifetime->get_weak();
+                static_cast<void>(lifetime->DispatcherQueue().TryEnqueue(
+                    Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
+                    [weak, generation] {
+                        const auto self = weak.get();
+                        if (self == nullptr ||
+                            generation != self->content_generation_ ||
+                            self->current_kind_ != glance::app::PreviewKind::image)
+                        {
+                            return;
+                        }
+                        self->fit_image_to_viewport();
+                    }));
                 lifetime->begin_component_refinement(generation);
             }));
         }
@@ -3451,6 +3472,7 @@ namespace winrt::Glance::App::implementation
             image_bits_per_pixel_ = 0;
             ImagePreview().Source(bitmap);
             update_image_fit_surface();
+            update_image_zoom_map();
             update_footer_metadata();
             auto_fit_window_to_content(width, height);
             dismiss_preview_info_bar();
@@ -4479,9 +4501,127 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::fit_image_to_viewport()
     {
+        ImageScroller().CancelDirectManipulations();
+        ImageScroller().ReleasePointerCaptures();
         image_panning_ = false;
         update_image_fit_surface();
         static_cast<void>(ImageScroller().ChangeView(0.0, 0.0, 1.0F, true));
+        update_image_zoom_map();
+    }
+
+    void MainWindow::update_image_zoom_map()
+    {
+        const double zoom = ImageScroller().ZoomFactor();
+        if (!image_zoom_map_enabled_ ||
+            current_kind_ != glance::app::PreviewKind::image ||
+            ImagePreview().Source() == nullptr ||
+            image_pixel_width_ == 0 ||
+            image_pixel_height_ == 0 ||
+            zoom <= 1.001)
+        {
+            ImageZoomMapOverlay().Visibility(Visibility::Collapsed);
+            return;
+        }
+
+        constexpr double maximum_map_width = 180.0;
+        constexpr double maximum_map_height = 120.0;
+        const bool swaps_axes =
+            static_cast<int>(std::lround(image_rotation_)) % 180 != 0;
+        const double rotated_pixel_width = swaps_axes
+            ? image_pixel_height_
+            : image_pixel_width_;
+        const double rotated_pixel_height = swaps_axes
+            ? image_pixel_width_
+            : image_pixel_height_;
+        const double map_scale = std::min(
+            maximum_map_width / rotated_pixel_width,
+            maximum_map_height / rotated_pixel_height);
+        const double mapped_width = rotated_pixel_width * map_scale;
+        const double mapped_height = rotated_pixel_height * map_scale;
+        const double image_width = swaps_axes ? mapped_height : mapped_width;
+        const double image_height = swaps_axes ? mapped_width : mapped_height;
+        const double image_left = (mapped_width - image_width) / 2.0;
+        const double image_top = (mapped_height - image_height) / 2.0;
+
+        ImageZoomMapOverlay().Width(mapped_width);
+        ImageZoomMapOverlay().Height(mapped_height);
+        ImageZoomMapCanvas().Width(mapped_width);
+        ImageZoomMapCanvas().Height(mapped_height);
+        ImageZoomMapViewportLayer().Width(mapped_width);
+        ImageZoomMapViewportLayer().Height(mapped_height);
+
+        const auto configure_map_image = [&](const Border& frame, const auto& transform) {
+            frame.Width(image_width);
+            frame.Height(image_height);
+            Canvas::SetLeft(frame, image_left);
+            Canvas::SetTop(frame, image_top);
+            transform.Rotation(image_rotation_);
+            transform.ScaleX(image_scale_x_);
+            transform.ScaleY(image_scale_y_);
+        };
+        configure_map_image(ImageZoomMapBaseFrame(), ImageZoomMapBaseTransform());
+        configure_map_image(ImageZoomMapViewportFrame(), ImageZoomMapViewportTransform());
+
+        const double surface_width = ImageFitSurface().Width();
+        const double surface_height = ImageFitSurface().Height();
+        const double displayed_width = swaps_axes
+            ? ImagePreview().Height()
+            : ImagePreview().Width();
+        const double displayed_height = swaps_axes
+            ? ImagePreview().Width()
+            : ImagePreview().Height();
+        const double zoomed_image_left = (surface_width - displayed_width) * zoom / 2.0;
+        const double zoomed_image_top = (surface_height - displayed_height) * zoom / 2.0;
+        const double zoomed_image_width = displayed_width * zoom;
+        const double zoomed_image_height = displayed_height * zoom;
+        const double viewport_width = std::max(
+            1.0,
+            ImageScroller().ViewportWidth() > 0.0
+                ? ImageScroller().ViewportWidth()
+                : ImageScroller().ActualWidth());
+        const double viewport_height = std::max(
+            1.0,
+            ImageScroller().ViewportHeight() > 0.0
+                ? ImageScroller().ViewportHeight()
+                : ImageScroller().ActualHeight());
+        const double visible_left = std::clamp(
+            (ImageScroller().HorizontalOffset() - zoomed_image_left) / zoomed_image_width,
+            0.0,
+            1.0);
+        const double visible_top = std::clamp(
+            (ImageScroller().VerticalOffset() - zoomed_image_top) / zoomed_image_height,
+            0.0,
+            1.0);
+        const double visible_right = std::clamp(
+            (ImageScroller().HorizontalOffset() + viewport_width - zoomed_image_left) /
+                zoomed_image_width,
+            0.0,
+            1.0);
+        const double visible_bottom = std::clamp(
+            (ImageScroller().VerticalOffset() + viewport_height - zoomed_image_top) /
+                zoomed_image_height,
+            0.0,
+            1.0);
+        if (visible_right <= visible_left || visible_bottom <= visible_top)
+        {
+            ImageZoomMapOverlay().Visibility(Visibility::Collapsed);
+            return;
+        }
+
+        const double viewport_left = visible_left * mapped_width;
+        const double viewport_top = visible_top * mapped_height;
+        const double viewport_map_width = (visible_right - visible_left) * mapped_width;
+        const double viewport_map_height = (visible_bottom - visible_top) * mapped_height;
+        ImageZoomMapViewportClip().Rect(Windows::Foundation::Rect{
+            static_cast<float>(viewport_left),
+            static_cast<float>(viewport_top),
+            static_cast<float>(viewport_map_width),
+            static_cast<float>(viewport_map_height) });
+        ImageZoomMapViewportBorder().Width(viewport_map_width);
+        ImageZoomMapViewportBorder().Height(viewport_map_height);
+        Canvas::SetLeft(ImageZoomMapViewportBorder(), viewport_left);
+        Canvas::SetTop(ImageZoomMapViewportBorder(), viewport_top);
+        ImageZoomMapOverlay().Visibility(Visibility::Visible);
     }
 
     void MainWindow::update_pdf_fit_surface()
@@ -4815,6 +4955,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::ImagePanel_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
     {
         update_image_fit_surface();
+        update_image_zoom_map();
     }
 
     void MainWindow::PdfPanel_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
@@ -4871,6 +5012,19 @@ namespace winrt::Glance::App::implementation
                 static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
     }
 
+    void MainWindow::ZoomOutButton_RightTapped(
+        IInspectable const&,
+        RightTappedRoutedEventArgs const& args)
+    {
+        const float zoom = std::max(1.0F, ImageScroller().ZoomFactor() / 1.05F);
+        set_image_zoom(
+            zoom,
+            Windows::Foundation::Point{
+                static_cast<float>(ImageScroller().ActualWidth() / 2.0),
+                static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
+        args.Handled(true);
+    }
+
     void MainWindow::ZoomInButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         const float zoom = std::min(16.0F, ImageScroller().ZoomFactor() * 1.25F);
@@ -4879,6 +5033,19 @@ namespace winrt::Glance::App::implementation
             Windows::Foundation::Point{
                 static_cast<float>(ImageScroller().ActualWidth() / 2.0),
                 static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
+    }
+
+    void MainWindow::ZoomInButton_RightTapped(
+        IInspectable const&,
+        RightTappedRoutedEventArgs const& args)
+    {
+        const float zoom = std::min(16.0F, ImageScroller().ZoomFactor() * 1.05F);
+        set_image_zoom(
+            zoom,
+            Windows::Foundation::Point{
+                static_cast<float>(ImageScroller().ActualWidth() / 2.0),
+                static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
+        args.Handled(true);
     }
 
     void MainWindow::ImageScroller_PointerWheelChanged(
@@ -4974,9 +5141,59 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::RotateButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        image_rotation_ = std::fmod(image_rotation_ + 90.0, 360.0);
+        rotate_image(90.0);
+    }
+
+    void MainWindow::RotateButton_RightTapped(
+        IInspectable const&,
+        RightTappedRoutedEventArgs const& args)
+    {
+        rotate_image(-90.0);
+        args.Handled(true);
+    }
+
+    void MainWindow::ImageScroller_ViewChanged(
+        IInspectable const&,
+        ScrollViewerViewChangedEventArgs const&)
+    {
+        update_image_zoom_map();
+    }
+
+    void MainWindow::rotate_image(double degrees)
+    {
+        image_rotation_ = std::fmod(image_rotation_ + degrees + 360.0, 360.0);
         ImageTransform().Rotation(image_rotation_);
         fit_image_to_viewport();
+    }
+
+    void MainWindow::FlipButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        flip_image(true);
+    }
+
+    void MainWindow::FlipButton_RightTapped(
+        IInspectable const&,
+        RightTappedRoutedEventArgs const& args)
+    {
+        flip_image(false);
+        args.Handled(true);
+    }
+
+    void MainWindow::flip_image(bool horizontal)
+    {
+        const bool swaps_axes =
+            static_cast<int>(std::lround(image_rotation_)) % 180 != 0;
+        if (horizontal != swaps_axes)
+        {
+            image_scale_x_ = -image_scale_x_;
+            ImageTransform().ScaleX(image_scale_x_);
+        }
+        else
+        {
+            image_scale_y_ = -image_scale_y_;
+            ImageTransform().ScaleY(image_scale_y_);
+        }
+        update_image_zoom_map();
     }
 
     void MainWindow::show_media_controls()

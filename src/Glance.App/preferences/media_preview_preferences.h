@@ -30,6 +30,7 @@ namespace glance::app
         bool autoplay_audio{ true };
         bool autoplay_video{ true };
         bool reverse_seek_wheel{};
+        bool show_image_zoom_map{ true };
     };
 
     [[nodiscard]] MediaPreviewPreferences load_media_preview_preferences() noexcept;

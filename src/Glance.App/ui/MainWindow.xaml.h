@@ -105,6 +105,9 @@ namespace winrt::Glance::App::implementation
         void ImageScroller_PointerWheelChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void ImageScroller_ViewChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::ScrollViewerViewChangedEventArgs const&);
         void ImageScroller_PointerPressed(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
@@ -121,8 +124,21 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void ZoomOutButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void ZoomOutButton_RightTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void ZoomInButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void ZoomInButton_RightTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void RotateButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void RotateButton_RightTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
+        void FlipButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void FlipButton_RightTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void MediaPanel_PointerMoved(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
@@ -373,6 +389,9 @@ namespace winrt::Glance::App::implementation
         void show_provider_error(std::wstring message, std::uint64_t generation);
         void update_image_fit_surface();
         void fit_image_to_viewport();
+        void update_image_zoom_map();
+        void rotate_image(double degrees);
+        void flip_image(bool horizontal);
         void update_pdf_fit_surface();
         void stop_media_playback();
         void show_media_controls();
@@ -433,7 +452,10 @@ namespace winrt::Glance::App::implementation
         std::uint64_t web_navigation_id_{};
         bool image_metadata_visible_{};
         bool image_panning_{};
+        bool image_zoom_map_enabled_{ true };
         double image_rotation_{};
+        double image_scale_x_{ 1.0 };
+        double image_scale_y_{ 1.0 };
         std::uint32_t image_pixel_width_{};
         std::uint32_t image_pixel_height_{};
         std::uint32_t image_bits_per_pixel_{};

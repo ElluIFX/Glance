@@ -826,6 +826,28 @@
                             </Grid>
                         </Border>
                     </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="ImagePreviewGroupTitle" x:Uid="ImagePreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Image preview" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="ImageZoomMapLabel" x:Uid="ImageZoomMapLabel" Text="Zoom thumbnail" />
+                                    <TextBlock x:Name="ImageZoomMapDescription" x:Uid="ImageZoomMapDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Show the current viewport while an image is zoomed" />
+                                </StackPanel>
+                                <ToggleSwitch
+                                    x:Name="ImageZoomMapToggle"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    OffContent="{x:Null}"
+                                    OnContent="{x:Null}"
+                                    Toggled="MediaPreferenceToggle_Toggled" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 

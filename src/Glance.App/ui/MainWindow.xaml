@@ -229,6 +229,7 @@
                         VerticalScrollBarVisibility="Auto"
                         VerticalScrollMode="Enabled"
                         ZoomMode="Enabled"
+                        ViewChanged="ImageScroller_ViewChanged"
                         PointerCanceled="ImageScroller_PointerCanceled"
                         PointerCaptureLost="ImageScroller_PointerCaptureLost"
                         PointerMoved="ImageScroller_PointerMoved"
@@ -250,6 +251,55 @@
                             </Image>
                         </Grid>
                     </ScrollViewer>
+                    <Border
+                        x:Name="ImageZoomMapOverlay"
+                        Margin="14"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Background="#99000000"
+                        CornerRadius="4"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed">
+                        <Canvas x:Name="ImageZoomMapCanvas">
+                            <Border
+                                x:Name="ImageZoomMapBaseFrame"
+                                CornerRadius="4"
+                                RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform>
+                                    <CompositeTransform x:Name="ImageZoomMapBaseTransform" />
+                                </Border.RenderTransform>
+                                <Image
+                                    x:Name="ImageZoomMapBaseImage"
+                                    Opacity="0.45"
+                                    Source="{Binding Source, ElementName=ImagePreview}"
+                                    Stretch="Fill" />
+                            </Border>
+                            <Canvas x:Name="ImageZoomMapViewportLayer">
+                                <Canvas.Clip>
+                                    <RectangleGeometry x:Name="ImageZoomMapViewportClip" />
+                                </Canvas.Clip>
+                                <Border
+                                    x:Name="ImageZoomMapViewportFrame"
+                                    CornerRadius="4"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <Border.RenderTransform>
+                                        <CompositeTransform x:Name="ImageZoomMapViewportTransform" />
+                                    </Border.RenderTransform>
+                                    <Image
+                                        x:Name="ImageZoomMapViewportImage"
+                                        Opacity="0.9"
+                                        Source="{Binding Source, ElementName=ImagePreview}"
+                                        Stretch="Fill" />
+                                </Border>
+                            </Canvas>
+                            <Border
+                                x:Name="ImageZoomMapViewportBorder"
+                                Background="#18FFFFFF"
+                                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                BorderThickness="2"
+                                CornerRadius="4" />
+                        </Canvas>
+                    </Border>
                     <Border
                         x:Name="ImageMetadataOverlay"
                         Margin="12"
@@ -804,6 +854,7 @@
                     x:Uid="ZoomOutButton"
                     Style="{StaticResource IconButtonStyle}"
                     Click="ZoomOutButton_Click"
+                    RightTapped="ZoomOutButton_RightTapped"
                     ToolTipService.ToolTip="Zoom out">
                     <FontIcon FontSize="14" Glyph="&#xE71F;" />
                 </Button>
@@ -812,6 +863,7 @@
                     x:Uid="ZoomInButton"
                     Style="{StaticResource IconButtonStyle}"
                     Click="ZoomInButton_Click"
+                    RightTapped="ZoomInButton_RightTapped"
                     ToolTipService.ToolTip="Zoom in">
                     <FontIcon FontSize="14" Glyph="&#xE8A3;" />
                 </Button>
@@ -820,8 +872,18 @@
                     x:Uid="RotateButton"
                     Style="{StaticResource IconButtonStyle}"
                     Click="RotateButton_Click"
-                    ToolTipService.ToolTip="Rotate clockwise">
+                    RightTapped="RotateButton_RightTapped"
+                    ToolTipService.ToolTip="Rotate clockwise&#xA;Right-click to rotate counterclockwise">
                     <FontIcon FontSize="14" Glyph="&#xE7AD;" />
+                </Button>
+                <Button
+                    x:Name="FlipButton"
+                    x:Uid="FlipButton"
+                    Style="{StaticResource IconButtonStyle}"
+                    Click="FlipButton_Click"
+                    RightTapped="FlipButton_RightTapped"
+                    ToolTipService.ToolTip="Flip horizontally&#xA;Right-click to flip vertically">
+                    <FontIcon FontSize="14" Glyph="&#xE8AB;" />
                 </Button>
                 <ToggleButton
                     x:Name="ImageExifButton"

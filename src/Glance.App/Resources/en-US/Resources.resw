@@ -94,7 +94,8 @@
   <data name="SyntaxHighlightButton.ToolTipService.ToolTip" xml:space="preserve"><value>Syntax highlighting</value></data>
   <data name="ZoomOutButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom out</value></data>
   <data name="ZoomInButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom in</value></data>
-  <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>Rotate clockwise</value></data>
+  <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>Rotate clockwise&#xA;Right-click to rotate counterclockwise</value></data>
+  <data name="FlipButton.ToolTipService.ToolTip" xml:space="preserve"><value>Flip horizontally&#xA;Right-click to flip vertically</value></data>
   <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>Image metadata (EXIF)</value></data>
   <data name="MediaInfoContainer" xml:space="preserve"><value>Container</value></data>
   <data name="MediaInfoDuration" xml:space="preserve"><value>Duration</value></data>
@@ -179,7 +180,10 @@
   <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>Window opacity</value></data>
   <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>Set the opacity of all preview windows</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>Media preview</value></data>
-  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Audio, video, and rich document preview settings</value></data>
+  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Image, audio, video, and rich document preview settings</value></data>
+  <data name="ImagePreviewGroupTitle.Text" xml:space="preserve"><value>Image preview</value></data>
+  <data name="ImageZoomMapLabel.Text" xml:space="preserve"><value>Zoom thumbnail</value></data>
+  <data name="ImageZoomMapDescription.Text" xml:space="preserve"><value>Show the current viewport while an image is zoomed</value></data>
   <data name="AudioVideoPreviewGroupTitle.Text" xml:space="preserve"><value>Audio and video preview</value></data>
   <data name="DefaultAudioVolumeLabel.Text" xml:space="preserve"><value>Default audio volume</value></data>
   <data name="DefaultAudioVolumeDescription.Text" xml:space="preserve"><value>Initial volume for audio previews</value></data>
