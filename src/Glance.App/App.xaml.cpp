@@ -587,7 +587,9 @@ namespace winrt::Glance::App::implementation
     void App::terminate_unresponsive_core()
     {
         glance::contracts::log_event(
-            L"Core health check failed five consecutive times; terminating it for recovery.");
+            L"Core health check failed " +
+            std::to_wstring(glance::contracts::process_watchdog_failure_limit) +
+            L" consecutive times; terminating it for recovery.");
         static_cast<void>(pipe_client_.send(glance::contracts::MessageType::terminate_unresponsive));
         if (core_process_ != nullptr)
         {

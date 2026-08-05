@@ -184,11 +184,7 @@ namespace glance::app
             ULONG server_process_id{};
             if (!GetNamedPipeServerProcessId(pipe, &server_process_id))
             {
-                std::scoped_lock lock(write_mutex_);
-                if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
-                {
-                    CloseHandle(pipe);
-                }
+                CloseHandle(pipe);
                 std::this_thread::sleep_for(retry_delay);
                 retry_delay = std::min(retry_delay * 2, 1600ms);
                 continue;

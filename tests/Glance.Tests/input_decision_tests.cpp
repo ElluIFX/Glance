@@ -3,6 +3,7 @@
 #include "glance/contracts/ipc_protocol.h"
 #include "media_preview_preferences.h"
 #include "pan_interaction.h"
+#include "pdf_render_client.h"
 #include "text_font_fallback.h"
 #include "../../src/version.h"
 
@@ -10,7 +11,9 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -98,6 +101,38 @@ namespace
             reinterpret_cast<const char*>(bytes.data()),
             static_cast<std::streamsize>(bytes.size()));
         return static_cast<bool>(output);
+    }
+
+    std::vector<unsigned char> make_pdf_fixture()
+    {
+        std::string pdf = "%PDF-1.4\n";
+        std::array<std::size_t, 5> offsets{};
+        const auto append_object = [&](std::size_t number, std::string_view body) {
+            offsets[number] = pdf.size();
+            pdf += std::to_string(number) + " 0 obj\n";
+            pdf.append(body);
+            pdf += "\nendobj\n";
+        };
+        append_object(1, "<< /Type /Catalog /Pages 2 0 R >>");
+        append_object(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+        append_object(
+            3,
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] "
+            "/Resources << >> /Contents 4 0 R >>");
+        append_object(4, "<< /Length 0 >>\nstream\n\nendstream");
+
+        const auto xref_offset = pdf.size();
+        std::ostringstream xref;
+        xref << "xref\n0 5\n0000000000 65535 f \n";
+        for (std::size_t index = 1; index < offsets.size(); ++index)
+        {
+            xref << std::setw(10) << std::setfill('0') << offsets[index]
+                 << " 00000 n \n";
+        }
+        xref << "trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n"
+             << xref_offset << "\n%%EOF\n";
+        pdf += xref.str();
+        return { pdf.begin(), pdf.end() };
     }
 }
 
@@ -665,6 +700,39 @@ int main()
             api.shutdown();
         }
         FreeLibrary(adobe_component);
+    }
+
+    {
+        const auto test_directory =
+            std::filesystem::temp_directory_path() /
+            (L"GlancePdfTests-" + std::to_wstring(GetCurrentProcessId()));
+        std::error_code cleanup_error;
+        std::filesystem::remove_all(test_directory, cleanup_error);
+        std::filesystem::create_directories(test_directory, cleanup_error);
+        const auto pdf_path = test_directory / L"single-page.pdf";
+        expect(
+            !cleanup_error && write_bytes(pdf_path, make_pdf_fixture()),
+            "PDF render fixture");
+        if (std::filesystem::is_regular_file(pdf_path))
+        {
+            glance::app::PdfRenderClient client;
+            const auto opened = client.open(pdf_path.wstring(), L"");
+            expect(
+                opened.status == glance::contracts::pdf::Status::success &&
+                    opened.page_count == 1,
+                "PDF RenderHost opens document");
+            if (opened.status == glance::contracts::pdf::Status::success)
+            {
+                const auto rendered = client.render(0, 256, 256);
+                expect(
+                    rendered.status == glance::contracts::pdf::Status::success &&
+                        rendered.pixel_width > 0 &&
+                        rendered.pixel_height > 0 &&
+                        !rendered.pixels.empty(),
+                    "PDF RenderHost renders page");
+            }
+        }
+        std::filesystem::remove_all(test_directory, cleanup_error);
     }
 
     if (failures == 0)

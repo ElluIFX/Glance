@@ -22,7 +22,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\src\Glance.App\preferences;$(ProjectDir)..\..\src\Glance.App\preview;$(ProjectDir)..\..\src\Glance.Contracts\include;$(ProjectDir)..\..\src\Glance.Core\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\src\Glance.App\preferences;$(ProjectDir)..\..\src\Glance.App\preview;$(ProjectDir)..\..\src\Glance.Contracts\include;$(ProjectDir)..\..\src\Glance.Core\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -30,6 +30,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="input_decision_tests.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\pdf_render_client.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Glance.RenderHost\Glance.RenderHost.vcxproj">
+      <Project>{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.5" />

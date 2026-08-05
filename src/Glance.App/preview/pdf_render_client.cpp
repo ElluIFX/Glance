@@ -21,43 +21,14 @@ namespace
         return std::filesystem::path(path).parent_path();
     }
 
-    bool read_exact(HANDLE handle, void* destination, std::size_t size, DWORD timeout_ms)
+    bool read_exact(HANDLE handle, void* destination, std::size_t size)
     {
         auto* bytes = static_cast<std::byte*>(destination);
         while (size != 0)
         {
-            OVERLAPPED operation{};
-            operation.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-            if (operation.hEvent == nullptr)
-            {
-                return false;
-            }
             DWORD read{};
             const DWORD request = static_cast<DWORD>(std::min<std::size_t>(size, MAXDWORD));
-            const BOOL started = ReadFile(handle, bytes, request, &read, &operation);
-            if (!started && GetLastError() == ERROR_IO_PENDING)
-            {
-                const DWORD wait_result = WaitForSingleObject(operation.hEvent, timeout_ms);
-                if (wait_result == WAIT_OBJECT_0)
-                {
-                    if (!GetOverlappedResult(handle, &operation, &read, FALSE))
-                    {
-                        read = 0;
-                    }
-                }
-                else
-                {
-                    CancelIoEx(handle, &operation);
-                    WaitForSingleObject(operation.hEvent, INFINITE);
-                    read = 0;
-                }
-            }
-            else if (!started)
-            {
-                read = 0;
-            }
-            CloseHandle(operation.hEvent);
-            if (read == 0)
+            if (!ReadFile(handle, bytes, request, &read, nullptr) || read == 0)
             {
                 return false;
             }
@@ -67,43 +38,14 @@ namespace
         return true;
     }
 
-    bool write_exact(HANDLE handle, const void* source, std::size_t size, DWORD timeout_ms)
+    bool write_exact(HANDLE handle, const void* source, std::size_t size)
     {
         const auto* bytes = static_cast<const std::byte*>(source);
         while (size != 0)
         {
-            OVERLAPPED operation{};
-            operation.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-            if (operation.hEvent == nullptr)
-            {
-                return false;
-            }
             DWORD written{};
             const DWORD request = static_cast<DWORD>(std::min<std::size_t>(size, MAXDWORD));
-            const BOOL started = WriteFile(handle, bytes, request, &written, &operation);
-            if (!started && GetLastError() == ERROR_IO_PENDING)
-            {
-                const DWORD wait_result = WaitForSingleObject(operation.hEvent, timeout_ms);
-                if (wait_result == WAIT_OBJECT_0)
-                {
-                    if (!GetOverlappedResult(handle, &operation, &written, FALSE))
-                    {
-                        written = 0;
-                    }
-                }
-                else
-                {
-                    CancelIoEx(handle, &operation);
-                    WaitForSingleObject(operation.hEvent, INFINITE);
-                    written = 0;
-                }
-            }
-            else if (!started)
-            {
-                written = 0;
-            }
-            CloseHandle(operation.hEvent);
-            if (written == 0)
+            if (!WriteFile(handle, bytes, request, &written, nullptr) || written == 0)
             {
                 return false;
             }
@@ -112,6 +54,73 @@ namespace
         }
         return true;
     }
+
+    class RenderTransactionTimeout final
+    {
+    public:
+        RenderTransactionTimeout() = default;
+
+        ~RenderTransactionTimeout()
+        {
+            if (timer_ != nullptr)
+            {
+                SetThreadpoolTimer(timer_, nullptr, 0, 0);
+                WaitForThreadpoolTimerCallbacks(timer_, TRUE);
+                CloseThreadpoolTimer(timer_);
+            }
+            if (process_ != nullptr)
+            {
+                CloseHandle(process_);
+            }
+        }
+
+        RenderTransactionTimeout(const RenderTransactionTimeout&) = delete;
+        RenderTransactionTimeout& operator=(const RenderTransactionTimeout&) = delete;
+
+        [[nodiscard]] bool start(HANDLE process, DWORD timeout_ms) noexcept
+        {
+            if (process == nullptr ||
+                !DuplicateHandle(
+                    GetCurrentProcess(),
+                    process,
+                    GetCurrentProcess(),
+                    &process_,
+                    0,
+                    FALSE,
+                    DUPLICATE_SAME_ACCESS))
+            {
+                return false;
+            }
+            timer_ = CreateThreadpoolTimer(timeout_callback, this, nullptr);
+            if (timer_ == nullptr)
+            {
+                CloseHandle(process_);
+                process_ = nullptr;
+                return false;
+            }
+
+            LARGE_INTEGER due_time{};
+            due_time.QuadPart = -static_cast<LONGLONG>(timeout_ms) * 10000LL;
+            FILETIME due_file_time{
+                due_time.LowPart,
+                static_cast<DWORD>(due_time.HighPart) };
+            SetThreadpoolTimer(timer_, &due_file_time, 0, 0);
+            return true;
+        }
+
+    private:
+        static void CALLBACK timeout_callback(
+            PTP_CALLBACK_INSTANCE,
+            void* context,
+            PTP_TIMER) noexcept
+        {
+            const auto timeout = static_cast<RenderTransactionTimeout*>(context);
+            static_cast<void>(TerminateProcess(timeout->process_, ERROR_TIMEOUT));
+        }
+
+        HANDLE process_{};
+        PTP_TIMER timer_{};
+    };
 
     template <typename T>
     void append_value(std::vector<std::byte>& output, const T& value)
@@ -375,18 +384,24 @@ namespace glance::app
             return false;
         }
         constexpr DWORD transact_timeout_ms = 30000;
+        RenderTransactionTimeout timeout;
+        if (!timeout.start(process_, transact_timeout_ms))
+        {
+            close_locked();
+            return false;
+        }
         const RequestHeader header{
             .command = command,
             .payload_size = static_cast<std::uint32_t>(request.size()),
         };
-        if (!write_exact(request_pipe_, &header, sizeof(header), transact_timeout_ms) ||
-            (!request.empty() && !write_exact(request_pipe_, request.data(), request.size(), transact_timeout_ms)))
+        if (!write_exact(request_pipe_, &header, sizeof(header)) ||
+            (!request.empty() && !write_exact(request_pipe_, request.data(), request.size())))
         {
             close_locked();
             return false;
         }
         ResponseHeader response_header{};
-        if (!read_exact(response_pipe_, &response_header, sizeof(response_header), transact_timeout_ms) ||
+        if (!read_exact(response_pipe_, &response_header, sizeof(response_header)) ||
             response_header.magic != protocol_magic ||
             response_header.version != protocol_version ||
             response_header.payload_size > maximum_payload_size)
@@ -396,7 +411,7 @@ namespace glance::app
         }
         response.resize(response_header.payload_size);
         if (!response.empty() &&
-            !read_exact(response_pipe_, response.data(), response.size(), transact_timeout_ms))
+            !read_exact(response_pipe_, response.data(), response.size()))
         {
             close_locked();
             return false;

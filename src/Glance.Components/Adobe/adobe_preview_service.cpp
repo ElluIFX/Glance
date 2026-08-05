@@ -724,7 +724,7 @@ namespace
                 active_processes.insert(process.hProcess);
             }
 
-            const HANDLE process_job = CreateJobObjectW(nullptr, nullptr);
+            HANDLE process_job = CreateJobObjectW(nullptr, nullptr);
             if (process_job != nullptr)
             {
                 JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
@@ -737,6 +737,7 @@ namespace
                     !AssignProcessToJobObject(process_job, process.hProcess))
                 {
                     CloseHandle(process_job);
+                    process_job = nullptr;
                 }
             }
 

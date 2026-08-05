@@ -572,7 +572,9 @@ namespace glance::core
     void CoreApplication::terminate_unresponsive_app()
     {
         glance::contracts::log_event(
-            L"UI health check failed five consecutive times; terminating it for recovery.");
+            L"UI health check failed " +
+            std::to_wstring(glance::contracts::process_watchdog_failure_limit) +
+            L" consecutive times; terminating it for recovery.");
         input_state_.ui_connected.store(false, std::memory_order_release);
         preview_state_.store(
             glance::contracts::PreviewWindowState::hidden,
