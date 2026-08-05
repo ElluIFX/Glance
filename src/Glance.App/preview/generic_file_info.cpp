@@ -174,7 +174,9 @@ namespace
         if (GetNamedSecurityInfoW(
                 owned_path.data(),
                 SE_FILE_OBJECT,
-                DACL_SECURITY_INFORMATION,
+                OWNER_SECURITY_INFORMATION |
+                    GROUP_SECURITY_INFORMATION |
+                    DACL_SECURITY_INFORMATION,
                 nullptr,
                 nullptr,
                 nullptr,
@@ -348,22 +350,7 @@ namespace glance::app
     {
         try
         {
-            PSECURITY_DESCRIPTOR descriptor{};
-            const std::wstring owned_path(path);
-            if (GetNamedSecurityInfoW(
-                    owned_path.data(),
-                    SE_FILE_OBJECT,
-                    DACL_SECURITY_INFORMATION,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    &descriptor) != ERROR_SUCCESS)
-            {
-                return std::nullopt;
-            }
-            const auto rights = access_check_rights(descriptor);
-            LocalFree(descriptor);
+            const auto rights = path_rights(path);
             if (!rights.has_value())
             {
                 return std::nullopt;
