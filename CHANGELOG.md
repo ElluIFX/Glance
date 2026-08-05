@@ -4,6 +4,18 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.06.1] - 2026-08-06
+
+### Added
+
+- Added a built-in updater with streamed downloads, progress reporting, cancellation, SHA-256 verification, and silent installation.
+
+### Changed
+
+- Installer upgrades preserve the previously selected optional components and select newly introduced components by default.
+- Installed builds prioritize direct updates, while portable builds prioritize the Release page and retain direct installation as an option.
+- Successful automatic updates restart Glance under the original user account.
+
 ## [2026.08.06] - 2026-08-06
 
 ### Added
@@ -149,6 +161,8 @@ The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 - Improved preview switching, pinned-window lifecycle, adaptive sizing, image rotation, large-text rendering, and archive enumeration stability.
 - Prevented stalled Shell selection queries and expensive directory rendering from taking down the preview workflow.
 
+[2026.08.06.1]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.06.1
+[2026.08.06]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.06
 [2026.07.27]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.27
 [2026.07.25.1]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.25.1
 [2026.07.25]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.25
