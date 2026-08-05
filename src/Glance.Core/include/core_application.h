@@ -42,6 +42,8 @@ namespace glance::core
         static constexpr UINT selection_interval_ms = 25;
         static constexpr UINT selection_stale_after_ms = 500;
         static constexpr UINT selection_worker_stall_after_ms = 1000;
+        static constexpr UINT selection_worker_max_restarts = 5;
+        static constexpr UINT selection_worker_cooldown_ms = 30000;
         static constexpr UINT hook_refresh_interval_ms = 1000;
         static constexpr UINT app_watchdog_interval_ms =
             glance::contracts::process_watchdog_interval_ms;
@@ -95,6 +97,8 @@ namespace glance::core
         std::shared_ptr<SelectionWorkerContext> selection_worker_context_;
         std::thread selection_worker_;
         std::uint64_t selection_worker_last_restart_ms_{};
+        std::uint64_t selection_worker_cooldown_until_ms_{};
+        std::uint32_t selection_worker_consecutive_stalls_{};
         std::uint64_t selection_generation_{};
         PipeServer pipe_server_;
         KeyboardHookService* keyboard_hook_{};

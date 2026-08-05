@@ -22,10 +22,31 @@ namespace
 {
     constexpr DWORD conversion_timeout_ms = 120000;
     constexpr DWORD cooperative_cancel_timeout_ms = 6000;
-    constexpr auto shutdown_wait = std::chrono::seconds(7);
+    constexpr auto shutdown_wait = std::chrono::milliseconds(
+        conversion_timeout_ms + cooperative_cancel_timeout_ms + 20000);
     constexpr std::size_t copy_buffer_size = 1024U * 1024U;
+    constexpr std::uint64_t maximum_cache_size = 1ULL * 1024ULL * 1024ULL * 1024ULL;
+    constexpr auto maximum_cache_age = std::chrono::hours(24 * 30);
 
     std::atomic_uint64_t temporary_sequence{};
+    std::atomic_uint32_t active_prepares{};
+
+    class PrepareCountGuard final
+    {
+    public:
+        PrepareCountGuard() noexcept
+        {
+            active_prepares.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        ~PrepareCountGuard() noexcept
+        {
+            active_prepares.fetch_sub(1, std::memory_order_relaxed);
+        }
+
+        PrepareCountGuard(const PrepareCountGuard&) = delete;
+        PrepareCountGuard& operator=(const PrepareCountGuard&) = delete;
+    };
 
     class UniqueHandle final
     {
@@ -374,6 +395,79 @@ namespace
         return error ? std::filesystem::path{} : root;
     }
 
+    void prune_cache() noexcept
+    {
+        try
+        {
+            const auto root = cache_root();
+            if (root.empty())
+            {
+                return;
+            }
+            struct Entry
+            {
+                std::filesystem::path path;
+                std::uint64_t size{};
+                std::filesystem::file_time_type write_time;
+            };
+            std::vector<Entry> entries;
+            std::uint64_t total_size{};
+            const auto expired_before =
+                std::filesystem::file_time_type::clock::now() - maximum_cache_age;
+            std::error_code error;
+            for (std::filesystem::directory_iterator iterator(root, error), end;
+                 !error && iterator != end;
+                 iterator.increment(error))
+            {
+                const auto filename = iterator->path().filename().wstring();
+                if (std::wstring_view(filename).starts_with(L"staging-") ||
+                    std::wstring_view(filename).starts_with(L"output-"))
+                {
+                    std::filesystem::remove(iterator->path(), error);
+                    error.clear();
+                    continue;
+                }
+                if (iterator->path().extension().wstring() != L".pdf" ||
+                    !iterator->is_regular_file(error))
+                {
+                    error.clear();
+                    continue;
+                }
+                const auto write_time = iterator->last_write_time(error);
+                const auto size = iterator->file_size(error);
+                if (error)
+                {
+                    error.clear();
+                    continue;
+                }
+                if (write_time < expired_before)
+                {
+                    std::filesystem::remove(iterator->path(), error);
+                    error.clear();
+                    continue;
+                }
+                entries.push_back({ iterator->path(), size, write_time });
+                total_size += size;
+            }
+            std::ranges::sort(entries, {}, &Entry::write_time);
+            for (const auto& entry : entries)
+            {
+                if (total_size <= maximum_cache_size)
+                {
+                    break;
+                }
+                if (std::filesystem::remove(entry.path, error))
+                {
+                    total_size -= entry.size;
+                }
+                error.clear();
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
     bool valid_pdf(const std::filesystem::path& path)
     {
         UniqueHandle file(CreateFileW(
@@ -715,6 +809,7 @@ namespace
     public:
         glance::app::OfficePdfResult prepare(const std::wstring& source_path)
         {
+            PrepareCountGuard guard;
             auto source = open_source_file(source_path);
             if (!source.handle)
             {
@@ -839,6 +934,12 @@ namespace
             {
                 job->wait_until_complete();
             }
+            const auto deadline = std::chrono::steady_clock::now() + shutdown_wait;
+            while (active_prepares.load(std::memory_order_acquire) != 0 &&
+                   std::chrono::steady_clock::now() < deadline)
+            {
+                Sleep(50);
+            }
         }
 
     private:
@@ -859,6 +960,11 @@ namespace glance::app
     OfficePdfResult prepare_office_pdf(const std::wstring& source_path)
     {
         return service().prepare(source_path);
+    }
+
+    void prune_office_pdf_cache() noexcept
+    {
+        prune_cache();
     }
 
     void shutdown_office_pdf_service() noexcept

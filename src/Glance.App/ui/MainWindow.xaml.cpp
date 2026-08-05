@@ -780,8 +780,9 @@ namespace winrt::Glance::App::implementation
             PinButton().IsChecked(false);
             update_window_action_visibility();
         }
+        const auto current_kind = glance::app::resolve_preview_kind(files_[current_index_].path);
         defer_auto_fit_show_ = (new_session || replace_deferred_session) &&
-            should_defer_auto_fit_show();
+            should_defer_auto_fit_show(current_kind);
         visible_ = true;
 
         FileList().Items().Clear();
@@ -795,7 +796,7 @@ namespace winrt::Glance::App::implementation
         }
         update_preview_navigation_ui();
 
-        present_file(current_index_);
+        present_file(current_index_, current_kind);
         if (!topmost_ && (new_session || !user_sized_))
         {
             position_initial_window();
@@ -1196,7 +1197,7 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    bool MainWindow::should_defer_auto_fit_show() const noexcept
+    bool MainWindow::should_defer_auto_fit_show(glance::app::PreviewKind kind) const noexcept
     {
         if (current_index_ >= files_.size())
         {
@@ -1216,7 +1217,6 @@ namespace winrt::Glance::App::implementation
             return false;
         }
 
-        const auto kind = glance::app::resolve_preview_kind(file.path);
         return kind == glance::app::PreviewKind::image ||
             kind == glance::app::PreviewKind::pdf ||
             (kind == glance::app::PreviewKind::media && !is_audio_path(file.path));
@@ -1445,7 +1445,9 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void MainWindow::present_file(std::uint32_t index)
+    void MainWindow::present_file(
+        std::uint32_t index,
+        std::optional<glance::app::PreviewKind> known_kind)
     {
         if (index >= files_.size())
         {
@@ -1529,7 +1531,9 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
-        const auto kind = glance::app::resolve_preview_kind(file.path);
+        const auto kind = known_kind
+            ? *known_kind
+            : glance::app::resolve_preview_kind(file.path);
         if (kind == glance::app::PreviewKind::component)
         {
             present_generic(file, false, false);
@@ -1970,13 +1974,14 @@ namespace winrt::Glance::App::implementation
         const auto lifetime = get_strong();
         try
         {
-            const auto file = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
-            const auto source = Windows::Media::Core::MediaSource::CreateFromStorageFile(file);
-            const Windows::Media::Playback::MediaPlaybackItem playback_item(source);
-            if (generation != content_generation_)
-            {
-                co_return;
-            }
+        const auto file = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
+        const auto source = Windows::Media::Core::MediaSource::CreateFromStorageFile(file);
+        const Windows::Media::Playback::MediaPlaybackItem playback_item(source);
+        if (generation != content_generation_ ||
+            state_ == glance::contracts::PreviewWindowState::closed)
+        {
+            co_return;
+        }
 
             media_is_audio_ = is_audio_path(path);
             AudioMetadataPanel().Visibility(media_is_audio_ ? Visibility::Visible : Visibility::Collapsed);
@@ -2017,7 +2022,8 @@ namespace winrt::Glance::App::implementation
                 try
                 {
                     const auto properties = co_await file.Properties().GetMusicPropertiesAsync();
-                    if (generation != content_generation_)
+                    if (generation != content_generation_ ||
+                        state_ == glance::contracts::PreviewWindowState::closed)
                     {
                         co_return;
                     }
@@ -2036,7 +2042,9 @@ namespace winrt::Glance::App::implementation
                     const auto thumbnail = co_await file.GetThumbnailAsync(
                         Windows::Storage::FileProperties::ThumbnailMode::MusicView,
                         320);
-                    if (generation == content_generation_ && thumbnail != nullptr && thumbnail.Size() > 0)
+                    if (generation == content_generation_ &&
+                        state_ != glance::contracts::PreviewWindowState::closed &&
+                        thumbnail != nullptr && thumbnail.Size() > 0)
                     {
                         Microsoft::UI::Xaml::Media::Imaging::BitmapImage bitmap;
                         co_await bitmap.SetSourceAsync(thumbnail);
@@ -2058,7 +2066,9 @@ namespace winrt::Glance::App::implementation
                 try
                 {
                     const auto properties = co_await file.Properties().GetVideoPropertiesAsync();
-                    if (generation != content_generation_ || current_index_ >= files_.size())
+                    if (generation != content_generation_ ||
+                        current_index_ >= files_.size() ||
+                        state_ == glance::contracts::PreviewWindowState::closed)
                     {
                         co_return;
                     }
@@ -2076,8 +2086,11 @@ namespace winrt::Glance::App::implementation
         }
         catch (const hresult_error& error)
         {
-            const auto message = glance::app::localize_format(L"MediaOpenError", { error.message() });
-            lifetime->show_provider_error(message, generation);
+            if (state_ != glance::contracts::PreviewWindowState::closed)
+            {
+                const auto message = glance::app::localize_format(L"MediaOpenError", { error.message() });
+                lifetime->show_provider_error(message, generation);
+            }
         }
     }
 

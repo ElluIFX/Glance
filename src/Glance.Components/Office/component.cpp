@@ -59,6 +59,7 @@ namespace
         }
 
         glance::app::initialize_office_availability();
+        glance::app::prune_office_pdf_cache();
         for (const auto* extension : office_extensions)
         {
             if (!registrar->register_extension(registrar->context, extension))

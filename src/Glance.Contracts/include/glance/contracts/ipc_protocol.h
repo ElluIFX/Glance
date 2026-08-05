@@ -9,8 +9,9 @@ namespace glance::contracts
     inline constexpr std::uint32_t frame_magic = 0x434E4C47;
     inline constexpr std::uint16_t protocol_version = 1;
     inline constexpr std::uint32_t maximum_payload_size = 1024U * 1024U;
-    inline constexpr std::uint32_t process_watchdog_interval_ms = 1000;
-    inline constexpr std::uint32_t process_watchdog_failure_limit = 5;
+    inline constexpr std::uint32_t process_watchdog_interval_ms = 500;
+    inline constexpr std::uint32_t process_watchdog_failure_limit = 4;
+    inline constexpr std::uint32_t process_watchdog_connect_grace_ms = 15000;
     inline constexpr wchar_t pipe_name[] = LR"(\\.\pipe\Glance.Core.v1)";
 
     enum class MessageType : std::uint16_t
@@ -22,11 +23,21 @@ namespace glance::contracts
         open_active_preview = 10,
         close_active_preview = 11,
         preview_state_changed = 12,
-        detach_preview = 13,
         preview_input = 14,
         shutdown = 20,
         terminate_unresponsive = 21,
     };
+
+    // Heartbeat acknowledgements arrive on the pipe thread while the watchdog
+    // checks on its own tick. A delayed acknowledgement may lag one round
+    // behind the pending sequence; only an older acknowledgement (lag >= 2
+    // rounds) or a stalled peer must count as a failure.
+    [[nodiscard]] constexpr bool heartbeat_acknowledged(
+        std::uint32_t pending_sequence,
+        std::uint32_t acknowledged_sequence) noexcept
+    {
+        return pending_sequence - acknowledged_sequence <= 1U;
+    }
 
     enum class PreviewInputAction : std::uint32_t
     {

@@ -21,14 +21,43 @@ namespace
         return std::filesystem::path(path).parent_path();
     }
 
-    bool read_exact(HANDLE handle, void* destination, std::size_t size)
+    bool read_exact(HANDLE handle, void* destination, std::size_t size, DWORD timeout_ms)
     {
         auto* bytes = static_cast<std::byte*>(destination);
         while (size != 0)
         {
+            OVERLAPPED operation{};
+            operation.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            if (operation.hEvent == nullptr)
+            {
+                return false;
+            }
             DWORD read{};
             const DWORD request = static_cast<DWORD>(std::min<std::size_t>(size, MAXDWORD));
-            if (!ReadFile(handle, bytes, request, &read, nullptr) || read == 0)
+            const BOOL started = ReadFile(handle, bytes, request, &read, &operation);
+            if (!started && GetLastError() == ERROR_IO_PENDING)
+            {
+                const DWORD wait_result = WaitForSingleObject(operation.hEvent, timeout_ms);
+                if (wait_result == WAIT_OBJECT_0)
+                {
+                    if (!GetOverlappedResult(handle, &operation, &read, FALSE))
+                    {
+                        read = 0;
+                    }
+                }
+                else
+                {
+                    CancelIoEx(handle, &operation);
+                    WaitForSingleObject(operation.hEvent, INFINITE);
+                    read = 0;
+                }
+            }
+            else if (!started)
+            {
+                read = 0;
+            }
+            CloseHandle(operation.hEvent);
+            if (read == 0)
             {
                 return false;
             }
@@ -38,14 +67,43 @@ namespace
         return true;
     }
 
-    bool write_exact(HANDLE handle, const void* source, std::size_t size)
+    bool write_exact(HANDLE handle, const void* source, std::size_t size, DWORD timeout_ms)
     {
         const auto* bytes = static_cast<const std::byte*>(source);
         while (size != 0)
         {
+            OVERLAPPED operation{};
+            operation.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            if (operation.hEvent == nullptr)
+            {
+                return false;
+            }
             DWORD written{};
             const DWORD request = static_cast<DWORD>(std::min<std::size_t>(size, MAXDWORD));
-            if (!WriteFile(handle, bytes, request, &written, nullptr) || written == 0)
+            const BOOL started = WriteFile(handle, bytes, request, &written, &operation);
+            if (!started && GetLastError() == ERROR_IO_PENDING)
+            {
+                const DWORD wait_result = WaitForSingleObject(operation.hEvent, timeout_ms);
+                if (wait_result == WAIT_OBJECT_0)
+                {
+                    if (!GetOverlappedResult(handle, &operation, &written, FALSE))
+                    {
+                        written = 0;
+                    }
+                }
+                else
+                {
+                    CancelIoEx(handle, &operation);
+                    WaitForSingleObject(operation.hEvent, INFINITE);
+                    written = 0;
+                }
+            }
+            else if (!started)
+            {
+                written = 0;
+            }
+            CloseHandle(operation.hEvent);
+            if (written == 0)
             {
                 return false;
             }
@@ -316,26 +374,31 @@ namespace glance::app
             status = Status::dependency_missing;
             return false;
         }
+        constexpr DWORD transact_timeout_ms = 30000;
         const RequestHeader header{
             .command = command,
             .payload_size = static_cast<std::uint32_t>(request.size()),
         };
-        if (!write_exact(request_pipe_, &header, sizeof(header)) ||
-            (!request.empty() && !write_exact(request_pipe_, request.data(), request.size())))
+        if (!write_exact(request_pipe_, &header, sizeof(header), transact_timeout_ms) ||
+            (!request.empty() && !write_exact(request_pipe_, request.data(), request.size(), transact_timeout_ms)))
         {
+            close_locked();
             return false;
         }
         ResponseHeader response_header{};
-        if (!read_exact(response_pipe_, &response_header, sizeof(response_header)) ||
+        if (!read_exact(response_pipe_, &response_header, sizeof(response_header), transact_timeout_ms) ||
             response_header.magic != protocol_magic ||
             response_header.version != protocol_version ||
             response_header.payload_size > maximum_payload_size)
         {
+            close_locked();
             return false;
         }
         response.resize(response_header.payload_size);
-        if (!response.empty() && !read_exact(response_pipe_, response.data(), response.size()))
+        if (!response.empty() &&
+            !read_exact(response_pipe_, response.data(), response.size(), transact_timeout_ms))
         {
+            close_locked();
             return false;
         }
         status = response_header.status;

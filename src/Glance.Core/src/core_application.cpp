@@ -488,7 +488,8 @@ namespace glance::core
 
         if (pending_heartbeat_ != 0)
         {
-            if (last_heartbeat_ack_.load(std::memory_order_acquire) == pending_heartbeat_)
+            const auto acknowledged = last_heartbeat_ack_.load(std::memory_order_acquire);
+            if (glance::contracts::heartbeat_acknowledged(pending_heartbeat_, acknowledged))
             {
                 missed_heartbeats_ = 0;
             }
@@ -551,7 +552,8 @@ namespace glance::core
         {
             app_token_ = std::move(token);
         }
-        app_connection_grace_until_ms_ = GetTickCount64() + 5000;
+        app_connection_grace_until_ms_ =
+            GetTickCount64() + glance::contracts::process_watchdog_connect_grace_ms;
     }
 
     void CoreApplication::close_app_process() noexcept
@@ -669,7 +671,8 @@ namespace glance::core
         {
             app_token_.reset(duplicate_primary_token(process.hProcess));
         }
-        app_connection_grace_until_ms_ = now + 5000;
+        app_connection_grace_until_ms_ =
+            GetTickCount64() + glance::contracts::process_watchdog_connect_grace_ms;
         reset_app_health();
         glance::contracts::log_event(L"UI process recovery launch requested.");
         return true;
@@ -847,10 +850,25 @@ namespace glance::core
             progress_ms != 0 &&
             now - progress_ms <= selection_worker_stall_after_ms)
         {
+            selection_worker_consecutive_stalls_ = 0;
             return;
         }
         if (now - selection_worker_last_restart_ms_ <= selection_worker_stall_after_ms)
         {
+            return;
+        }
+        if (now < selection_worker_cooldown_until_ms_)
+        {
+            return;
+        }
+        if (++selection_worker_consecutive_stalls_ >= selection_worker_max_restarts)
+        {
+            selection_worker_cooldown_until_ms_ =
+                now + selection_worker_cooldown_ms;
+            selection_worker_consecutive_stalls_ = 0;
+            glance::contracts::log_event(
+                L"Selection worker stalled repeatedly; pausing restart for " +
+                std::to_wstring(selection_worker_cooldown_ms) + L" ms.");
             return;
         }
 
@@ -1077,7 +1095,15 @@ namespace glance::core
         }
         if (type == glance::contracts::MessageType::heartbeat_ack)
         {
-            last_heartbeat_ack_.store(flags, std::memory_order_release);
+            auto acknowledged = last_heartbeat_ack_.load(std::memory_order_relaxed);
+            while (flags > acknowledged &&
+                   !last_heartbeat_ack_.compare_exchange_weak(
+                       acknowledged,
+                       flags,
+                       std::memory_order_release,
+                       std::memory_order_relaxed))
+            {
+            }
             return;
         }
         if (type == glance::contracts::MessageType::heartbeat)
@@ -1135,10 +1161,21 @@ namespace glance::core
         const glance::contracts::SelectionSnapshot& selection) const
     {
         using namespace winrt::Windows::Data::Json;
+        constexpr std::size_t maximum_payload_files = 512;
         JsonObject root;
         JsonArray files;
-        for (const auto& item : selection.items)
+        const auto file_count = std::min<std::size_t>(
+            selection.items.size(),
+            maximum_payload_files);
+        if (selection.items.size() > file_count)
         {
+            glance::contracts::log_event(
+                L"Truncating a large selection to the first " +
+                std::to_wstring(file_count) + L" files for the preview payload.");
+        }
+        for (std::size_t index = 0; index < file_count; ++index)
+        {
+            const auto& item = selection.items[index];
             JsonObject file;
             file.SetNamedValue(L"displayName", JsonValue::CreateStringValue(item.display_name));
             file.SetNamedValue(L"path", JsonValue::CreateStringValue(item.filesystem_path));

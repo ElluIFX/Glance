@@ -1,5 +1,6 @@
 #include "input_decision.h"
 #include "glance/contracts/component_api.h"
+#include "glance/contracts/ipc_protocol.h"
 #include "media_preview_preferences.h"
 #include "pan_interaction.h"
 #include "text_font_fallback.h"
@@ -116,6 +117,22 @@ int main()
     expect(!should_capture_key(VK_ESCAPE, true, false, true, false, false), "inactive Escape");
     expect(!should_capture_key(VK_ESCAPE, true, true, false, false, true), "modified Escape");
     expect(!should_capture_key('A', true, true, true, false, false), "unrelated key");
+
+    using glance::contracts::heartbeat_acknowledged;
+    expect(heartbeat_acknowledged(1, 1), "heartbeat ack matches pending");
+    expect(heartbeat_acknowledged(2, 1), "heartbeat ack may lag one round");
+    expect(heartbeat_acknowledged(1, 0), "heartbeat ack may cover the previous round");
+    expect(heartbeat_acknowledged(10, 10), "heartbeat ack equals pending");
+    expect(!heartbeat_acknowledged(10, 8), "heartbeat ack lagging two rounds fails");
+    expect(!heartbeat_acknowledged(5, 0), "heartbeat without any ack fails");
+    expect(!heartbeat_acknowledged(100, 98), "heartbeat ack two rounds behind fails");
+    expect(
+        glance::contracts::process_watchdog_interval_ms == 500 &&
+            glance::contracts::process_watchdog_failure_limit == 4,
+        "watchdog detects a stalled peer within two seconds");
+    expect(
+        glance::contracts::process_watchdog_connect_grace_ms >= 10000,
+        "watchdog keeps a long connection grace for slow startup");
 
     expect(!glance::app::zoom_allows_pan(1.0F), "fit zoom does not pan");
     expect(!glance::app::zoom_allows_pan(1.001F), "zoom tolerance does not pan");

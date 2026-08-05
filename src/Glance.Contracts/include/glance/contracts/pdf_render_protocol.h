@@ -9,6 +9,7 @@ namespace glance::contracts::pdf
     inline constexpr std::uint32_t maximum_payload_size = 8U * 1024U * 1024U;
     inline constexpr std::uint32_t shared_bitmap_size = 256U * 1024U * 1024U;
     inline constexpr std::uint32_t maximum_bitmap_dimension = 8192U;
+    inline constexpr std::uint64_t maximum_document_size = 512ULL * 1024ULL * 1024ULL;
 
     enum class Command : std::uint32_t
     {

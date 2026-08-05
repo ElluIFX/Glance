@@ -74,6 +74,7 @@ namespace
     };
 
     std::atomic_bool shutting_down{};
+    std::atomic_uint32_t active_prepares{};
     std::mutex lease_mutex;
     std::unordered_map<std::uint64_t, LeaseRecord> leases;
     std::atomic_uint64_t next_lease{ 1 };
@@ -82,6 +83,23 @@ namespace
     std::mutex jobs_mutex;
     std::unordered_map<std::wstring, std::shared_ptr<RefinementJob>> jobs;
     std::atomic_uint64_t temporary_sequence{};
+
+    class PrepareCountGuard final
+    {
+    public:
+        PrepareCountGuard() noexcept
+        {
+            active_prepares.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        ~PrepareCountGuard() noexcept
+        {
+            active_prepares.fetch_sub(1, std::memory_order_relaxed);
+        }
+
+        PrepareCountGuard(const PrepareCountGuard&) = delete;
+        PrepareCountGuard& operator=(const PrepareCountGuard&) = delete;
+    };
 
     std::uint16_t read_be16(const std::array<unsigned char, 2>& bytes) noexcept
     {
@@ -546,9 +564,18 @@ namespace
                  !error && iterator != end;
                  iterator.increment(error))
             {
+                const auto filename = iterator->path().filename().wstring();
+                if (std::wstring_view(filename).starts_with(L"staging-") ||
+                    std::wstring_view(filename).starts_with(L"output-"))
+                {
+                    std::filesystem::remove(iterator->path(), error);
+                    error.clear();
+                    continue;
+                }
                 if (!iterator->is_regular_file(error) ||
                     _wcsicmp(iterator->path().extension().c_str(), L".png") != 0)
                 {
+                    error.clear();
                     continue;
                 }
                 const auto write_time = iterator->last_write_time(error);
@@ -697,6 +724,22 @@ namespace
                 active_processes.insert(process.hProcess);
             }
 
+            const HANDLE process_job = CreateJobObjectW(nullptr, nullptr);
+            if (process_job != nullptr)
+            {
+                JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+                limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                if (!SetInformationJobObject(
+                        process_job,
+                        JobObjectExtendedLimitInformation,
+                        &limits,
+                        sizeof(limits)) ||
+                    !AssignProcessToJobObject(process_job, process.hProcess))
+                {
+                    CloseHandle(process_job);
+                }
+            }
+
             DWORD wait_result{};
             do
             {
@@ -706,6 +749,10 @@ namespace
             {
                 TerminateProcess(process.hProcess, ERROR_CANCELLED);
                 WaitForSingleObject(process.hProcess, 5000);
+            }
+            if (process_job != nullptr)
+            {
+                CloseHandle(process_job);
             }
 
             DWORD exit_code = ERROR_GEN_FAILURE;
@@ -901,6 +948,21 @@ namespace glance::components::adobe
     void initialize() noexcept
     {
         shutting_down.store(false);
+        const auto current_pid = std::to_wstring(GetCurrentProcessId());
+        const auto lease_root =
+            std::filesystem::temp_directory_path() / L"Glance" / L"AdobePreview";
+        std::error_code error;
+        for (std::filesystem::directory_iterator iterator(lease_root, error), end;
+             !error && iterator != end;
+             iterator.increment(error))
+        {
+            if (iterator->is_directory(error) &&
+                iterator->path().filename().wstring() != current_pid)
+            {
+                std::filesystem::remove_all(iterator->path(), error);
+            }
+            error.clear();
+        }
         prune_cache();
     }
 
@@ -937,6 +999,7 @@ namespace glance::components::adobe
         const std::filesystem::path& path,
         std::uint32_t maximum_dimension) noexcept
     {
+        PrepareCountGuard guard;
         try
         {
             maximum_dimension = normalize_dimension(maximum_dimension);
@@ -1036,6 +1099,7 @@ namespace glance::components::adobe
         std::uint64_t lease_token,
         std::uint32_t maximum_dimension) noexcept
     {
+        PrepareCountGuard guard;
         try
         {
             RefinementContext context;
@@ -1099,6 +1163,12 @@ namespace glance::components::adobe
             {
                 TerminateProcess(process, ERROR_CANCELLED);
             }
+        }
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        while (active_prepares.load(std::memory_order_acquire) != 0 &&
+               std::chrono::steady_clock::now() < deadline)
+        {
+            Sleep(50);
         }
         std::vector<std::filesystem::path> directories;
         {

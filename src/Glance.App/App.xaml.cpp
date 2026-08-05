@@ -16,8 +16,11 @@
 #include <microsoft.ui.xaml.window.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
+#include <optional>
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
@@ -431,7 +434,8 @@ namespace winrt::Glance::App::implementation
             {
                 core_process_ = execute.hProcess;
                 core_process_id_ = GetProcessId(execute.hProcess);
-                core_connection_grace_until_ms_ = now + 5000;
+                core_connection_grace_until_ms_ =
+                    now + glance::contracts::process_watchdog_connect_grace_ms;
             }
             return;
         }
@@ -442,7 +446,8 @@ namespace winrt::Glance::App::implementation
             glance::contracts::log_event(L"Core process launch requested without elevation.");
             core_process_ = execute.hProcess;
             core_process_id_ = GetProcessId(execute.hProcess);
-            core_connection_grace_until_ms_ = now + 5000;
+            core_connection_grace_until_ms_ =
+                now + glance::contracts::process_watchdog_connect_grace_ms;
         }
     }
 
@@ -505,7 +510,8 @@ namespace winrt::Glance::App::implementation
 
         if (pending_heartbeat_ != 0)
         {
-            if (last_heartbeat_ack_.load(std::memory_order_acquire) == pending_heartbeat_)
+            const auto acknowledged = last_heartbeat_ack_.load(std::memory_order_acquire);
+            if (glance::contracts::heartbeat_acknowledged(pending_heartbeat_, acknowledged))
             {
                 missed_heartbeats_ = 0;
             }
@@ -557,7 +563,8 @@ namespace winrt::Glance::App::implementation
         close_core_process();
         core_process_ = process;
         core_process_id_ = process_id;
-        core_connection_grace_until_ms_ = GetTickCount64() + 5000;
+        core_connection_grace_until_ms_ =
+            GetTickCount64() + glance::contracts::process_watchdog_connect_grace_ms;
     }
 
     void App::close_core_process() noexcept
@@ -733,7 +740,15 @@ namespace winrt::Glance::App::implementation
         }
         if (type == glance::contracts::MessageType::heartbeat_ack)
         {
-            last_heartbeat_ack_.store(flags, std::memory_order_release);
+            auto acknowledged = last_heartbeat_ack_.load(std::memory_order_relaxed);
+            while (flags > acknowledged &&
+                   !last_heartbeat_ack_.compare_exchange_weak(
+                       acknowledged,
+                       flags,
+                       std::memory_order_release,
+                       std::memory_order_relaxed))
+            {
+            }
             return;
         }
         if (shutting_down_.load(std::memory_order_acquire))
@@ -855,6 +870,17 @@ namespace winrt::Glance::App::implementation
         std::uint32_t source_kind{};
         std::uintptr_t source_window{};
 
+        const auto parse_u64 = [](const winrt::hstring& text) {
+            errno = 0;
+            wchar_t* end{};
+            const auto value = std::wcstoull(text.c_str(), &end, 10);
+            if (errno == ERANGE || end == text.c_str() || *end != L'\0')
+            {
+                return std::optional<std::uint64_t>{};
+            }
+            return std::optional<std::uint64_t>{ value };
+        };
+
         try
         {
             const auto root = winrt::Windows::Data::Json::JsonObject::Parse(to_hstring(payload));
@@ -867,9 +893,16 @@ namespace winrt::Glance::App::implementation
                 file.display_name = object.GetNamedString(L"displayName").c_str();
                 file.path = object.GetNamedString(L"path").c_str();
                 file.parsing_name = object.GetNamedString(L"parsingName").c_str();
-                file.size = std::stoull(object.GetNamedString(L"size").c_str());
-                file.creation_time = std::stoull(object.GetNamedString(L"creationTime").c_str());
-                file.last_write_time = std::stoull(object.GetNamedString(L"lastWriteTime").c_str());
+                const auto size = parse_u64(object.GetNamedString(L"size"));
+                const auto creation_time = parse_u64(object.GetNamedString(L"creationTime"));
+                const auto last_write_time = parse_u64(object.GetNamedString(L"lastWriteTime"));
+                if (!size || !creation_time || !last_write_time)
+                {
+                    return;
+                }
+                file.size = *size;
+                file.creation_time = *creation_time;
+                file.last_write_time = *last_write_time;
                 file.attributes = static_cast<std::uint32_t>(object.GetNamedNumber(L"attributes"));
                 file.is_filesystem = object.GetNamedBoolean(L"isFilesystem");
                 file.is_cloud_placeholder = object.GetNamedBoolean(L"isCloudPlaceholder");
@@ -877,9 +910,18 @@ namespace winrt::Glance::App::implementation
             }
             focused_index = static_cast<std::uint32_t>(root.GetNamedNumber(L"focusedIndex"));
             source_kind = static_cast<std::uint32_t>(root.GetNamedNumber(L"sourceKind"));
-            source_window = static_cast<std::uintptr_t>(std::stoull(root.GetNamedString(L"sourceWindow").c_str()));
+            const auto source_window_value = parse_u64(root.GetNamedString(L"sourceWindow"));
+            if (!source_window_value)
+            {
+                return;
+            }
+            source_window = static_cast<std::uintptr_t>(*source_window_value);
         }
         catch (const hresult_error&)
+        {
+            return;
+        }
+        catch (const std::exception&)
         {
             return;
         }

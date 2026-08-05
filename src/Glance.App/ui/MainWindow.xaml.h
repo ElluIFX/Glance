@@ -29,6 +29,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <vector>
 
 namespace winrt::Glance::App::implementation
@@ -177,7 +178,8 @@ namespace winrt::Glance::App::implementation
             DWORD_PTR reference_data) noexcept;
         void configure_window();
         void position_initial_window(bool ignore_saved_size = false);
-        [[nodiscard]] bool should_defer_auto_fit_show() const noexcept;
+        [[nodiscard]] bool should_defer_auto_fit_show(
+            glance::app::PreviewKind kind) const noexcept;
         void show_prepared_window() noexcept;
         void reveal_deferred_preview() noexcept;
         void auto_fit_window_to_content(
@@ -191,7 +193,9 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] const glance::app::ArchiveEntry* selected_folder_entry() noexcept;
         void cancel_pdf_render() noexcept;
         void reset_hidden_window_size() noexcept;
-        void present_file(std::uint32_t index);
+        void present_file(
+            std::uint32_t index,
+            std::optional<glance::app::PreviewKind> known_kind = std::nullopt);
         void present_generic(
             const glance::app::PreviewFile& file,
             bool allow_text_preview = false,

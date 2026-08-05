@@ -20,5 +20,6 @@ namespace glance::app
     };
 
     [[nodiscard]] OfficePdfResult prepare_office_pdf(const std::wstring& source_path);
+    void prune_office_pdf_cache() noexcept;
     void shutdown_office_pdf_service() noexcept;
 }

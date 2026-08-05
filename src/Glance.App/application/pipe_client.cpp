@@ -30,11 +30,10 @@ namespace glance::app
     void PipeClient::stop() noexcept
     {
         stopping_.store(true, std::memory_order_release);
-        const HANDLE pipe = pipe_.exchange(nullptr, std::memory_order_acq_rel);
+        const HANDLE pipe = pipe_.load(std::memory_order_acquire);
         if (pipe != nullptr && pipe != INVALID_HANDLE_VALUE)
         {
             CancelIoEx(pipe, nullptr);
-            CloseHandle(pipe);
         }
         if (thread_.joinable())
         {
@@ -163,6 +162,7 @@ namespace glance::app
     void PipeClient::run() noexcept
     {
         using namespace std::chrono_literals;
+        auto retry_delay = 100ms;
         while (!stopping_.load(std::memory_order_acquire))
         {
             HANDLE pipe = CreateFileW(
@@ -176,18 +176,25 @@ namespace glance::app
             if (pipe == INVALID_HANDLE_VALUE)
             {
                 WaitNamedPipeW(glance::contracts::pipe_name, 500);
-                std::this_thread::sleep_for(100ms);
+                std::this_thread::sleep_for(retry_delay);
+                retry_delay = std::min(retry_delay * 2, 1600ms);
                 continue;
             }
 
             ULONG server_process_id{};
             if (!GetNamedPipeServerProcessId(pipe, &server_process_id))
             {
-                CloseHandle(pipe);
-                std::this_thread::sleep_for(100ms);
+                std::scoped_lock lock(write_mutex_);
+                if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
+                {
+                    CloseHandle(pipe);
+                }
+                std::this_thread::sleep_for(retry_delay);
+                retry_delay = std::min(retry_delay * 2, 1600ms);
                 continue;
             }
 
+            retry_delay = 100ms;
             peer_process_id_.store(server_process_id, std::memory_order_release);
             pipe_.store(pipe, std::memory_order_release);
             connected_.store(true, std::memory_order_release);
@@ -211,9 +218,12 @@ namespace glance::app
 
             connected_.store(false, std::memory_order_release);
             connection_handler_(false);
-            if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
             {
-                CloseHandle(pipe);
+                std::scoped_lock lock(write_mutex_);
+                if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
+                {
+                    CloseHandle(pipe);
+                }
             }
         }
     }

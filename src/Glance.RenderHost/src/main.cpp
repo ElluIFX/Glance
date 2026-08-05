@@ -112,6 +112,10 @@ namespace
         {
             return {};
         }
+        if (static_cast<std::uint64_t>(length) > maximum_document_size)
+        {
+            return {};
+        }
         std::vector<std::byte> bytes(static_cast<std::size_t>(length));
         stream.seekg(0);
         if (!stream.read(reinterpret_cast<char*>(bytes.data()), length))

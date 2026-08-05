@@ -134,12 +134,10 @@ namespace glance::core
     void PipeServer::stop() noexcept
     {
         stopping_.store(true, std::memory_order_release);
-        const HANDLE pipe = pipe_.exchange(nullptr, std::memory_order_acq_rel);
+        const HANDLE pipe = pipe_.load(std::memory_order_acquire);
         if (pipe != nullptr && pipe != INVALID_HANDLE_VALUE)
         {
             CancelIoEx(pipe, nullptr);
-            DisconnectNamedPipe(pipe);
-            CloseHandle(pipe);
         }
         if (thread_.joinable())
         {
@@ -339,9 +337,12 @@ namespace glance::core
             if (!connected || stopping_.load(std::memory_order_acquire) ||
                 !authorize_client(pipe, client_process_id))
             {
-                if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
                 {
-                    CloseHandle(pipe);
+                    std::scoped_lock lock(write_mutex_);
+                    if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
+                    {
+                        CloseHandle(pipe);
+                    }
                 }
                 continue;
             }
@@ -367,10 +368,13 @@ namespace glance::core
 
             connected_.store(false, std::memory_order_release);
             connection_handler_(false);
-            if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
             {
-                DisconnectNamedPipe(pipe);
-                CloseHandle(pipe);
+                std::scoped_lock lock(write_mutex_);
+                if (pipe_.exchange(nullptr, std::memory_order_acq_rel) == pipe)
+                {
+                    DisconnectNamedPipe(pipe);
+                    CloseHandle(pipe);
+                }
             }
         }
 
