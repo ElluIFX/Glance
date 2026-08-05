@@ -593,7 +593,7 @@
                 <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="TextPreviewPageTitle" x:Uid="TextPreviewPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Document preview" />
-                        <TextBlock x:Name="TextPreviewPageDescription" x:Uid="TextPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Plain text document appearance and behavior" />
+                        <TextBlock x:Name="TextPreviewPageDescription" x:Uid="TextPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Document previewer appearance and behavior" />
                     </StackPanel>
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="PlainTextPreviewSectionTitle" x:Uid="PlainTextPreviewSectionTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Plain text preview" />
@@ -693,6 +693,32 @@
                         </StackPanel>
                         </Border>
                     </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="RichDocumentPreviewGroupTitle" x:Uid="RichDocumentPreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Rich document preview" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="RichDocumentRenderResolutionLabel" x:Uid="RichDocumentRenderResolutionLabel" Text="Render resolution" />
+                                    <TextBlock x:Name="RichDocumentRenderResolutionDescription" x:Uid="RichDocumentRenderResolutionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Maximum pixel length of the rendered preview" />
+                                </StackPanel>
+                                <ComboBox
+                                    x:Name="RichDocumentRenderResolutionComboBox"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    SelectionChanged="RichDocumentRenderResolutionComboBox_SelectionChanged">
+                                    <ComboBoxItem x:Name="RichDocumentResolution1024Item" x:Uid="RichDocumentResolution1024Item" Content="1024 px" Tag="1024" />
+                                    <ComboBoxItem x:Name="RichDocumentResolution2048Item" x:Uid="RichDocumentResolution2048Item" Content="2048 px" Tag="2048" />
+                                    <ComboBoxItem x:Name="RichDocumentResolution4096Item" x:Uid="RichDocumentResolution4096Item" Content="4096 px" Tag="4096" />
+                                    <ComboBoxItem x:Name="RichDocumentResolution8192Item" x:Uid="RichDocumentResolution8192Item" Content="8192 px" Tag="8192" />
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
@@ -704,7 +730,7 @@
                 <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="20">
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="MediaPreviewPageTitle" x:Uid="MediaPreviewPageTitle" Style="{StaticResource SettingsPageTitleStyle}" Text="Media preview" />
-                        <TextBlock x:Name="MediaPreviewPageDescription" x:Uid="MediaPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Playback defaults and window behavior" />
+                        <TextBlock x:Name="MediaPreviewPageDescription" x:Uid="MediaPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Appearance and behavior of image, audio, and video previewers" />
                     </StackPanel>
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="AudioVideoPreviewGroupTitle" x:Uid="AudioVideoPreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Audio and video preview" />
@@ -798,32 +824,6 @@
                                     Toggled="MediaPreferenceToggle_Toggled" />
                             </Grid>
                         </StackPanel>
-                        </Border>
-                    </StackPanel>
-                    <StackPanel Spacing="8">
-                        <TextBlock x:Name="RichDocumentPreviewGroupTitle" x:Uid="RichDocumentPreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Rich document preview" />
-                        <Border Style="{StaticResource SettingsGroupStyle}">
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="220" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="RichDocumentRenderResolutionLabel" x:Uid="RichDocumentRenderResolutionLabel" Text="Render resolution" />
-                                    <TextBlock x:Name="RichDocumentRenderResolutionDescription" x:Uid="RichDocumentRenderResolutionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Maximum pixel length of the rendered preview" />
-                                </StackPanel>
-                                <ComboBox
-                                    x:Name="RichDocumentRenderResolutionComboBox"
-                                    Grid.Column="1"
-                                    HorizontalAlignment="Stretch"
-                                    VerticalAlignment="Center"
-                                    SelectionChanged="RichDocumentRenderResolutionComboBox_SelectionChanged">
-                                    <ComboBoxItem x:Name="RichDocumentResolution1024Item" x:Uid="RichDocumentResolution1024Item" Content="1024 px" Tag="1024" />
-                                    <ComboBoxItem x:Name="RichDocumentResolution2048Item" x:Uid="RichDocumentResolution2048Item" Content="2048 px" Tag="2048" />
-                                    <ComboBoxItem x:Name="RichDocumentResolution4096Item" x:Uid="RichDocumentResolution4096Item" Content="4096 px" Tag="4096" />
-                                    <ComboBoxItem x:Name="RichDocumentResolution8192Item" x:Uid="RichDocumentResolution8192Item" Content="8192 px" Tag="8192" />
-                                </ComboBox>
-                            </Grid>
                         </Border>
                     </StackPanel>
                     <StackPanel Spacing="8">

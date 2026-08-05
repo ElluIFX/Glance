@@ -180,7 +180,7 @@
   <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>Window opacity</value></data>
   <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>Set the opacity of all preview windows</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>Media preview</value></data>
-  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Image, audio, video, and rich document preview settings</value></data>
+  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Appearance and behavior of image, audio, and video previewers</value></data>
   <data name="ImagePreviewGroupTitle.Text" xml:space="preserve"><value>Image preview</value></data>
   <data name="ImageZoomMapLabel.Text" xml:space="preserve"><value>Zoom thumbnail</value></data>
   <data name="ImageZoomMapDescription.Text" xml:space="preserve"><value>Show the current viewport while an image is zoomed</value></data>
@@ -203,7 +203,7 @@
   <data name="RichDocumentResolution4096Item.Content" xml:space="preserve"><value>4096 px</value></data>
   <data name="RichDocumentResolution8192Item.Content" xml:space="preserve"><value>8192 px</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Document preview</value></data>
-  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Plain text document appearance and behavior</value></data>
+  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Document previewer appearance and behavior</value></data>
   <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>Plain text preview</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>Font family</value></data>
   <data name="FontFamilyDescription.Text" xml:space="preserve"><value>Font used for plain text and code</value></data>

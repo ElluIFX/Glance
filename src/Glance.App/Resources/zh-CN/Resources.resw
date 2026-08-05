@@ -180,7 +180,7 @@
   <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>窗口不透明度</value></data>
   <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>设置所有预览窗口的不透明度</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>媒体预览</value></data>
-  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>图片、音视频与富文档预览设置</value></data>
+  <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>图片与音视频预览器的外观与行为</value></data>
   <data name="ImagePreviewGroupTitle.Text" xml:space="preserve"><value>图片预览</value></data>
   <data name="ImageZoomMapLabel.Text" xml:space="preserve"><value>缩放缩略图</value></data>
   <data name="ImageZoomMapDescription.Text" xml:space="preserve"><value>图片缩放时显示当前预览区域</value></data>
@@ -203,7 +203,7 @@
   <data name="RichDocumentResolution4096Item.Content" xml:space="preserve"><value>4096 px</value></data>
   <data name="RichDocumentResolution8192Item.Content" xml:space="preserve"><value>8192 px</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文档预览</value></data>
-  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>纯文本文档的外观与行为</value></data>
+  <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>文档预览器的外观与行为</value></data>
   <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>纯文本预览</value></data>
   <data name="FontFamilyLabel.Text" xml:space="preserve"><value>字体</value></data>
   <data name="FontFamilyDescription.Text" xml:space="preserve"><value>纯文本和代码使用的字体</value></data>
