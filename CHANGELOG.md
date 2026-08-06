@@ -4,6 +4,21 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.06.3] - 2026-08-06
+
+### Added
+
+- Added an optional archive preview component for ZIP, 7z, RAR, tar, ISO, and other common archive formats without full extraction.
+
+### Changed
+
+- Moved PDF preview and PDFium into an optional component with dependency-aware Office installation and health reporting.
+- Moved rich-document rendering settings to Document Preview and registered them through the PDF component.
+
+### Fixed
+
+- Restored permission information in the preview footer.
+
 ## [2026.08.06.2] - 2026-08-06
 
 ### Added
@@ -161,6 +176,7 @@ The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 - Improved preview switching, pinned-window lifecycle, adaptive sizing, image rotation, large-text rendering, and archive enumeration stability.
 - Prevented stalled Shell selection queries and expensive directory rendering from taking down the preview workflow.
 
+[2026.08.06.3]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.06.3
 [2026.08.06.2]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.06.2
 [2026.08.06]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.06
 [2026.07.27]: https://github.com/ElluIFX/Glance/releases/tag/v2026.07.27
