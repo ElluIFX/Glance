@@ -24,6 +24,10 @@ IDI_GLANCE_APP ICON "Glance.App\\Assets\\AppIcon.ico"
 #define GLANCE_FILE_DESCRIPTION "Glance PDF Render Host"
 #define GLANCE_INTERNAL_NAME "Glance.PdfHost"
 #define GLANCE_ORIGINAL_FILENAME "Glance.PdfHost.exe"
+#elif GLANCE_BINARY_KIND == 6
+#define GLANCE_FILE_DESCRIPTION "Glance Archive Preview Host"
+#define GLANCE_INTERNAL_NAME "Glance.ArchiveHost"
+#define GLANCE_ORIGINAL_FILENAME "Glance.ArchiveHost.exe"
 #else
 #error GLANCE_BINARY_KIND must identify the target executable.
 #endif

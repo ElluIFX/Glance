@@ -41,6 +41,7 @@
 #include <span>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
@@ -237,6 +238,163 @@ namespace
             }
             return preferences.ascending ? comparison < 0 : comparison > 0;
         });
+    }
+
+    void copy_component_directory_value(
+        const glance::app::FileDirectoryColumn& column,
+        const glance::app::FileDirectoryValue& value,
+        glance::app::ArchiveEntry& entry)
+    {
+        entry.values.push_back(glance::app::ArchiveEntryValue{
+            .kind = static_cast<std::uint32_t>(value.kind),
+            .unsigned_value = value.unsigned_value,
+            .ratio_value = value.ratio_value,
+            .text = value.text });
+        if (column.id == L"type")
+        {
+            entry.type_name = value.text;
+        }
+        else if (column.id == L"modified")
+        {
+            entry.modified_time = value.unsigned_value;
+        }
+        else if (column.id == L"packed-size")
+        {
+            entry.compressed_size = value.unsigned_value;
+            entry.compressed_size_known =
+                value.kind != glance::contracts::components::FileDirectoryValueKind::none;
+        }
+        else if (column.id == L"size")
+        {
+            entry.original_size = value.unsigned_value;
+            entry.original_size_known =
+                value.kind != glance::contracts::components::FileDirectoryValueKind::none;
+        }
+    }
+
+    bool append_component_directory_tree(
+        const std::shared_ptr<void>& session,
+        const glance::app::FileDirectoryDescriptor& descriptor,
+        std::uint64_t parent_node_id,
+        std::size_t depth,
+        std::vector<glance::app::ArchiveEntry>& destination,
+        glance::app::ArchivePreview& preview,
+        std::unordered_set<std::uint64_t>& visited)
+    {
+        constexpr std::size_t maximum_depth = 6;
+        std::uint32_t offset{};
+        while (preview.entry_count < glance::app::maximum_preview_entries)
+        {
+            auto page = glance::app::enumerate_component_file_directory(
+                session,
+                parent_node_id,
+                offset,
+                128);
+            if (page.failed)
+            {
+                return false;
+            }
+            for (auto& source : page.entries)
+            {
+                if (preview.entry_count >= glance::app::maximum_preview_entries)
+                {
+                    preview.truncated = true;
+                    preview.entry_limit_reached = true;
+                    return true;
+                }
+                if (source.node_id == 0 || !visited.insert(source.node_id).second)
+                {
+                    return false;
+                }
+                glance::app::ArchiveEntry entry;
+                entry.name = std::move(source.name);
+                entry.path = source.icon_key;
+                entry.is_folder = source.is_folder;
+                const auto value_count = std::min(
+                    source.values.size(),
+                    descriptor.columns.size());
+                entry.values.reserve(value_count);
+                for (std::size_t index = 0; index < value_count; ++index)
+                {
+                    copy_component_directory_value(
+                        descriptor.columns[index],
+                        source.values[index],
+                        entry);
+                }
+                ++preview.entry_count;
+                if (!entry.is_folder)
+                {
+                    ++preview.file_count;
+                }
+                if (entry.is_folder && source.has_children)
+                {
+                    if (depth < maximum_depth)
+                    {
+                        if (!append_component_directory_tree(
+                                session,
+                                descriptor,
+                                source.node_id,
+                                depth + 1,
+                                entry.children,
+                                preview,
+                                visited))
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        preview.truncated = true;
+                        preview.depth_limited = true;
+                    }
+                }
+                destination.push_back(std::move(entry));
+            }
+            offset += static_cast<std::uint32_t>(page.entries.size());
+            if (offset >= page.total)
+            {
+                return true;
+            }
+            if (page.entries.empty())
+            {
+                return false;
+            }
+        }
+        preview.truncated = true;
+        preview.entry_limit_reached = true;
+        return true;
+    }
+
+    void apply_component_directory_summary(
+        const glance::app::FileDirectoryDescriptor& descriptor,
+        glance::app::ArchivePreview& preview)
+    {
+        preview.truncated = preview.truncated || descriptor.truncated;
+        preview.depth_limited = preview.depth_limited || descriptor.depth_limited;
+        for (const auto& field : descriptor.info_fields)
+        {
+            if (field.id == L"file-count")
+            {
+                preview.file_count = static_cast<std::size_t>(field.value.unsigned_value);
+            }
+            else if (field.id == L"packed-size")
+            {
+                preview.compressed_size = field.value.unsigned_value;
+                preview.compressed_size_known = true;
+            }
+            else if (field.id == L"original-size")
+            {
+                preview.original_size = field.value.unsigned_value;
+                preview.original_size_known = true;
+            }
+            else if (field.id == L"encrypted")
+            {
+                preview.encrypted = field.value.unsigned_value != 0;
+            }
+        }
+        preview.entry_compressed_size_available = std::ranges::any_of(
+            descriptor.columns,
+            [](const auto& column) { return column.id == L"packed-size"; });
     }
 
     ScrollViewer find_scroll_viewer(const DependencyObject& root)
@@ -555,29 +713,6 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_archive_header_state()
     {
-        const auto columns = archive_columns(
-            archive_preview_is_directory_,
-            archive_entry_compressed_size_available_);
-        configure_archive_columns(ArchiveHeaderGrid(), columns);
-        ArchiveNameHeader().Text(glance::app::localize(L"ArchiveNameHeader.Text"));
-        ArchiveTypeHeader().Text(glance::app::localize(L"ArchiveTypeHeader.Text"));
-        ArchiveThirdHeader().Text(glance::app::localize(
-            archive_preview_is_directory_
-                ? L"ArchiveModifiedHeader.Text"
-                : archive_entry_compressed_size_available_
-                    ? L"ArchiveCompressedSizeHeader"
-                    : L"ArchiveOriginalSizeHeader"));
-        ArchiveFourthHeader().Text(glance::app::localize(
-            archive_preview_is_directory_
-                ? L"ArchiveSizeHeader.Text"
-                : L"ArchiveOriginalSizeHeader"));
-        ArchiveModifiedHeaderButton().HorizontalContentAlignment(
-            archive_preview_is_directory_
-                ? HorizontalAlignment::Left
-                : HorizontalAlignment::Right);
-        ArchiveSizeHeaderButton().Visibility(
-            columns.size() > 3 ? Visibility::Visible : Visibility::Collapsed);
-
         const std::array buttons{
             ArchiveNameHeaderButton(),
             ArchiveTypeHeaderButton(),
@@ -590,6 +725,75 @@ namespace winrt::Glance::App::implementation
             ArchiveModifiedSortGlyph(),
             ArchiveSizeSortGlyph(),
         };
+        const std::array headers{
+            ArchiveNameHeader(),
+            ArchiveTypeHeader(),
+            ArchiveThirdHeader(),
+            ArchiveFourthHeader(),
+        };
+
+        active_file_directory_columns_.clear();
+        if (!archive_preview_is_directory_ &&
+            !active_file_directory_descriptor_.columns.empty())
+        {
+            std::vector<ArchiveColumnSpec> columns;
+            const auto count = std::min<std::size_t>(
+                active_file_directory_descriptor_.columns.size(),
+                buttons.size());
+            columns.reserve(count);
+            for (std::size_t index = 0; index < count; ++index)
+            {
+                const auto& column = active_file_directory_descriptor_.columns[index];
+                active_file_directory_columns_.push_back(
+                    static_cast<std::uint32_t>(index));
+                columns.push_back(ArchiveColumnSpec{
+                    .kind = ArchiveColumnKind::name,
+                    .width = index == 0
+                        ? 0.0
+                        : static_cast<double>(column.width == 0 ? 110 : column.width) });
+                headers[index].Text(column.title);
+                buttons[index].Visibility(Visibility::Visible);
+                buttons[index].HorizontalContentAlignment(
+                    column.alignment ==
+                            glance::contracts::components::FileDirectoryAlignment::right
+                        ? HorizontalAlignment::Right
+                        : HorizontalAlignment::Left);
+            }
+            for (std::size_t index = count; index < buttons.size(); ++index)
+            {
+                buttons[index].Visibility(Visibility::Collapsed);
+            }
+            configure_archive_columns(ArchiveHeaderGrid(), columns);
+        }
+        else
+        {
+            const auto columns = archive_columns(
+                archive_preview_is_directory_,
+                archive_entry_compressed_size_available_);
+            configure_archive_columns(ArchiveHeaderGrid(), columns);
+            ArchiveNameHeader().Text(glance::app::localize(L"ArchiveNameHeader.Text"));
+            ArchiveTypeHeader().Text(glance::app::localize(L"ArchiveTypeHeader.Text"));
+            ArchiveThirdHeader().Text(glance::app::localize(
+                archive_preview_is_directory_
+                    ? L"ArchiveModifiedHeader.Text"
+                    : archive_entry_compressed_size_available_
+                        ? L"ArchiveCompressedSizeHeader"
+                        : L"ArchiveOriginalSizeHeader"));
+            ArchiveFourthHeader().Text(glance::app::localize(
+                archive_preview_is_directory_
+                    ? L"ArchiveSizeHeader.Text"
+                    : L"ArchiveOriginalSizeHeader"));
+            ArchiveModifiedHeaderButton().HorizontalContentAlignment(
+                archive_preview_is_directory_
+                    ? HorizontalAlignment::Left
+                    : HorizontalAlignment::Right);
+            for (std::size_t index = 0; index < buttons.size(); ++index)
+            {
+                buttons[index].Visibility(
+                    index < columns.size() ? Visibility::Visible : Visibility::Collapsed);
+            }
+        }
+
         for (const auto& button : buttons)
         {
             const bool interactive =
@@ -978,6 +1182,9 @@ namespace winrt::Glance::App::implementation
         glance::app::cancel_text_preview_read(current_text_reader_);
         clear_web_view_content();
         active_component_web_preview_.reset();
+        active_component_file_directory_.reset();
+        active_file_directory_descriptor_ = {};
+        active_file_directory_columns_.clear();
         active_component_preview_.reset();
         active_component_refinement_.reset();
         component_refinement_text_.clear();
@@ -1018,8 +1225,6 @@ namespace winrt::Glance::App::implementation
         archive_render_state_.reset();
         archive_preview_is_directory_ = false;
         archive_entry_compressed_size_available_ = false;
-        archive_source_path_.clear();
-        archive_password_.clear();
         update_archive_header_state();
         ArchiveEntryTree().RootNodes().Clear();
         FolderEntryList().Items().Clear();
@@ -1480,6 +1685,8 @@ namespace winrt::Glance::App::implementation
             return;
         }
         auto previous_component_preview = std::move(active_component_preview_);
+        auto previous_component_file_directory =
+            std::move(active_component_file_directory_);
         auto previous_component_refinement = std::move(active_component_refinement_);
         active_component_web_preview_.reset();
         component_refinement_text_.clear();
@@ -1493,6 +1700,8 @@ namespace winrt::Glance::App::implementation
         content_preview_kind_ = glance::app::PreviewKind::generic;
         generic_text_preview_allowed_ = false;
         archive_render_state_.reset();
+        active_file_directory_descriptor_ = {};
+        active_file_directory_columns_.clear();
         archive_preview_is_directory_ = false;
         archive_entry_compressed_size_available_ = false;
         update_archive_header_state();
@@ -1663,13 +1872,6 @@ namespace winrt::Glance::App::implementation
             PdfLoadingOverlay().Visibility(Visibility::Visible);
             load_pdf_async(file.path, generation);
             break;
-        case glance::app::PreviewKind::archive:
-            show_content_panel(kind);
-            ArchiveStatusText().Text(glance::app::localize(L"LoadingArchive"));
-            ArchiveEntryTree().RootNodes().Clear();
-            FolderEntryList().Items().Clear();
-            load_archive_async(file.path, generation);
-            break;
         default:
             present_generic(file, true, true);
             break;
@@ -1682,8 +1884,12 @@ namespace winrt::Glance::App::implementation
         bool allow_advanced_info)
     {
         auto previous_component_preview = std::move(active_component_preview_);
+        auto previous_component_file_directory =
+            std::move(active_component_file_directory_);
         auto previous_component_refinement = std::move(active_component_refinement_);
         active_component_web_preview_.reset();
+        active_file_directory_descriptor_ = {};
+        active_file_directory_columns_.clear();
         component_refinement_text_.clear();
         component_refinement_started_ = false;
         current_kind_ = glance::app::PreviewKind::generic;
@@ -2643,33 +2849,6 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    fire_and_forget MainWindow::load_archive_async(
-        std::wstring path,
-        std::uint64_t generation,
-        std::wstring password)
-    {
-        const auto lifetime = get_strong();
-        const auto dispatcher = DispatcherQueue();
-        archive_source_path_ = path;
-        archive_password_ = password;
-        co_await resume_background();
-        auto preview = glance::app::load_archive_preview(path, password);
-        static_cast<void>(dispatcher.TryEnqueue([
-            lifetime,
-            preview = std::move(preview),
-            path = std::move(path),
-            password = std::move(password),
-            generation]() mutable {
-                if (generation != lifetime->content_generation_)
-                {
-                    return;
-                }
-                lifetime->archive_source_path_ = std::move(path);
-                lifetime->archive_password_ = std::move(password);
-                lifetime->apply_archive_preview(std::move(preview), generation);
-            }));
-    }
-
     fire_and_forget MainWindow::load_directory_async(std::wstring path, std::uint64_t generation)
     {
         const auto lifetime = get_strong();
@@ -2691,27 +2870,6 @@ namespace winrt::Glance::App::implementation
             return;
         }
         cancel_archive_icon_load();
-        if (preview.password_required || preview.invalid_password)
-        {
-            show_password_prompt(
-                PasswordPromptTarget::archive,
-                preview.invalid_password);
-            return;
-        }
-        if (preview.unsupported_or_encrypted)
-        {
-            archive_render_state_.reset();
-            archive_entry_compressed_size_available_ = false;
-            content_preview_kind_ = glance::app::PreviewKind::generic;
-            update_preview_mode_button();
-            if (current_index_ < files_.size())
-            {
-                present_generic(files_[current_index_], false, true);
-            }
-            show_preview_notice(L"ArchiveUnavailableNotice");
-            reveal_deferred_preview();
-            return;
-        }
         if (!preview.error.empty())
         {
             show_provider_error(std::move(preview.error), generation);
@@ -2737,9 +2895,48 @@ namespace winrt::Glance::App::implementation
         {
             state->pending.push_back(PendingArchiveNode{ &entry, nullptr });
         }
-        state->status = glance::app::localize_format(
-            L"FileCount",
-            { std::to_wstring(state->preview.file_count) });
+        if (!archive_preview_is_directory_ &&
+            !active_file_directory_descriptor_.info_fields.empty())
+        {
+            const auto format_value = [this](
+                                          const glance::app::FileDirectoryValue& value) {
+                using glance::contracts::components::FileDirectoryValueKind;
+                switch (value.kind)
+                {
+                case FileDirectoryValueKind::text:
+                    return value.text;
+                case FileDirectoryValueKind::unsigned_integer:
+                    return std::to_wstring(value.unsigned_value);
+                case FileDirectoryValueKind::bytes:
+                    return formatted_size(value.unsigned_value);
+                case FileDirectoryValueKind::timestamp:
+                    return formatted_time(value.unsigned_value);
+                case FileDirectoryValueKind::ratio:
+                {
+                    std::wostringstream text;
+                    text << std::fixed << std::setprecision(1)
+                         << value.ratio_value * 100.0 << L'%';
+                    return text.str();
+                }
+                default:
+                    return std::wstring(L"--");
+                }
+            };
+            for (const auto& field : active_file_directory_descriptor_.info_fields)
+            {
+                if (!state->status.empty())
+                {
+                    state->status += L"  |  ";
+                }
+                state->status += field.label + L" " + format_value(field.value);
+            }
+        }
+        else
+        {
+            state->status = glance::app::localize_format(
+                L"FileCount",
+                { std::to_wstring(state->preview.file_count) });
+        }
         if (archive_preview_is_directory_)
         {
             state->status += L"  |  " + glance::app::localize_format(
@@ -2748,7 +2945,7 @@ namespace winrt::Glance::App::implementation
                     ? formatted_size(state->preview.original_size)
                     : std::wstring(L"--") });
         }
-        else
+        else if (active_file_directory_descriptor_.info_fields.empty())
         {
             const auto compressed_size = state->preview.compressed_size_known
                 ? formatted_size(state->preview.compressed_size)
@@ -2809,9 +3006,35 @@ namespace winrt::Glance::App::implementation
             const auto& entry = *pending.entry;
 
             Grid row;
-            const auto columns = archive_columns(
-                archive_preview_is_directory_,
-                archive_entry_compressed_size_available_);
+            std::vector<ArchiveColumnSpec> component_columns;
+            std::span<const ArchiveColumnSpec> columns;
+            if (!archive_preview_is_directory_ &&
+                !active_file_directory_columns_.empty())
+            {
+                component_columns.reserve(active_file_directory_columns_.size());
+                for (std::size_t column = 0;
+                     column < active_file_directory_columns_.size();
+                     ++column)
+                {
+                    const auto descriptor_index =
+                        active_file_directory_columns_[column];
+                    const auto& descriptor =
+                        active_file_directory_descriptor_.columns[descriptor_index];
+                    component_columns.push_back(ArchiveColumnSpec{
+                        .kind = ArchiveColumnKind::name,
+                        .width = column == 0
+                            ? 0.0
+                            : static_cast<double>(
+                                descriptor.width == 0 ? 110 : descriptor.width) });
+                }
+                columns = component_columns;
+            }
+            else
+            {
+                columns = archive_columns(
+                    archive_preview_is_directory_,
+                    archive_entry_compressed_size_available_);
+            }
             configure_archive_columns(row, columns);
 
             Grid name_cell;
@@ -2896,6 +3119,61 @@ namespace winrt::Glance::App::implementation
             };
             for (std::size_t column = 1; column < columns.size(); ++column)
             {
+                if (!active_file_directory_columns_.empty())
+                {
+                    const auto descriptor_index =
+                        active_file_directory_columns_[column];
+                    if (descriptor_index >= entry.values.size())
+                    {
+                        continue;
+                    }
+                    const auto& descriptor =
+                        active_file_directory_descriptor_.columns[descriptor_index];
+                    const auto& value = entry.values[descriptor_index];
+                    std::wstring text;
+                    const auto kind = static_cast<
+                        glance::contracts::components::FileDirectoryValueKind>(value.kind);
+                    switch (kind)
+                    {
+                    case glance::contracts::components::FileDirectoryValueKind::text:
+                        text = value.text;
+                        break;
+                    case glance::contracts::components::FileDirectoryValueKind::bytes:
+                        if (!entry.is_folder)
+                        {
+                            text = formatted_size(value.unsigned_value);
+                        }
+                        break;
+                    case glance::contracts::components::FileDirectoryValueKind::timestamp:
+                        if (value.unsigned_value != 0)
+                        {
+                            text = formatted_time(value.unsigned_value);
+                        }
+                        break;
+                    case glance::contracts::components::FileDirectoryValueKind::unsigned_integer:
+                        text = std::to_wstring(value.unsigned_value);
+                        break;
+                    case glance::contracts::components::FileDirectoryValueKind::ratio:
+                    {
+                        std::wostringstream output;
+                        output << std::fixed << std::setprecision(1)
+                               << value.ratio_value * 100.0 << L'%';
+                        text = output.str();
+                        break;
+                    }
+                    case glance::contracts::components::FileDirectoryValueKind::none:
+                    default:
+                        break;
+                    }
+                    append_text(
+                        text,
+                        static_cast<int>(column),
+                        descriptor.alignment ==
+                                glance::contracts::components::FileDirectoryAlignment::right
+                            ? TextAlignment::Right
+                            : TextAlignment::Left);
+                    continue;
+                }
                 switch (columns[column].kind)
                 {
                 case ArchiveColumnKind::type:
@@ -3273,7 +3551,7 @@ namespace winrt::Glance::App::implementation
             }
             if (result.status !=
                     glance::contracts::components::PrepareStatus::success ||
-                result.output_path.empty())
+                (result.output_path.empty() && result.file_directory == nullptr))
             {
                 if (result.status !=
                     glance::contracts::components::PrepareStatus::cancelled)
@@ -3292,6 +3570,84 @@ namespace winrt::Glance::App::implementation
             }
 
             lifetime->apply_component_preview(std::move(result), generation);
+        }));
+    }
+
+    fire_and_forget MainWindow::load_component_file_directory_async(
+        std::shared_ptr<void> session,
+        std::wstring password,
+        std::uint64_t generation)
+    {
+        const auto weak = get_weak();
+        const auto dispatcher = DispatcherQueue();
+        const auto language = glance::app::current_ui_language();
+        co_await resume_background();
+
+        glance::app::FileDirectoryDescriptor descriptor;
+        const auto status = glance::app::open_component_file_directory(
+            session,
+            language,
+            password,
+            descriptor);
+        glance::app::ArchivePreview preview;
+        if (status == glance::contracts::components::FileDirectoryOpenStatus::ready)
+        {
+            std::unordered_set<std::uint64_t> visited;
+            if (!append_component_directory_tree(
+                    session,
+                    descriptor,
+                    0,
+                    1,
+                    preview.entries,
+                    preview,
+                    visited))
+            {
+                preview.error = glance::app::localize(L"ArchiveReadError");
+            }
+            apply_component_directory_summary(descriptor, preview);
+        }
+
+        static_cast<void>(dispatcher.TryEnqueue([
+            weak,
+            session = std::move(session),
+            descriptor = std::move(descriptor),
+            preview = std::move(preview),
+            status,
+            generation]() mutable {
+            const auto lifetime = weak.get();
+            if (lifetime == nullptr || generation != lifetime->content_generation_ ||
+                session != lifetime->active_component_file_directory_ ||
+                lifetime->current_kind_ != glance::app::PreviewKind::archive)
+            {
+                return;
+            }
+            if (status ==
+                    glance::contracts::components::FileDirectoryOpenStatus::password_required ||
+                status ==
+                    glance::contracts::components::FileDirectoryOpenStatus::invalid_password)
+            {
+                lifetime->show_password_prompt(
+                    PasswordPromptTarget::archive,
+                    status == glance::contracts::components::
+                        FileDirectoryOpenStatus::invalid_password);
+                return;
+            }
+            if (status != glance::contracts::components::FileDirectoryOpenStatus::ready)
+            {
+                if (status !=
+                    glance::contracts::components::FileDirectoryOpenStatus::cancelled)
+                {
+                    lifetime->show_provider_error(
+                        glance::app::localize(L"ArchiveReadError"),
+                        generation);
+                }
+                return;
+            }
+            lifetime->active_file_directory_descriptor_ = std::move(descriptor);
+            lifetime->archive_entry_compressed_size_available_ =
+                preview.entry_compressed_size_available;
+            lifetime->update_archive_header_state();
+            lifetime->apply_archive_preview(std::move(preview), generation);
         }));
     }
 
@@ -3371,6 +3727,12 @@ namespace winrt::Glance::App::implementation
         {
             kind = glance::app::PreviewKind::web;
         }
+        else if (result.kind == PreviewContentKind::directory &&
+                 result.format == PreviewContentFormat::file_directory &&
+                 result.file_directory != nullptr)
+        {
+            kind = glance::app::PreviewKind::archive;
+        }
 
         if (kind == glance::app::PreviewKind::generic ||
             generation != content_generation_ ||
@@ -3383,6 +3745,33 @@ namespace winrt::Glance::App::implementation
             !glance::app::paged_document_renderer().has_value())
         {
             present_generic(files_[current_index_]);
+            return;
+        }
+
+        if (kind == glance::app::PreviewKind::archive)
+        {
+            active_component_preview_ = std::move(result.lease);
+            active_component_file_directory_ = std::move(result.file_directory);
+            active_file_directory_descriptor_ = {};
+            active_file_directory_columns_.clear();
+            archive_preview_is_directory_ = false;
+            content_preview_kind_ = kind;
+            current_kind_ = kind;
+            update_preview_mode_button();
+            update_archive_header_state();
+            show_content_panel(kind);
+            const auto loading_text = ComponentLoadingText().Text();
+            ArchiveStatusText().Text(
+                loading_text.empty()
+                    ? winrt::hstring(glance::app::localize(L"LoadingArchive"))
+                    : loading_text);
+            ArchiveEntryTree().RootNodes().Clear();
+            FolderEntryList().Items().Clear();
+            ComponentLoadingText().Visibility(Visibility::Collapsed);
+            load_component_file_directory_async(
+                active_component_file_directory_,
+                {},
+                generation);
             return;
         }
 
@@ -5367,7 +5756,7 @@ namespace winrt::Glance::App::implementation
             image_scale_x_ = -image_scale_x_;
             ImageTransform().ScaleX(image_scale_x_);
         }
-        else
+        else if (active_file_directory_descriptor_.info_fields.empty())
         {
             image_scale_y_ = -image_scale_y_;
             ImageTransform().ScaleY(image_scale_y_);
@@ -5869,10 +6258,14 @@ namespace winrt::Glance::App::implementation
             PdfLoadingOverlay().Visibility(Visibility::Visible);
             load_pdf_async(pdf_source_path_, content_generation_, password);
         }
-        else if (target == PasswordPromptTarget::archive && !archive_source_path_.empty())
+        else if (target == PasswordPromptTarget::archive &&
+                 active_component_file_directory_ != nullptr)
         {
             ArchiveStatusText().Text(glance::app::localize(L"LoadingArchive"));
-            load_archive_async(archive_source_path_, content_generation_, password);
+            load_component_file_directory_async(
+                active_component_file_directory_,
+                password,
+                content_generation_);
         }
     }
 

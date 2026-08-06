@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -48,14 +49,25 @@ namespace
         const GUID* interface_id,
         std::uint32_t interface_version) noexcept
     {
-        return kind == glance::contracts::components::PreviewContentKind::document &&
-            format == glance::contracts::components::PreviewContentFormat::pdf &&
-            interface_id != nullptr &&
-            IsEqualGUID(
-                *interface_id,
-                glance::contracts::components::paged_document_renderer_api_id) &&
-            interface_version ==
-                glance::contracts::components::paged_document_renderer_api_version;
+        if (interface_id == nullptr)
+        {
+            return FALSE;
+        }
+        return (kind == glance::contracts::components::PreviewContentKind::document &&
+                format == glance::contracts::components::PreviewContentFormat::pdf &&
+                IsEqualGUID(
+                    *interface_id,
+                    glance::contracts::components::paged_document_renderer_api_id) &&
+                interface_version ==
+                    glance::contracts::components::paged_document_renderer_api_version) ||
+            (kind == glance::contracts::components::PreviewContentKind::directory &&
+             format ==
+                 glance::contracts::components::PreviewContentFormat::file_directory &&
+             IsEqualGUID(
+                 *interface_id,
+                 glance::contracts::components::file_directory_preview_api_id) &&
+             interface_version ==
+                 glance::contracts::components::file_directory_preview_api_version);
     }
 
     void append_be16(std::vector<unsigned char>& bytes, std::uint16_t value)
@@ -70,6 +82,98 @@ namespace
         bytes.push_back(static_cast<unsigned char>(value >> 16));
         bytes.push_back(static_cast<unsigned char>(value >> 8));
         bytes.push_back(static_cast<unsigned char>(value));
+    }
+
+    void append_le16(std::vector<unsigned char>& bytes, std::uint16_t value)
+    {
+        bytes.push_back(static_cast<unsigned char>(value));
+        bytes.push_back(static_cast<unsigned char>(value >> 8));
+    }
+
+    void append_le32(std::vector<unsigned char>& bytes, std::uint32_t value)
+    {
+        bytes.push_back(static_cast<unsigned char>(value));
+        bytes.push_back(static_cast<unsigned char>(value >> 8));
+        bytes.push_back(static_cast<unsigned char>(value >> 16));
+        bytes.push_back(static_cast<unsigned char>(value >> 24));
+    }
+
+    std::vector<unsigned char> make_zip_fixture()
+    {
+        static constexpr std::string_view name = "folder/hello.txt";
+        static constexpr std::string_view content = "hello";
+        static constexpr std::uint32_t crc32 = 0x3610A686;
+        std::vector<unsigned char> file;
+        append_le32(file, 0x04034B50);
+        append_le16(file, 20);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le32(file, crc32);
+        append_le32(file, static_cast<std::uint32_t>(content.size()));
+        append_le32(file, static_cast<std::uint32_t>(content.size()));
+        append_le16(file, static_cast<std::uint16_t>(name.size()));
+        append_le16(file, 0);
+        file.insert(file.end(), name.begin(), name.end());
+        file.insert(file.end(), content.begin(), content.end());
+
+        const auto central_offset = static_cast<std::uint32_t>(file.size());
+        append_le32(file, 0x02014B50);
+        append_le16(file, 20);
+        append_le16(file, 20);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le32(file, crc32);
+        append_le32(file, static_cast<std::uint32_t>(content.size()));
+        append_le32(file, static_cast<std::uint32_t>(content.size()));
+        append_le16(file, static_cast<std::uint16_t>(name.size()));
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le32(file, 0);
+        append_le32(file, 0);
+        file.insert(file.end(), name.begin(), name.end());
+        const auto central_size =
+            static_cast<std::uint32_t>(file.size()) - central_offset;
+
+        append_le32(file, 0x06054B50);
+        append_le16(file, 0);
+        append_le16(file, 0);
+        append_le16(file, 1);
+        append_le16(file, 1);
+        append_le32(file, central_size);
+        append_le32(file, central_offset);
+        append_le16(file, 0);
+        return file;
+    }
+
+    struct CollectedDirectoryEntry
+    {
+        std::uint64_t id{};
+        std::wstring name;
+        bool folder{};
+        bool has_children{};
+    };
+
+    BOOL WINAPI collect_directory_entry(
+        void* context,
+        const glance::contracts::components::FileDirectoryEntry* entry) noexcept
+    {
+        if (context == nullptr || entry == nullptr || entry->name == nullptr)
+        {
+            return FALSE;
+        }
+        static_cast<std::vector<CollectedDirectoryEntry>*>(context)->push_back(
+            CollectedDirectoryEntry{
+                .id = entry->node_id,
+                .name = entry->name,
+                .folder = entry->is_folder != FALSE,
+                .has_children = entry->has_children != FALSE });
+        return TRUE;
     }
 
     std::vector<unsigned char> make_psd_thumbnail_fixture()
@@ -874,6 +978,157 @@ int main()
             }
         }
         std::filesystem::remove_all(test_directory, cleanup_error);
+    }
+
+    {
+        using namespace glance::contracts::components;
+        const auto archive_directory =
+            std::filesystem::path(executable_path).parent_path() /
+            L"components" / L"archive";
+        const auto archive_component_path =
+            archive_directory / L"Glance.ArchiveComponent.dll";
+        expect(
+            std::filesystem::is_regular_file(archive_component_path),
+            "Archive component DLL output");
+        expect(
+            std::filesystem::is_regular_file(
+                archive_directory / L"Glance.ArchiveHost.exe") &&
+                std::filesystem::is_regular_file(archive_directory / L"7z.dll") &&
+                std::filesystem::is_regular_file(
+                    archive_directory / L"7-Zip-LICENSE.txt") &&
+                std::filesystem::is_regular_file(archive_directory / L"resources.pri"),
+            "Archive component runtime output");
+
+        const HMODULE archive_component = LoadLibraryExW(
+            archive_component_path.c_str(),
+            nullptr,
+            LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                LOAD_LIBRARY_SEARCH_SYSTEM32);
+        expect(archive_component != nullptr, "load Archive component DLL");
+        if (archive_component != nullptr)
+        {
+            const auto get_api = reinterpret_cast<GetApiFunction>(
+                GetProcAddress(archive_component, get_api_export));
+            ComponentApi api;
+            expect(
+                get_api != nullptr && get_api(abi_version, &api) != FALSE,
+                "Archive component ABI negotiation");
+            if (get_api != nullptr && api.initialize != nullptr)
+            {
+                std::vector<std::wstring> extensions;
+                ComponentRegistrar registrar{
+                    .context = &extensions,
+                    .register_extension = collect_extension,
+                    .register_renderer = accept_renderer };
+                ComponentRegistration registration;
+                expect(
+                    api.initialize(&registrar, &registration) != FALSE &&
+                        std::wstring_view(registration.component_id) == L"archive" &&
+                        registration.preferred_kind == PreviewContentKind::directory &&
+                        registration.preferred_format ==
+                            PreviewContentFormat::file_directory &&
+                        std::ranges::find(extensions, L".iso") != extensions.end() &&
+                        std::ranges::find(extensions, L".zip") != extensions.end(),
+                    "Archive component registration");
+
+                void* interface_pointer{};
+                expect(
+                    api.query_interface(
+                        &file_directory_preview_api_id,
+                        file_directory_preview_api_version,
+                        &interface_pointer) != FALSE &&
+                        interface_pointer != nullptr,
+                    "Archive component file directory interface");
+
+                const auto test_directory =
+                    std::filesystem::temp_directory_path() /
+                    (L"GlanceArchiveTests-" +
+                     std::to_wstring(GetCurrentProcessId()));
+                std::error_code cleanup_error;
+                std::filesystem::remove_all(test_directory, cleanup_error);
+                std::filesystem::create_directories(test_directory, cleanup_error);
+                const auto archive_path = test_directory / L"sample.zip";
+                expect(
+                    !cleanup_error && write_bytes(archive_path, make_zip_fixture()),
+                    "Archive preview fixture");
+                if (interface_pointer != nullptr &&
+                    std::filesystem::is_regular_file(archive_path))
+                {
+                    PreparedPreview preview;
+                    expect(
+                        api.can_preview(archive_path.c_str()) != FALSE &&
+                            api.prepare_preview(
+                                archive_path.c_str(),
+                                L"en-US",
+                                &preview) == PrepareStatus::success &&
+                            preview.kind == PreviewContentKind::directory &&
+                            preview.format == PreviewContentFormat::file_directory &&
+                            preview.lease_token != 0,
+                        "Archive component prepares directory output");
+                    const auto directory_api =
+                        static_cast<const FileDirectoryPreviewApi*>(interface_pointer);
+                    FileDirectoryDescriptor archive_descriptor;
+                    const auto opened = directory_api->open(
+                        preview.lease_token,
+                        L"en-US",
+                        L"",
+                        &archive_descriptor);
+                    expect(
+                        opened == FileDirectoryOpenStatus::ready &&
+                            archive_descriptor.column_count >= 3 &&
+                            archive_descriptor.info_field_count >= 3,
+                        "Archive Host reads ZIP metadata");
+                    if (opened == FileDirectoryOpenStatus::ready)
+                    {
+                        std::vector<CollectedDirectoryEntry> root_entries;
+                        FileDirectoryEntrySink sink{
+                            .context = &root_entries,
+                            .append = collect_directory_entry };
+                        std::uint32_t returned{};
+                        std::uint32_t total{};
+                        expect(
+                            directory_api->enumerate_children(
+                                preview.lease_token,
+                                0,
+                                0,
+                                16,
+                                &sink,
+                                &returned,
+                                &total) != FALSE &&
+                                returned == 1 && total == 1 &&
+                                root_entries.size() == 1 &&
+                                root_entries[0].folder &&
+                                root_entries[0].has_children &&
+                                root_entries[0].name == L"folder",
+                            "Archive component enumerates root directory");
+                        if (!root_entries.empty())
+                        {
+                            std::vector<CollectedDirectoryEntry> child_entries;
+                            sink.context = &child_entries;
+                            expect(
+                                directory_api->enumerate_children(
+                                    preview.lease_token,
+                                    root_entries[0].id,
+                                    0,
+                                    16,
+                                    &sink,
+                                    &returned,
+                                    &total) != FALSE &&
+                                    returned == 1 && total == 1 &&
+                                    child_entries.size() == 1 &&
+                                    !child_entries[0].folder &&
+                                    child_entries[0].name == L"hello.txt",
+                                "Archive component enumerates child directory");
+                        }
+                    }
+                    api.release_preview(preview.lease_token);
+                }
+                std::filesystem::remove_all(test_directory, cleanup_error);
+                api.shutdown();
+            }
+            FreeLibrary(archive_component);
+        }
     }
 
     if (failures == 0)

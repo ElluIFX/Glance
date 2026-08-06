@@ -1,0 +1,17 @@
+{
+  "schema_version": 3,
+  "id": "archive",
+  "architecture": "x64",
+  "entry_point": "Glance.ArchiveComponent.dll",
+  "dependencies": [],
+  "payload_files": [
+    "Glance.ArchiveHost.exe",
+    "7z.dll",
+    "7-Zip-LICENSE.txt",
+    "resources.pri"
+  ],
+  "installer_names": {
+    "en-US": "Archive preview",
+    "zh-CN": "压缩包预览"
+  }
+}

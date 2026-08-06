@@ -62,8 +62,64 @@ namespace glance::app
         std::shared_ptr<void> lease;
         std::shared_ptr<void> refinement;
         std::shared_ptr<ComponentWebPreview> web_preview;
+        std::shared_ptr<void> file_directory;
         std::wstring refinement_text;
         std::wstring notice;
+    };
+
+    struct FileDirectoryValue
+    {
+        glance::contracts::components::FileDirectoryValueKind kind{
+            glance::contracts::components::FileDirectoryValueKind::none };
+        std::uint64_t unsigned_value{};
+        double ratio_value{};
+        std::wstring text;
+    };
+
+    struct FileDirectoryInfoField
+    {
+        std::wstring id;
+        std::wstring label;
+        FileDirectoryValue value;
+    };
+
+    struct FileDirectoryColumn
+    {
+        std::wstring id;
+        std::wstring title;
+        glance::contracts::components::FileDirectoryValueKind kind{
+            glance::contracts::components::FileDirectoryValueKind::text };
+        glance::contracts::components::FileDirectoryAlignment alignment{
+            glance::contracts::components::FileDirectoryAlignment::left };
+        std::uint32_t width{};
+        bool sortable{};
+    };
+
+    struct FileDirectoryDescriptor
+    {
+        glance::contracts::components::FileDirectoryPresentation presentation{
+            glance::contracts::components::FileDirectoryPresentation::tree };
+        std::vector<FileDirectoryInfoField> info_fields;
+        std::vector<FileDirectoryColumn> columns;
+        bool truncated{};
+        bool depth_limited{};
+    };
+
+    struct FileDirectoryEntry
+    {
+        std::uint64_t node_id{};
+        bool is_folder{};
+        bool has_children{};
+        std::wstring name;
+        std::wstring icon_key;
+        std::vector<FileDirectoryValue> values;
+    };
+
+    struct FileDirectoryPage
+    {
+        std::vector<FileDirectoryEntry> entries;
+        std::uint32_t total{};
+        bool failed{};
     };
 
     struct PagedDocumentRendererRegistration
@@ -111,6 +167,17 @@ namespace glance::app
     [[nodiscard]] ComponentPreviewResult refine_component_preview(
         const std::shared_ptr<void>& refinement,
         std::wstring_view language_tag) noexcept;
+    [[nodiscard]] glance::contracts::components::FileDirectoryOpenStatus
+        open_component_file_directory(
+            const std::shared_ptr<void>& session,
+            std::wstring_view language_tag,
+            std::wstring_view password,
+            FileDirectoryDescriptor& descriptor) noexcept;
+    [[nodiscard]] FileDirectoryPage enumerate_component_file_directory(
+        const std::shared_ptr<void>& session,
+        std::uint64_t parent_node_id,
+        std::uint32_t offset,
+        std::uint32_t limit) noexcept;
     [[nodiscard]] std::vector<ComponentStatus> component_statuses(
         std::wstring_view language_tag) noexcept;
     [[nodiscard]] std::optional<PagedDocumentRendererRegistration>

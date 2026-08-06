@@ -349,6 +349,129 @@ $cadHtml = $modelTemplate.Replace(
     [System.Text.UTF8Encoding]::new($false))
 Write-Host "The model preview web bundles are ready."
 
+$sevenZipVersion = "26.02"
+$sevenZipDestination = Join-Path $repositoryRoot `
+    "src\Glance.Components\Archive\third_party\7zip\bin\$sevenZipVersion"
+$sevenZipDll = Join-Path $sevenZipDestination "7z.dll"
+$sevenZipLicense = Join-Path $sevenZipDestination "License.txt"
+$sevenZipArchiveHeader = Join-Path $sevenZipDestination "sdk\CPP\7zip\Archive\IArchive.h"
+$sevenZipAvailable =
+    (Test-Dependency `
+        -Path $sevenZipDll `
+        -Sha256 "69FD4DF057985C40E510E2FAC182881C7F85E90AA13EC703F763A8FDB2CE61F8") -and
+    (Test-Dependency `
+        -Path $sevenZipLicense `
+        -Sha256 "519AC0A4BDED9C18EA02E0AFB71F663D8C47373BD9FACD3AC96A79F51D77765D") -and
+    (Test-Dependency `
+        -Path $sevenZipArchiveHeader `
+        -Sha256 "A10F38D599DAD4926E2F219A577E3B11AA7214D1B4A02FA88ED9C71A5047CAEC")
+if ($sevenZipAvailable) {
+    Write-Host "7-Zip $sevenZipVersion archive preview dependencies are available."
+}
+else {
+    $sevenZipBaseUri = "https://github.com/ip7z/7zip/releases/download/$sevenZipVersion"
+    $sevenZipExtraSha256 =
+        "081DF9E9311DFD9C9E0E98C1C80180B99BB51E4CB24156B5F3057FE3C259D70A"
+    $sevenZipInstallerSha256 =
+        "6745FA76DC2EA031596D8678F6F6B99C3C1B435B4164A63485ADBBC7B8D82EF0"
+    $sevenZipSourceSha256 =
+        "CF967C98BCA02A4B8B16375F441825A8E141362F14BE1969BBEC8E1CA0BFF9DD"
+    $sevenZipTemporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) (
+        "Glance.SevenZip." + [Guid]::NewGuid().ToString("N"))
+    $sevenZipExtra = Join-Path $sevenZipTemporaryDirectory "7z2602-extra.7z"
+    $sevenZipInstaller = Join-Path $sevenZipTemporaryDirectory "7z2602-x64.exe"
+    $sevenZipSource = Join-Path $sevenZipTemporaryDirectory "7z2602-src.tar.xz"
+    $sevenZipExtraDirectory = Join-Path $sevenZipTemporaryDirectory "extra"
+    $sevenZipInstallDirectory = Join-Path $sevenZipTemporaryDirectory "installed"
+    $sevenZipSourceDirectory = Join-Path $sevenZipTemporaryDirectory "source"
+    try {
+        New-Item -ItemType Directory -Path $sevenZipExtraDirectory -Force | Out-Null
+        New-Item -ItemType Directory -Path $sevenZipInstallDirectory -Force | Out-Null
+        New-Item -ItemType Directory -Path $sevenZipSourceDirectory -Force | Out-Null
+        Write-Host "Downloading 7-Zip $sevenZipVersion archive preview dependencies..."
+        Invoke-DependencyDownload `
+            -Uri "$sevenZipBaseUri/7z2602-extra.7z" `
+            -OutFile $sevenZipExtra
+        Invoke-DependencyDownload `
+            -Uri "$sevenZipBaseUri/7z2602-x64.exe" `
+            -OutFile $sevenZipInstaller
+        Invoke-DependencyDownload `
+            -Uri "$sevenZipBaseUri/7z2602-src.tar.xz" `
+            -OutFile $sevenZipSource
+        foreach ($archive in @(
+                @{ Path = $sevenZipExtra; Hash = $sevenZipExtraSha256 },
+                @{ Path = $sevenZipInstaller; Hash = $sevenZipInstallerSha256 },
+                @{ Path = $sevenZipSource; Hash = $sevenZipSourceSha256 })) {
+            $actualHash = (Get-FileHash -LiteralPath $archive.Path -Algorithm SHA256).Hash
+            if ($actualHash -ne $archive.Hash) {
+                throw "7-Zip dependency SHA-256 mismatch for '$($archive.Path)'."
+            }
+        }
+
+        & "$env:SystemRoot\System32\tar.exe" `
+            -xf $sevenZipExtra `
+            -C $sevenZipExtraDirectory
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to extract the 7-Zip Extra archive."
+        }
+        & (Join-Path $sevenZipExtraDirectory "x64\7za.exe") `
+            x $sevenZipInstaller `
+            "-o$sevenZipInstallDirectory" `
+            -y | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to extract the 7-Zip x64 package."
+        }
+        & "$env:SystemRoot\System32\tar.exe" `
+            -xf $sevenZipSource `
+            -C $sevenZipSourceDirectory
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to extract the 7-Zip source archive."
+        }
+
+        New-Item -ItemType Directory -Path $sevenZipDestination -Force | Out-Null
+        Copy-Item `
+            -LiteralPath (Join-Path $sevenZipInstallDirectory "7z.dll") `
+            -Destination $sevenZipDll `
+            -Force
+        Copy-Item `
+            -LiteralPath (Join-Path $sevenZipInstallDirectory "License.txt") `
+            -Destination $sevenZipLicense `
+            -Force
+        $sdkDestination = Join-Path $sevenZipDestination "sdk"
+        foreach ($header in Get-ChildItem `
+                -LiteralPath $sevenZipSourceDirectory `
+                -Filter "*.h" `
+                -File `
+                -Recurse) {
+            $relative = [System.IO.Path]::GetRelativePath(
+                $sevenZipSourceDirectory,
+                $header.FullName)
+            $destination = Join-Path $sdkDestination $relative
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force |
+                Out-Null
+            Copy-Item -LiteralPath $header.FullName -Destination $destination -Force
+        }
+        if (-not (
+                (Test-Dependency `
+                    -Path $sevenZipDll `
+                    -Sha256 "69FD4DF057985C40E510E2FAC182881C7F85E90AA13EC703F763A8FDB2CE61F8") -and
+                (Test-Dependency `
+                    -Path $sevenZipLicense `
+                    -Sha256 "519AC0A4BDED9C18EA02E0AFB71F663D8C47373BD9FACD3AC96A79F51D77765D") -and
+                (Test-Dependency `
+                    -Path $sevenZipArchiveHeader `
+                    -Sha256 "A10F38D599DAD4926E2F219A577E3B11AA7214D1B4A02FA88ED9C71A5047CAEC"))) {
+            throw "7-Zip archive preview dependencies failed validation."
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $sevenZipTemporaryDirectory) {
+            Remove-Item -LiteralPath $sevenZipTemporaryDirectory -Recurse -Force
+        }
+    }
+    Write-Host "7-Zip $sevenZipVersion archive preview dependencies are ready."
+}
+
 if ($allAvailable) {
     Write-Host "Scintilla runtime dependencies are available."
     return

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Component.DisplayName" xml:space="preserve"><value>压缩包预览</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>支持常见压缩包、归档与光盘映像格式</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>压缩包预览文件缺失</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在读取归档目录</value></data>
+  <data name="Column.Name" xml:space="preserve"><value>名称</value></data>
+  <data name="Column.Type" xml:space="preserve"><value>类型</value></data>
+  <data name="Column.Modified" xml:space="preserve"><value>修改日期</value></data>
+  <data name="Column.PackedSize" xml:space="preserve"><value>压缩后大小</value></data>
+  <data name="Column.Size" xml:space="preserve"><value>原始大小</value></data>
+  <data name="Info.FileCount" xml:space="preserve"><value>文件</value></data>
+  <data name="Info.Format" xml:space="preserve"><value>格式</value></data>
+  <data name="Info.ArchiveSize" xml:space="preserve"><value>压缩包大小</value></data>
+  <data name="Info.OriginalSize" xml:space="preserve"><value>原始大小</value></data>
+  <data name="Info.Ratio" xml:space="preserve"><value>压缩率</value></data>
+  <data name="Info.Encrypted" xml:space="preserve"><value>加密</value></data>
+  <data name="Value.Yes" xml:space="preserve"><value>是</value></data>
+  <data name="Value.No" xml:space="preserve"><value>否</value></data>
+  <data name="Value.Folder" xml:space="preserve"><value>文件夹</value></data>
+  <data name="Value.File" xml:space="preserve"><value>文件</value></data>
+</root>

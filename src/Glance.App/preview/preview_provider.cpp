@@ -275,10 +275,6 @@ namespace
         {
             return glance::app::PreviewKind::generic;
         }
-        if (matches(0, { 0x50, 0x4B, 0x03, 0x04 }) || matches(0, { 0x37, 0x7A, 0xBC, 0xAF }))
-        {
-            return glance::app::PreviewKind::archive;
-        }
         if (matches(0, { 0x1A, 0x45, 0xDF, 0xA3 }) ||
             matches(0, { 0x4F, 0x67, 0x67, 0x53 }) ||
             matches(0, { 0x66, 0x4C, 0x61, 0x43 }) ||
@@ -740,12 +736,6 @@ namespace glance::app
             std::wstring_view(L".avi"), std::wstring_view(L".webm"), std::wstring_view(L".wmv"),
             std::wstring_view(L".mp3"), std::wstring_view(L".flac"), std::wstring_view(L".wav"),
             std::wstring_view(L".m4a"), std::wstring_view(L".aac"), std::wstring_view(L".ogg") };
-        static constexpr std::array archive_extensions{
-            std::wstring_view(L".zip"), std::wstring_view(L".7z"), std::wstring_view(L".rar"),
-            std::wstring_view(L".tar"), std::wstring_view(L".gz"), std::wstring_view(L".bz2"),
-            std::wstring_view(L".xz"), std::wstring_view(L".tgz"), std::wstring_view(L".tbz"),
-            std::wstring_view(L".tbz2"), std::wstring_view(L".txz"), std::wstring_view(L".zst"),
-            std::wstring_view(L".cab") };
         if (extension == L".md" || extension == L".markdown")
         {
             return PreviewKind::markdown;
@@ -771,10 +761,6 @@ namespace glance::app
         if (contains(extension, media_extensions))
         {
             return PreviewKind::media;
-        }
-        if (contains(extension, archive_extensions))
-        {
-            return PreviewKind::archive;
         }
         if (component_has_extension(extension))
         {

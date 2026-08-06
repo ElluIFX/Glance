@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Component.DisplayName" xml:space="preserve"><value>Archive preview</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>Supports common archives and disc images</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>Archive preview files are missing</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>Reading archive contents</value></data>
+  <data name="Column.Name" xml:space="preserve"><value>Name</value></data>
+  <data name="Column.Type" xml:space="preserve"><value>Type</value></data>
+  <data name="Column.Modified" xml:space="preserve"><value>Date modified</value></data>
+  <data name="Column.PackedSize" xml:space="preserve"><value>Compressed size</value></data>
+  <data name="Column.Size" xml:space="preserve"><value>Original size</value></data>
+  <data name="Info.FileCount" xml:space="preserve"><value>Files</value></data>
+  <data name="Info.Format" xml:space="preserve"><value>Format</value></data>
+  <data name="Info.ArchiveSize" xml:space="preserve"><value>Archive size</value></data>
+  <data name="Info.OriginalSize" xml:space="preserve"><value>Original size</value></data>
+  <data name="Info.Ratio" xml:space="preserve"><value>Compression ratio</value></data>
+  <data name="Info.Encrypted" xml:space="preserve"><value>Encrypted</value></data>
+  <data name="Value.Yes" xml:space="preserve"><value>Yes</value></data>
+  <data name="Value.No" xml:space="preserve"><value>No</value></data>
+  <data name="Value.Folder" xml:space="preserve"><value>Folder</value></data>
+  <data name="Value.File" xml:space="preserve"><value>File</value></data>
+</root>

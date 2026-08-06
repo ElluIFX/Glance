@@ -22,6 +22,7 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t web_preview_api_version = 1;
     inline constexpr std::uint32_t paged_document_renderer_api_version = 1;
     inline constexpr std::uint32_t settings_contribution_api_version = 1;
+    inline constexpr std::uint32_t file_directory_preview_api_version = 1;
     inline constexpr std::size_t web_resource_host_capacity = 64;
     inline constexpr std::size_t maximum_web_resource_mappings = 4;
     inline constexpr std::size_t renderer_host_capacity = 260;
@@ -30,6 +31,10 @@ namespace glance::contracts::components
     inline constexpr std::size_t setting_text_capacity = 256;
     inline constexpr std::size_t setting_option_text_capacity = 64;
     inline constexpr std::size_t maximum_setting_options = 8;
+    inline constexpr std::size_t file_directory_id_capacity = 64;
+    inline constexpr std::size_t file_directory_text_capacity = 256;
+    inline constexpr std::size_t maximum_file_directory_info_fields = 8;
+    inline constexpr std::size_t maximum_file_directory_columns = 8;
     inline constexpr GUID configurable_preview_api_id{
         0x950742e7,
         0x0af2,
@@ -60,6 +65,11 @@ namespace glance::contracts::components
         0x3b06,
         0x46a3,
         { 0xa1, 0xc0, 0xae, 0x40, 0x78, 0x3f, 0xf2, 0xdc } };
+    inline constexpr GUID file_directory_preview_api_id{
+        0xd350908d,
+        0xc8dc,
+        0x462f,
+        { 0x95, 0x8a, 0xe1, 0x1f, 0xc7, 0xaf, 0xc1, 0xda } };
 
     enum class PreviewContentKind : std::uint32_t
     {
@@ -69,6 +79,7 @@ namespace glance::contracts::components
         media = 3,
         document = 4,
         web = 5,
+        directory = 6,
     };
 
     enum class PreviewContentFormat : std::uint32_t
@@ -80,6 +91,7 @@ namespace glance::contracts::components
         media_file = 4,
         pdf = 5,
         html = 6,
+        file_directory = 7,
     };
 
     enum class PrepareStatus : std::uint32_t
@@ -118,6 +130,37 @@ namespace glance::contracts::components
     {
         toggle = 1,
         choice = 2,
+    };
+
+    enum class FileDirectoryPresentation : std::uint32_t
+    {
+        list = 0,
+        tree = 1,
+    };
+
+    enum class FileDirectoryValueKind : std::uint32_t
+    {
+        none = 0,
+        text = 1,
+        unsigned_integer = 2,
+        bytes = 3,
+        timestamp = 4,
+        ratio = 5,
+    };
+
+    enum class FileDirectoryAlignment : std::uint32_t
+    {
+        left = 0,
+        right = 1,
+    };
+
+    enum class FileDirectoryOpenStatus : std::uint32_t
+    {
+        ready = 0,
+        password_required = 1,
+        invalid_password = 2,
+        failed = 3,
+        cancelled = 4,
     };
 
     using RegisterExtensionFunction = BOOL(WINAPI*)(
@@ -229,6 +272,68 @@ namespace glance::contracts::components
         ComponentSettingOption options[maximum_setting_options]{};
     };
 
+    struct FileDirectoryValue
+    {
+        FileDirectoryValueKind kind{ FileDirectoryValueKind::none };
+        std::uint64_t unsigned_value{};
+        double ratio_value{};
+        const wchar_t* text{};
+    };
+
+    struct FileDirectoryInfoField
+    {
+        wchar_t id[file_directory_id_capacity]{};
+        wchar_t label[file_directory_text_capacity]{};
+        FileDirectoryValueKind kind{ FileDirectoryValueKind::none };
+        std::uint64_t unsigned_value{};
+        double ratio_value{};
+        wchar_t text[file_directory_text_capacity]{};
+    };
+
+    struct FileDirectoryColumnDescriptor
+    {
+        wchar_t id[file_directory_id_capacity]{};
+        wchar_t title[file_directory_text_capacity]{};
+        FileDirectoryValueKind kind{ FileDirectoryValueKind::text };
+        FileDirectoryAlignment alignment{ FileDirectoryAlignment::left };
+        std::uint32_t width{};
+        BOOL sortable{};
+    };
+
+    struct FileDirectoryDescriptor
+    {
+        std::uint32_t size{ sizeof(FileDirectoryDescriptor) };
+        FileDirectoryPresentation presentation{ FileDirectoryPresentation::tree };
+        std::uint32_t info_field_count{};
+        FileDirectoryInfoField info_fields[maximum_file_directory_info_fields]{};
+        std::uint32_t column_count{};
+        FileDirectoryColumnDescriptor columns[maximum_file_directory_columns]{};
+        BOOL truncated{};
+        BOOL depth_limited{};
+    };
+
+    struct FileDirectoryEntry
+    {
+        std::uint64_t node_id{};
+        BOOL is_folder{};
+        BOOL has_children{};
+        const wchar_t* name{};
+        const wchar_t* icon_key{};
+        std::uint32_t value_count{};
+        const FileDirectoryValue* values{};
+    };
+
+    using AppendFileDirectoryEntryFunction = BOOL(WINAPI*)(
+        void* context,
+        const FileDirectoryEntry* entry) noexcept;
+
+    struct FileDirectoryEntrySink
+    {
+        std::uint32_t size{ sizeof(FileDirectoryEntrySink) };
+        void* context{};
+        AppendFileDirectoryEntryFunction append{};
+    };
+
     using InitializeFunction = BOOL(WINAPI*)(
         const ComponentRegistrar* registrar,
         ComponentRegistration* registration) noexcept;
@@ -276,6 +381,19 @@ namespace glance::contracts::components
         ComponentSettingDescriptor* descriptors,
         std::uint32_t capacity,
         std::uint32_t* count) noexcept;
+    using OpenFileDirectoryFunction = FileDirectoryOpenStatus(WINAPI*)(
+        std::uint64_t lease_token,
+        const wchar_t* language_tag,
+        const wchar_t* password,
+        FileDirectoryDescriptor* descriptor) noexcept;
+    using EnumerateFileDirectoryChildrenFunction = BOOL(WINAPI*)(
+        std::uint64_t lease_token,
+        std::uint64_t parent_node_id,
+        std::uint32_t offset,
+        std::uint32_t limit,
+        const FileDirectoryEntrySink* sink,
+        std::uint32_t* returned,
+        std::uint32_t* total) noexcept;
     using QueryInterfaceFunction = BOOL(WINAPI*)(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -324,6 +442,14 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(SettingsContributionApi) };
         std::uint32_t version{ settings_contribution_api_version };
         EnumerateComponentSettingsFunction enumerate_settings{};
+    };
+
+    struct FileDirectoryPreviewApi
+    {
+        std::uint32_t size{ sizeof(FileDirectoryPreviewApi) };
+        std::uint32_t version{ file_directory_preview_api_version };
+        OpenFileDirectoryFunction open{};
+        EnumerateFileDirectoryChildrenFunction enumerate_children{};
     };
 
     struct ComponentApi

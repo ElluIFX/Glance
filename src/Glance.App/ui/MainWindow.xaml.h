@@ -293,13 +293,13 @@ namespace winrt::Glance::App::implementation
         void set_password_prompt_activation(bool enabled) noexcept;
         void submit_password();
         void cancel_archive_icon_load() noexcept;
-        winrt::fire_and_forget load_archive_async(
-            std::wstring path,
-            std::uint64_t generation,
-            std::wstring password = {});
         winrt::fire_and_forget load_directory_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_component_async(
             std::wstring path,
+            std::uint64_t generation);
+        winrt::fire_and_forget load_component_file_directory_async(
+            std::shared_ptr<void> session,
+            std::wstring password,
             std::uint64_t generation);
         winrt::fire_and_forget refresh_component_loading_text_async(
             std::wstring path,
@@ -510,8 +510,6 @@ namespace winrt::Glance::App::implementation
         bool pending_folder_focus_restore_{};
         bool archive_preview_is_directory_{};
         bool archive_entry_compressed_size_available_{};
-        std::wstring archive_source_path_;
-        std::wstring archive_password_;
         PasswordPromptTarget password_prompt_target_{ PasswordPromptTarget::none };
         bool password_prompt_activation_enabled_{};
         bool password_prompt_focused_{};
@@ -526,6 +524,9 @@ namespace winrt::Glance::App::implementation
         glance::app::MediaTechnicalMetadata media_metadata_;
         std::shared_ptr<glance::app::PagedDocumentRenderClient> pdf_render_client_;
         std::shared_ptr<void> active_component_preview_;
+        std::shared_ptr<void> active_component_file_directory_;
+        glance::app::FileDirectoryDescriptor active_file_directory_descriptor_;
+        std::vector<std::uint32_t> active_file_directory_columns_;
         std::shared_ptr<void> active_component_refinement_;
         std::shared_ptr<glance::app::ComponentWebPreview> active_component_web_preview_;
         std::wstring component_refinement_text_;

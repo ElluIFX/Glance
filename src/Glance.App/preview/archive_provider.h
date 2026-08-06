@@ -9,6 +9,14 @@ namespace glance::app
 {
     inline constexpr std::size_t maximum_preview_entries = 4000;
 
+    struct ArchiveEntryValue
+    {
+        std::uint32_t kind{};
+        std::uint64_t unsigned_value{};
+        double ratio_value{};
+        std::wstring text;
+    };
+
     struct ArchiveEntry
     {
         std::wstring name;
@@ -22,6 +30,7 @@ namespace glance::app
         bool compressed_size_known{};
         bool original_size_known{};
         bool is_folder{};
+        std::vector<ArchiveEntryValue> values;
         std::vector<ArchiveEntry> children;
     };
 
@@ -37,21 +46,11 @@ namespace glance::app
         bool original_size_known{};
         bool entry_compressed_size_available{};
         bool encrypted{};
-        bool password_required{};
-        bool invalid_password{};
-        bool unsupported_or_encrypted{};
         bool truncated{};
         bool entry_limit_reached{};
         bool depth_limited{};
     };
 
-    [[nodiscard]] ArchivePreview load_archive_preview(
-        const std::wstring& path,
-        const std::wstring& password = {},
-        std::size_t maximum_entries = maximum_preview_entries);
-    [[nodiscard]] ArchivePreview load_shell_archive_preview(
-        const std::wstring& path,
-        std::size_t maximum_entries = maximum_preview_entries);
     [[nodiscard]] ArchivePreview load_directory_preview(
         const std::wstring& path,
         std::size_t maximum_entries = maximum_preview_entries);

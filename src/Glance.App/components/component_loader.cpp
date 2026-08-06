@@ -26,6 +26,7 @@ namespace
     using glance::contracts::components::ConfigurablePreviewApi;
     using glance::contracts::components::GetApiFunction;
     using glance::contracts::components::HealthSeverity;
+    using glance::contracts::components::FileDirectoryPreviewApi;
     using glance::contracts::components::PreparedPreview;
     using glance::contracts::components::PagedDocumentHostDescriptor;
     using glance::contracts::components::PagedDocumentRendererApi;
@@ -82,6 +83,7 @@ namespace
         std::optional<PagedDocumentRendererApi> paged_document_renderer;
         std::optional<std::filesystem::path> paged_document_host;
         std::optional<SettingsContributionApi> settings_contribution;
+        std::optional<FileDirectoryPreviewApi> file_directory_preview;
         std::vector<std::wstring> extensions;
         std::vector<std::wstring> dependencies;
         std::vector<RendererRegistration> renderers;
@@ -139,6 +141,14 @@ namespace
         glance::contracts::components::PreviewPreparationOptions options;
         PreviewContentKind kind{ PreviewContentKind::none };
         PreviewContentFormat format{ PreviewContentFormat::none };
+        std::uint64_t token{};
+    };
+
+    struct FileDirectorySession
+    {
+        std::shared_ptr<LoadedComponent> component;
+        std::shared_ptr<void> lease;
+        FileDirectoryPreviewApi api;
         std::uint64_t token{};
     };
 
@@ -248,9 +258,23 @@ namespace
             return format == PreviewContentFormat::pdf;
         case PreviewContentKind::web:
             return format == PreviewContentFormat::html;
+        case PreviewContentKind::directory:
+            return format == PreviewContentFormat::file_directory;
         default:
             return false;
         }
+    }
+
+    bool valid_file_directory_value_kind(
+        glance::contracts::components::FileDirectoryValueKind kind) noexcept
+    {
+        using glance::contracts::components::FileDirectoryValueKind;
+        return kind == FileDirectoryValueKind::none ||
+            kind == FileDirectoryValueKind::text ||
+            kind == FileDirectoryValueKind::unsigned_integer ||
+            kind == FileDirectoryValueKind::bytes ||
+            kind == FileDirectoryValueKind::timestamp ||
+            kind == FileDirectoryValueKind::ratio;
     }
 
     std::uint64_t renderer_key(
@@ -527,18 +551,42 @@ namespace
                 component->settings_contribution = *interface_api;
             }
         }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::file_directory_preview_api_id,
+                glance::contracts::components::file_directory_preview_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const FileDirectoryPreviewApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(FileDirectoryPreviewApi) &&
+                interface_api->version ==
+                    glance::contracts::components::file_directory_preview_api_version &&
+                interface_api->open != nullptr &&
+                interface_api->enumerate_children != nullptr)
+            {
+                component->file_directory_preview = *interface_api;
+            }
+        }
         if (std::ranges::any_of(component->renderers, [&component](const auto& renderer) {
-                return IsEqualGUID(
-                           renderer.interface_id,
-                           glance::contracts::components::paged_document_renderer_api_id) &&
-                    (!component->paged_document_renderer.has_value() ||
-                     renderer.interface_version !=
-                         glance::contracts::components::paged_document_renderer_api_version);
-            }) ||
-            std::ranges::any_of(component->renderers, [](const auto& renderer) {
-                return !IsEqualGUID(
-                    renderer.interface_id,
-                    glance::contracts::components::paged_document_renderer_api_id);
+                if (IsEqualGUID(
+                        renderer.interface_id,
+                        glance::contracts::components::paged_document_renderer_api_id))
+                {
+                    return !component->paged_document_renderer.has_value() ||
+                        renderer.interface_version !=
+                            glance::contracts::components::paged_document_renderer_api_version;
+                }
+                if (IsEqualGUID(
+                        renderer.interface_id,
+                        glance::contracts::components::file_directory_preview_api_id))
+                {
+                    return !component->file_directory_preview.has_value() ||
+                        renderer.interface_version !=
+                            glance::contracts::components::file_directory_preview_api_version;
+                }
+                return true;
             }))
         {
             return {};
@@ -782,8 +830,37 @@ namespace
     {
         glance::app::ComponentPreviewResult result;
         result.status = glance::contracts::components::PrepareStatus::success;
-        if (!valid_content_pair(preview.kind, preview.format) ||
-            preview.path[0] == L'\0')
+        if (!valid_content_pair(preview.kind, preview.format))
+        {
+            component->api.release_preview(preview.lease_token);
+            result.status = glance::contracts::components::PrepareStatus::failed;
+            return result;
+        }
+
+        if (preview.kind == PreviewContentKind::directory &&
+            preview.format == PreviewContentFormat::file_directory)
+        {
+            if (preview.lease_token == 0 ||
+                !component->file_directory_preview.has_value())
+            {
+                component->api.release_preview(preview.lease_token);
+                result.status = glance::contracts::components::PrepareStatus::failed;
+                return result;
+            }
+            auto lease = std::make_shared<PreviewLease>(component, preview.lease_token);
+            auto session = std::make_shared<FileDirectorySession>();
+            session->component = component;
+            session->lease = lease;
+            session->api = *component->file_directory_preview;
+            session->token = preview.lease_token;
+            result.kind = preview.kind;
+            result.format = preview.format;
+            result.lease = lease;
+            result.file_directory = std::move(session);
+            return result;
+        }
+
+        if (preview.path[0] == L'\0')
         {
             component->api.release_preview(preview.lease_token);
             result.status = glance::contracts::components::PrepareStatus::failed;
@@ -899,6 +976,57 @@ namespace
             return {};
         }
         return result;
+    }
+
+    struct FileDirectoryEntryCollector
+    {
+        std::vector<glance::app::FileDirectoryEntry>* entries{};
+        bool valid{ true };
+    };
+
+    BOOL WINAPI append_file_directory_entry(
+        void* context,
+        const glance::contracts::components::FileDirectoryEntry* entry) noexcept
+    {
+        if (context == nullptr || entry == nullptr || entry->name == nullptr ||
+            entry->node_id == 0 ||
+            entry->value_count > glance::contracts::components::maximum_file_directory_columns ||
+            (entry->value_count != 0 && entry->values == nullptr))
+        {
+            return FALSE;
+        }
+        auto& collector = *static_cast<FileDirectoryEntryCollector*>(context);
+        try
+        {
+            glance::app::FileDirectoryEntry copied{
+                .node_id = entry->node_id,
+                .is_folder = entry->is_folder != FALSE,
+                .has_children = entry->has_children != FALSE,
+                .name = entry->name,
+                .icon_key = entry->icon_key == nullptr ? L"" : entry->icon_key };
+            copied.values.reserve(entry->value_count);
+            for (std::uint32_t index = 0; index < entry->value_count; ++index)
+            {
+                const auto& value = entry->values[index];
+                if (!valid_file_directory_value_kind(value.kind))
+                {
+                    collector.valid = false;
+                    return FALSE;
+                }
+                copied.values.push_back(glance::app::FileDirectoryValue{
+                    .kind = value.kind,
+                    .unsigned_value = value.unsigned_value,
+                    .ratio_value = value.ratio_value,
+                    .text = value.text == nullptr ? L"" : value.text });
+            }
+            collector.entries->push_back(std::move(copied));
+            return TRUE;
+        }
+        catch (...)
+        {
+            collector.valid = false;
+            return FALSE;
+        }
     }
 }
 
@@ -1123,6 +1251,158 @@ namespace glance::app
             result.status = glance::contracts::components::PrepareStatus::failed;
             return result;
         }
+    }
+
+    glance::contracts::components::FileDirectoryOpenStatus
+        open_component_file_directory(
+            const std::shared_ptr<void>& session_value,
+            std::wstring_view language_tag,
+            std::wstring_view password,
+            FileDirectoryDescriptor& descriptor) noexcept
+    {
+        using namespace glance::contracts::components;
+        descriptor = {};
+        if (session_value == nullptr)
+        {
+            return FileDirectoryOpenStatus::failed;
+        }
+        try
+        {
+            const auto session = std::static_pointer_cast<FileDirectorySession>(session_value);
+            glance::contracts::components::FileDirectoryDescriptor native;
+            const std::wstring language(language_tag);
+            const std::wstring password_value(password);
+            const auto status = session->api.open(
+                session->token,
+                language.c_str(),
+                password_value.c_str(),
+                &native);
+            if (status != FileDirectoryOpenStatus::ready)
+            {
+                return status;
+            }
+            if (native.size < sizeof(native) ||
+                (native.presentation != FileDirectoryPresentation::list &&
+                 native.presentation != FileDirectoryPresentation::tree) ||
+                native.info_field_count > maximum_file_directory_info_fields ||
+                native.column_count == 0 ||
+                native.column_count > maximum_file_directory_columns)
+            {
+                return FileDirectoryOpenStatus::failed;
+            }
+
+            descriptor.presentation = native.presentation;
+            descriptor.truncated = native.truncated != FALSE;
+            descriptor.depth_limited = native.depth_limited != FALSE;
+            descriptor.info_fields.reserve(native.info_field_count);
+            std::unordered_set<std::wstring> info_ids;
+            for (std::uint32_t index = 0; index < native.info_field_count; ++index)
+            {
+                const auto& field = native.info_fields[index];
+                const auto id = bounded_string(field.id);
+                const auto label = bounded_string(field.label);
+                const auto value = bounded_string(field.text);
+                if (!id.has_value() || !valid_setting_id(*id) ||
+                    !info_ids.insert(*id).second ||
+                    !label.has_value() || label->empty() || !value.has_value() ||
+                    !valid_file_directory_value_kind(field.kind))
+                {
+                    return FileDirectoryOpenStatus::failed;
+                }
+                descriptor.info_fields.push_back(FileDirectoryInfoField{
+                    .id = *id,
+                    .label = *label,
+                    .value = FileDirectoryValue{
+                        .kind = field.kind,
+                        .unsigned_value = field.unsigned_value,
+                        .ratio_value = field.ratio_value,
+                        .text = *value } });
+            }
+            descriptor.columns.reserve(native.column_count);
+            std::unordered_set<std::wstring> column_ids;
+            for (std::uint32_t index = 0; index < native.column_count; ++index)
+            {
+                const auto& column = native.columns[index];
+                const auto id = bounded_string(column.id);
+                const auto title = bounded_string(column.title);
+                if (!id.has_value() || !valid_setting_id(*id) ||
+                    !column_ids.insert(*id).second ||
+                    !title.has_value() || title->empty() ||
+                    !valid_file_directory_value_kind(column.kind) ||
+                    column.kind == FileDirectoryValueKind::none ||
+                    (column.alignment != FileDirectoryAlignment::left &&
+                     column.alignment != FileDirectoryAlignment::right) ||
+                    column.width > 1000)
+                {
+                    return FileDirectoryOpenStatus::failed;
+                }
+                descriptor.columns.push_back(FileDirectoryColumn{
+                    .id = *id,
+                    .title = *title,
+                    .kind = column.kind,
+                    .alignment = column.alignment,
+                    .width = column.width,
+                    .sortable = column.sortable != FALSE });
+            }
+            if (descriptor.columns.front().id != L"name" ||
+                descriptor.columns.front().kind != FileDirectoryValueKind::text)
+            {
+                descriptor = {};
+                return FileDirectoryOpenStatus::failed;
+            }
+            return status;
+        }
+        catch (...)
+        {
+            descriptor = {};
+            return FileDirectoryOpenStatus::failed;
+        }
+    }
+
+    FileDirectoryPage enumerate_component_file_directory(
+        const std::shared_ptr<void>& session_value,
+        std::uint64_t parent_node_id,
+        std::uint32_t offset,
+        std::uint32_t limit) noexcept
+    {
+        FileDirectoryPage result;
+        if (session_value == nullptr || limit == 0 || limit > 128)
+        {
+            result.failed = true;
+            return result;
+        }
+        try
+        {
+            const auto session = std::static_pointer_cast<FileDirectorySession>(session_value);
+            result.entries.reserve(limit);
+            FileDirectoryEntryCollector collector{ .entries = &result.entries };
+            glance::contracts::components::FileDirectoryEntrySink sink{
+                .context = &collector,
+                .append = append_file_directory_entry };
+            std::uint32_t returned{};
+            if (!session->api.enumerate_children(
+                    session->token,
+                    parent_node_id,
+                    offset,
+                    limit,
+                    &sink,
+                    &returned,
+                    &result.total) ||
+                !collector.valid || returned != result.entries.size() ||
+                returned > limit ||
+                static_cast<std::uint64_t>(result.total) <
+                    static_cast<std::uint64_t>(offset) + returned)
+            {
+                result.entries.clear();
+                result.failed = true;
+            }
+        }
+        catch (...)
+        {
+            result.entries.clear();
+            result.failed = true;
+        }
+        return result;
     }
 
     std::vector<ComponentStatus> component_statuses(
