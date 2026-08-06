@@ -1,8 +1,9 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "id": "model3d",
   "architecture": "x64",
   "entry_point": "Glance.Model3DComponent.dll",
+  "dependencies": [],
   "payload_files": [
     "resources.pri",
     "three-LICENSE.txt",

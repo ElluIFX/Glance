@@ -25,8 +25,6 @@ namespace glance::app
     {
         std::uint32_t audio_volume_percent{ 100 };
         std::uint32_t video_volume_percent{ 100 };
-        std::uint32_t rich_document_render_dimension{
-            default_rich_document_render_dimension };
         bool autoplay_audio{ true };
         bool autoplay_video{ true };
         bool reverse_seek_wheel{};

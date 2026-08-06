@@ -23,7 +23,7 @@ namespace
             return L"Image";
         case PreviewKind::media:
             return media_is_audio ? L"Audio" : L"Video";
-        case PreviewKind::pdf:
+        case PreviewKind::document:
             return L"Pdf";
         case PreviewKind::archive:
             return L"Archive";

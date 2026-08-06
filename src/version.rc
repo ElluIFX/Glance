@@ -22,8 +22,8 @@ IDI_GLANCE_APP ICON "Glance.App\\Assets\\AppIcon.ico"
 #define GLANCE_ORIGINAL_FILENAME "Glance.DialogBroker32.exe"
 #elif GLANCE_BINARY_KIND == 5
 #define GLANCE_FILE_DESCRIPTION "Glance PDF Render Host"
-#define GLANCE_INTERNAL_NAME "Glance.RenderHost"
-#define GLANCE_ORIGINAL_FILENAME "Glance.RenderHost.exe"
+#define GLANCE_INTERNAL_NAME "Glance.PdfHost"
+#define GLANCE_ORIGINAL_FILENAME "Glance.PdfHost.exe"
 #else
 #error GLANCE_BINARY_KIND must identify the target executable.
 #endif

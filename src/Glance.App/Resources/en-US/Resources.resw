@@ -195,13 +195,6 @@
   <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>Start video playback when a preview opens</value></data>
   <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>Reverse seek wheel direction</value></data>
   <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>Reverse the mouse wheel direction used to seek media</value></data>
-  <data name="RichDocumentPreviewGroupTitle.Text" xml:space="preserve"><value>Rich document preview</value></data>
-  <data name="RichDocumentRenderResolutionLabel.Text" xml:space="preserve"><value>Render resolution</value></data>
-  <data name="RichDocumentRenderResolutionDescription.Text" xml:space="preserve"><value>Maximum pixel length of the rendered preview</value></data>
-  <data name="RichDocumentResolution1024Item.Content" xml:space="preserve"><value>1024 px</value></data>
-  <data name="RichDocumentResolution2048Item.Content" xml:space="preserve"><value>2048 px</value></data>
-  <data name="RichDocumentResolution4096Item.Content" xml:space="preserve"><value>4096 px</value></data>
-  <data name="RichDocumentResolution8192Item.Content" xml:space="preserve"><value>8192 px</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>Document preview</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>Document previewer appearance and behavior</value></data>
   <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>Plain text preview</value></data>
@@ -369,4 +362,6 @@
   <data name="ComponentStateWarning" xml:space="preserve"><value>Warning</value></data>
   <data name="ComponentStateError" xml:space="preserve"><value>Unavailable</value></data>
   <data name="ComponentWebViewUnavailable" xml:space="preserve"><value>WebView2 Runtime not found</value></data>
+  <data name="ComponentDependencyUnavailable" xml:space="preserve"><value>Required component {0} is unavailable</value></data>
+  <data name="ComponentDependencyCycle" xml:space="preserve"><value>The component dependency graph contains a cycle</value></data>
 </root>

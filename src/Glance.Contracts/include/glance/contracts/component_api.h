@@ -7,7 +7,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 4;
+    inline constexpr std::uint32_t abi_version = 5;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -20,8 +20,16 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t progressive_preview_api_version = 1;
     inline constexpr std::uint32_t preview_notice_api_version = 1;
     inline constexpr std::uint32_t web_preview_api_version = 1;
+    inline constexpr std::uint32_t paged_document_renderer_api_version = 1;
+    inline constexpr std::uint32_t settings_contribution_api_version = 1;
     inline constexpr std::size_t web_resource_host_capacity = 64;
     inline constexpr std::size_t maximum_web_resource_mappings = 4;
+    inline constexpr std::size_t renderer_host_capacity = 260;
+    inline constexpr std::size_t setting_id_capacity = 64;
+    inline constexpr std::size_t setting_group_id_capacity = 64;
+    inline constexpr std::size_t setting_text_capacity = 256;
+    inline constexpr std::size_t setting_option_text_capacity = 64;
+    inline constexpr std::size_t maximum_setting_options = 8;
     inline constexpr GUID configurable_preview_api_id{
         0x950742e7,
         0x0af2,
@@ -42,6 +50,16 @@ namespace glance::contracts::components
         0x840d,
         0x49f5,
         { 0xa7, 0xbc, 0x77, 0xe0, 0x2d, 0x49, 0xd6, 0x28 } };
+    inline constexpr GUID paged_document_renderer_api_id{
+        0x3ce11f55,
+        0x620e,
+        0x4fc2,
+        { 0x89, 0x41, 0x19, 0xd2, 0x39, 0x29, 0xe2, 0x66 } };
+    inline constexpr GUID settings_contribution_api_id{
+        0xd1ef7371,
+        0x3b06,
+        0x46a3,
+        { 0xa1, 0xc0, 0xae, 0x40, 0x78, 0x3f, 0xf2, 0xdc } };
 
     enum class PreviewContentKind : std::uint32_t
     {
@@ -91,15 +109,33 @@ namespace glance::contracts::components
         allow = 1,
     };
 
+    enum class ComponentSettingPage : std::uint32_t
+    {
+        document_preview = 1,
+    };
+
+    enum class ComponentSettingKind : std::uint32_t
+    {
+        toggle = 1,
+        choice = 2,
+    };
+
     using RegisterExtensionFunction = BOOL(WINAPI*)(
         void* context,
         const wchar_t* extension) noexcept;
+    using RegisterRendererFunction = BOOL(WINAPI*)(
+        void* context,
+        PreviewContentKind kind,
+        PreviewContentFormat format,
+        const GUID* interface_id,
+        std::uint32_t interface_version) noexcept;
 
     struct ComponentRegistrar
     {
         std::uint32_t size{ sizeof(ComponentRegistrar) };
         void* context{};
         RegisterExtensionFunction register_extension{};
+        RegisterRendererFunction register_renderer{};
     };
 
     struct ComponentRegistration
@@ -164,6 +200,35 @@ namespace glance::contracts::components
         WebResourceMapping mappings[maximum_web_resource_mappings]{};
     };
 
+    struct PagedDocumentHostDescriptor
+    {
+        std::uint32_t size{ sizeof(PagedDocumentHostDescriptor) };
+        wchar_t host_executable[renderer_host_capacity]{};
+    };
+
+    struct ComponentSettingOption
+    {
+        std::int64_t value{};
+        wchar_t text[setting_option_text_capacity]{};
+    };
+
+    struct ComponentSettingDescriptor
+    {
+        std::uint32_t size{ sizeof(ComponentSettingDescriptor) };
+        wchar_t setting_id[setting_id_capacity]{};
+        ComponentSettingPage page{ ComponentSettingPage::document_preview };
+        wchar_t group_id[setting_group_id_capacity]{};
+        wchar_t group_title[setting_text_capacity]{};
+        wchar_t label[setting_text_capacity]{};
+        wchar_t description[setting_text_capacity]{};
+        ComponentSettingKind kind{ ComponentSettingKind::choice };
+        std::int64_t default_value{};
+        std::uint32_t group_order{};
+        std::uint32_t setting_order{};
+        std::uint32_t option_count{};
+        ComponentSettingOption options[maximum_setting_options]{};
+    };
+
     using InitializeFunction = BOOL(WINAPI*)(
         const ComponentRegistrar* registrar,
         ComponentRegistration* registration) noexcept;
@@ -204,6 +269,13 @@ namespace glance::contracts::components
         std::uint64_t lease_token,
         const WebPreviewOptions* options,
         WebPreviewDescriptor* descriptor) noexcept;
+    using QueryPagedDocumentHostFunction = BOOL(WINAPI*)(
+        PagedDocumentHostDescriptor* descriptor) noexcept;
+    using EnumerateComponentSettingsFunction = BOOL(WINAPI*)(
+        const wchar_t* language_tag,
+        ComponentSettingDescriptor* descriptors,
+        std::uint32_t capacity,
+        std::uint32_t* count) noexcept;
     using QueryInterfaceFunction = BOOL(WINAPI*)(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -238,6 +310,20 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(WebPreviewApi) };
         std::uint32_t version{ web_preview_api_version };
         QueryWebPreviewFunction query_preview{};
+    };
+
+    struct PagedDocumentRendererApi
+    {
+        std::uint32_t size{ sizeof(PagedDocumentRendererApi) };
+        std::uint32_t version{ paged_document_renderer_api_version };
+        QueryPagedDocumentHostFunction query_host{};
+    };
+
+    struct SettingsContributionApi
+    {
+        std::uint32_t size{ sizeof(SettingsContributionApi) };
+        std::uint32_t version{ settings_contribution_api_version };
+        EnumerateComponentSettingsFunction enumerate_settings{};
     };
 
     struct ComponentApi

@@ -118,8 +118,6 @@ $requiredFiles = @(
     "Glance.DialogBroker32.exe",
     "Glance.DialogHook.dll",
     "Glance.DialogHook32.dll",
-    "Glance.RenderHost.exe",
-    "pdfium.dll",
     "Lexilla.dll",
     "Scintilla.dll",
     "msvcp140.dll",
@@ -181,17 +179,12 @@ foreach ($artifact in $developmentArtifacts) {
     Remove-GlanceWorkspaceItem -Path $artifact.FullName
 }
 
-$pdfiumLicenseSource = Join-Path $repositoryRoot "licenses\PDFium"
-$pdfiumLicenseDestination = Join-Path $payloadDirectory "licenses\PDFium"
-New-Item -ItemType Directory -Path $pdfiumLicenseDestination -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\PDFium-NOTICE.txt") `
-    -Destination (Join-Path $payloadDirectory "licenses\PDFium-NOTICE.txt") -Force
-Copy-Item -Path (Join-Path $pdfiumLicenseSource "*") `
-    -Destination $pdfiumLicenseDestination -Force
+$licenseDirectory = Join-Path $payloadDirectory "licenses"
+New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\Scintilla-Lexilla.txt") `
-    -Destination (Join-Path $payloadDirectory "licenses\Scintilla-Lexilla.txt") -Force
+    -Destination (Join-Path $licenseDirectory "Scintilla-Lexilla.txt") -Force
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\Tinted-Theming.txt") `
-    -Destination (Join-Path $payloadDirectory "licenses\Tinted-Theming.txt") -Force
+    -Destination (Join-Path $licenseDirectory "Tinted-Theming.txt") -Force
 
 $forbiddenRuntimeFiles = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File | Where-Object {
     $_.Name -in @(

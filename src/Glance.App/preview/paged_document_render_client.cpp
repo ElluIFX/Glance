@@ -1,5 +1,9 @@
 #include "pch.h"
-#include "pdf_render_client.h"
+#include "paged_document_render_client.h"
+
+#ifndef GLANCE_PAGED_DOCUMENT_CLIENT_NO_COMPONENT_FACTORY
+#include "component_loader.h"
+#endif
 
 #include <algorithm>
 #include <array>
@@ -11,15 +15,7 @@
 
 namespace
 {
-    using namespace glance::contracts::pdf;
-
-    std::filesystem::path executable_directory()
-    {
-        std::wstring path(32768, L'\0');
-        const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
-        path.resize(length);
-        return std::filesystem::path(path).parent_path();
-    }
+    using namespace glance::contracts::document;
 
     bool read_exact(HANDLE handle, void* destination, std::size_t size)
     {
@@ -143,20 +139,30 @@ namespace
 
 namespace glance::app
 {
-    namespace
+    PagedDocumentRenderClient::PagedDocumentRenderClient(
+        std::wstring host_path,
+        std::shared_ptr<void> renderer_lease)
+        : host_path_(std::move(host_path)),
+          renderer_lease_(std::move(renderer_lease))
     {
-        std::mutex warm_client_mutex;
-        std::shared_ptr<PdfRenderClient> warm_client;
+        idle_timer_ = CreateThreadpoolTimer(idle_timeout_callback, this, nullptr);
     }
 
-    PdfRenderClient::~PdfRenderClient()
+    PagedDocumentRenderClient::~PagedDocumentRenderClient()
     {
-        cancel();
+        if (idle_timer_ != nullptr)
+        {
+            SetThreadpoolTimer(idle_timer_, nullptr, 0, 0);
+            WaitForThreadpoolTimerCallbacks(idle_timer_, TRUE);
+            CloseThreadpoolTimer(idle_timer_);
+            idle_timer_ = nullptr;
+        }
+        terminate_process();
         std::scoped_lock lock(mutex_);
-        close_locked();
+        close_process_locked(true);
     }
 
-    bool PdfRenderClient::start()
+    bool PagedDocumentRenderClient::start()
     {
         bool stale_process{};
         {
@@ -172,9 +178,9 @@ namespace glance::app
         }
         if (stale_process)
         {
-            close_locked();
+            close_process_locked(false);
         }
-        const auto host_path = executable_directory() / L"Glance.RenderHost.exe";
+        const std::filesystem::path host_path(host_path_);
         std::error_code path_error;
         if (!std::filesystem::is_regular_file(host_path, path_error))
         {
@@ -307,14 +313,36 @@ namespace glance::app
         }
         if (cancelled_.load(std::memory_order_acquire))
         {
-            close_locked();
+            close_process_locked(false);
             return false;
         }
         return true;
     }
 
-    void PdfRenderClient::close_locked() noexcept
+    void PagedDocumentRenderClient::close_process_locked(bool graceful) noexcept
     {
+        HANDLE process{};
+        {
+            std::scoped_lock process_lock(process_handle_mutex_);
+            process = std::exchange(process_, nullptr);
+        }
+        if (process != nullptr)
+        {
+            if (WaitForSingleObject(process, 0) == WAIT_TIMEOUT)
+            {
+                if (graceful)
+                {
+                    const RequestHeader request{ .command = Command::shutdown };
+                    static_cast<void>(write_exact(request_pipe_, &request, sizeof(request)));
+                }
+                if (!graceful || WaitForSingleObject(process, 2000) == WAIT_TIMEOUT)
+                {
+                    TerminateProcess(process, ERROR_CANCELLED);
+                    WaitForSingleObject(process, 1000);
+                }
+            }
+            CloseHandle(process);
+        }
         if (bitmap_memory_ != nullptr)
         {
             UnmapViewOfFile(bitmap_memory_);
@@ -335,23 +363,9 @@ namespace glance::app
             CloseHandle(response_pipe_);
             response_pipe_ = nullptr;
         }
-        HANDLE process{};
-        {
-            std::scoped_lock process_lock(process_handle_mutex_);
-            process = std::exchange(process_, nullptr);
-        }
-        if (process != nullptr)
-        {
-            if (WaitForSingleObject(process, 0) == WAIT_TIMEOUT)
-            {
-                TerminateProcess(process, ERROR_CANCELLED);
-                WaitForSingleObject(process, 1000);
-            }
-            CloseHandle(process);
-        }
     }
 
-    void PdfRenderClient::cancel() noexcept
+    void PagedDocumentRenderClient::terminate_process() noexcept
     {
         cancelled_.store(true, std::memory_order_release);
         std::scoped_lock process_lock(process_handle_mutex_);
@@ -361,13 +375,81 @@ namespace glance::app
         }
     }
 
-    bool PdfRenderClient::prewarm()
+    void PagedDocumentRenderClient::stop_idle_timer() noexcept
     {
-        std::scoped_lock lock(mutex_);
-        return !cancelled_.load(std::memory_order_acquire) && start();
+        if (idle_timer_ != nullptr)
+        {
+            SetThreadpoolTimer(idle_timer_, nullptr, 0, 0);
+        }
     }
 
-    bool PdfRenderClient::transact(
+    void PagedDocumentRenderClient::arm_idle_timer() noexcept
+    {
+        if (idle_timer_ == nullptr)
+        {
+            return;
+        }
+        constexpr auto idle_timeout = std::chrono::seconds(60);
+        LARGE_INTEGER due_time{};
+        due_time.QuadPart = -idle_timeout.count() * 10000000LL;
+        FILETIME due_file_time{
+            due_time.LowPart,
+            static_cast<DWORD>(due_time.HighPart) };
+        SetThreadpoolTimer(idle_timer_, &due_file_time, 0, 0);
+    }
+
+    void CALLBACK PagedDocumentRenderClient::idle_timeout_callback(
+        PTP_CALLBACK_INSTANCE,
+        void* context,
+        PTP_TIMER) noexcept
+    {
+        auto* client = static_cast<PagedDocumentRenderClient*>(context);
+        std::scoped_lock lock(client->mutex_);
+        if (client->cancelled_.load(std::memory_order_acquire))
+        {
+            client->close_process_locked(true);
+        }
+    }
+
+    bool PagedDocumentRenderClient::send_control_command_locked(Command command) noexcept
+    {
+        if (process_ == nullptr || WaitForSingleObject(process_, 0) != WAIT_TIMEOUT)
+        {
+            return false;
+        }
+        RenderTransactionTimeout timeout;
+        if (!timeout.start(process_, 2000))
+        {
+            return false;
+        }
+        const RequestHeader request{ .command = command };
+        ResponseHeader response{};
+        return write_exact(request_pipe_, &request, sizeof(request)) &&
+            read_exact(response_pipe_, &response, sizeof(response)) &&
+            response.magic == protocol_magic &&
+            response.version == protocol_version &&
+            response.status == Status::success &&
+            response.payload_size == 0;
+    }
+
+    void PagedDocumentRenderClient::close_document() noexcept
+    {
+        cancelled_.store(true, std::memory_order_release);
+        std::unique_lock lock(mutex_, std::try_to_lock);
+        if (!lock.owns_lock())
+        {
+            terminate_process();
+            return;
+        }
+        if (process_ != nullptr && !send_control_command_locked(Command::close_document))
+        {
+            close_process_locked(false);
+            return;
+        }
+        arm_idle_timer();
+    }
+
+    bool PagedDocumentRenderClient::transact(
         Command command,
         const std::vector<std::byte>& request,
         Status& status,
@@ -387,7 +469,7 @@ namespace glance::app
         RenderTransactionTimeout timeout;
         if (!timeout.start(process_, transact_timeout_ms))
         {
-            close_locked();
+            close_process_locked(false);
             return false;
         }
         const RequestHeader header{
@@ -397,7 +479,7 @@ namespace glance::app
         if (!write_exact(request_pipe_, &header, sizeof(header)) ||
             (!request.empty() && !write_exact(request_pipe_, request.data(), request.size())))
         {
-            close_locked();
+            close_process_locked(false);
             return false;
         }
         ResponseHeader response_header{};
@@ -406,24 +488,28 @@ namespace glance::app
             response_header.version != protocol_version ||
             response_header.payload_size > maximum_payload_size)
         {
-            close_locked();
+            close_process_locked(false);
             return false;
         }
         response.resize(response_header.payload_size);
         if (!response.empty() &&
             !read_exact(response_pipe_, response.data(), response.size()))
         {
-            close_locked();
+            close_process_locked(false);
             return false;
         }
         status = response_header.status;
         return true;
     }
 
-    PdfOpenResult PdfRenderClient::open(const std::wstring& path, const std::wstring& password)
+    PagedDocumentOpenResult PagedDocumentRenderClient::open(
+        const std::wstring& path,
+        const std::wstring& password)
     {
         std::scoped_lock lock(mutex_);
-        PdfOpenResult result;
+        stop_idle_timer();
+        cancelled_.store(false, std::memory_order_release);
+        PagedDocumentOpenResult result;
         const OpenRequest request{
             .path_characters = static_cast<std::uint32_t>(path.size()),
             .password_characters = static_cast<std::uint32_t>(password.size()),
@@ -468,7 +554,7 @@ namespace glance::app
                 return result;
             }
             const auto* title = reinterpret_cast<const wchar_t*>(response.data() + offset);
-            result.outline.push_back(PdfOutlineEntry{
+            result.outline.push_back(PagedDocumentOutlineEntry{
                 .depth = entry.depth,
                 .page_index = entry.page_index,
                 .title = std::wstring(title, entry.title_characters),
@@ -478,13 +564,13 @@ namespace glance::app
         return result;
     }
 
-    PdfRenderResult PdfRenderClient::render(
+    PagedDocumentRenderResult PagedDocumentRenderClient::render(
         std::uint32_t page_index,
         std::uint32_t maximum_width,
         std::uint32_t maximum_height)
     {
         std::scoped_lock lock(mutex_);
-        PdfRenderResult result;
+        PagedDocumentRenderResult result;
         const RenderRequest request{
             .page_index = page_index,
             .maximum_width = maximum_width,
@@ -501,11 +587,11 @@ namespace glance::app
         return consume_render_response(result.status, response);
     }
 
-    PdfRenderResult PdfRenderClient::consume_render_response(
+    PagedDocumentRenderResult PagedDocumentRenderClient::consume_render_response(
         Status status,
         const std::vector<std::byte>& response)
     {
-        PdfRenderResult result;
+        PagedDocumentRenderResult result;
         result.status = status;
         RenderResponse metadata{};
         std::memcpy(&metadata, response.data(), sizeof(metadata));
@@ -532,49 +618,18 @@ namespace glance::app
         return result;
     }
 
-    void prewarm_pdf_render_client()
+#ifndef GLANCE_PAGED_DOCUMENT_CLIENT_NO_COMPONENT_FACTORY
+    std::shared_ptr<PagedDocumentRenderClient>
+    acquire_paged_document_render_client()
     {
-        auto client = std::make_shared<PdfRenderClient>();
+        const auto renderer = paged_document_renderer();
+        if (!renderer.has_value())
         {
-            std::scoped_lock lock(warm_client_mutex);
-            if (warm_client != nullptr)
-            {
-                return;
-            }
-            warm_client = client;
+            return {};
         }
-        std::thread([client] {
-            bool ready{};
-            try
-            {
-                ready = client->prewarm();
-            }
-            catch (...)
-            {
-            }
-            if (!ready)
-            {
-                std::scoped_lock lock(warm_client_mutex);
-                if (warm_client == client)
-                {
-                    warm_client.reset();
-                }
-            }
-        }).detach();
+        return std::make_shared<PagedDocumentRenderClient>(
+            renderer->host_path,
+            renderer->lease);
     }
-
-    std::shared_ptr<PdfRenderClient> acquire_pdf_render_client()
-    {
-        std::shared_ptr<PdfRenderClient> client;
-        {
-            std::scoped_lock lock(warm_client_mutex);
-            client = std::move(warm_client);
-        }
-        if (client == nullptr)
-        {
-            client = std::make_shared<PdfRenderClient>();
-        }
-        prewarm_pdf_render_client();
-        return client;
-    }
+#endif
 }

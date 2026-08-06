@@ -65,9 +65,6 @@ namespace winrt::Glance::App::implementation
         void MediaPreferenceToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void RichDocumentRenderResolutionComboBox_SelectionChanged(
-            IInspectable const&,
-            Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
         winrt::fire_and_forget ExportDiagnosticBundleButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -151,6 +148,7 @@ namespace winrt::Glance::App::implementation
         void save_footer_preferences();
         void update_auto_fit_controls_enabled() noexcept;
         void rebuild_footer_field_rows();
+        void rebuild_component_settings();
         [[nodiscard]] FooterFieldControls footer_field_controls(glance::app::FooterField field);
         winrt::fire_and_forget download_and_install_update(glance::app::UpdateInstallerAsset asset);
         void show_update_download_card(std::wstring_view version);

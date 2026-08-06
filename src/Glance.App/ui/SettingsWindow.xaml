@@ -693,32 +693,7 @@
                         </StackPanel>
                         </Border>
                     </StackPanel>
-                    <StackPanel Spacing="8">
-                        <TextBlock x:Name="RichDocumentPreviewGroupTitle" x:Uid="RichDocumentPreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Rich document preview" />
-                        <Border Style="{StaticResource SettingsGroupStyle}">
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="220" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="RichDocumentRenderResolutionLabel" x:Uid="RichDocumentRenderResolutionLabel" Text="Render resolution" />
-                                    <TextBlock x:Name="RichDocumentRenderResolutionDescription" x:Uid="RichDocumentRenderResolutionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Maximum pixel length of the rendered preview" />
-                                </StackPanel>
-                                <ComboBox
-                                    x:Name="RichDocumentRenderResolutionComboBox"
-                                    Grid.Column="1"
-                                    HorizontalAlignment="Stretch"
-                                    VerticalAlignment="Center"
-                                    SelectionChanged="RichDocumentRenderResolutionComboBox_SelectionChanged">
-                                    <ComboBoxItem x:Name="RichDocumentResolution1024Item" x:Uid="RichDocumentResolution1024Item" Content="1024 px" Tag="1024" />
-                                    <ComboBoxItem x:Name="RichDocumentResolution2048Item" x:Uid="RichDocumentResolution2048Item" Content="2048 px" Tag="2048" />
-                                    <ComboBoxItem x:Name="RichDocumentResolution4096Item" x:Uid="RichDocumentResolution4096Item" Content="4096 px" Tag="4096" />
-                                    <ComboBoxItem x:Name="RichDocumentResolution8192Item" x:Uid="RichDocumentResolution8192Item" Content="8192 px" Tag="8192" />
-                                </ComboBox>
-                            </Grid>
-                        </Border>
-                    </StackPanel>
+                    <StackPanel x:Name="ComponentDocumentSettingsPanel" Spacing="24" />
                 </StackPanel>
             </ScrollViewer>
 

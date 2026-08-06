@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Component.DisplayName" xml:space="preserve"><value>PDF 预览</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>PDF 渲染可用</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>PDF 渲染文件缺失</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在加载文档</value></data>
+  <data name="Settings.GroupTitle" xml:space="preserve"><value>富文档预览</value></data>
+  <data name="Settings.RenderResolution.Label" xml:space="preserve"><value>渲染分辨率</value></data>
+  <data name="Settings.RenderResolution.Description" xml:space="preserve"><value>渲染预览最长边的像素上限</value></data>
+  <data name="Settings.RenderResolution.1024" xml:space="preserve"><value>1024 px</value></data>
+  <data name="Settings.RenderResolution.2048" xml:space="preserve"><value>2048 px</value></data>
+  <data name="Settings.RenderResolution.4096" xml:space="preserve"><value>4096 px</value></data>
+  <data name="Settings.RenderResolution.8192" xml:space="preserve"><value>8192 px</value></data>
+</root>

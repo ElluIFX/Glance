@@ -1,8 +1,11 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "id": "office",
   "architecture": "x64",
   "entry_point": "Glance.OfficeComponent.dll",
+  "dependencies": [
+    "pdf"
+  ],
   "payload_files": [
     "Glance.OfficeHost.exe",
     "resources.pri"

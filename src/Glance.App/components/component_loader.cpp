@@ -14,6 +14,7 @@
 #include <mutex>
 #include <optional>
 #include <ranges>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -26,10 +27,13 @@ namespace
     using glance::contracts::components::GetApiFunction;
     using glance::contracts::components::HealthSeverity;
     using glance::contracts::components::PreparedPreview;
+    using glance::contracts::components::PagedDocumentHostDescriptor;
+    using glance::contracts::components::PagedDocumentRendererApi;
     using glance::contracts::components::PreviewContentFormat;
     using glance::contracts::components::PreviewContentKind;
     using glance::contracts::components::PreviewNoticeApi;
     using glance::contracts::components::ProgressivePreviewApi;
+    using glance::contracts::components::SettingsContributionApi;
     using glance::contracts::components::WebPreviewApi;
     using glance::contracts::components::WebPreviewDescriptor;
     using glance::contracts::components::WebPreviewOptions;
@@ -39,11 +43,35 @@ namespace
     {
         std::wstring id;
         std::wstring entry_point;
+        std::vector<std::wstring> dependencies;
+    };
+
+    struct RendererRegistration
+    {
+        PreviewContentKind kind{ PreviewContentKind::none };
+        PreviewContentFormat format{ PreviewContentFormat::none };
+        GUID interface_id{};
+        std::uint32_t interface_version{};
+    };
+
+    struct RegistrationCollector
+    {
+        std::vector<std::wstring> extensions;
+        std::vector<RendererRegistration> renderers;
+    };
+
+    enum class DependencyFailure
+    {
+        none,
+        missing,
+        inactive,
+        cycle,
     };
 
     struct LoadedComponent
     {
         std::wstring id;
+        std::filesystem::path directory;
         HMODULE module{};
         ComponentApi api;
         ComponentRegistration registration;
@@ -51,7 +79,16 @@ namespace
         std::optional<ProgressivePreviewApi> progressive_preview;
         std::optional<PreviewNoticeApi> preview_notice;
         std::optional<WebPreviewApi> web_preview;
+        std::optional<PagedDocumentRendererApi> paged_document_renderer;
+        std::optional<std::filesystem::path> paged_document_host;
+        std::optional<SettingsContributionApi> settings_contribution;
         std::vector<std::wstring> extensions;
+        std::vector<std::wstring> dependencies;
+        std::vector<RendererRegistration> renderers;
+        std::wstring dependency_name;
+        DependencyFailure dependency_failure{ DependencyFailure::none };
+        bool activation_ready{ true };
+        bool active{};
 
         ~LoadedComponent()
         {
@@ -111,6 +148,9 @@ namespace
     std::unordered_map<
         std::wstring,
         std::vector<std::shared_ptr<LoadedComponent>>> extension_index;
+    std::unordered_map<
+        std::uint64_t,
+        std::vector<std::shared_ptr<LoadedComponent>>> renderer_index;
 
     std::filesystem::path executable_directory()
     {
@@ -123,6 +163,28 @@ namespace
         }
         path.resize(length);
         return std::filesystem::path(path).parent_path();
+    }
+
+    template <std::size_t Size>
+    std::optional<std::wstring> bounded_string(const wchar_t (&value)[Size])
+    {
+        const auto length = wcsnlen_s(value, Size);
+        if (length == Size)
+        {
+            return std::nullopt;
+        }
+        return std::wstring(value, length);
+    }
+
+    bool valid_setting_id(std::wstring_view id) noexcept
+    {
+        return !id.empty() &&
+            id.size() < glance::contracts::components::setting_id_capacity &&
+            std::ranges::all_of(id, [](wchar_t character) {
+                return (character >= L'a' && character <= L'z') ||
+                    (character >= L'0' && character <= L'9') ||
+                    character == L'-';
+            });
     }
 
     void log_component_failure(
@@ -191,6 +253,14 @@ namespace
         }
     }
 
+    std::uint64_t renderer_key(
+        PreviewContentKind kind,
+        PreviewContentFormat format) noexcept
+    {
+        return static_cast<std::uint64_t>(kind) << 32U |
+            static_cast<std::uint32_t>(format);
+    }
+
     bool read_manifest(
         const std::filesystem::path& path,
         ComponentManifest& manifest) noexcept
@@ -207,12 +277,25 @@ namespace
                 std::istreambuf_iterator<char>() };
             const auto object =
                 winrt::Windows::Data::Json::JsonObject::Parse(winrt::to_hstring(json));
-            if (object.GetNamedNumber(L"schema_version") != 2.0)
+            if (object.GetNamedNumber(L"schema_version") != 3.0)
             {
                 return false;
             }
             manifest.id = object.GetNamedString(L"id");
             manifest.entry_point = object.GetNamedString(L"entry_point");
+            const auto dependencies = object.GetNamedArray(L"dependencies");
+            std::unordered_set<std::wstring> unique_dependencies;
+            for (std::uint32_t index = 0; index < dependencies.Size(); ++index)
+            {
+                auto dependency = std::wstring(dependencies.GetStringAt(index));
+                if (!valid_component_id(dependency) ||
+                    dependency == manifest.id ||
+                    !unique_dependencies.insert(dependency).second)
+                {
+                    return false;
+                }
+                manifest.dependencies.push_back(std::move(dependency));
+            }
             const std::filesystem::path entry(manifest.entry_point);
             return valid_component_id(manifest.id) &&
                 !manifest.entry_point.empty() &&
@@ -233,7 +316,7 @@ namespace
         }
         try
         {
-            auto& extensions = *static_cast<std::vector<std::wstring>*>(context);
+            auto& extensions = static_cast<RegistrationCollector*>(context)->extensions;
             auto normalized = normalize_extension(extension);
             if (normalized.empty() ||
                 std::ranges::find(extensions, normalized) != extensions.end())
@@ -249,11 +332,47 @@ namespace
         }
     }
 
+    BOOL WINAPI register_renderer(
+        void* context,
+        PreviewContentKind kind,
+        PreviewContentFormat format,
+        const GUID* interface_id,
+        std::uint32_t interface_version) noexcept
+    {
+        if (context == nullptr || interface_id == nullptr || interface_version == 0 ||
+            !valid_content_pair(kind, format))
+        {
+            return FALSE;
+        }
+        try
+        {
+            auto& renderers = static_cast<RegistrationCollector*>(context)->renderers;
+            if (std::ranges::any_of(renderers, [kind, format](const auto& renderer) {
+                    return renderer.kind == kind && renderer.format == format;
+                }))
+            {
+                return FALSE;
+            }
+            renderers.push_back(RendererRegistration{
+                .kind = kind,
+                .format = format,
+                .interface_id = *interface_id,
+                .interface_version = interface_version });
+            return TRUE;
+        }
+        catch (...)
+        {
+            return FALSE;
+        }
+    }
+
     std::shared_ptr<LoadedComponent> load_component(
         const std::filesystem::path& directory,
         const ComponentManifest& manifest)
     {
         auto component = std::make_shared<LoadedComponent>();
+        component->directory = directory;
+        component->dependencies = manifest.dependencies;
         component->module = LoadLibraryExW(
             (directory / manifest.entry_point).c_str(),
             nullptr,
@@ -284,15 +403,17 @@ namespace
             return {};
         }
 
+        RegistrationCollector collector;
         glance::contracts::components::ComponentRegistrar registrar{
-            .context = &component->extensions,
-            .register_extension = register_extension };
+            .context = &collector,
+            .register_extension = register_extension,
+            .register_renderer = register_renderer };
         if (!component->api.initialize(&registrar, &component->registration) ||
             component->registration.size < sizeof(ComponentRegistration) ||
             manifest.id != component->registration.component_id ||
             std::wstring_view(component->registration.target_app_version) !=
                 GLANCE_VERSION_WSTRING ||
-            component->extensions.empty() ||
+            collector.extensions.empty() ||
             !valid_content_pair(
                 component->registration.preferred_kind,
                 component->registration.preferred_format))
@@ -300,6 +421,8 @@ namespace
             return {};
         }
         component->id = manifest.id;
+        component->extensions = std::move(collector.extensions);
+        component->renderers = std::move(collector.renderers);
         void* interface_pointer{};
         if (component->api.query_interface(
                 &glance::contracts::components::configurable_preview_api_id,
@@ -370,8 +493,135 @@ namespace
                 component->web_preview = *interface_api;
             }
         }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::paged_document_renderer_api_id,
+                glance::contracts::components::paged_document_renderer_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const PagedDocumentRendererApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(PagedDocumentRendererApi) &&
+                interface_api->version ==
+                    glance::contracts::components::paged_document_renderer_api_version &&
+                interface_api->query_host != nullptr)
+            {
+                component->paged_document_renderer = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::settings_contribution_api_id,
+                glance::contracts::components::settings_contribution_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const SettingsContributionApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(SettingsContributionApi) &&
+                interface_api->version ==
+                    glance::contracts::components::settings_contribution_api_version &&
+                interface_api->enumerate_settings != nullptr)
+            {
+                component->settings_contribution = *interface_api;
+            }
+        }
+        if (std::ranges::any_of(component->renderers, [&component](const auto& renderer) {
+                return IsEqualGUID(
+                           renderer.interface_id,
+                           glance::contracts::components::paged_document_renderer_api_id) &&
+                    (!component->paged_document_renderer.has_value() ||
+                     renderer.interface_version !=
+                         glance::contracts::components::paged_document_renderer_api_version);
+            }) ||
+            std::ranges::any_of(component->renderers, [](const auto& renderer) {
+                return !IsEqualGUID(
+                    renderer.interface_id,
+                    glance::contracts::components::paged_document_renderer_api_id);
+            }))
+        {
+            return {};
+        }
+        if (component->paged_document_renderer.has_value())
+        {
+            PagedDocumentHostDescriptor descriptor;
+            const bool described =
+                component->paged_document_renderer->query_host(&descriptor) != FALSE &&
+                descriptor.size >= sizeof(PagedDocumentHostDescriptor);
+            const auto executable = described
+                ? bounded_string(descriptor.host_executable)
+                : std::nullopt;
+            const std::filesystem::path relative = executable.has_value()
+                ? std::filesystem::path(*executable)
+                : std::filesystem::path{};
+            std::error_code error;
+            component->activation_ready = executable.has_value() &&
+                !relative.empty() && relative == relative.filename() &&
+                _wcsicmp(relative.extension().c_str(), L".exe") == 0 &&
+                std::filesystem::is_regular_file(directory / relative, error);
+            if (component->activation_ready)
+            {
+                component->paged_document_host = directory / relative;
+            }
+        }
         std::ranges::sort(component->extensions);
         return component;
+    }
+
+    enum class DependencyVisit
+    {
+        none,
+        visiting,
+        complete,
+    };
+
+    bool activate_component(
+        const std::shared_ptr<LoadedComponent>& component,
+        const std::unordered_map<std::wstring, std::shared_ptr<LoadedComponent>>& components,
+        std::unordered_map<std::wstring, DependencyVisit>& visits)
+    {
+        auto& visit = visits[component->id];
+        if (visit == DependencyVisit::complete)
+        {
+            return component->active;
+        }
+        if (visit == DependencyVisit::visiting)
+        {
+            component->dependency_failure = DependencyFailure::cycle;
+            return false;
+        }
+
+        visit = DependencyVisit::visiting;
+        if (!component->activation_ready)
+        {
+            visit = DependencyVisit::complete;
+            return false;
+        }
+        for (const auto& dependency_id : component->dependencies)
+        {
+            const auto dependency = components.find(dependency_id);
+            if (dependency == components.end())
+            {
+                component->dependency_failure = DependencyFailure::missing;
+                component->dependency_name = dependency_id;
+                visit = DependencyVisit::complete;
+                return false;
+            }
+            if (!activate_component(dependency->second, components, visits))
+            {
+                component->dependency_failure =
+                    dependency->second->dependency_failure == DependencyFailure::cycle
+                    ? DependencyFailure::cycle
+                    : DependencyFailure::inactive;
+                component->dependency_name = dependency_id;
+                visit = DependencyVisit::complete;
+                return false;
+            }
+        }
+        component->active = true;
+        visit = DependencyVisit::complete;
+        return true;
     }
 
     void initialize_registry()
@@ -427,20 +677,46 @@ namespace
             return left->id < right->id;
         });
 
+        std::unordered_map<std::wstring, std::shared_ptr<LoadedComponent>> components_by_id;
+        for (const auto& component : loaded)
+        {
+            components_by_id.emplace(component->id, component);
+        }
+        std::unordered_map<std::wstring, DependencyVisit> dependency_visits;
+        for (const auto& component : loaded)
+        {
+            static_cast<void>(activate_component(
+                component,
+                components_by_id,
+                dependency_visits));
+        }
+
         std::unordered_map<
             std::wstring,
             std::vector<std::shared_ptr<LoadedComponent>>> index;
+        std::unordered_map<
+            std::uint64_t,
+            std::vector<std::shared_ptr<LoadedComponent>>> renderers;
         for (const auto& component : loaded)
         {
+            if (!component->active)
+            {
+                continue;
+            }
             for (const auto& extension : component->extensions)
             {
                 index[extension].push_back(component);
+            }
+            for (const auto& renderer : component->renderers)
+            {
+                renderers[renderer_key(renderer.kind, renderer.format)].push_back(component);
             }
         }
 
         std::scoped_lock lock(registry_mutex);
         registered_components = std::move(loaded);
         extension_index = std::move(index);
+        renderer_index = std::move(renderers);
     }
 
     std::vector<std::shared_ptr<LoadedComponent>> candidates_for_path(
@@ -882,7 +1158,22 @@ namespace glance::app
                     state = ComponentState::warning;
                 }
                 std::wstring detail = status.detail;
-                if (component->registration.preferred_kind ==
+                if (!component->active &&
+                    component->dependency_failure != DependencyFailure::none)
+                {
+                    state = ComponentState::error;
+                    if (component->dependency_failure == DependencyFailure::cycle)
+                    {
+                        detail = glance::app::localize(L"ComponentDependencyCycle");
+                    }
+                    else
+                    {
+                        detail = glance::app::localize_format(
+                            L"ComponentDependencyUnavailable",
+                            { component->dependency_name });
+                    }
+                }
+                else if (component->registration.preferred_kind ==
                         PreviewContentKind::web &&
                     component->web_preview.has_value() &&
                     !glance::app::webview_runtime_available())
@@ -903,12 +1194,277 @@ namespace glance::app
         return statuses;
     }
 
+    std::optional<PagedDocumentRendererRegistration>
+    paged_document_renderer() noexcept
+    {
+        try
+        {
+            initialize_components();
+            std::vector<std::shared_ptr<LoadedComponent>> candidates;
+            {
+                std::scoped_lock lock(registry_mutex);
+                const auto match = renderer_index.find(renderer_key(
+                    PreviewContentKind::document,
+                    PreviewContentFormat::pdf));
+                if (match == renderer_index.end())
+                {
+                    return std::nullopt;
+                }
+                candidates = match->second;
+            }
+            for (const auto& component : candidates)
+            {
+                if (!component->paged_document_host.has_value())
+                {
+                    continue;
+                }
+                return PagedDocumentRendererRegistration{
+                    .host_path = component->paged_document_host->wstring(),
+                    .lease = std::static_pointer_cast<void>(component) };
+            }
+        }
+        catch (...)
+        {
+        }
+        return std::nullopt;
+    }
+
+    std::vector<ComponentSetting> component_settings(
+        std::wstring_view language_tag) noexcept
+    {
+        std::vector<std::shared_ptr<LoadedComponent>> components;
+        {
+            initialize_components();
+            std::scoped_lock lock(registry_mutex);
+            components = registered_components;
+        }
+
+        std::vector<ComponentSetting> settings;
+        const std::wstring language(language_tag);
+        for (const auto& component : components)
+        {
+            if (!component->active || !component->settings_contribution.has_value())
+            {
+                continue;
+            }
+            try
+            {
+                std::uint32_t count{};
+                if (!component->settings_contribution->enumerate_settings(
+                        language.c_str(), nullptr, 0, &count) ||
+                    count == 0 || count > 64)
+                {
+                    continue;
+                }
+                std::vector<glance::contracts::components::ComponentSettingDescriptor>
+                    descriptors(count);
+                std::uint32_t written = count;
+                if (!component->settings_contribution->enumerate_settings(
+                        language.c_str(), descriptors.data(), count, &written) ||
+                    written != count)
+                {
+                    continue;
+                }
+                for (const auto& descriptor : descriptors)
+                {
+                    const auto setting_id = bounded_string(descriptor.setting_id);
+                    const auto group_id = bounded_string(descriptor.group_id);
+                    const auto group_title = bounded_string(descriptor.group_title);
+                    const auto label = bounded_string(descriptor.label);
+                    const auto description = bounded_string(descriptor.description);
+                    if (descriptor.size < sizeof(descriptor) ||
+                        !setting_id.has_value() || !valid_setting_id(*setting_id) ||
+                        !group_id.has_value() || !valid_setting_id(*group_id) ||
+                        !group_title.has_value() || group_title->empty() ||
+                        !label.has_value() || label->empty() ||
+                        !description.has_value() ||
+                        (descriptor.kind !=
+                             glance::contracts::components::ComponentSettingKind::toggle &&
+                         descriptor.kind !=
+                             glance::contracts::components::ComponentSettingKind::choice) ||
+                        descriptor.option_count >
+                            glance::contracts::components::maximum_setting_options ||
+                        (descriptor.kind ==
+                             glance::contracts::components::ComponentSettingKind::choice &&
+                         descriptor.option_count == 0))
+                    {
+                        continue;
+                    }
+                    ComponentSetting setting{
+                        .component_id = component->id,
+                        .setting_id = std::move(*setting_id),
+                        .page = descriptor.page,
+                        .group_id = std::move(*group_id),
+                        .group_title = std::move(*group_title),
+                        .label = std::move(*label),
+                        .description = std::move(*description),
+                        .kind = descriptor.kind,
+                        .default_value = descriptor.default_value,
+                        .group_order = descriptor.group_order,
+                        .setting_order = descriptor.setting_order };
+                    for (std::uint32_t index = 0;
+                         index < descriptor.option_count;
+                         ++index)
+                    {
+                        const auto text = bounded_string(descriptor.options[index].text);
+                        if (!text.has_value() || text->empty())
+                        {
+                            setting.options.clear();
+                            break;
+                        }
+                        setting.options.push_back(ComponentSettingOption{
+                            .value = descriptor.options[index].value,
+                            .text = std::move(*text) });
+                    }
+                    if (descriptor.kind ==
+                            glance::contracts::components::ComponentSettingKind::toggle ||
+                        !setting.options.empty())
+                    {
+                        settings.push_back(std::move(setting));
+                    }
+                }
+            }
+            catch (...)
+            {
+            }
+        }
+        std::ranges::sort(settings, [](const auto& left, const auto& right) {
+            return std::tie(
+                       left.page,
+                       left.group_order,
+                       left.component_id,
+                       left.group_id,
+                       left.setting_order,
+                       left.setting_id) <
+                std::tie(
+                       right.page,
+                       right.group_order,
+                       right.component_id,
+                       right.group_id,
+                       right.setting_order,
+                       right.setting_id);
+        });
+        return settings;
+    }
+
+    std::int64_t component_setting_value(
+        std::wstring_view component_id,
+        std::wstring_view setting_id,
+        std::int64_t default_value) noexcept
+    {
+        if (!valid_component_id(component_id) || !valid_setting_id(setting_id))
+        {
+            return default_value;
+        }
+        try
+        {
+            const std::wstring key_path = L"Software\\Glance\\Components\\" +
+                std::wstring(component_id);
+            HKEY key{};
+            if (RegOpenKeyExW(HKEY_CURRENT_USER, key_path.c_str(), 0, KEY_QUERY_VALUE, &key) ==
+                ERROR_SUCCESS)
+            {
+                ULONGLONG value{};
+                DWORD type{};
+                DWORD size = sizeof(value);
+                const auto status = RegQueryValueExW(
+                    key,
+                    std::wstring(setting_id).c_str(),
+                    nullptr,
+                    &type,
+                    reinterpret_cast<BYTE*>(&value),
+                    &size);
+                RegCloseKey(key);
+                if (status == ERROR_SUCCESS && type == REG_QWORD && size == sizeof(value))
+                {
+                    return static_cast<std::int64_t>(value);
+                }
+            }
+
+            if (component_id == L"pdf" && setting_id == L"render-dimension")
+            {
+                HKEY legacy_key{};
+                if (RegOpenKeyExW(
+                        HKEY_CURRENT_USER,
+                        L"Software\\Glance\\MediaPreview",
+                        0,
+                        KEY_QUERY_VALUE,
+                        &legacy_key) == ERROR_SUCCESS)
+                {
+                    DWORD value{};
+                    DWORD type{};
+                    DWORD size = sizeof(value);
+                    const auto status = RegQueryValueExW(
+                        legacy_key,
+                        L"RichDocumentRenderDimension",
+                        nullptr,
+                        &type,
+                        reinterpret_cast<BYTE*>(&value),
+                        &size);
+                    RegCloseKey(legacy_key);
+                    if (status == ERROR_SUCCESS && type == REG_DWORD && size == sizeof(value))
+                    {
+                        save_component_setting_value(component_id, setting_id, value);
+                        return value;
+                    }
+                }
+            }
+        }
+        catch (...)
+        {
+        }
+        return default_value;
+    }
+
+    void save_component_setting_value(
+        std::wstring_view component_id,
+        std::wstring_view setting_id,
+        std::int64_t value) noexcept
+    {
+        if (!valid_component_id(component_id) || !valid_setting_id(setting_id))
+        {
+            return;
+        }
+        try
+        {
+            const std::wstring key_path = L"Software\\Glance\\Components\\" +
+                std::wstring(component_id);
+            HKEY key{};
+            if (RegCreateKeyExW(
+                    HKEY_CURRENT_USER,
+                    key_path.c_str(),
+                    0,
+                    nullptr,
+                    0,
+                    KEY_SET_VALUE,
+                    nullptr,
+                    &key,
+                    nullptr) != ERROR_SUCCESS)
+            {
+                return;
+            }
+            const auto stored = static_cast<ULONGLONG>(value);
+            static_cast<void>(RegSetValueExW(
+                key,
+                std::wstring(setting_id).c_str(),
+                0,
+                REG_QWORD,
+                reinterpret_cast<const BYTE*>(&stored),
+                sizeof(stored)));
+            RegCloseKey(key);
+        }
+        catch (...)
+        {
+        }
+    }
+
     void shutdown_components() noexcept
     {
         std::vector<std::shared_ptr<LoadedComponent>> components;
         {
             std::scoped_lock lock(registry_mutex);
             extension_index.clear();
+            renderer_index.clear();
             components = std::move(registered_components);
         }
         components.clear();

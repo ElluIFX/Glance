@@ -16,7 +16,7 @@ namespace glance::app
         web,
         image,
         media,
-        pdf,
+        document,
         archive,
         component,
     };

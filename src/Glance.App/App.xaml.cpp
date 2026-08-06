@@ -4,7 +4,6 @@
 #include "localization.h"
 #include "MainWindow.xaml.h"
 #include "component_loader.h"
-#include "pdf_render_client.h"
 #include "resource.h"
 #include "SettingsWindow.xaml.h"
 #include "startup_registration.h"
@@ -252,7 +251,6 @@ namespace winrt::Glance::App::implementation
         }
 
         glance::app::initialize_webview_availability();
-        glance::app::prewarm_pdf_render_client();
         glance::app::initialize_components();
         glance::contracts::log_event(L"Creating the initial preview window.");
         create_active_window();

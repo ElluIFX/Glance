@@ -3,7 +3,7 @@
 #include <pdfium/fpdf_doc.h>
 #include <pdfium/fpdfview.h>
 
-#include "glance/contracts/pdf_render_protocol.h"
+#include "glance/contracts/paged_document_protocol.h"
 
 #include <algorithm>
 #include <cmath>
@@ -19,7 +19,7 @@
 
 namespace
 {
-    using namespace glance::contracts::pdf;
+    using namespace glance::contracts::document;
 
     bool read_exact(HANDLE handle, void* destination, std::size_t size)
     {
@@ -248,6 +248,11 @@ namespace
                 else if (request.command == Command::render_page)
                 {
                     handle_render(payload);
+                }
+                else if (request.command == Command::close_document)
+                {
+                    close_document();
+                    send_response(Status::success, {});
                 }
                 else
                 {

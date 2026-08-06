@@ -50,6 +50,27 @@ using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
+    class AtomicCounterGuard final
+    {
+    public:
+        explicit AtomicCounterGuard(std::atomic_uint32_t& counter) noexcept
+            : counter_(counter)
+        {
+            counter_.fetch_add(1, std::memory_order_acq_rel);
+        }
+
+        ~AtomicCounterGuard()
+        {
+            counter_.fetch_sub(1, std::memory_order_acq_rel);
+        }
+
+        AtomicCounterGuard(const AtomicCounterGuard&) = delete;
+        AtomicCounterGuard& operator=(const AtomicCounterGuard&) = delete;
+
+    private:
+        std::atomic_uint32_t& counter_;
+    };
+
     struct __declspec(uuid("905a0fef-bc53-11df-8c49-001e4fc686da")) BufferByteAccess : IUnknown
     {
         virtual HRESULT STDMETHODCALLTYPE Buffer(byte** value) = 0;
@@ -242,7 +263,7 @@ namespace
     }
 
     Microsoft::UI::Xaml::Media::Imaging::WriteableBitmap create_pdf_bitmap(
-        const glance::app::PdfRenderResult& rendered)
+        const glance::app::PagedDocumentRenderResult& rendered)
     {
         Microsoft::UI::Xaml::Media::Imaging::WriteableBitmap bitmap(
             static_cast<std::int32_t>(rendered.pixel_width),
@@ -797,10 +818,15 @@ namespace winrt::Glance::App::implementation
         }
         update_preview_navigation_ui();
 
+        const bool position_window = !topmost_ && (new_session || !user_sized_);
         present_file(current_index_, current_kind);
-        if (!topmost_ && (new_session || !user_sized_))
+        if (position_window)
         {
             position_initial_window();
+            component_placement_generation_ =
+                current_kind_ == glance::app::PreviewKind::component
+                ? content_generation_
+                : 0;
         }
         update_state();
     }
@@ -1109,8 +1135,7 @@ namespace winrt::Glance::App::implementation
     {
         if (pdf_render_client_ != nullptr)
         {
-            pdf_render_client_->cancel();
-            pdf_render_client_.reset();
+            pdf_render_client_->close_document();
         }
     }
 
@@ -1219,7 +1244,7 @@ namespace winrt::Glance::App::implementation
         }
 
         return kind == glance::app::PreviewKind::image ||
-            kind == glance::app::PreviewKind::pdf ||
+            kind == glance::app::PreviewKind::document ||
             (kind == glance::app::PreviewKind::media && !is_audio_path(file.path));
     }
 
@@ -1265,7 +1290,7 @@ namespace winrt::Glance::App::implementation
             return false;
         }
         return current_kind_ == glance::app::PreviewKind::image ||
-            current_kind_ == glance::app::PreviewKind::pdf ||
+            current_kind_ == glance::app::PreviewKind::document ||
             (current_kind_ == glance::app::PreviewKind::media && !media_is_audio_);
     }
 
@@ -1309,7 +1334,7 @@ namespace winrt::Glance::App::implementation
         int horizontal_chrome = std::max(
             0,
             current_width - static_cast<int>(std::lround(panel.ActualWidth())));
-        if (current_kind_ == glance::app::PreviewKind::pdf)
+        if (current_kind_ == glance::app::PreviewKind::document)
         {
             horizontal_chrome += static_cast<int>(std::lround(PdfNavigationColumn().ActualWidth()));
         }
@@ -1628,7 +1653,7 @@ namespace winrt::Glance::App::implementation
             show_media_controls();
             load_media_async(file.path, generation);
             break;
-        case glance::app::PreviewKind::pdf:
+        case glance::app::PreviewKind::document:
             show_content_panel(kind);
             PdfPageImage().Source(nullptr);
             pdf_wheel_delta_ = 0;
@@ -2380,8 +2405,19 @@ namespace winrt::Glance::App::implementation
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         cancel_pdf_render();
-        auto session = glance::app::acquire_pdf_render_client();
-        pdf_render_client_ = session;
+        auto session = pdf_render_client_;
+        if (session == nullptr)
+        {
+            session = glance::app::acquire_paged_document_render_client();
+            pdf_render_client_ = session;
+        }
+        if (session == nullptr)
+        {
+            show_provider_error(
+                glance::app::localize(L"PdfComponentMissingError"),
+                generation);
+            co_return;
+        }
         pdf_source_path_ = path;
         pdf_password_ = password;
         PdfLoadingText().Visibility(Visibility::Visible);
@@ -2404,20 +2440,20 @@ namespace winrt::Glance::App::implementation
     }
 
     void MainWindow::apply_pdf_open_result(
-        std::shared_ptr<glance::app::PdfRenderClient> session,
-        glance::app::PdfOpenResult result,
+        std::shared_ptr<glance::app::PagedDocumentRenderClient> session,
+        glance::app::PagedDocumentOpenResult result,
         std::wstring path,
         std::wstring password,
         std::uint64_t generation)
     {
-        using glance::contracts::pdf::Status;
+        using glance::contracts::document::Status;
         glance::contracts::log_event(
             L"PDF open completed: status=" +
             std::to_wstring(static_cast<std::uint32_t>(result.status)) +
             L", pages=" + std::to_wstring(result.page_count));
         if (generation != content_generation_ || session != pdf_render_client_)
         {
-            session->cancel();
+            session->close_document();
             return;
         }
         if (result.status == Status::password_required || result.status == Status::invalid_password)
@@ -2472,7 +2508,12 @@ namespace winrt::Glance::App::implementation
         }
         PdfLoadingOverlay().Visibility(Visibility::Visible);
         const auto render_dimension =
-            glance::app::load_media_preview_preferences().rich_document_render_dimension;
+            glance::app::normalize_rich_document_render_dimension(
+                static_cast<std::uint32_t>(glance::app::component_setting_value(
+                    L"pdf",
+                    L"render-dimension",
+                    glance::app::default_rich_document_render_dimension)));
+        AtomicCounterGuard foreground_render(pdf_foreground_render_requests_);
         co_await resume_background();
         if (request != pdf_render_request_.load(std::memory_order_relaxed))
         {
@@ -2490,7 +2531,7 @@ namespace winrt::Glance::App::implementation
             request,
             generation,
             dynamic_update]() mutable {
-            using glance::contracts::pdf::Status;
+            using glance::contracts::document::Status;
             if (generation != lifetime->content_generation_ ||
                 session != lifetime->pdf_render_client_ ||
                 page_index != lifetime->pdf_page_index_ ||
@@ -2526,7 +2567,7 @@ namespace winrt::Glance::App::implementation
                             const auto self = weak.get();
                             if (self == nullptr ||
                                 generation != self->content_generation_ ||
-                                self->current_kind_ != glance::app::PreviewKind::pdf)
+                                self->current_kind_ != glance::app::PreviewKind::document)
                             {
                                 return;
                             }
@@ -2563,8 +2604,12 @@ namespace winrt::Glance::App::implementation
         co_await resume_background();
         for (std::uint32_t page = 0; page < page_count; ++page)
         {
+            while (pdf_foreground_render_requests_.load(std::memory_order_acquire) != 0)
+            {
+                co_await resume_after(std::chrono::milliseconds(4));
+            }
             auto rendered = session->render(page, 176, 132);
-            if (rendered.status != glance::contracts::pdf::Status::success)
+            if (rendered.status != glance::contracts::document::Status::success)
             {
                 co_return;
             }
@@ -3180,9 +3225,11 @@ namespace winrt::Glance::App::implementation
             ? glance::contracts::components::PreviewColorScheme::dark
             : glance::contracts::components::PreviewColorScheme::light;
         glance::contracts::components::PreviewPreparationOptions options{
-            .maximum_dimension =
-                glance::app::load_media_preview_preferences()
-                    .rich_document_render_dimension };
+            .maximum_dimension = glance::app::normalize_rich_document_render_dimension(
+                static_cast<std::uint32_t>(glance::app::component_setting_value(
+                    L"pdf",
+                    L"render-dimension",
+                    glance::app::default_rich_document_render_dimension))) };
         co_await resume_background();
 
         auto result = glance::app::prepare_component_preview(
@@ -3317,7 +3364,7 @@ namespace winrt::Glance::App::implementation
         else if (result.kind == PreviewContentKind::document &&
                  result.format == PreviewContentFormat::pdf)
         {
-            kind = glance::app::PreviewKind::pdf;
+            kind = glance::app::PreviewKind::document;
         }
         else if (result.kind == PreviewContentKind::web &&
                  result.format == PreviewContentFormat::html)
@@ -3330,6 +3377,12 @@ namespace winrt::Glance::App::implementation
             current_index_ >= files_.size())
         {
             show_provider_error(glance::app::localize(L"ComponentStateError"), generation);
+            return;
+        }
+        if (kind == glance::app::PreviewKind::document &&
+            !glance::app::paged_document_renderer().has_value())
+        {
+            present_generic(files_[current_index_]);
             return;
         }
 
@@ -3348,7 +3401,14 @@ namespace winrt::Glance::App::implementation
         prepared_file.parsing_name = prepared_file.path;
         prepared_file.is_filesystem = true;
         prepared_file.is_cloud_placeholder = false;
+        const bool restore_component_placement =
+            generation == component_placement_generation_;
+        component_placement_generation_ = 0;
         present_resolved_file(prepared_file, kind, generation);
+        if (restore_component_placement && !topmost_ && !user_sized_ && !auto_fit_applies())
+        {
+            position_initial_window();
+        }
         if (!component_notice.empty())
         {
             show_preview_message(
@@ -4250,7 +4310,7 @@ namespace winrt::Glance::App::implementation
         TextPanel().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         ImagePanel().Visibility(kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
         MediaPanel().Visibility(kind == glance::app::PreviewKind::media ? Visibility::Visible : Visibility::Collapsed);
-        PdfPanel().Visibility(kind == glance::app::PreviewKind::pdf ? Visibility::Visible : Visibility::Collapsed);
+        PdfPanel().Visibility(kind == glance::app::PreviewKind::document ? Visibility::Visible : Visibility::Collapsed);
         ArchivePanel().Visibility(kind == glance::app::PreviewKind::archive ? Visibility::Visible : Visibility::Collapsed);
         ImageStatusControls().Visibility(
             kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
@@ -4285,7 +4345,7 @@ namespace winrt::Glance::App::implementation
             MediaAdvancedInfoButton().IsChecked(false);
             MediaAdvancedInfoOverlay().Visibility(Visibility::Collapsed);
         }
-        if (kind != glance::app::PreviewKind::pdf)
+        if (kind != glance::app::PreviewKind::document)
         {
             cancel_pdf_render();
             PdfPageImage().Source(nullptr);

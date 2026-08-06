@@ -2,10 +2,10 @@
 
 #include <cstdint>
 
-namespace glance::contracts::pdf
+namespace glance::contracts::document
 {
     inline constexpr std::uint32_t protocol_magic = 0x46504447U;
-    inline constexpr std::uint32_t protocol_version = 4U;
+    inline constexpr std::uint32_t protocol_version = 5U;
     inline constexpr std::uint32_t maximum_payload_size = 8U * 1024U * 1024U;
     inline constexpr std::uint32_t shared_bitmap_size = 256U * 1024U * 1024U;
     inline constexpr std::uint32_t maximum_bitmap_dimension = 8192U;
@@ -15,7 +15,8 @@ namespace glance::contracts::pdf
     {
         open_document = 1,
         render_page = 2,
-        shutdown = 3,
+        close_document = 3,
+        shutdown = 4,
     };
 
     enum class Status : std::uint32_t

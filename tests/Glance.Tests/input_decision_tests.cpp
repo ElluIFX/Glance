@@ -3,7 +3,7 @@
 #include "glance/contracts/ipc_protocol.h"
 #include "media_preview_preferences.h"
 #include "pan_interaction.h"
-#include "pdf_render_client.h"
+#include "paged_document_render_client.h"
 #include "text_font_fallback.h"
 #include "../../src/version.h"
 
@@ -39,6 +39,23 @@ namespace
         }
         static_cast<std::vector<std::wstring>*>(context)->emplace_back(extension);
         return TRUE;
+    }
+
+    BOOL WINAPI accept_renderer(
+        void*,
+        glance::contracts::components::PreviewContentKind kind,
+        glance::contracts::components::PreviewContentFormat format,
+        const GUID* interface_id,
+        std::uint32_t interface_version) noexcept
+    {
+        return kind == glance::contracts::components::PreviewContentKind::document &&
+            format == glance::contracts::components::PreviewContentFormat::pdf &&
+            interface_id != nullptr &&
+            IsEqualGUID(
+                *interface_id,
+                glance::contracts::components::paged_document_renderer_api_id) &&
+            interface_version ==
+                glance::contracts::components::paged_document_renderer_api_version;
     }
 
     void append_be16(std::vector<unsigned char>& bytes, std::uint16_t value)
@@ -254,6 +271,10 @@ int main()
     expect(
         descriptor.find("\"resources.pri\"") != std::string::npos,
         "Office descriptor resource payload");
+    expect(
+        descriptor.find("\"schema_version\": 3") != std::string::npos &&
+            descriptor.find("\"pdf\"") != std::string::npos,
+        "Office descriptor PDF dependency");
 
     const HMODULE component = LoadLibraryExW(
         component_path.c_str(),
@@ -287,7 +308,8 @@ int main()
                 std::vector<std::wstring> extensions;
                 ComponentRegistrar registrar{
                     .context = &extensions,
-                    .register_extension = collect_extension };
+                    .register_extension = collect_extension,
+                    .register_renderer = accept_renderer };
                 ComponentRegistration registration;
                 expect(
                     api.initialize(&registrar, &registration) != FALSE,
@@ -485,7 +507,8 @@ int main()
             std::vector<std::wstring> extensions;
             ComponentRegistrar registrar{
                 .context = &extensions,
-                .register_extension = collect_extension };
+                .register_extension = collect_extension,
+                .register_renderer = accept_renderer };
             ComponentRegistration registration;
             expect(
                 api.initialize(&registrar, &registration) != FALSE,
@@ -715,21 +738,139 @@ int main()
             "PDF render fixture");
         if (std::filesystem::is_regular_file(pdf_path))
         {
-            glance::app::PdfRenderClient client;
+            const auto pdf_component_directory =
+                std::filesystem::path(executable_path).parent_path() /
+                L"components" / L"pdf";
+            const auto pdf_component_path =
+                pdf_component_directory / L"Glance.PdfComponent.dll";
+            const auto pdf_host_path =
+                pdf_component_directory / L"Glance.PdfHost.exe";
+            expect(
+                std::filesystem::is_regular_file(pdf_component_path),
+                "PDF component DLL output");
+            expect(
+                std::filesystem::is_regular_file(pdf_host_path),
+                "PDF component host output");
+            expect(
+                std::filesystem::is_regular_file(pdf_component_directory / L"pdfium.dll"),
+                "PDF component PDFium output");
+            expect(
+                std::filesystem::is_regular_file(pdf_component_directory / L"resources.pri"),
+                "PDF component resource output");
+
+            const HMODULE pdf_component = LoadLibraryExW(
+                pdf_component_path.c_str(),
+                nullptr,
+                LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+                    LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                    LOAD_LIBRARY_SEARCH_SYSTEM32);
+            expect(pdf_component != nullptr, "load PDF component DLL");
+            if (pdf_component != nullptr)
+            {
+                using namespace glance::contracts::components;
+                const auto get_api = reinterpret_cast<GetApiFunction>(
+                    GetProcAddress(pdf_component, get_api_export));
+                ComponentApi api;
+                expect(
+                    get_api != nullptr && get_api(abi_version, &api) != FALSE,
+                    "PDF component ABI negotiation");
+                if (get_api != nullptr && api.initialize != nullptr)
+                {
+                    std::vector<std::wstring> extensions;
+                    ComponentRegistrar registrar{
+                        .context = &extensions,
+                        .register_extension = collect_extension,
+                        .register_renderer = accept_renderer };
+                    ComponentRegistration registration;
+                    expect(
+                        api.initialize(&registrar, &registration) != FALSE,
+                        "PDF component registration");
+                    expect(
+                        std::wstring_view(registration.component_id) == L"pdf" &&
+                            extensions == std::vector<std::wstring>{ L".pdf" },
+                        "PDF component extension registration");
+
+                    void* interface_pointer{};
+                    expect(
+                        api.query_interface(
+                            &paged_document_renderer_api_id,
+                            paged_document_renderer_api_version,
+                            &interface_pointer) != FALSE &&
+                            interface_pointer != nullptr,
+                        "PDF component paged document interface");
+                    if (interface_pointer != nullptr)
+                    {
+                        PagedDocumentHostDescriptor host;
+                        const auto renderer =
+                            static_cast<const PagedDocumentRendererApi*>(interface_pointer);
+                        expect(
+                            renderer->query_host(&host) != FALSE &&
+                                std::wstring_view(host.host_executable) ==
+                                    L"Glance.PdfHost.exe",
+                            "PDF component host descriptor");
+                    }
+
+                    interface_pointer = nullptr;
+                    expect(
+                        api.query_interface(
+                            &settings_contribution_api_id,
+                            settings_contribution_api_version,
+                            &interface_pointer) != FALSE &&
+                            interface_pointer != nullptr,
+                        "PDF component settings interface");
+                    if (interface_pointer != nullptr)
+                    {
+                        const auto settings =
+                            static_cast<const SettingsContributionApi*>(interface_pointer);
+                        std::uint32_t setting_count{};
+                        expect(
+                            settings->enumerate_settings(
+                                L"zh-CN", nullptr, 0, &setting_count) != FALSE &&
+                                setting_count == 1,
+                            "PDF component setting count");
+                        ComponentSettingDescriptor setting;
+                        expect(
+                            settings->enumerate_settings(
+                                L"zh-CN", &setting, 1, &setting_count) != FALSE &&
+                                std::wstring_view(setting.setting_id) ==
+                                    L"render-dimension" &&
+                                setting.option_count == 4 &&
+                                setting.default_value == 4096,
+                            "PDF component render setting");
+                    }
+
+                    PreparedPreview preview;
+                    expect(
+                        api.can_preview(pdf_path.c_str()) != FALSE &&
+                            api.prepare_preview(
+                                pdf_path.c_str(), L"en-US", &preview) ==
+                                PrepareStatus::success &&
+                            preview.kind == PreviewContentKind::document &&
+                            preview.format == PreviewContentFormat::pdf &&
+                            std::filesystem::path(preview.path) == pdf_path,
+                        "PDF component prepares standard document output");
+                    api.shutdown();
+                }
+                FreeLibrary(pdf_component);
+            }
+
+            glance::app::PagedDocumentRenderClient client(
+                pdf_host_path.wstring(),
+                nullptr);
             const auto opened = client.open(pdf_path.wstring(), L"");
             expect(
-                opened.status == glance::contracts::pdf::Status::success &&
+                opened.status == glance::contracts::document::Status::success &&
                     opened.page_count == 1,
-                "PDF RenderHost opens document");
-            if (opened.status == glance::contracts::pdf::Status::success)
+                "PDF Host opens document");
+            if (opened.status == glance::contracts::document::Status::success)
             {
                 const auto rendered = client.render(0, 256, 256);
                 expect(
-                    rendered.status == glance::contracts::pdf::Status::success &&
+                    rendered.status == glance::contracts::document::Status::success &&
                         rendered.pixel_width > 0 &&
                         rendered.pixel_height > 0 &&
                         !rendered.pixels.empty(),
-                    "PDF RenderHost renders page");
+                    "PDF Host renders page");
             }
         }
         std::filesystem::remove_all(test_directory, cleanup_error);

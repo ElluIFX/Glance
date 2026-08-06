@@ -12,7 +12,7 @@
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
-#include "pdf_render_client.h"
+#include "paged_document_render_client.h"
 #include "scintilla_text_view.h"
 #include "shell_icon_provider.h"
 #include "text_preferences.h"
@@ -272,8 +272,8 @@ namespace winrt::Glance::App::implementation
             bool dynamic_update = false);
         winrt::fire_and_forget load_pdf_thumbnails_async(std::uint64_t generation);
         void apply_pdf_open_result(
-            std::shared_ptr<glance::app::PdfRenderClient> session,
-            glance::app::PdfOpenResult result,
+            std::shared_ptr<glance::app::PagedDocumentRenderClient> session,
+            glance::app::PagedDocumentOpenResult result,
             std::wstring path,
             std::wstring password,
             std::uint64_t generation);
@@ -486,6 +486,7 @@ namespace winrt::Glance::App::implementation
         double image_pan_vertical_offset_{};
         Windows::Foundation::Point image_pan_start_{};
         std::uint64_t content_generation_{};
+        std::uint64_t component_placement_generation_{};
         std::wstring current_text_;
         std::wstring current_text_path_;
         bool current_text_markdown_{};
@@ -523,7 +524,7 @@ namespace winrt::Glance::App::implementation
         Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };
         std::uint64_t media_playback_generation_{};
         glance::app::MediaTechnicalMetadata media_metadata_;
-        std::shared_ptr<glance::app::PdfRenderClient> pdf_render_client_;
+        std::shared_ptr<glance::app::PagedDocumentRenderClient> pdf_render_client_;
         std::shared_ptr<void> active_component_preview_;
         std::shared_ptr<void> active_component_refinement_;
         std::shared_ptr<glance::app::ComponentWebPreview> active_component_web_preview_;
@@ -531,7 +532,7 @@ namespace winrt::Glance::App::implementation
         std::wstring component_loading_language_;
         std::wstring pdf_source_path_;
         std::wstring pdf_password_;
-        std::vector<glance::app::PdfOutlineEntry> pdf_outline_;
+        std::vector<glance::app::PagedDocumentOutlineEntry> pdf_outline_;
         std::vector<winrt::weak_ref<Microsoft::UI::Xaml::Controls::Image>> pdf_thumbnail_images_;
         std::uint32_t pdf_page_count_{};
         std::uint32_t pdf_thumbnail_items_built_{};
@@ -543,6 +544,7 @@ namespace winrt::Glance::App::implementation
         double pdf_pan_vertical_offset_{};
         Windows::Foundation::Point pdf_pan_start_{};
         std::atomic_uint64_t pdf_render_request_{};
+        std::atomic_uint32_t pdf_foreground_render_requests_{};
         int pdf_wheel_delta_{};
         int media_seek_wheel_delta_{};
         int media_volume_wheel_delta_{};

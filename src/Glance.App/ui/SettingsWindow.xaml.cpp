@@ -322,21 +322,6 @@ namespace winrt::Glance::App::implementation
         media_preview_preferences_ = glance::app::load_media_preview_preferences();
         DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
         DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
-        switch (media_preview_preferences_.rich_document_render_dimension)
-        {
-        case 1024:
-            RichDocumentRenderResolutionComboBox().SelectedIndex(0);
-            break;
-        case 2048:
-            RichDocumentRenderResolutionComboBox().SelectedIndex(1);
-            break;
-        case 8192:
-            RichDocumentRenderResolutionComboBox().SelectedIndex(3);
-            break;
-        default:
-            RichDocumentRenderResolutionComboBox().SelectedIndex(2);
-            break;
-        }
         AutoplayAudioToggle().IsOn(media_preview_preferences_.autoplay_audio);
         AutoplayVideoToggle().IsOn(media_preview_preferences_.autoplay_video);
         ReverseSeekWheelToggle().IsOn(media_preview_preferences_.reverse_seek_wheel);
@@ -571,25 +556,6 @@ namespace winrt::Glance::App::implementation
         set_text(AutoplayVideoDescription(), L"AutoplayVideoDescription.Text");
         set_text(ReverseSeekWheelLabel(), L"ReverseSeekWheelLabel.Text");
         set_text(ReverseSeekWheelDescription(), L"ReverseSeekWheelDescription.Text");
-        set_text(RichDocumentPreviewGroupTitle(), L"RichDocumentPreviewGroupTitle.Text");
-        set_text(
-            RichDocumentRenderResolutionLabel(),
-            L"RichDocumentRenderResolutionLabel.Text");
-        set_text(
-            RichDocumentRenderResolutionDescription(),
-            L"RichDocumentRenderResolutionDescription.Text");
-        set_content(
-            RichDocumentResolution1024Item(),
-            L"RichDocumentResolution1024Item.Content");
-        set_content(
-            RichDocumentResolution2048Item(),
-            L"RichDocumentResolution2048Item.Content");
-        set_content(
-            RichDocumentResolution4096Item(),
-            L"RichDocumentResolution4096Item.Content");
-        set_content(
-            RichDocumentResolution8192Item(),
-            L"RichDocumentResolution8192Item.Content");
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
         set_text(PlainTextPreviewSectionTitle(), L"PlainTextPreviewSectionTitle.Text");
@@ -679,6 +645,7 @@ namespace winrt::Glance::App::implementation
             L"VersionFormat", { GLANCE_VERSION_WSTRING }));
         refresh_runtime_statuses();
         refresh_component_statuses();
+        rebuild_component_settings();
     }
 
     bool SettingsWindow::launch_at_sign_in_enabled() const
@@ -818,6 +785,183 @@ namespace winrt::Glance::App::implementation
             row.Children().Append(status_icon);
             ComponentStatusList().Children().Append(row);
         }
+    }
+
+    void SettingsWindow::rebuild_component_settings()
+    {
+        const bool was_initializing = initializing_;
+        initializing_ = true;
+
+        const auto panel = ComponentDocumentSettingsPanel();
+        panel.Children().Clear();
+        auto settings = glance::app::component_settings(
+            glance::app::current_ui_language());
+        std::erase_if(settings, [](const auto& setting) {
+            return setting.page != glance::contracts::components::
+                ComponentSettingPage::document_preview;
+        });
+        if (settings.empty())
+        {
+            initializing_ = was_initializing;
+            return;
+        }
+
+        const auto title_style = SettingsNavigation().Resources()
+            .Lookup(box_value(L"SettingsGroupTitleStyle")).as<Style>();
+        const auto group_style = SettingsNavigation().Resources()
+            .Lookup(box_value(L"SettingsGroupStyle")).as<Style>();
+        const auto row_style = SettingsNavigation().Resources()
+            .Lookup(box_value(L"SettingsRowStyle")).as<Style>();
+        const auto description_style = SettingsNavigation().Resources()
+            .Lookup(box_value(L"SettingsDescriptionStyle")).as<Style>();
+        const auto divider_brush = Application::Current().Resources().TryLookup(
+            box_value(L"DividerStrokeColorDefaultBrush")).try_as<Media::Brush>();
+        const auto weak = get_weak();
+
+        std::size_t index{};
+        while (index < settings.size())
+        {
+            const auto group_component = settings[index].component_id;
+            const auto group_id = settings[index].group_id;
+            Controls::StackPanel group;
+            group.Spacing(8);
+            Controls::TextBlock title;
+            title.Style(title_style);
+            title.Text(settings[index].group_title);
+            group.Children().Append(title);
+
+            Controls::Border border;
+            border.Style(group_style);
+            Controls::StackPanel rows;
+            bool first_row = true;
+            while (index < settings.size() &&
+                   settings[index].component_id == group_component &&
+                   settings[index].group_id == group_id)
+            {
+                const auto setting = settings[index++];
+                if (!first_row)
+                {
+                    Shapes::Rectangle divider;
+                    divider.Height(1);
+                    divider.Fill(divider_brush);
+                    rows.Children().Append(divider);
+                }
+                first_row = false;
+
+                Controls::Grid row;
+                row.Style(row_style);
+                Controls::ColumnDefinition content_column;
+                content_column.Width(GridLength{ 1, GridUnitType::Star });
+                row.ColumnDefinitions().Append(content_column);
+                Controls::ColumnDefinition control_column;
+                control_column.Width(
+                    setting.kind == glance::contracts::components::
+                        ComponentSettingKind::choice
+                    ? GridLength{ 220, GridUnitType::Pixel }
+                    : GridLengthHelper::Auto());
+                row.ColumnDefinitions().Append(control_column);
+
+                Controls::StackPanel content;
+                content.Spacing(3);
+                content.VerticalAlignment(VerticalAlignment::Center);
+                Controls::TextBlock label;
+                label.Text(setting.label);
+                content.Children().Append(label);
+                if (!setting.description.empty())
+                {
+                    Controls::TextBlock description;
+                    description.Style(description_style);
+                    description.Text(setting.description);
+                    content.Children().Append(description);
+                }
+                row.Children().Append(content);
+
+                const auto stored_value = glance::app::component_setting_value(
+                    setting.component_id,
+                    setting.setting_id,
+                    setting.default_value);
+                if (setting.kind == glance::contracts::components::
+                        ComponentSettingKind::toggle)
+                {
+                    Controls::ToggleSwitch toggle;
+                    toggle.IsOn(stored_value != 0);
+                    Controls::Grid::SetColumn(toggle, 1);
+                    toggle.Toggled([
+                        weak,
+                        component_id = setting.component_id,
+                        setting_id = setting.setting_id](
+                            IInspectable const& sender,
+                            RoutedEventArgs const&) {
+                        if (const auto self = weak.get();
+                            self != nullptr && !self->initializing_)
+                        {
+                            glance::app::save_component_setting_value(
+                                component_id,
+                                setting_id,
+                                sender.as<Controls::ToggleSwitch>().IsOn() ? 1 : 0);
+                        }
+                    });
+                    row.Children().Append(toggle);
+                }
+                else
+                {
+                    Controls::ComboBox combo;
+                    combo.HorizontalAlignment(HorizontalAlignment::Stretch);
+                    combo.VerticalAlignment(VerticalAlignment::Center);
+                    int selected_index = -1;
+                    for (std::size_t option_index = 0;
+                         option_index < setting.options.size();
+                         ++option_index)
+                    {
+                        combo.Items().Append(box_value(setting.options[option_index].text));
+                        if (setting.options[option_index].value == stored_value)
+                        {
+                            selected_index = static_cast<int>(option_index);
+                        }
+                    }
+                    if (selected_index < 0)
+                    {
+                        const auto default_option = std::ranges::find_if(
+                            setting.options,
+                            [&setting](const auto& option) {
+                                return option.value == setting.default_value;
+                            });
+                        selected_index = default_option == setting.options.end()
+                            ? 0
+                            : static_cast<int>(std::distance(
+                                setting.options.begin(),
+                                default_option));
+                    }
+                    combo.SelectedIndex(selected_index);
+                    Controls::Grid::SetColumn(combo, 1);
+                    combo.SelectionChanged([
+                        weak,
+                        component_id = setting.component_id,
+                        setting_id = setting.setting_id,
+                        options = setting.options](
+                            IInspectable const& sender,
+                            Controls::SelectionChangedEventArgs const&) {
+                        const auto self = weak.get();
+                        const int selected = sender.as<Controls::ComboBox>().SelectedIndex();
+                        if (self == nullptr || self->initializing_ || selected < 0 ||
+                            selected >= static_cast<int>(options.size()))
+                        {
+                            return;
+                        }
+                        glance::app::save_component_setting_value(
+                            component_id,
+                            setting_id,
+                            options[static_cast<std::size_t>(selected)].value);
+                    });
+                    row.Children().Append(combo);
+                }
+                rows.Children().Append(row);
+            }
+            border.Child(rows);
+            group.Children().Append(border);
+            panel.Children().Append(group);
+        }
+        initializing_ = was_initializing;
     }
 
     void SettingsWindow::refresh_diagnostic_bundle_status()
@@ -1023,27 +1167,6 @@ namespace winrt::Glance::App::implementation
         media_preview_preferences_.autoplay_video = AutoplayVideoToggle().IsOn();
         media_preview_preferences_.reverse_seek_wheel = ReverseSeekWheelToggle().IsOn();
         media_preview_preferences_.show_image_zoom_map = ImageZoomMapToggle().IsOn();
-        glance::app::save_media_preview_preferences(media_preview_preferences_);
-    }
-
-    void SettingsWindow::RichDocumentRenderResolutionComboBox_SelectionChanged(
-        IInspectable const&,
-        Controls::SelectionChangedEventArgs const&)
-    {
-        if (initializing_)
-        {
-            return;
-        }
-
-        static constexpr std::array<std::uint32_t, 4> dimensions{
-            1024, 2048, 4096, 8192 };
-        const int selected = RichDocumentRenderResolutionComboBox().SelectedIndex();
-        if (selected < 0 || selected >= static_cast<int>(dimensions.size()))
-        {
-            return;
-        }
-        media_preview_preferences_.rich_document_render_dimension =
-            dimensions[static_cast<std::size_t>(selected)];
         glance::app::save_media_preview_preferences(media_preview_preferences_);
     }
 

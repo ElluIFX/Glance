@@ -34,7 +34,7 @@
     <ClInclude Include="preview\markdown_renderer.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\media_metadata_provider.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\pan_interaction.h"><Filter>Preview</Filter></ClInclude>
-    <ClInclude Include="preview\pdf_render_client.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\paged_document_render_client.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\preview_file.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\preview_provider.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\scintilla_text_view.h"><Filter>Preview</Filter></ClInclude>
@@ -69,7 +69,7 @@
     <ClCompile Include="preview\image_metadata_provider.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\markdown_renderer.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\media_metadata_provider.cpp"><Filter>Preview</Filter></ClCompile>
-    <ClCompile Include="preview\pdf_render_client.cpp"><Filter>Preview</Filter></ClCompile>
+    <ClCompile Include="preview\paged_document_render_client.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\preview_provider.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\scintilla_text_view.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\shell_icon_provider.cpp"><Filter>Preview</Filter></ClCompile>

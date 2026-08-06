@@ -1,0 +1,33 @@
+{
+  "schema_version": 3,
+  "id": "pdf",
+  "architecture": "x64",
+  "entry_point": "Glance.PdfComponent.dll",
+  "dependencies": [],
+  "payload_files": [
+    "Glance.PdfHost.exe",
+    "pdfium.dll",
+    "resources.pri",
+    "licenses/PDFium-NOTICE.txt",
+    "licenses/PDFium/abseil.txt",
+    "licenses/PDFium/agg23.txt",
+    "licenses/PDFium/BinaryDistribution-MIT.txt",
+    "licenses/PDFium/fast_float.txt",
+    "licenses/PDFium/freetype.txt",
+    "licenses/PDFium/icu.txt",
+    "licenses/PDFium/lcms.txt",
+    "licenses/PDFium/libjpeg_turbo.ijg",
+    "licenses/PDFium/libjpeg_turbo.md",
+    "licenses/PDFium/libopenjpeg.txt",
+    "licenses/PDFium/libpng.txt",
+    "licenses/PDFium/libtiff.txt",
+    "licenses/PDFium/llvm-libc.txt",
+    "licenses/PDFium/pdfium.txt",
+    "licenses/PDFium/simdutf.txt",
+    "licenses/PDFium/zlib.txt"
+  ],
+  "installer_names": {
+    "en-US": "PDF preview",
+    "zh-CN": "PDF 预览"
+  }
+}

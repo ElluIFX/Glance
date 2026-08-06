@@ -195,13 +195,6 @@
   <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>打开视频预览时自动开始播放</value></data>
   <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>反转进度滚轮方向</value></data>
   <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>反转鼠标滚轮调整播放进度的方向</value></data>
-  <data name="RichDocumentPreviewGroupTitle.Text" xml:space="preserve"><value>富文档预览</value></data>
-  <data name="RichDocumentRenderResolutionLabel.Text" xml:space="preserve"><value>渲染分辨率</value></data>
-  <data name="RichDocumentRenderResolutionDescription.Text" xml:space="preserve"><value>渲染预览最长边的像素上限</value></data>
-  <data name="RichDocumentResolution1024Item.Content" xml:space="preserve"><value>1024 px</value></data>
-  <data name="RichDocumentResolution2048Item.Content" xml:space="preserve"><value>2048 px</value></data>
-  <data name="RichDocumentResolution4096Item.Content" xml:space="preserve"><value>4096 px</value></data>
-  <data name="RichDocumentResolution8192Item.Content" xml:space="preserve"><value>8192 px</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文档预览</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>文档预览器的外观与行为</value></data>
   <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>纯文本预览</value></data>
@@ -369,4 +362,6 @@
   <data name="ComponentStateWarning" xml:space="preserve"><value>警告</value></data>
   <data name="ComponentStateError" xml:space="preserve"><value>不可用</value></data>
   <data name="ComponentWebViewUnavailable" xml:space="preserve"><value>未检测到 WebView2 运行时</value></data>
+  <data name="ComponentDependencyUnavailable" xml:space="preserve"><value>依赖组件 {0} 不可用</value></data>
+  <data name="ComponentDependencyCycle" xml:space="preserve"><value>组件依赖关系存在循环</value></data>
 </root>

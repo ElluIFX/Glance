@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -65,6 +66,36 @@ namespace glance::app
         std::wstring notice;
     };
 
+    struct PagedDocumentRendererRegistration
+    {
+        std::wstring host_path;
+        std::shared_ptr<void> lease;
+    };
+
+    struct ComponentSettingOption
+    {
+        std::int64_t value{};
+        std::wstring text;
+    };
+
+    struct ComponentSetting
+    {
+        std::wstring component_id;
+        std::wstring setting_id;
+        glance::contracts::components::ComponentSettingPage page{
+            glance::contracts::components::ComponentSettingPage::document_preview };
+        std::wstring group_id;
+        std::wstring group_title;
+        std::wstring label;
+        std::wstring description;
+        glance::contracts::components::ComponentSettingKind kind{
+            glance::contracts::components::ComponentSettingKind::choice };
+        std::int64_t default_value{};
+        std::uint32_t group_order{};
+        std::uint32_t setting_order{};
+        std::vector<ComponentSettingOption> options;
+    };
+
     [[nodiscard]] std::filesystem::path application_component_root();
     void initialize_components() noexcept;
     [[nodiscard]] bool component_has_extension(std::wstring_view extension) noexcept;
@@ -82,5 +113,17 @@ namespace glance::app
         std::wstring_view language_tag) noexcept;
     [[nodiscard]] std::vector<ComponentStatus> component_statuses(
         std::wstring_view language_tag) noexcept;
+    [[nodiscard]] std::optional<PagedDocumentRendererRegistration>
+        paged_document_renderer() noexcept;
+    [[nodiscard]] std::vector<ComponentSetting> component_settings(
+        std::wstring_view language_tag) noexcept;
+    [[nodiscard]] std::int64_t component_setting_value(
+        std::wstring_view component_id,
+        std::wstring_view setting_id,
+        std::int64_t default_value) noexcept;
+    void save_component_setting_value(
+        std::wstring_view component_id,
+        std::wstring_view setting_id,
+        std::int64_t value) noexcept;
     void shutdown_components() noexcept;
 }

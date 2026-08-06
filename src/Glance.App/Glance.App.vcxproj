@@ -70,7 +70,7 @@
     <ClInclude Include="preferences\media_preview_preferences.h" />
     <ClInclude Include="preview\pan_interaction.h" />
     <ClInclude Include="preferences\path_copy_preferences.h" />
-    <ClInclude Include="preview\pdf_render_client.h" />
+    <ClInclude Include="preview\paged_document_render_client.h" />
     <ClInclude Include="common\pch.h" />
     <ClInclude Include="common\resource.h" />
     <ClInclude Include="preview\shell_icon_provider.h" />
@@ -118,7 +118,7 @@
     <ClCompile Include="preview\media_metadata_provider.cpp" />
     <ClCompile Include="preferences\media_preview_preferences.cpp" />
     <ClCompile Include="preferences\path_copy_preferences.cpp" />
-    <ClCompile Include="preview\pdf_render_client.cpp" />
+    <ClCompile Include="preview\paged_document_render_client.cpp" />
     <ClCompile Include="common\pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="App.xaml.cpp"><DependentUpon>App.xaml</DependentUpon></ClCompile>
     <ClCompile Include="ui\MainWindow.xaml.cpp"><DependentUpon>MainWindow.xaml</DependentUpon></ClCompile>
@@ -179,10 +179,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Glance.Contracts\Glance.Contracts.vcxproj">
       <Project>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\Glance.RenderHost\Glance.RenderHost.vcxproj">
-      <Project>{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}</Project>
-      <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

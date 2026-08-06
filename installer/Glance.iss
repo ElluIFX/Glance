@@ -113,6 +113,8 @@ const
 var
   DeleteUserData: Boolean;
   UserDataRestartRequired: Boolean;
+  UpdatingComponentSelection: Boolean;
+  ComponentSelectionSnapshot: String;
 
 function HasCommandLineParameter(const Value: String): Boolean;
 var
@@ -143,12 +145,87 @@ begin
     ',' + Lowercase(Catalog) + ',') > 0;
 end;
 
+function AddComponentToSelection(
+  const Selection: String;
+  const ComponentName: String): String;
+begin
+  if Selection = '' then
+    Result := ComponentName
+  else if ComponentCatalogContains(Selection, ComponentName) then
+    Result := Selection
+  else
+    Result := Selection + ',' + ComponentName;
+end;
+
+function RemoveComponentFromSelection(
+  const Selection: String;
+  const ComponentName: String): String;
+var
+  Working: String;
+begin
+  Working := ',' + Selection + ',';
+  StringChangeEx(
+    Working,
+    ',' + ComponentName + ',',
+    ',',
+    True);
+  if (Length(Working) > 0) and (Working[1] = ',') then
+    Delete(Working, 1, 1);
+  if (Length(Working) > 0) and (Working[Length(Working)] = ',') then
+    Delete(Working, Length(Working), 1);
+  Result := Working;
+end;
+
+procedure ResolveComponentDependency(
+  const Dependent: String;
+  const Dependency: String;
+  const PreviousSelection: String);
+var
+  Selection: String;
+begin
+  Selection := WizardSelectedComponents(False);
+  if ComponentCatalogContains(Selection, Dependent) and
+     not ComponentCatalogContains(Selection, Dependency) then
+  begin
+    if ComponentCatalogContains(PreviousSelection, Dependent) and
+       ComponentCatalogContains(PreviousSelection, Dependency) then
+      Selection := RemoveComponentFromSelection(Selection, Dependent)
+    else
+      Selection := AddComponentToSelection(Selection, Dependency);
+    WizardSelectComponents(Selection);
+  end;
+end;
+
+procedure NormalizeComponentDependencies(const PreviousSelection: String);
+var
+  SelectionBefore: String;
+begin
+  repeat
+    SelectionBefore := WizardSelectedComponents(False);
+#include ComponentInnoDir + "\component-dependencies.iss"
+  until SelectionBefore = WizardSelectedComponents(False);
+end;
+
 procedure SelectComponentIfNew(
-  const ComponentName: String;
+  const ComponentId: String;
+  const InstallerName: String;
   const PreviousComponentCatalog: String);
 begin
-  if not ComponentCatalogContains(PreviousComponentCatalog, ComponentName) then
-    WizardSelectComponents(ComponentName);
+  if not ComponentCatalogContains(PreviousComponentCatalog, ComponentId) then
+    WizardSelectComponents(InstallerName);
+end;
+
+procedure ComponentsListClickCheck(Sender: TObject);
+var
+  PreviousSelection: String;
+begin
+  if UpdatingComponentSelection then
+    Exit;
+  UpdatingComponentSelection := True;
+  PreviousSelection := ComponentSelectionSnapshot;
+  NormalizeComponentDependencies(PreviousSelection);
+  ComponentSelectionSnapshot := WizardSelectedComponents(False);
+  UpdatingComponentSelection := False;
 end;
 
 procedure InitializeWizard;
@@ -158,6 +235,9 @@ begin
   PreviousComponentCatalog := GetPreviousData(
     'KnownComponents', LegacyComponentCatalog);
 #include ComponentInnoDir + "\component-select-new.iss"
+  NormalizeComponentDependencies('');
+  ComponentSelectionSnapshot := WizardSelectedComponents(False);
+  WizardForm.ComponentsList.OnClickCheck := @ComponentsListClickCheck;
 end;
 
 procedure RegisterPreviousData(PreviousDataKey: Integer);
@@ -209,6 +289,7 @@ end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
+  NormalizeComponentDependencies('');
   RequestGlanceShutdown;
   Result := '';
 end;

@@ -273,7 +273,7 @@ namespace
         }
         if (matches(0, { 0x25, 0x50, 0x44, 0x46 }))
         {
-            return glance::app::PreviewKind::pdf;
+            return glance::app::PreviewKind::generic;
         }
         if (matches(0, { 0x50, 0x4B, 0x03, 0x04 }) || matches(0, { 0x37, 0x7A, 0xBC, 0xAF }))
         {
@@ -771,10 +771,6 @@ namespace glance::app
         if (contains(extension, media_extensions))
         {
             return PreviewKind::media;
-        }
-        if (extension == L".pdf")
-        {
-            return PreviewKind::pdf;
         }
         if (contains(extension, archive_extensions))
         {

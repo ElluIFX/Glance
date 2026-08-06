@@ -23,6 +23,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\src\Glance.App\preferences;$(ProjectDir)..\..\src\Glance.App\preview;$(ProjectDir)..\..\src\Glance.Contracts\include;$(ProjectDir)..\..\src\Glance.Core\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GLANCE_PAGED_DOCUMENT_CLIENT_NO_COMPONENT_FACTORY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -30,13 +31,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="input_decision_tests.cpp" />
-    <ClCompile Include="..\..\src\Glance.App\preview\pdf_render_client.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\paged_document_render_client.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Glance.RenderHost\Glance.RenderHost.vcxproj">
+    <ProjectReference Include="..\..\src\Glance.Components\Pdf\host\Glance.PdfHost.vcxproj">
       <Project>{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
