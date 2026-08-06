@@ -58,8 +58,10 @@
 
 复杂格式支持以独立组件提供，与 Glance 主程序保持隔离，在安装时可自由裁剪
 
-- **Microsoft Office 预览** — 支持预览 Word、PowerPoint 与 Excel 文件，需要本机安装对应的 Office 应用
-- **Adobe 文档预览** — 支持预览 PS、AI 工程文件，不依赖本机安装 Adobe 应用
+- **PDF 预览** — 支持 PDF 多页文档预览，并为 Office 组件提供文档渲染能力
+- **Microsoft Office 预览** — 支持预览 Word、PowerPoint 与 Excel 文件，依赖本机安装对应的 Office 应用
+- **压缩包预览** — 支持直接预览 ZIP、7z、RAR、tar、ISO 等常见压缩与归档格式
+- **Adobe 文档预览** — 支持预览 PS、AI 工程文件，不需要本机安装 Adobe 应用
 - **3D 模型预览** — 支持预览常见 3D 文件，如 STEP、STL、OBJ 等
 
 ### 可选依赖
