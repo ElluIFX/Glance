@@ -4,6 +4,18 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.11] - 2026-08-11
+
+### Added
+
+- Added gallery navigation for images, audio, and video using the current File Explorer order, synchronized selection, continuous scrolling, and adjacent-image preloading.
+- Added an optional advanced media information component with on-demand, verified FFprobe preparation after user confirmation.
+
+### Fixed
+
+- Sorted component status entries alphabetically and restored component size estimates in the installer.
+- Kept long names readable in multi-file previews by compacting their middle while preserving the beginning and extension.
+
 ## [2026.08.06.3] - 2026-08-06
 
 ### Added
