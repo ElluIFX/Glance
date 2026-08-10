@@ -90,6 +90,7 @@
                 x:Name="FileList"
                 Grid.Column="0"
                 Margin="8"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                 SelectionChanged="FileList_SelectionChanged"
                 Visibility="Collapsed" />
 

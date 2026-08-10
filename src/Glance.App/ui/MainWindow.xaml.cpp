@@ -99,6 +99,49 @@ namespace
     constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
     constexpr std::size_t retained_preview_buffer_limit_bytes = 8U * 1024U * 1024U;
     constexpr std::uint32_t folder_icon_pixel_size = 20;
+
+    std::wstring compact_file_list_name(std::wstring_view name)
+    {
+        constexpr std::size_t maximum_units = 24;
+        constexpr std::wstring_view ellipsis = L"...";
+        const auto units = [](wchar_t character) noexcept
+        {
+            return character < 0x80 ? 1U : 2U;
+        };
+
+        std::size_t total_units{};
+        for (const auto character : name)
+        {
+            total_units += units(character);
+        }
+        if (total_units <= maximum_units)
+        {
+            return std::wstring(name);
+        }
+
+        constexpr std::size_t prefix_units = 14;
+        constexpr std::size_t suffix_units = maximum_units - prefix_units - ellipsis.size();
+        std::size_t prefix_length{};
+        std::size_t used_units{};
+        while (prefix_length < name.size() &&
+            used_units + units(name[prefix_length]) <= prefix_units)
+        {
+            used_units += units(name[prefix_length++]);
+        }
+
+        std::size_t suffix_start = name.size();
+        used_units = 0;
+        while (suffix_start > prefix_length &&
+            used_units + units(name[suffix_start - 1]) <= suffix_units)
+        {
+            used_units += units(name[--suffix_start]);
+        }
+
+        std::wstring compacted(name.substr(0, prefix_length));
+        compacted.append(ellipsis);
+        compacted.append(name.substr(suffix_start));
+        return compacted;
+    }
     constexpr std::uint32_t folder_thumbnail_pixel_size = 32;
     constexpr std::size_t thumbnail_update_batch_size = 8;
     constexpr auto web_view_idle_timeout = std::chrono::minutes(1);
@@ -1601,7 +1644,7 @@ namespace winrt::Glance::App::implementation
         FileList().Items().Clear();
         for (const auto& file : files_)
         {
-            FileList().Items().Append(box_value(file.display_name));
+            FileList().Items().Append(box_value(compact_file_list_name(file.display_name)));
         }
         if (files_.size() > 1)
         {
