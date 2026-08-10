@@ -1,8 +1,13 @@
 #pragma once
 
+#include "glance/contracts/component_api.h"
+
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace glance::app
 {
@@ -44,6 +49,10 @@ namespace glance::app
     };
 
     [[nodiscard]] PreviewKind resolve_preview_kind(const std::wstring& path);
+    [[nodiscard]] glance::contracts::components::GalleryMediaKind gallery_media_kind(
+        const std::wstring& path);
+    [[nodiscard]] std::vector<std::wstring> gallery_extensions(
+        glance::contracts::components::GalleryMediaKind kind);
     [[nodiscard]] bool can_try_preview_as_text(const std::wstring& path);
     [[nodiscard]] TextPreview load_text_preview(
         const std::wstring& path,

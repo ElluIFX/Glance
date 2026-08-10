@@ -20,6 +20,10 @@
   <data name="EncodingDetecting" xml:space="preserve"><value>Detecting...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="FontSizeOverlayFormat" xml:space="preserve"><value>{0} px</value></data>
+  <data name="GalleryScrollModeNotice" xml:space="preserve"><value>Gallery scroll mode</value></data>
+  <data name="ImageWheelZoomModeNotice" xml:space="preserve"><value>Image wheel zoom mode</value></data>
+  <data name="MediaWheelControlModeNotice" xml:space="preserve"><value>Media wheel control mode</value></data>
+  <data name="GalleryUnavailableNotice" xml:space="preserve"><value>Gallery scrolling is unavailable for this source</value></data>
   <data name="LineNumbersTooltip" xml:space="preserve"><value>Show line numbers</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>Line numbers are unavailable while wrapping</value></data>
   <data name="NoImageMetadata" xml:space="preserve"><value>No embedded image metadata.</value></data>
@@ -79,6 +83,7 @@
   <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>Play or pause</value></data>
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mute or unmute</value></data>
   <data name="MediaAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show advanced media information</value></data>
+  <data name="GalleryModeButton.ToolTipService.ToolTip" xml:space="preserve"><value>Gallery mode</value></data>
   <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Previous page</value></data>
   <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Next page</value></data>
   <data name="PdfThumbnailsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Thumbnails</value></data>
@@ -181,6 +186,11 @@
   <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>Set the opacity of all preview windows</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>Media preview</value></data>
   <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Appearance and behavior of image, audio, and video previewers</value></data>
+  <data name="MediaGeneralGroupTitle.Text" xml:space="preserve"><value>General</value></data>
+  <data name="MiddleClickGalleryModeLabel.Text" xml:space="preserve"><value>Middle-click gallery mode</value></data>
+  <data name="MiddleClickGalleryModeDescription.Text" xml:space="preserve"><value>Use the middle mouse button to switch gallery mode</value></data>
+  <data name="LoopGalleryScrollingLabel.Text" xml:space="preserve"><value>Loop gallery scrolling</value></data>
+  <data name="LoopGalleryScrollingDescription.Text" xml:space="preserve"><value>Continue from the opposite end after the first or last item</value></data>
   <data name="ImagePreviewGroupTitle.Text" xml:space="preserve"><value>Image preview</value></data>
   <data name="ImageZoomMapLabel.Text" xml:space="preserve"><value>Zoom thumbnail</value></data>
   <data name="ImageZoomMapDescription.Text" xml:space="preserve"><value>Show the current viewport while an image is zoomed</value></data>

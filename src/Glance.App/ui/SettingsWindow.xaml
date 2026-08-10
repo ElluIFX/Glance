@@ -708,6 +708,36 @@
                         <TextBlock x:Name="MediaPreviewPageDescription" x:Uid="MediaPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Appearance and behavior of image, audio, and video previewers" />
                     </StackPanel>
                     <StackPanel Spacing="8">
+                        <TextBlock x:Name="MediaGeneralGroupTitle" x:Uid="MediaGeneralGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="General" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <StackPanel>
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="MiddleClickGalleryModeLabel" x:Uid="MiddleClickGalleryModeLabel" Text="Middle-click gallery mode" />
+                                        <TextBlock x:Name="MiddleClickGalleryModeDescription" x:Uid="MiddleClickGalleryModeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use the middle mouse button to switch gallery mode" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="MiddleClickGalleryModeToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                                </Grid>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="LoopGalleryScrollingLabel" x:Uid="LoopGalleryScrollingLabel" Text="Loop gallery scrolling" />
+                                        <TextBlock x:Name="LoopGalleryScrollingDescription" x:Uid="LoopGalleryScrollingDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Continue from the opposite end after the first or last item" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="LoopGalleryScrollingToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
                         <TextBlock x:Name="AudioVideoPreviewGroupTitle" x:Uid="AudioVideoPreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Audio and video preview" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>

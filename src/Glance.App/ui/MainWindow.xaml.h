@@ -30,6 +30,8 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace winrt::Glance::App::implementation
@@ -39,10 +41,14 @@ namespace winrt::Glance::App::implementation
         using StateCallback = std::function<void(
             std::uint64_t,
             glance::contracts::PreviewWindowState)>;
+        using GalleryRequestCallback = std::function<bool(std::string)>;
 
         MainWindow();
 
-        void InitializeSession(std::uint64_t instance_id, StateCallback callback);
+        void InitializeSession(
+            std::uint64_t instance_id,
+            StateCallback callback,
+            GalleryRequestCallback gallery_request_callback);
         void ShowPreview(
             std::vector<glance::app::PreviewFile> files,
             std::uint32_t focused_index,
@@ -58,6 +64,8 @@ namespace winrt::Glance::App::implementation
         void ApplyLocalizedResources();
         void ApplyTextPreferences();
         void ApplyFooterPreferences();
+        void HandleGalleryResponse(std::string_view payload);
+        void HandleGalleryDisconnect();
         [[nodiscard]] std::uint64_t InstanceId() const noexcept { return instance_id_; }
 
         void TopmostButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -157,11 +165,15 @@ namespace winrt::Glance::App::implementation
         void MediaPanel_PointerMoved(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void MediaPanel_PointerPressed(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void MediaPanel_PointerWheelChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void MediaPlayPauseButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MediaMuteButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void GalleryModeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MediaAdvancedInfoButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -203,6 +215,13 @@ namespace winrt::Glance::App::implementation
         void GenericAdvancedInfoButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
+        enum class GalleryMode
+        {
+            inactive,
+            opening,
+            active,
+        };
+
         void show_copy_feedback();
         static LRESULT CALLBACK window_subclass(
             HWND window,
@@ -253,7 +272,13 @@ namespace winrt::Glance::App::implementation
             bool preview_as_text_attempt = false);
         winrt::fire_and_forget load_next_text_chunk_async(std::uint64_t generation);
         void set_text_loading(bool loading);
-        winrt::fire_and_forget load_image_async(std::wstring path, std::uint64_t generation);
+        Windows::Foundation::IAsyncAction load_image_async(
+            std::wstring path,
+            std::uint64_t generation,
+            bool first_frame_presented = false);
+        Windows::Foundation::IAsyncAction preload_gallery_image_async(
+            glance::app::PreviewFile file,
+            std::uint64_t generation);
         winrt::fire_and_forget load_image_metadata_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_image_media_info_async(
             std::wstring path,
@@ -348,6 +373,14 @@ namespace winrt::Glance::App::implementation
             std::wstring status;
             std::uint64_t generation{};
         };
+        struct GalleryImageCacheEntry
+        {
+            glance::app::PreviewFile file;
+            Microsoft::UI::Xaml::Media::Imaging::BitmapImage bitmap{ nullptr };
+            std::uint32_t pixel_width{};
+            std::uint32_t pixel_height{};
+            std::uint64_t decoded_bytes{};
+        };
         struct PreviewNavigationEntry
         {
             glance::app::PreviewFile file;
@@ -394,6 +427,24 @@ namespace winrt::Glance::App::implementation
         void update_text_layout();
         void adjust_text_font_size(int steps);
         void show_text_font_size_overlay();
+        void update_title_text();
+        void toggle_gallery_mode();
+        void open_gallery(bool preserve_navigation = false);
+        void leave_gallery(bool show_notice, bool notify_core = true);
+        void navigate_gallery(int steps);
+        [[nodiscard]] bool handle_gallery_wheel(int delta);
+        void request_gallery_page(std::uint32_t target_index, bool select_after_load = true);
+        void request_gallery_selection(std::uint32_t target_index);
+        [[nodiscard]] bool send_gallery_request(
+            std::wstring_view operation,
+            std::uint64_t request_id,
+            std::uint32_t page_start = 0,
+            std::uint32_t target_index = 0);
+        void apply_gallery_file(std::uint32_t index, glance::app::PreviewFile file);
+        void schedule_gallery_preloads();
+        void cancel_gallery_preloads() noexcept;
+        [[nodiscard]] std::wstring gallery_image_cache_key(
+            const glance::app::PreviewFile& file) const;
         void set_markdown_preview_mode(bool preview);
         void update_line_number_visibility();
         void show_content_panel(glance::app::PreviewKind kind);
@@ -443,6 +494,7 @@ namespace winrt::Glance::App::implementation
         HWND window_{};
         std::uint64_t instance_id_{};
         StateCallback state_callback_;
+        GalleryRequestCallback gallery_request_callback_;
         std::vector<glance::app::PreviewFile> files_;
         std::uint32_t current_index_{};
         std::uint32_t source_kind_{};
@@ -476,6 +528,29 @@ namespace winrt::Glance::App::implementation
         bool image_panning_{};
         bool image_zoom_map_panning_{};
         bool image_zoom_map_enabled_{ true };
+        GalleryMode gallery_mode_{ GalleryMode::inactive };
+        glance::contracts::components::GalleryMediaKind gallery_media_kind_{
+            glance::contracts::components::GalleryMediaKind::none };
+        bool middle_click_gallery_enabled_{ true };
+        bool loop_gallery_enabled_{ true };
+        std::uint64_t gallery_session_id_{};
+        std::uint64_t gallery_request_sequence_{};
+        std::uint64_t gallery_open_request_id_{};
+        std::uint64_t gallery_page_request_id_{};
+        std::uint64_t gallery_select_request_id_{};
+        std::uint32_t gallery_total_count_{};
+        std::uint32_t gallery_current_index_{};
+        std::uint32_t gallery_desired_index_{};
+        std::optional<std::uint32_t> gallery_pending_target_;
+        bool gallery_page_select_after_load_{};
+        int gallery_pending_navigation_steps_{};
+        int gallery_wheel_delta_{};
+        std::unordered_map<std::uint32_t, glance::app::PreviewFile> gallery_items_;
+        std::unordered_map<std::wstring, GalleryImageCacheEntry> gallery_image_cache_;
+        std::optional<GalleryImageCacheEntry> pending_gallery_image_;
+        std::vector<Windows::Foundation::IAsyncAction> gallery_preload_operations_;
+        Windows::Foundation::IAsyncAction image_load_operation_{ nullptr };
+        std::uint64_t gallery_preload_generation_{};
         double image_rotation_{};
         double image_scale_x_{ 1.0 };
         double image_scale_y_{ 1.0 };

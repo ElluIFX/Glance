@@ -12,13 +12,16 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 namespace glance::core
 {
     struct SelectionWorkerContext;
+    struct GalleryResponse;
 
     class CoreApplication
     {
@@ -36,6 +39,8 @@ namespace glance::core
         static constexpr UINT selection_result_message = WM_APP + 2;
         static constexpr UINT heartbeat_message = WM_APP + 3;
         static constexpr UINT connection_changed_message = WM_APP + 4;
+        static constexpr UINT gallery_command_message = WM_APP + 5;
+        static constexpr UINT gallery_result_message = WM_APP + 6;
         static constexpr UINT selection_timer_id = 1;
         static constexpr UINT hook_refresh_timer_id = 2;
         static constexpr UINT app_watchdog_timer_id = 3;
@@ -58,10 +63,18 @@ namespace glance::core
         static void publish_selection(
             const std::shared_ptr<SelectionWorkerContext>& context,
             std::uint64_t generation,
-            glance::contracts::SelectionSnapshot next);
+            glance::contracts::SelectionSnapshot next,
+            bool suppress_preview_update);
+        static void publish_gallery_response(
+            const std::shared_ptr<SelectionWorkerContext>& context,
+            GalleryResponse response);
         void stop_selection_worker() noexcept;
         void apply_pending_selection();
-        void apply_selection(glance::contracts::SelectionSnapshot next);
+        void apply_selection(
+            glance::contracts::SelectionSnapshot next,
+            bool suppress_preview_update = false);
+        void apply_pending_gallery_commands();
+        void apply_pending_gallery_responses();
         void monitor_selection_worker();
         [[nodiscard]] bool selection_worker_healthy() const noexcept;
         void handle_hook_action(HookAction action, std::uint64_t posted_at_ms);
@@ -100,6 +113,8 @@ namespace glance::core
         std::uint64_t selection_worker_cooldown_until_ms_{};
         std::uint32_t selection_worker_consecutive_stalls_{};
         std::uint64_t selection_generation_{};
+        std::mutex gallery_payload_mutex_;
+        std::vector<std::string> pending_gallery_payloads_;
         PipeServer pipe_server_;
         KeyboardHookService* keyboard_hook_{};
         std::atomic_uint64_t raw_input_count_{};

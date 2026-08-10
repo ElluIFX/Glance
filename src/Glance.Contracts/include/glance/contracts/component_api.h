@@ -23,6 +23,7 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t paged_document_renderer_api_version = 1;
     inline constexpr std::uint32_t settings_contribution_api_version = 1;
     inline constexpr std::uint32_t file_directory_preview_api_version = 1;
+    inline constexpr std::uint32_t gallery_media_api_version = 1;
     inline constexpr std::size_t web_resource_host_capacity = 64;
     inline constexpr std::size_t maximum_web_resource_mappings = 4;
     inline constexpr std::size_t renderer_host_capacity = 260;
@@ -70,6 +71,11 @@ namespace glance::contracts::components
         0xc8dc,
         0x462f,
         { 0x95, 0x8a, 0xe1, 0x1f, 0xc7, 0xaf, 0xc1, 0xda } };
+    inline constexpr GUID gallery_media_api_id{
+        0x80dbd46d,
+        0xa62c,
+        0x4b43,
+        { 0x9c, 0xcd, 0x08, 0x26, 0x09, 0xaa, 0xd2, 0xd7 } };
 
     enum class PreviewContentKind : std::uint32_t
     {
@@ -100,6 +106,14 @@ namespace glance::contracts::components
         unavailable = 1,
         failed = 2,
         cancelled = 3,
+    };
+
+    enum class GalleryMediaKind : std::uint32_t
+    {
+        none = 0,
+        image = 1,
+        video = 2,
+        audio = 3,
     };
 
     enum class HealthSeverity : std::uint32_t
@@ -394,6 +408,8 @@ namespace glance::contracts::components
         const FileDirectoryEntrySink* sink,
         std::uint32_t* returned,
         std::uint32_t* total) noexcept;
+    using ClassifyGalleryExtensionFunction = GalleryMediaKind(WINAPI*)(
+        const wchar_t* extension) noexcept;
     using QueryInterfaceFunction = BOOL(WINAPI*)(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -450,6 +466,13 @@ namespace glance::contracts::components
         std::uint32_t version{ file_directory_preview_api_version };
         OpenFileDirectoryFunction open{};
         EnumerateFileDirectoryChildrenFunction enumerate_children{};
+    };
+
+    struct GalleryMediaApi
+    {
+        std::uint32_t size{ sizeof(GalleryMediaApi) };
+        std::uint32_t version{ gallery_media_api_version };
+        ClassifyGalleryExtensionFunction classify_extension{};
     };
 
     struct ComponentApi

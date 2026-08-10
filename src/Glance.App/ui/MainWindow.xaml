@@ -332,6 +332,7 @@
                     x:Name="MediaPanel"
                     Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                     PointerMoved="MediaPanel_PointerMoved"
+                    PointerPressed="MediaPanel_PointerPressed"
                     PointerWheelChanged="MediaPanel_PointerWheelChanged"
                     Visibility="Collapsed">
                     <MediaPlayerElement
@@ -898,6 +899,16 @@
                     <FontIcon FontSize="14" Glyph="&#xE946;" />
                 </ToggleButton>
             </StackPanel>
+            <ToggleButton
+                x:Name="GalleryModeButton"
+                x:Uid="GalleryModeButton"
+                Grid.Column="3"
+                Style="{StaticResource IconToggleButtonStyle}"
+                Click="GalleryModeButton_Click"
+                ToolTipService.ToolTip="Gallery mode"
+                Visibility="Collapsed">
+                <FontIcon FontSize="14" Glyph="&#xE7C5;" />
+            </ToggleButton>
             <ToggleButton
                 x:Name="WordWrapButton"
                 x:Uid="WordWrapButton"

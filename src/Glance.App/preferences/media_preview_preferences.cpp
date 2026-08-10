@@ -77,6 +77,8 @@ namespace glance::app
             .autoplay_audio = read_bool(L"AutoplayAudio", true),
             .autoplay_video = read_bool(L"AutoplayVideo", true),
             .reverse_seek_wheel = read_bool(L"ReverseSeekWheel", false),
+            .middle_click_gallery_mode = read_bool(L"MiddleClickGalleryMode", true),
+            .loop_gallery_scrolling = read_bool(L"LoopGalleryScrolling", true),
             .show_image_zoom_map = read_bool(L"ShowImageZoomMap", true),
         };
     }
@@ -103,6 +105,8 @@ namespace glance::app
         write_bool(key, L"AutoplayAudio", preferences.autoplay_audio);
         write_bool(key, L"AutoplayVideo", preferences.autoplay_video);
         write_bool(key, L"ReverseSeekWheel", preferences.reverse_seek_wheel);
+        write_bool(key, L"MiddleClickGalleryMode", preferences.middle_click_gallery_mode);
+        write_bool(key, L"LoopGalleryScrolling", preferences.loop_gallery_scrolling);
         write_bool(key, L"ShowImageZoomMap", preferences.show_image_zoom_map);
         RegCloseKey(key);
     }

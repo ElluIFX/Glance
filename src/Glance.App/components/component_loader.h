@@ -155,6 +155,10 @@ namespace glance::app
     [[nodiscard]] std::filesystem::path application_component_root();
     void initialize_components() noexcept;
     [[nodiscard]] bool component_has_extension(std::wstring_view extension) noexcept;
+    [[nodiscard]] glance::contracts::components::GalleryMediaKind
+        component_gallery_media_kind(std::wstring_view extension) noexcept;
+    [[nodiscard]] std::vector<std::wstring> component_gallery_extensions(
+        glance::contracts::components::GalleryMediaKind kind) noexcept;
     [[nodiscard]] ComponentLoadingMessage component_loading_text(
         const std::wstring& path,
         std::wstring_view language_tag) noexcept;

@@ -16,7 +16,9 @@
 
 #include <algorithm>
 #include <cwctype>
+#include <filesystem>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -334,6 +336,190 @@ namespace
             return false;
         }
         return populate_from_folder_view(folder_view.Get(), snapshot);
+    }
+
+    std::wstring folder_view_path(IFolderView2* folder_view)
+    {
+        ComPtr<IShellFolder> folder;
+        ComPtr<IPersistFolder2> persist_folder;
+        PIDLIST_ABSOLUTE folder_id{};
+        if (folder_view == nullptr ||
+            FAILED(folder_view->GetFolder(IID_PPV_ARGS(&folder))) ||
+            folder == nullptr ||
+            FAILED(folder.As(&persist_folder)) ||
+            FAILED(persist_folder->GetCurFolder(&folder_id)) ||
+            folder_id == nullptr)
+        {
+            return {};
+        }
+        ComPtr<IShellItem> folder_item;
+        const HRESULT item_result = SHCreateItemFromIDList(
+            folder_id,
+            IID_PPV_ARGS(&folder_item));
+        CoTaskMemFree(folder_id);
+        return SUCCEEDED(item_result) && folder_item != nullptr
+            ? shell_item_name(folder_item.Get(), SIGDN_FILESYSPATH)
+            : std::wstring{};
+    }
+
+    bool resolve_folder_view(
+        HWND source_window,
+        std::wstring_view expected_folder_path,
+        HWND expected_view_window,
+        ComPtr<IFolderView2>& folder_view,
+        HWND* resolved_view_window = nullptr)
+    {
+        if (source_window == nullptr || !IsWindow(source_window))
+        {
+            return false;
+        }
+
+        ComPtr<IShellWindows> shell_windows;
+        if (FAILED(CoCreateInstance(
+                CLSID_ShellWindows,
+                nullptr,
+                CLSCTX_LOCAL_SERVER,
+                IID_PPV_ARGS(&shell_windows))))
+        {
+            return false;
+        }
+
+        const auto class_name = window_class_name(source_window);
+        const bool desktop = _wcsicmp(class_name.c_str(), L"Progman") == 0 ||
+            _wcsicmp(class_name.c_str(), L"WorkerW") == 0;
+        const auto folder_matches = [expected_folder_path](IFolderView2* candidate) {
+            if (expected_folder_path.empty())
+            {
+                return true;
+            }
+            const auto path = folder_view_path(candidate);
+            return !path.empty() &&
+                _wcsicmp(path.c_str(), expected_folder_path.data()) == 0;
+        };
+        if (desktop)
+        {
+            VARIANT location{};
+            VARIANT location_root{};
+            long desktop_handle{};
+            ComPtr<IDispatch> dispatch;
+            if (FAILED(shell_windows->FindWindowSW(
+                    &location,
+                    &location_root,
+                    SWC_DESKTOP,
+                    &desktop_handle,
+                    SWFO_NEEDDISPATCH,
+                    &dispatch)) ||
+                dispatch == nullptr)
+            {
+                return false;
+            }
+            ComPtr<IServiceProvider> service_provider;
+            ComPtr<IShellBrowser> shell_browser;
+            ComPtr<IShellView> shell_view;
+            ComPtr<IFolderView2> candidate;
+            HWND view_window{};
+            const bool resolved = SUCCEEDED(dispatch.As(&service_provider)) &&
+                (SUCCEEDED(service_provider->QueryService(
+                     SID_STopLevelBrowser,
+                     IID_PPV_ARGS(&shell_browser))) ||
+                 SUCCEEDED(service_provider->QueryService(
+                     IID_IShellBrowser,
+                     IID_PPV_ARGS(&shell_browser)))) &&
+                shell_browser != nullptr &&
+                SUCCEEDED(shell_browser->QueryActiveShellView(&shell_view)) &&
+                shell_view != nullptr &&
+                SUCCEEDED(shell_view->GetWindow(&view_window)) &&
+                SUCCEEDED(shell_view.As(&candidate)) &&
+                (expected_view_window == nullptr || view_window == expected_view_window) &&
+                folder_matches(candidate.Get());
+            if (!resolved)
+            {
+                return false;
+            }
+            folder_view = std::move(candidate);
+            if (resolved_view_window != nullptr)
+            {
+                *resolved_view_window = view_window;
+            }
+            return true;
+        }
+
+        GUITHREADINFO thread_info{ sizeof(thread_info) };
+        DWORD source_process_id{};
+        const DWORD source_thread_id = GetWindowThreadProcessId(
+            source_window,
+            &source_process_id);
+        static_cast<void>(source_process_id);
+        static_cast<void>(GetGUIThreadInfo(source_thread_id, &thread_info));
+        ComPtr<IFolderView2> fallback;
+        HWND fallback_view_window{};
+        long count{};
+        if (FAILED(shell_windows->get_Count(&count)))
+        {
+            return false;
+        }
+        for (long index = 0; index < count; ++index)
+        {
+            VARIANT item_index{};
+            item_index.vt = VT_I4;
+            item_index.lVal = index;
+            ComPtr<IDispatch> dispatch;
+            ComPtr<IWebBrowserApp> browser;
+            SHANDLE_PTR browser_handle{};
+            if (FAILED(shell_windows->Item(item_index, &dispatch)) ||
+                dispatch == nullptr ||
+                FAILED(dispatch.As(&browser)) ||
+                FAILED(browser->get_HWND(&browser_handle)) ||
+                GetAncestor(reinterpret_cast<HWND>(browser_handle), GA_ROOT) != source_window)
+            {
+                continue;
+            }
+            ComPtr<IServiceProvider> service_provider;
+            ComPtr<IShellBrowser> shell_browser;
+            ComPtr<IShellView> shell_view;
+            ComPtr<IFolderView2> candidate;
+            HWND view_window{};
+            if (SUCCEEDED(browser.As(&service_provider)) &&
+                SUCCEEDED(service_provider->QueryService(
+                    SID_STopLevelBrowser,
+                    IID_PPV_ARGS(&shell_browser))) &&
+                shell_browser != nullptr &&
+                SUCCEEDED(shell_browser->QueryActiveShellView(&shell_view)) &&
+                shell_view != nullptr &&
+                SUCCEEDED(shell_view->GetWindow(&view_window)) &&
+                SUCCEEDED(shell_view.As(&candidate)) &&
+                (expected_view_window == nullptr || view_window == expected_view_window) &&
+                folder_matches(candidate.Get()))
+            {
+                const bool focused = thread_info.hwndFocus == view_window ||
+                    (thread_info.hwndFocus != nullptr &&
+                     IsChild(view_window, thread_info.hwndFocus));
+                if (expected_view_window != nullptr || focused)
+                {
+                    folder_view = std::move(candidate);
+                    if (resolved_view_window != nullptr)
+                    {
+                        *resolved_view_window = view_window;
+                    }
+                    return true;
+                }
+                if (fallback == nullptr)
+                {
+                    fallback = std::move(candidate);
+                    fallback_view_window = view_window;
+                }
+            }
+        }
+        if (fallback == nullptr)
+        {
+            return false;
+        }
+        folder_view = std::move(fallback);
+        if (resolved_view_window != nullptr)
+        {
+            *resolved_view_window = fallback_view_window;
+        }
+        return true;
     }
 
     glance::contracts::FileDescriptor describe_folder_item(FolderItem* item)
@@ -731,5 +917,281 @@ namespace glance::core
         }
         log_explorer_rejection(L"no Shell browser matches the foreground window");
         return snapshot;
+    }
+
+    GalleryResponse ExplorerSelectionService::handle_gallery_command(
+        const GalleryCommand& command,
+        const std::function<bool()>& canceled,
+        const std::function<void()>& report_progress)
+    {
+        GalleryResponse response;
+        response.operation = command.operation;
+        response.window_id = command.window_id;
+        response.request_id = command.request_id;
+        response.session_id = command.session_id;
+        const auto fail = [&response](std::wstring error) {
+            response.error = std::move(error);
+            return response;
+        };
+
+        try
+        {
+            if (command.operation == GalleryOperation::close)
+            {
+                const auto session = gallery_sessions_.find(command.window_id);
+                if (session != gallery_sessions_.end() &&
+                    (command.session_id == 0 || session->second.id == command.session_id))
+                {
+                    gallery_sessions_.erase(session);
+                }
+                response.success = true;
+                return response;
+            }
+
+            if (command.operation == GalleryOperation::open)
+            {
+                ComPtr<IFolderView2> folder_view;
+                const auto folder_path = std::filesystem::path(command.current_path)
+                    .parent_path()
+                    .wstring();
+                HWND view_window{};
+                if (!resolve_folder_view(
+                        reinterpret_cast<HWND>(command.source_window),
+                        folder_path,
+                        nullptr,
+                        folder_view,
+                        &view_window))
+                {
+                    return fail(L"unavailable");
+                }
+
+                std::unordered_set<std::wstring> extensions;
+                for (auto extension : command.extensions)
+                {
+                    std::ranges::transform(
+                        extension,
+                        extension.begin(),
+                        [](wchar_t value) { return std::towlower(value); });
+                    extensions.insert(std::move(extension));
+                }
+                if (extensions.empty())
+                {
+                    return fail(L"unsupported");
+                }
+
+                ComPtr<IShellItemArray> view_items;
+                const UINT flags = static_cast<UINT>(SVGIO_ALLVIEW) |
+                    static_cast<UINT>(SVGIO_FLAG_VIEWORDER);
+                if (FAILED(folder_view->Items(flags, IID_PPV_ARGS(&view_items))) ||
+                    view_items == nullptr)
+                {
+                    return fail(L"unavailable");
+                }
+                DWORD item_count{};
+                if (FAILED(view_items->GetCount(&item_count)))
+                {
+                    return fail(L"unavailable");
+                }
+
+                GallerySession session;
+                session.id = ++next_gallery_session_id_;
+                if (session.id == 0)
+                {
+                    session.id = ++next_gallery_session_id_;
+                }
+                session.source_window = command.source_window;
+                session.view_window = reinterpret_cast<std::uintptr_t>(view_window);
+                session.folder_path = folder_path;
+                bool found_current{};
+                for (DWORD view_index = 0; view_index < item_count; ++view_index)
+                {
+                    if ((view_index & 63U) == 0)
+                    {
+                        report_progress();
+                        if (canceled())
+                        {
+                            return fail(L"canceled");
+                        }
+                    }
+                    ComPtr<IShellItem> item;
+                    if (FAILED(view_items->GetItemAt(view_index, &item)) || item == nullptr)
+                    {
+                        continue;
+                    }
+                    SFGAOF attributes{};
+                    if (FAILED(item->GetAttributes(SFGAO_FILESYSTEM | SFGAO_FOLDER, &attributes)) ||
+                        (attributes & SFGAO_FILESYSTEM) == 0 ||
+                        (attributes & SFGAO_FOLDER) != 0)
+                    {
+                        continue;
+                    }
+                    auto path = shell_item_name(item.Get(), SIGDN_FILESYSPATH);
+                    if (path.empty())
+                    {
+                        continue;
+                    }
+                    auto extension = std::filesystem::path(path).extension().wstring();
+                    std::ranges::transform(
+                        extension,
+                        extension.begin(),
+                        [](wchar_t value) { return std::towlower(value); });
+                    if (!extensions.contains(extension))
+                    {
+                        continue;
+                    }
+                    if (!found_current && _wcsicmp(path.c_str(), command.current_path.c_str()) == 0)
+                    {
+                        session.current_index = static_cast<std::uint32_t>(session.items.size());
+                        found_current = true;
+                    }
+                    session.items.push_back(GallerySessionItem{
+                        std::move(path),
+                        view_index });
+                }
+                if (!found_current || session.items.empty())
+                {
+                    return fail(L"current_not_found");
+                }
+
+                response.session_id = session.id;
+                response.total_count = static_cast<std::uint32_t>(session.items.size());
+                response.current_index = session.current_index;
+                gallery_sessions_[command.window_id] = std::move(session);
+            }
+
+            const auto session = gallery_sessions_.find(command.window_id);
+            if (session == gallery_sessions_.end() ||
+                session->second.id != response.session_id)
+            {
+                return fail(L"stale");
+            }
+            auto& active_session = session->second;
+            response.total_count = static_cast<std::uint32_t>(active_session.items.size());
+            response.current_index = active_session.current_index;
+
+            if (command.operation == GalleryOperation::select)
+            {
+                if (command.target_index >= active_session.items.size())
+                {
+                    return fail(L"stale");
+                }
+                const auto& target = active_session.items[command.target_index];
+                ComPtr<IFolderView2> folder_view;
+                ComPtr<IShellFolder> folder;
+                PITEMID_CHILD item_id{};
+                ComPtr<IShellItem> item;
+                const bool resolved = resolve_folder_view(
+                        reinterpret_cast<HWND>(active_session.source_window),
+                        active_session.folder_path,
+                        reinterpret_cast<HWND>(active_session.view_window),
+                        folder_view) &&
+                    SUCCEEDED(folder_view->GetFolder(IID_PPV_ARGS(&folder))) &&
+                    SUCCEEDED(folder_view->Item(static_cast<int>(target.view_index), &item_id)) &&
+                    item_id != nullptr &&
+                    SUCCEEDED(SHCreateItemWithParent(
+                        nullptr,
+                        folder.Get(),
+                        item_id,
+                        IID_PPV_ARGS(&item)));
+                CoTaskMemFree(item_id);
+                if (!resolved || item == nullptr ||
+                    _wcsicmp(
+                        shell_item_name(item.Get(), SIGDN_FILESYSPATH).c_str(),
+                        target.path.c_str()) != 0)
+                {
+                    gallery_sessions_.erase(session);
+                    return fail(L"stale");
+                }
+                const DWORD select_flags = SVSI_SELECT | SVSI_DESELECTOTHERS |
+                    SVSI_ENSUREVISIBLE | SVSI_FOCUSED;
+                if (FAILED(folder_view->SelectItem(
+                        static_cast<int>(target.view_index),
+                        select_flags)))
+                {
+                    return fail(L"unavailable");
+                }
+                active_session.current_index = command.target_index;
+                synchronized_source_window_ = active_session.source_window;
+                synchronized_path_ = target.path;
+                synchronized_selection_expires_ = GetTickCount64() + 2000;
+                response.current_index = command.target_index;
+                response.success = true;
+                return response;
+            }
+
+            const std::uint32_t requested_count = std::clamp(command.page_count, 1U, 64U);
+            const std::uint32_t requested_start = command.operation == GalleryOperation::open
+                ? (response.current_index > requested_count / 2
+                    ? response.current_index - requested_count / 2
+                    : 0)
+                : command.page_start;
+            response.page_start = std::min<std::uint32_t>(requested_start, response.total_count);
+            if (response.total_count > requested_count)
+            {
+                response.page_start = std::min(
+                    response.page_start,
+                    response.total_count - requested_count);
+            }
+            const auto page_end = std::min<std::uint32_t>(
+                response.total_count,
+                response.page_start + requested_count);
+            response.items.reserve(page_end - response.page_start);
+            for (std::uint32_t index = response.page_start; index < page_end; ++index)
+            {
+                if ((index & 7U) == 0)
+                {
+                    report_progress();
+                    if (canceled())
+                    {
+                        return fail(L"canceled");
+                    }
+                }
+                auto descriptor = describe_path(active_session.items[index].path);
+                if (descriptor.filesystem_path.empty())
+                {
+                    descriptor.filesystem_path = active_session.items[index].path;
+                    descriptor.display_name = std::filesystem::path(descriptor.filesystem_path)
+                        .filename()
+                        .wstring();
+                    descriptor.is_filesystem = true;
+                }
+                response.items.push_back(std::move(descriptor));
+            }
+            response.success = true;
+            return response;
+        }
+        catch (...)
+        {
+            return fail(L"unavailable");
+        }
+    }
+
+    bool ExplorerSelectionService::consume_gallery_selection_sync(
+        const glance::contracts::SelectionSnapshot& snapshot)
+    {
+        if (synchronized_path_.empty())
+        {
+            return false;
+        }
+        if (GetTickCount64() > synchronized_selection_expires_)
+        {
+            synchronized_path_.clear();
+            synchronized_source_window_ = 0;
+            synchronized_selection_expires_ = 0;
+            return false;
+        }
+        if (snapshot.source_window != synchronized_source_window_ ||
+            snapshot.focused_index >= snapshot.items.size() ||
+            !same_item(
+                snapshot.items[snapshot.focused_index],
+                synchronized_path_,
+                {}))
+        {
+            return false;
+        }
+        synchronized_path_.clear();
+        synchronized_source_window_ = 0;
+        synchronized_selection_expires_ = 0;
+        return true;
     }
 }

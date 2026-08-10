@@ -28,6 +28,8 @@ namespace glance::app
         bool autoplay_audio{ true };
         bool autoplay_video{ true };
         bool reverse_seek_wheel{};
+        bool middle_click_gallery_mode{ true };
+        bool loop_gallery_scrolling{ true };
         bool show_image_zoom_map{ true };
     };
 

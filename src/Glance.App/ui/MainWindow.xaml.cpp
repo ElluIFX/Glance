@@ -3,6 +3,7 @@
 #include "appearance_preferences.h"
 #include "footer_preferences.h"
 #include "generic_file_info.h"
+#include "gallery_navigation.h"
 #include "image_metadata_provider.h"
 #include "localization.h"
 #include "markdown_renderer.h"
@@ -28,6 +29,7 @@
 #include <shlobj_core.h>
 #include <shlwapi.h>
 #include <winrt/Microsoft.Web.WebView2.Core.h>
+#include <winrt/Windows.Data.Json.h>
 
 #include <algorithm>
 #include <array>
@@ -42,6 +44,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
@@ -51,6 +54,22 @@ using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
+    std::optional<std::uint64_t> parse_u64(const winrt::hstring& text)
+    {
+        try
+        {
+            std::size_t consumed{};
+            const auto value = std::stoull(text.c_str(), &consumed);
+            return consumed == text.size()
+                ? std::optional<std::uint64_t>(value)
+                : std::nullopt;
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+    }
+
     class AtomicCounterGuard final
     {
     public:
@@ -442,18 +461,6 @@ namespace
         return bitmap;
     }
 
-    bool is_audio_path(std::wstring_view path)
-    {
-        auto extension = std::filesystem::path(path).extension().wstring();
-        std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
-            return static_cast<wchar_t>(std::towlower(value));
-        });
-        static constexpr std::array audio_extensions{
-            std::wstring_view(L".mp3"), std::wstring_view(L".flac"), std::wstring_view(L".wav"),
-            std::wstring_view(L".m4a"), std::wstring_view(L".aac"), std::wstring_view(L".ogg") };
-        return std::ranges::find(audio_extensions, extension) != audio_extensions.end();
-    }
-
     std::wstring format_media_bitrate(std::uint32_t bitrate)
     {
         if (bitrate == 0)
@@ -567,10 +574,588 @@ namespace winrt::Glance::App::implementation
         });
     }
 
-    void MainWindow::InitializeSession(std::uint64_t instance_id, StateCallback callback)
+    void MainWindow::InitializeSession(
+        std::uint64_t instance_id,
+        StateCallback callback,
+        GalleryRequestCallback gallery_request_callback)
     {
         instance_id_ = instance_id;
         state_callback_ = std::move(callback);
+        gallery_request_callback_ = std::move(gallery_request_callback);
+    }
+
+    bool MainWindow::send_gallery_request(
+        std::wstring_view operation,
+        std::uint64_t request_id,
+        std::uint32_t page_start,
+        std::uint32_t target_index)
+    {
+        if (!gallery_request_callback_)
+        {
+            return false;
+        }
+        using namespace winrt::Windows::Data::Json;
+        JsonObject root;
+        root.SetNamedValue(L"operation", JsonValue::CreateStringValue(operation));
+        root.SetNamedValue(L"windowId", JsonValue::CreateStringValue(std::to_wstring(instance_id_)));
+        root.SetNamedValue(L"requestId", JsonValue::CreateStringValue(std::to_wstring(request_id)));
+        root.SetNamedValue(L"sessionId", JsonValue::CreateStringValue(std::to_wstring(gallery_session_id_)));
+        root.SetNamedValue(
+            L"sourceWindow",
+            JsonValue::CreateStringValue(std::to_wstring(reinterpret_cast<std::uintptr_t>(source_window_))));
+        root.SetNamedValue(L"pageStart", JsonValue::CreateNumberValue(page_start));
+        root.SetNamedValue(L"pageCount", JsonValue::CreateNumberValue(64));
+        root.SetNamedValue(L"targetIndex", JsonValue::CreateNumberValue(target_index));
+        if (operation == L"open" && current_index_ < files_.size())
+        {
+            root.SetNamedValue(L"currentPath", JsonValue::CreateStringValue(files_[current_index_].path));
+            JsonArray extensions;
+            for (const auto& extension : glance::app::gallery_extensions(gallery_media_kind_))
+            {
+                extensions.Append(JsonValue::CreateStringValue(extension));
+            }
+            root.SetNamedValue(L"extensions", extensions);
+        }
+        return gallery_request_callback_(winrt::to_string(root.Stringify()));
+    }
+
+    void MainWindow::open_gallery(bool preserve_navigation)
+    {
+        if (source_kind_ != 1 || source_window_ == nullptr ||
+            current_index_ >= files_.size() ||
+            gallery_media_kind_ ==
+                glance::contracts::components::GalleryMediaKind::none)
+        {
+            glance::contracts::log_event(
+                L"Gallery request rejected before dispatch: source kind " +
+                std::to_wstring(source_kind_) + L", source window " +
+                std::to_wstring(reinterpret_cast<std::uintptr_t>(source_window_)) + L".");
+            leave_gallery(false, false);
+            show_preview_notice(L"GalleryUnavailableNotice");
+            return;
+        }
+        if (!preserve_navigation)
+        {
+            gallery_pending_navigation_steps_ = 0;
+        }
+        gallery_session_id_ = 0;
+        gallery_page_request_id_ = 0;
+        gallery_select_request_id_ = 0;
+        gallery_total_count_ = 0;
+        gallery_current_index_ = 0;
+        gallery_desired_index_ = 0;
+        gallery_pending_target_.reset();
+        gallery_page_select_after_load_ = false;
+        gallery_items_.clear();
+        cancel_gallery_preloads();
+        gallery_image_cache_.clear();
+        pending_gallery_image_.reset();
+        gallery_wheel_delta_ = 0;
+        gallery_mode_ = GalleryMode::opening;
+        GalleryModeButton().IsChecked(true);
+        gallery_open_request_id_ = ++gallery_request_sequence_;
+        if (!send_gallery_request(L"open", gallery_open_request_id_))
+        {
+            leave_gallery(false, false);
+            show_preview_notice(L"GalleryUnavailableNotice");
+            return;
+        }
+        if (!preserve_navigation)
+        {
+            show_preview_notice(L"GalleryScrollModeNotice");
+        }
+    }
+
+    void MainWindow::leave_gallery(bool show_notice, bool notify_core)
+    {
+        const bool was_gallery = gallery_mode_ != GalleryMode::inactive;
+        if (was_gallery && notify_core && gallery_request_callback_)
+        {
+            const auto request_id = ++gallery_request_sequence_;
+            static_cast<void>(send_gallery_request(L"close", request_id));
+        }
+        gallery_mode_ = GalleryMode::inactive;
+        GalleryModeButton().IsChecked(false);
+        gallery_session_id_ = 0;
+        gallery_open_request_id_ = 0;
+        gallery_page_request_id_ = 0;
+        gallery_select_request_id_ = 0;
+        gallery_total_count_ = 0;
+        gallery_current_index_ = 0;
+        gallery_desired_index_ = 0;
+        gallery_pending_target_.reset();
+        gallery_page_select_after_load_ = false;
+        gallery_pending_navigation_steps_ = 0;
+        gallery_wheel_delta_ = 0;
+        gallery_items_.clear();
+        cancel_gallery_preloads();
+        gallery_image_cache_.clear();
+        pending_gallery_image_.reset();
+        update_title_text();
+        if (was_gallery && show_notice)
+        {
+            show_preview_notice(
+                gallery_media_kind_ ==
+                        glance::contracts::components::GalleryMediaKind::image
+                    ? L"ImageWheelZoomModeNotice"
+                    : L"MediaWheelControlModeNotice");
+        }
+    }
+
+    void MainWindow::toggle_gallery_mode()
+    {
+        if (gallery_mode_ == GalleryMode::inactive)
+        {
+            open_gallery();
+            return;
+        }
+        leave_gallery(true);
+    }
+
+    void MainWindow::request_gallery_page(std::uint32_t target_index, bool select_after_load)
+    {
+        if (gallery_mode_ != GalleryMode::active || gallery_total_count_ == 0)
+        {
+            return;
+        }
+        gallery_page_select_after_load_ = select_after_load;
+        if (select_after_load)
+        {
+            gallery_pending_target_ = target_index;
+        }
+        std::uint32_t page_start = target_index > 32 ? target_index - 32 : 0;
+        if (gallery_total_count_ > 64)
+        {
+            page_start = std::min(page_start, gallery_total_count_ - 64);
+        }
+        gallery_page_request_id_ = ++gallery_request_sequence_;
+        if (!send_gallery_request(L"page", gallery_page_request_id_, page_start))
+        {
+            leave_gallery(false, false);
+            show_preview_notice(L"GalleryUnavailableNotice");
+        }
+    }
+
+    void MainWindow::request_gallery_selection(std::uint32_t target_index)
+    {
+        if (gallery_mode_ != GalleryMode::active)
+        {
+            return;
+        }
+        if (!gallery_items_.contains(target_index))
+        {
+            request_gallery_page(target_index);
+            return;
+        }
+        gallery_pending_target_ = target_index;
+        gallery_select_request_id_ = ++gallery_request_sequence_;
+        if (!send_gallery_request(L"select", gallery_select_request_id_, 0, target_index))
+        {
+            leave_gallery(false, false);
+            show_preview_notice(L"GalleryUnavailableNotice");
+        }
+    }
+
+    void MainWindow::navigate_gallery(int steps)
+    {
+        if (gallery_mode_ != GalleryMode::active ||
+            gallery_total_count_ <= 1 || steps == 0)
+        {
+            return;
+        }
+        const auto target = glance::app::gallery_target_index(
+            gallery_desired_index_,
+            steps,
+            gallery_total_count_,
+            loop_gallery_enabled_);
+        if (target == gallery_desired_index_)
+        {
+            return;
+        }
+        gallery_desired_index_ = target;
+        gallery_pending_navigation_steps_ += steps;
+        request_gallery_selection(gallery_desired_index_);
+    }
+
+    bool MainWindow::handle_gallery_wheel(int delta)
+    {
+        if (gallery_mode_ == GalleryMode::inactive)
+        {
+            return false;
+        }
+        gallery_wheel_delta_ += delta;
+        const int notches = gallery_wheel_delta_ / WHEEL_DELTA;
+        if (notches != 0)
+        {
+            gallery_wheel_delta_ -= notches * WHEEL_DELTA;
+            const int steps = -notches;
+            if (gallery_mode_ == GalleryMode::opening)
+            {
+                gallery_pending_navigation_steps_ += steps;
+            }
+            else
+            {
+                navigate_gallery(steps);
+            }
+        }
+        return true;
+    }
+
+    void MainWindow::apply_gallery_file(std::uint32_t index, glance::app::PreviewFile file)
+    {
+        if (gallery_mode_ != GalleryMode::active || index != gallery_desired_index_)
+        {
+            return;
+        }
+        const auto kind = glance::app::resolve_preview_kind(file.path);
+        if (kind == glance::app::PreviewKind::image)
+        {
+            const auto cached = gallery_image_cache_.find(gallery_image_cache_key(file));
+            pending_gallery_image_ = cached != gallery_image_cache_.end()
+                ? std::optional<GalleryImageCacheEntry>(cached->second)
+                : std::nullopt;
+        }
+        else
+        {
+            pending_gallery_image_.reset();
+        }
+        files_.assign(1, std::move(file));
+        current_index_ = 0;
+        FileList().Items().Clear();
+        update_preview_navigation_ui();
+        present_file(0, kind);
+        schedule_gallery_preloads();
+    }
+
+    void MainWindow::HandleGalleryResponse(std::string_view payload)
+    {
+        using namespace winrt::Windows::Data::Json;
+        try
+        {
+            const auto root = JsonObject::Parse(winrt::to_hstring(payload));
+            const std::wstring operation = root.GetNamedString(L"operation").c_str();
+            const auto request_id = parse_u64(root.GetNamedString(L"requestId"));
+            const auto session_id = parse_u64(root.GetNamedString(L"sessionId"));
+            if (!request_id || !session_id)
+            {
+                return;
+            }
+            const bool success = root.GetNamedBoolean(L"success");
+            const std::wstring error = root.GetNamedString(L"error", L"").c_str();
+            if (operation == L"close")
+            {
+                return;
+            }
+            const bool current_request =
+                (operation == L"open" && *request_id == gallery_open_request_id_) ||
+                (operation == L"page" && *request_id == gallery_page_request_id_) ||
+                (operation == L"select" && *request_id == gallery_select_request_id_);
+            if (!current_request || gallery_mode_ == GalleryMode::inactive)
+            {
+                return;
+            }
+            if (!success)
+            {
+                if ((operation == L"select" || operation == L"page") &&
+                    error == L"stale")
+                {
+                    open_gallery(true);
+                    return;
+                }
+                leave_gallery(false, false);
+                show_preview_notice(L"GalleryUnavailableNotice");
+                return;
+            }
+
+            if (operation == L"open")
+            {
+                gallery_session_id_ = *session_id;
+                gallery_total_count_ = static_cast<std::uint32_t>(root.GetNamedNumber(L"totalCount"));
+                gallery_current_index_ = static_cast<std::uint32_t>(root.GetNamedNumber(L"currentIndex"));
+                gallery_desired_index_ = gallery_current_index_;
+                gallery_mode_ = GalleryMode::active;
+                update_title_text();
+            }
+            else if (*session_id != gallery_session_id_)
+            {
+                return;
+            }
+
+            if (operation == L"open" || operation == L"page")
+            {
+                const auto page_start = static_cast<std::uint32_t>(root.GetNamedNumber(L"pageStart"));
+                const auto items = root.GetNamedArray(L"items");
+                for (std::uint32_t offset = 0; offset < items.Size(); ++offset)
+                {
+                    const auto object = items.GetObjectAt(offset);
+                    const auto size = parse_u64(object.GetNamedString(L"size"));
+                    const auto creation_time = parse_u64(object.GetNamedString(L"creationTime"));
+                    const auto last_write_time = parse_u64(object.GetNamedString(L"lastWriteTime"));
+                    if (!size || !creation_time || !last_write_time)
+                    {
+                        continue;
+                    }
+                    glance::app::PreviewFile file;
+                    file.display_name = object.GetNamedString(L"displayName").c_str();
+                    file.path = object.GetNamedString(L"path").c_str();
+                    file.parsing_name = object.GetNamedString(L"parsingName").c_str();
+                    file.size = *size;
+                    file.creation_time = *creation_time;
+                    file.last_write_time = *last_write_time;
+                    file.attributes = static_cast<std::uint32_t>(object.GetNamedNumber(L"attributes"));
+                    file.is_filesystem = object.GetNamedBoolean(L"isFilesystem");
+                    file.is_cloud_placeholder = object.GetNamedBoolean(L"isCloudPlaceholder");
+                    gallery_items_[page_start + offset] = std::move(file);
+                }
+                if (operation == L"open" && gallery_pending_navigation_steps_ != 0)
+                {
+                    const int steps = std::exchange(gallery_pending_navigation_steps_, 0);
+                    navigate_gallery(steps);
+                }
+                else if (gallery_page_select_after_load_ && gallery_pending_target_ &&
+                    gallery_items_.contains(*gallery_pending_target_))
+                {
+                    gallery_page_select_after_load_ = false;
+                    request_gallery_selection(*gallery_pending_target_);
+                }
+                else
+                {
+                    schedule_gallery_preloads();
+                }
+                return;
+            }
+
+            if (operation == L"select")
+            {
+                const auto index = static_cast<std::uint32_t>(root.GetNamedNumber(L"currentIndex"));
+                const auto item = gallery_items_.find(index);
+                if (item == gallery_items_.end())
+                {
+                    request_gallery_page(index);
+                    return;
+                }
+                gallery_current_index_ = index;
+                gallery_desired_index_ = index;
+                gallery_pending_target_.reset();
+                gallery_pending_navigation_steps_ = 0;
+                apply_gallery_file(index, item->second);
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
+    void MainWindow::HandleGalleryDisconnect()
+    {
+        if (gallery_mode_ == GalleryMode::inactive)
+        {
+            return;
+        }
+        leave_gallery(false, false);
+        show_preview_notice(L"GalleryUnavailableNotice");
+    }
+
+    void MainWindow::update_title_text()
+    {
+        if (current_index_ >= files_.size())
+        {
+            TitleText().Text(L"");
+            return;
+        }
+        auto title = files_[current_index_].display_name;
+        if (gallery_mode_ == GalleryMode::active &&
+            gallery_total_count_ != 0 &&
+            gallery_current_index_ < gallery_total_count_)
+        {
+            title = L"(" + std::to_wstring(gallery_current_index_ + 1) + L"/" +
+                std::to_wstring(gallery_total_count_) + L") " + title;
+        }
+        TitleText().Text(std::move(title));
+    }
+
+    std::wstring MainWindow::gallery_image_cache_key(
+        const glance::app::PreviewFile& file) const
+    {
+        auto path = file.path;
+        std::ranges::transform(
+            path,
+            path.begin(),
+            [](wchar_t value) { return std::towlower(value); });
+        return path + L"\n" + std::to_wstring(file.size) + L"\n" +
+            std::to_wstring(file.last_write_time);
+    }
+
+    void MainWindow::cancel_gallery_preloads() noexcept
+    {
+        ++gallery_preload_generation_;
+        for (const auto& operation : gallery_preload_operations_)
+        {
+            try
+            {
+                if (operation != nullptr &&
+                    operation.Status() == Windows::Foundation::AsyncStatus::Started)
+                {
+                    operation.Cancel();
+                }
+            }
+            catch (...)
+            {
+            }
+        }
+        gallery_preload_operations_.clear();
+    }
+
+    Windows::Foundation::IAsyncAction MainWindow::preload_gallery_image_async(
+        glance::app::PreviewFile file,
+        std::uint64_t generation)
+    {
+        constexpr std::uint64_t cache_entry_budget = 32ULL * 1024ULL * 1024ULL;
+        const auto lifetime = get_strong();
+        auto cancellation = co_await winrt::get_cancellation_token();
+        cancellation.enable_propagation();
+        try
+        {
+            const double raster_scale = lifetime->ImagePanel().XamlRoot() != nullptr
+                ? lifetime->ImagePanel().XamlRoot().RasterizationScale()
+                : 1.0;
+            const double viewport_extent = std::max(
+                lifetime->ImageScroller().ActualWidth(),
+                lifetime->ImageScroller().ActualHeight()) * raster_scale;
+            const auto storage_file = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(file.path);
+            const auto properties = co_await storage_file.Properties().GetImagePropertiesAsync();
+            if (cancellation() || properties.Width() == 0 || properties.Height() == 0)
+            {
+                co_return;
+            }
+
+            const double width = properties.Width();
+            const double height = properties.Height();
+            const double memory_scale = std::min(
+                1.0,
+                std::sqrt(
+                    static_cast<double>(cache_entry_budget / 4ULL) /
+                    (width * height)));
+            const double viewport_scale = viewport_extent > 0
+                ? std::min(1.0, viewport_extent / std::max(width, height))
+                : memory_scale;
+            const double decode_scale = std::min(memory_scale, viewport_scale);
+            const auto decode_width = std::max(
+                1U,
+                static_cast<std::uint32_t>(std::llround(width * decode_scale)));
+            const auto decode_height = std::max(
+                1U,
+                static_cast<std::uint32_t>(std::llround(height * decode_scale)));
+
+            Microsoft::UI::Xaml::Media::Imaging::BitmapImage bitmap;
+            if (decode_width < properties.Width())
+            {
+                bitmap.DecodePixelWidth(static_cast<int>(decode_width));
+            }
+            const auto stream = co_await storage_file.OpenReadAsync();
+            co_await bitmap.SetSourceAsync(stream);
+            if (cancellation() || generation != lifetime->gallery_preload_generation_ ||
+                lifetime->gallery_mode_ != GalleryMode::active ||
+                lifetime->gallery_media_kind_ !=
+                    glance::contracts::components::GalleryMediaKind::image)
+            {
+                co_return;
+            }
+            GalleryImageCacheEntry entry;
+            entry.file = std::move(file);
+            entry.bitmap = std::move(bitmap);
+            entry.pixel_width = properties.Width();
+            entry.pixel_height = properties.Height();
+            entry.decoded_bytes = static_cast<std::uint64_t>(decode_width) *
+                decode_height * 4ULL;
+            lifetime->gallery_image_cache_[lifetime->gallery_image_cache_key(entry.file)] =
+                std::move(entry);
+        }
+        catch (const hresult_canceled&)
+        {
+        }
+        catch (...)
+        {
+        }
+    }
+
+    void MainWindow::schedule_gallery_preloads()
+    {
+        cancel_gallery_preloads();
+        if (gallery_mode_ != GalleryMode::active || gallery_total_count_ <= 1 ||
+            gallery_media_kind_ !=
+                glance::contracts::components::GalleryMediaKind::image)
+        {
+            return;
+        }
+
+        std::array<std::uint32_t, 2> neighbors{};
+        std::size_t neighbor_count{};
+        if (gallery_current_index_ > 0)
+        {
+            neighbors[neighbor_count++] = gallery_current_index_ - 1;
+        }
+        else if (loop_gallery_enabled_)
+        {
+            neighbors[neighbor_count++] = gallery_total_count_ - 1;
+        }
+        if (gallery_current_index_ + 1 < gallery_total_count_)
+        {
+            neighbors[neighbor_count++] = gallery_current_index_ + 1;
+        }
+        else if (loop_gallery_enabled_)
+        {
+            neighbors[neighbor_count++] = 0;
+        }
+        const auto active_neighbors = std::span(neighbors).first(neighbor_count);
+        for (const auto index : active_neighbors)
+        {
+            if (!gallery_items_.contains(index))
+            {
+                request_gallery_page(index, false);
+                return;
+            }
+        }
+
+        std::unordered_set<std::wstring> retained_keys;
+        if (const auto current = gallery_items_.find(gallery_current_index_);
+            current != gallery_items_.end() &&
+            glance::app::resolve_preview_kind(current->second.path) ==
+                glance::app::PreviewKind::image)
+        {
+            retained_keys.insert(gallery_image_cache_key(current->second));
+        }
+        for (const auto index : active_neighbors)
+        {
+            const auto& file = gallery_items_.at(index);
+            if (glance::app::resolve_preview_kind(file.path) ==
+                glance::app::PreviewKind::image)
+            {
+                retained_keys.insert(gallery_image_cache_key(file));
+            }
+        }
+        std::erase_if(gallery_image_cache_, [&retained_keys](const auto& item) {
+            return !retained_keys.contains(item.first);
+        });
+
+        const auto generation = gallery_preload_generation_;
+        std::unordered_set<std::wstring> scheduled;
+        for (const auto index : active_neighbors)
+        {
+            const auto& file = gallery_items_.at(index);
+            if (glance::app::resolve_preview_kind(file.path) !=
+                glance::app::PreviewKind::image)
+            {
+                continue;
+            }
+            const auto key = gallery_image_cache_key(file);
+            if (gallery_image_cache_.contains(key) || !scheduled.insert(key).second)
+            {
+                continue;
+            }
+            gallery_preload_operations_.push_back(
+                preload_gallery_image_async(file, generation));
+        }
     }
 
     void MainWindow::ApplyAppearancePreferences()
@@ -665,6 +1250,7 @@ namespace winrt::Glance::App::implementation
         set_tooltip(
             MediaAdvancedInfoButton(),
             L"MediaAdvancedInfoButton.ToolTipService.ToolTip");
+        set_tooltip(GalleryModeButton(), L"GalleryModeButton.ToolTipService.ToolTip");
         set_tooltip(PreviousPdfButton(), L"PreviousPdfButton.ToolTipService.ToolTip");
         set_tooltip(NextPdfButton(), L"NextPdfButton.ToolTipService.ToolTip");
         set_tooltip(PdfThumbnailsButton(), L"PdfThumbnailsButton.ToolTipService.ToolTip");
@@ -987,6 +1573,7 @@ namespace winrt::Glance::App::implementation
     {
         const bool new_session = !visible_;
         const bool replace_deferred_session = defer_auto_fit_show_;
+        leave_gallery(false);
         stop_detached_focus_monitor();
         preview_navigation_.clear();
         pending_folder_selection_path_.clear();
@@ -1176,6 +1763,18 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::clear_preview_content()
     {
+        leave_gallery(false);
+        if (image_load_operation_ != nullptr)
+        {
+            try
+            {
+                image_load_operation_.Cancel();
+            }
+            catch (...)
+            {
+            }
+            image_load_operation_ = nullptr;
+        }
         defer_auto_fit_show_ = false;
         cancel_pdf_render();
         cancel_archive_icon_load();
@@ -1450,7 +2049,9 @@ namespace winrt::Glance::App::implementation
 
         return kind == glance::app::PreviewKind::image ||
             kind == glance::app::PreviewKind::document ||
-            (kind == glance::app::PreviewKind::media && !is_audio_path(file.path));
+            (kind == glance::app::PreviewKind::media &&
+             glance::app::gallery_media_kind(file.path) !=
+                 glance::contracts::components::GalleryMediaKind::audio);
     }
 
     void MainWindow::show_prepared_window() noexcept
@@ -1684,6 +2285,21 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        if (image_load_operation_ != nullptr)
+        {
+            try
+            {
+                if (image_load_operation_.Status() == Windows::Foundation::AsyncStatus::Started)
+                {
+                    image_load_operation_.Cancel();
+                }
+            }
+            catch (...)
+            {
+            }
+            image_load_operation_ = nullptr;
+        }
+        cancel_gallery_preloads();
         auto previous_component_preview = std::move(active_component_preview_);
         auto previous_component_file_directory =
             std::move(active_component_file_directory_);
@@ -1723,8 +2339,14 @@ namespace winrt::Glance::App::implementation
         pdf_page_index_ = 0;
         pdf_page_count_ = 0;
         const auto& file = files_[index];
+        gallery_media_kind_ = file.path.empty()
+            ? glance::contracts::components::GalleryMediaKind::none
+            : glance::app::gallery_media_kind(file.path);
+        const auto media_preferences = glance::app::load_media_preview_preferences();
+        middle_click_gallery_enabled_ = media_preferences.middle_click_gallery_mode;
+        loop_gallery_enabled_ = media_preferences.loop_gallery_scrolling;
         const auto generation = ++content_generation_;
-        TitleText().Text(file.display_name);
+        update_title_text();
         image_pixel_width_ = 0;
         image_pixel_height_ = 0;
         image_bits_per_pixel_ = 0;
@@ -1801,6 +2423,7 @@ namespace winrt::Glance::App::implementation
             present_text(file, false, true);
             break;
         case glance::app::PreviewKind::image:
+        {
             show_content_panel(kind);
             image_zoom_map_enabled_ =
                 glance::app::load_media_preview_preferences().show_image_zoom_map;
@@ -1822,7 +2445,24 @@ namespace winrt::Glance::App::implementation
             ImageMetadataOverlay().Visibility(Visibility::Collapsed);
             ImageZoomMapOverlay().Visibility(Visibility::Collapsed);
             fit_image_to_viewport();
-            load_image_async(file.path, generation);
+            bool first_frame_presented{};
+            if (pending_gallery_image_ &&
+                gallery_image_cache_key(pending_gallery_image_->file) ==
+                    gallery_image_cache_key(file))
+            {
+                image_pixel_width_ = pending_gallery_image_->pixel_width;
+                image_pixel_height_ = pending_gallery_image_->pixel_height;
+                ImagePreview().Source(pending_gallery_image_->bitmap);
+                fit_image_to_viewport();
+                update_footer_metadata();
+                auto_fit_window_to_content(image_pixel_width_, image_pixel_height_);
+                first_frame_presented = true;
+            }
+            pending_gallery_image_.reset();
+            image_load_operation_ = load_image_async(
+                file.path,
+                generation,
+                first_frame_presented);
             if (glance::app::footer_field_enabled(
                     footer_preferences_, glance::app::FooterField::media_info))
             {
@@ -1830,9 +2470,11 @@ namespace winrt::Glance::App::implementation
             }
             load_image_metadata_async(file.path, generation);
             break;
+        }
         case glance::app::PreviewKind::media:
             show_content_panel(kind);
-            media_is_audio_ = is_audio_path(file.path);
+            media_is_audio_ = gallery_media_kind_ ==
+                glance::contracts::components::GalleryMediaKind::audio;
             media_seek_wheel_delta_ = 0;
             media_volume_wheel_delta_ = 0;
             {
@@ -2130,10 +2772,15 @@ namespace winrt::Glance::App::implementation
             }));
     }
 
-    fire_and_forget MainWindow::load_image_async(std::wstring path, std::uint64_t generation)
+    Windows::Foundation::IAsyncAction MainWindow::load_image_async(
+        std::wstring path,
+        std::uint64_t generation,
+        bool first_frame_presented)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
+        auto cancellation = co_await winrt::get_cancellation_token();
+        cancellation.enable_propagation();
         try
         {
             const auto file = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
@@ -2143,7 +2790,13 @@ namespace winrt::Glance::App::implementation
             co_await bitmap.SetSourceAsync(stream);
             const auto width = properties.Width() != 0 ? properties.Width() : static_cast<std::uint32_t>(bitmap.PixelWidth());
             const auto height = properties.Height() != 0 ? properties.Height() : static_cast<std::uint32_t>(bitmap.PixelHeight());
-            static_cast<void>(dispatcher.TryEnqueue([lifetime, bitmap, generation, width, height] {
+            static_cast<void>(dispatcher.TryEnqueue([
+                lifetime,
+                bitmap,
+                generation,
+                width,
+                height,
+                first_frame_presented] {
                 if (generation != lifetime->content_generation_)
                 {
                     return;
@@ -2151,24 +2804,34 @@ namespace winrt::Glance::App::implementation
                 lifetime->image_pixel_width_ = width;
                 lifetime->image_pixel_height_ = height;
                 lifetime->ImagePreview().Source(bitmap);
-                lifetime->fit_image_to_viewport();
                 lifetime->update_footer_metadata();
-                lifetime->auto_fit_window_to_content(width, height);
-                const auto weak = lifetime->get_weak();
-                static_cast<void>(lifetime->DispatcherQueue().TryEnqueue(
-                    Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
-                    [weak, generation] {
-                        const auto self = weak.get();
-                        if (self == nullptr ||
-                            generation != self->content_generation_ ||
-                            self->current_kind_ != glance::app::PreviewKind::image)
-                        {
-                            return;
-                        }
-                        self->fit_image_to_viewport();
-                    }));
+                if (!first_frame_presented)
+                {
+                    lifetime->fit_image_to_viewport();
+                    lifetime->auto_fit_window_to_content(width, height);
+                    const auto weak = lifetime->get_weak();
+                    static_cast<void>(lifetime->DispatcherQueue().TryEnqueue(
+                        Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
+                        [weak, generation] {
+                            const auto self = weak.get();
+                            if (self == nullptr ||
+                                generation != self->content_generation_ ||
+                                self->current_kind_ != glance::app::PreviewKind::image)
+                            {
+                                return;
+                            }
+                            self->fit_image_to_viewport();
+                        }));
+                }
+                else
+                {
+                    lifetime->update_image_zoom_map();
+                }
                 lifetime->begin_component_refinement(generation);
             }));
+        }
+        catch (const hresult_canceled&)
+        {
         }
         catch (const hresult_error& error)
         {
@@ -2235,7 +2898,8 @@ namespace winrt::Glance::App::implementation
             co_return;
         }
 
-            media_is_audio_ = is_audio_path(path);
+            media_is_audio_ = gallery_media_kind_ ==
+                glance::contracts::components::GalleryMediaKind::audio;
             AudioMetadataPanel().Visibility(media_is_audio_ ? Visibility::Visible : Visibility::Collapsed);
             MediaPreview().Visibility(media_is_audio_ ? Visibility::Collapsed : Visibility::Visible);
             if (media_is_audio_)
@@ -4703,6 +5367,11 @@ namespace winrt::Glance::App::implementation
         ArchivePanel().Visibility(kind == glance::app::PreviewKind::archive ? Visibility::Visible : Visibility::Collapsed);
         ImageStatusControls().Visibility(
             kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
+        GalleryModeButton().Visibility(
+            gallery_media_kind_ != glance::contracts::components::GalleryMediaKind::none
+                ? Visibility::Visible
+                : Visibility::Collapsed);
+        GalleryModeButton().IsChecked(gallery_mode_ != GalleryMode::inactive);
         MediaAdvancedInfoButton().Visibility(
             kind == glance::app::PreviewKind::media && glance::app::media_probe_available()
                 ? Visibility::Visible
@@ -5556,6 +6225,11 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        if (handle_gallery_wheel(delta))
+        {
+            args.Handled(true);
+            return;
+        }
         const float factor = std::pow(1.2F, static_cast<float>(delta) / 120.0F);
         set_image_zoom(ImageScroller().ZoomFactor() * factor, point.Position());
         args.Handled(true);
@@ -5566,6 +6240,12 @@ namespace winrt::Glance::App::implementation
         PointerRoutedEventArgs const& args)
     {
         const auto point = args.GetCurrentPoint(ImageScroller());
+        if (point.Properties().IsMiddleButtonPressed() && middle_click_gallery_enabled_)
+        {
+            toggle_gallery_mode();
+            args.Handled(true);
+            return;
+        }
         if (!point.Properties().IsLeftButtonPressed() || ImageScroller().ZoomFactor() <= 1.001F)
         {
             return;
@@ -5837,18 +6517,38 @@ namespace winrt::Glance::App::implementation
         show_media_controls();
     }
 
+    void MainWindow::MediaPanel_PointerPressed(
+        IInspectable const&,
+        PointerRoutedEventArgs const& args)
+    {
+        const auto point = args.GetCurrentPoint(MediaPanel());
+        if (point.Properties().IsMiddleButtonPressed() && middle_click_gallery_enabled_)
+        {
+            toggle_gallery_mode();
+            args.Handled(true);
+        }
+    }
+
     void MainWindow::MediaPanel_PointerWheelChanged(
         IInspectable const&,
         PointerRoutedEventArgs const& args)
     {
-        if (current_kind_ != glance::app::PreviewKind::media ||
-            MediaPreview().MediaPlayer() == nullptr)
+        if (current_kind_ != glance::app::PreviewKind::media)
         {
             return;
         }
 
         const int delta = args.GetCurrentPoint(MediaPanel()).Properties().MouseWheelDelta();
         if (delta == 0)
+        {
+            return;
+        }
+        if (handle_gallery_wheel(delta))
+        {
+            args.Handled(true);
+            return;
+        }
+        if (MediaPreview().MediaPlayer() == nullptr)
         {
             return;
         }
@@ -5930,6 +6630,12 @@ namespace winrt::Glance::App::implementation
         player.IsMuted(!player.IsMuted());
         MediaMuteIcon().Glyph(player.IsMuted() ? L"\xE74F" : L"\xE767");
         show_media_controls();
+    }
+
+    void MainWindow::GalleryModeButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        toggle_gallery_mode();
+        GalleryModeButton().IsChecked(gallery_mode_ != GalleryMode::inactive);
     }
 
     void MainWindow::MediaSeekSlider_ValueChanged(

@@ -269,6 +269,19 @@ namespace
     PreviewNoticeApi preview_notice_api{
         .query_preview_notice = query_preview_notice };
 
+    GalleryMediaKind WINAPI classify_gallery_extension(const wchar_t* extension) noexcept
+    {
+        if (extension != nullptr &&
+            (_wcsicmp(extension, L".psd") == 0 || _wcsicmp(extension, L".psb") == 0))
+        {
+            return GalleryMediaKind::image;
+        }
+        return GalleryMediaKind::none;
+    }
+
+    GalleryMediaApi gallery_media_api{
+        .classify_extension = classify_gallery_extension };
+
     BOOL WINAPI query_interface(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -296,6 +309,11 @@ namespace
         if (IsEqualGUID(*interface_id, preview_notice_api_id))
         {
             *interface_pointer = &preview_notice_api;
+            return TRUE;
+        }
+        if (IsEqualGUID(*interface_id, gallery_media_api_id))
+        {
+            *interface_pointer = &gallery_media_api;
             return TRUE;
         }
         return FALSE;

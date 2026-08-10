@@ -1,6 +1,7 @@
 #include "input_decision.h"
 #include "glance/contracts/component_api.h"
 #include "glance/contracts/ipc_protocol.h"
+#include "gallery_navigation.h"
 #include "media_preview_preferences.h"
 #include "pan_interaction.h"
 #include "paged_document_render_client.h"
@@ -274,6 +275,31 @@ int main()
     expect(!should_capture_key(VK_ESCAPE, true, true, false, false, true), "modified Escape");
     expect(!should_capture_key('A', true, true, true, false, false), "unrelated key");
 
+    expect(
+        glance::app::gallery_target_index(1, 1, 4, true) == 2,
+        "gallery advances to the next image");
+    expect(
+        glance::app::gallery_target_index(0, -1, 4, true) == 3,
+        "gallery wraps backward from the first image");
+    expect(
+        glance::app::gallery_target_index(3, 1, 4, true) == 0,
+        "gallery wraps forward from the last image");
+    expect(
+        glance::app::gallery_target_index(1, 10, 4, true) == 3 &&
+            glance::app::gallery_target_index(1, -10, 4, true) == 3,
+        "gallery folds rapid multi-step navigation");
+    expect(
+        glance::app::gallery_target_index(7, 1, 0, true) == 7,
+        "gallery leaves an empty sequence unchanged");
+    expect(
+        glance::app::gallery_target_index(0, -1, 4, false) == 0 &&
+            glance::app::gallery_target_index(3, 1, 4, false) == 3,
+        "gallery stops at boundaries when looping is disabled");
+    expect(
+        glance::app::gallery_target_index(1, 10, 4, false) == 3 &&
+            glance::app::gallery_target_index(1, -10, 4, false) == 0,
+        "gallery clamps rapid navigation when looping is disabled");
+
     using glance::contracts::heartbeat_acknowledged;
     expect(heartbeat_acknowledged(1, 1), "heartbeat ack matches pending");
     expect(heartbeat_acknowledged(2, 1), "heartbeat ack may lag one round");
@@ -341,6 +367,11 @@ int main()
         glance::app::normalize_rich_document_render_dimension(0) == 4096 &&
             glance::app::normalize_rich_document_render_dimension(16384) == 4096,
         "rich document render dimension fallback");
+    const glance::app::MediaPreviewPreferences default_media_preferences;
+    expect(
+        default_media_preferences.middle_click_gallery_mode &&
+            default_media_preferences.loop_gallery_scrolling,
+        "gallery media preference defaults");
 
     std::wstring executable_path(32768, L'\0');
     const DWORD executable_length = GetModuleFileNameW(
@@ -627,6 +658,24 @@ int main()
             expect(
                 extensions == std::vector<std::wstring>{ L".psd", L".psb", L".ai" },
                 "Adobe component extensions");
+
+            void* gallery_media_pointer{};
+            expect(
+                api.query_interface(
+                    &gallery_media_api_id,
+                    gallery_media_api_version,
+                    &gallery_media_pointer) != FALSE &&
+                    gallery_media_pointer != nullptr,
+                "Adobe gallery media interface");
+            if (gallery_media_pointer != nullptr)
+            {
+                const auto gallery_media = static_cast<GalleryMediaApi*>(gallery_media_pointer);
+                expect(
+                    gallery_media->classify_extension(L".psd") == GalleryMediaKind::image &&
+                        gallery_media->classify_extension(L".PSB") == GalleryMediaKind::image &&
+                        gallery_media->classify_extension(L".ai") == GalleryMediaKind::none,
+                    "Adobe gallery media classification");
+            }
 
             ComponentStatusResult status;
             expect(

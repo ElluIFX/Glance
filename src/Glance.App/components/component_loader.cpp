@@ -25,6 +25,8 @@ namespace
     using glance::contracts::components::ComponentRegistration;
     using glance::contracts::components::ConfigurablePreviewApi;
     using glance::contracts::components::GetApiFunction;
+    using glance::contracts::components::GalleryMediaApi;
+    using glance::contracts::components::GalleryMediaKind;
     using glance::contracts::components::HealthSeverity;
     using glance::contracts::components::FileDirectoryPreviewApi;
     using glance::contracts::components::PreparedPreview;
@@ -84,6 +86,7 @@ namespace
         std::optional<std::filesystem::path> paged_document_host;
         std::optional<SettingsContributionApi> settings_contribution;
         std::optional<FileDirectoryPreviewApi> file_directory_preview;
+        std::optional<GalleryMediaApi> gallery_media;
         std::vector<std::wstring> extensions;
         std::vector<std::wstring> dependencies;
         std::vector<RendererRegistration> renderers;
@@ -161,6 +164,8 @@ namespace
     std::unordered_map<
         std::uint64_t,
         std::vector<std::shared_ptr<LoadedComponent>>> renderer_index;
+    std::unordered_map<std::wstring, GalleryMediaKind> gallery_media_index;
+    std::unordered_map<GalleryMediaKind, std::vector<std::wstring>> gallery_extension_index;
 
     std::filesystem::path executable_directory()
     {
@@ -569,6 +574,23 @@ namespace
                 component->file_directory_preview = *interface_api;
             }
         }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::gallery_media_api_id,
+                glance::contracts::components::gallery_media_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const GalleryMediaApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(GalleryMediaApi) &&
+                interface_api->version ==
+                    glance::contracts::components::gallery_media_api_version &&
+                interface_api->classify_extension != nullptr)
+            {
+                component->gallery_media = *interface_api;
+            }
+        }
         if (std::ranges::any_of(component->renderers, [&component](const auto& renderer) {
                 if (IsEqualGUID(
                         renderer.interface_id,
@@ -745,6 +767,8 @@ namespace
         std::unordered_map<
             std::uint64_t,
             std::vector<std::shared_ptr<LoadedComponent>>> renderers;
+        std::unordered_map<std::wstring, GalleryMediaKind> gallery_media;
+        std::unordered_set<std::wstring> conflicting_gallery_extensions;
         for (const auto& component : loaded)
         {
             if (!component->active)
@@ -754,17 +778,50 @@ namespace
             for (const auto& extension : component->extensions)
             {
                 index[extension].push_back(component);
+                if (!component->gallery_media.has_value())
+                {
+                    continue;
+                }
+                const auto kind = component->gallery_media->classify_extension(extension.c_str());
+                if (kind != GalleryMediaKind::image &&
+                    kind != GalleryMediaKind::video &&
+                    kind != GalleryMediaKind::audio)
+                {
+                    continue;
+                }
+                const auto [match, inserted] = gallery_media.emplace(extension, kind);
+                if (!inserted && match->second != kind)
+                {
+                    conflicting_gallery_extensions.insert(extension);
+                }
             }
             for (const auto& renderer : component->renderers)
             {
                 renderers[renderer_key(renderer.kind, renderer.format)].push_back(component);
             }
         }
+        std::unordered_map<GalleryMediaKind, std::vector<std::wstring>> gallery_extensions;
+        for (const auto& extension : conflicting_gallery_extensions)
+        {
+            gallery_media.erase(extension);
+            glance::contracts::log_event(
+                L"Ignoring conflicting component gallery classification for " + extension + L".");
+        }
+        for (const auto& [extension, kind] : gallery_media)
+        {
+            gallery_extensions[kind].push_back(extension);
+        }
+        for (auto& [kind, extensions] : gallery_extensions)
+        {
+            std::ranges::sort(extensions);
+        }
 
         std::scoped_lock lock(registry_mutex);
         registered_components = std::move(loaded);
         extension_index = std::move(index);
         renderer_index = std::move(renderers);
+        gallery_media_index = std::move(gallery_media);
+        gallery_extension_index = std::move(gallery_extensions);
     }
 
     std::vector<std::shared_ptr<LoadedComponent>> candidates_for_path(
@@ -1065,6 +1122,45 @@ namespace glance::app
         catch (...)
         {
             return false;
+        }
+    }
+
+    GalleryMediaKind component_gallery_media_kind(std::wstring_view extension) noexcept
+    {
+        try
+        {
+            initialize_components();
+            const auto normalized = normalize_extension(extension);
+            if (normalized.empty())
+            {
+                return GalleryMediaKind::none;
+            }
+            std::scoped_lock lock(registry_mutex);
+            const auto match = gallery_media_index.find(normalized);
+            return match == gallery_media_index.end()
+                ? GalleryMediaKind::none
+                : match->second;
+        }
+        catch (...)
+        {
+            return GalleryMediaKind::none;
+        }
+    }
+
+    std::vector<std::wstring> component_gallery_extensions(GalleryMediaKind kind) noexcept
+    {
+        try
+        {
+            initialize_components();
+            std::scoped_lock lock(registry_mutex);
+            const auto match = gallery_extension_index.find(kind);
+            return match == gallery_extension_index.end()
+                ? std::vector<std::wstring>{}
+                : match->second;
+        }
+        catch (...)
+        {
+            return {};
         }
     }
 
@@ -1756,6 +1852,8 @@ namespace glance::app
             std::scoped_lock lock(registry_mutex);
             extension_index.clear();
             renderer_index.clear();
+            gallery_media_index.clear();
+            gallery_extension_index.clear();
             components = std::move(registered_components);
         }
         components.clear();

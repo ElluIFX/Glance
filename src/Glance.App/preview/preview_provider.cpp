@@ -574,6 +574,72 @@ namespace
 
 namespace glance::app
 {
+    std::span<const std::wstring_view> built_in_gallery_extensions(
+        glance::contracts::components::GalleryMediaKind kind) noexcept
+    {
+        using glance::contracts::components::GalleryMediaKind;
+        static constexpr std::array image_extensions{
+            std::wstring_view(L".png"), std::wstring_view(L".jpg"), std::wstring_view(L".jpeg"),
+            std::wstring_view(L".bmp"), std::wstring_view(L".gif"), std::wstring_view(L".tif"),
+            std::wstring_view(L".tiff"), std::wstring_view(L".webp"), std::wstring_view(L".ico"),
+            std::wstring_view(L".heic"), std::wstring_view(L".heif") };
+        static constexpr std::array video_extensions{
+            std::wstring_view(L".mp4"), std::wstring_view(L".mkv"), std::wstring_view(L".mov"),
+            std::wstring_view(L".avi"), std::wstring_view(L".webm"), std::wstring_view(L".wmv") };
+        static constexpr std::array audio_extensions{
+            std::wstring_view(L".mp3"), std::wstring_view(L".flac"), std::wstring_view(L".wav"),
+            std::wstring_view(L".m4a"), std::wstring_view(L".aac"), std::wstring_view(L".ogg") };
+        switch (kind)
+        {
+        case GalleryMediaKind::image:
+            return image_extensions;
+        case GalleryMediaKind::video:
+            return video_extensions;
+        case GalleryMediaKind::audio:
+            return audio_extensions;
+        default:
+            return {};
+        }
+    }
+
+    glance::contracts::components::GalleryMediaKind gallery_media_kind(
+        const std::wstring& path)
+    {
+        using glance::contracts::components::GalleryMediaKind;
+        const auto extension = lower_extension(path);
+        for (const auto kind : {
+                 GalleryMediaKind::image,
+                 GalleryMediaKind::video,
+                 GalleryMediaKind::audio })
+        {
+            if (contains(extension, built_in_gallery_extensions(kind)))
+            {
+                return kind;
+            }
+        }
+        return component_gallery_media_kind(extension);
+    }
+
+    std::vector<std::wstring> gallery_extensions(
+        glance::contracts::components::GalleryMediaKind kind)
+    {
+        std::vector<std::wstring> extensions;
+        const auto built_in = built_in_gallery_extensions(kind);
+        extensions.reserve(built_in.size());
+        for (const auto extension : built_in)
+        {
+            extensions.emplace_back(extension);
+        }
+        for (auto& extension : component_gallery_extensions(kind))
+        {
+            if (std::ranges::find(extensions, extension) == extensions.end())
+            {
+                extensions.push_back(std::move(extension));
+            }
+        }
+        return extensions;
+    }
+
     static_assert(sizeof(UChar) == sizeof(wchar_t));
 
     class IncrementalTextReader final : public std::enable_shared_from_this<IncrementalTextReader>
@@ -726,16 +792,6 @@ namespace glance::app
             std::wstring_view(L".scss"), std::wstring_view(L".sql"), std::wstring_view(L".sh"),
             std::wstring_view(L".ps1"), std::wstring_view(L".bat"), std::wstring_view(L".cmd"),
             std::wstring_view(L".cmake"), std::wstring_view(L".vcxproj"), std::wstring_view(L".sln") };
-        static constexpr std::array image_extensions{
-            std::wstring_view(L".png"), std::wstring_view(L".jpg"), std::wstring_view(L".jpeg"),
-            std::wstring_view(L".bmp"), std::wstring_view(L".gif"), std::wstring_view(L".tif"),
-            std::wstring_view(L".tiff"), std::wstring_view(L".webp"), std::wstring_view(L".ico"),
-            std::wstring_view(L".heic"), std::wstring_view(L".heif") };
-        static constexpr std::array media_extensions{
-            std::wstring_view(L".mp4"), std::wstring_view(L".mkv"), std::wstring_view(L".mov"),
-            std::wstring_view(L".avi"), std::wstring_view(L".webm"), std::wstring_view(L".wmv"),
-            std::wstring_view(L".mp3"), std::wstring_view(L".flac"), std::wstring_view(L".wav"),
-            std::wstring_view(L".m4a"), std::wstring_view(L".aac"), std::wstring_view(L".ogg") };
         if (extension == L".md" || extension == L".markdown")
         {
             return PreviewKind::markdown;
@@ -754,11 +810,21 @@ namespace glance::app
         {
             return PreviewKind::text;
         }
-        if (contains(extension, image_extensions))
+        if (contains(
+                extension,
+                built_in_gallery_extensions(
+                    glance::contracts::components::GalleryMediaKind::image)))
         {
             return PreviewKind::image;
         }
-        if (contains(extension, media_extensions))
+        if (contains(
+                extension,
+                built_in_gallery_extensions(
+                    glance::contracts::components::GalleryMediaKind::video)) ||
+            contains(
+                extension,
+                built_in_gallery_extensions(
+                    glance::contracts::components::GalleryMediaKind::audio)))
         {
             return PreviewKind::media;
         }

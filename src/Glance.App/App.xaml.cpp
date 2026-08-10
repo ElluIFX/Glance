@@ -76,6 +76,18 @@ namespace
                    TRUE) == CSTR_EQUAL;
     }
 
+    std::optional<std::uint64_t> parse_u64(const winrt::hstring& text)
+    {
+        errno = 0;
+        wchar_t* end{};
+        const auto value = std::wcstoull(text.c_str(), &end, 10);
+        if (errno == ERANGE || end == text.c_str() || *end != L'\0')
+        {
+            return std::nullopt;
+        }
+        return value;
+    }
+
     bool signal_existing_instance_shutdown() noexcept
     {
         const HANDLE event = OpenEventW(
@@ -609,6 +621,11 @@ namespace winrt::Glance::App::implementation
             next_instance_id_++,
             [this](std::uint64_t instance_id, glance::contracts::PreviewWindowState state) {
                 handle_window_state(instance_id, state);
+            },
+            [this](std::string payload) {
+                return pipe_client_.send(
+                    glance::contracts::MessageType::gallery_request,
+                    payload);
             });
     }
 
@@ -787,6 +804,39 @@ namespace winrt::Glance::App::implementation
                 handle_preview_input(
                     static_cast<glance::contracts::PreviewInputAction>(flags));
             }
+            else if (type == glance::contracts::MessageType::gallery_response)
+            {
+                try
+                {
+                    const auto root = winrt::Windows::Data::Json::JsonObject::Parse(to_hstring(payload));
+                    const auto window_id = parse_u64(root.GetNamedString(L"windowId"));
+                    if (!window_id)
+                    {
+                        return;
+                    }
+                    if (active_window_ != nullptr)
+                    {
+                        const auto window = get_self<implementation::MainWindow>(active_window_);
+                        if (window->InstanceId() == *window_id)
+                        {
+                            window->HandleGalleryResponse(payload);
+                            return;
+                        }
+                    }
+                    for (const auto& detached_window : detached_windows_)
+                    {
+                        const auto window = get_self<implementation::MainWindow>(detached_window);
+                        if (window->InstanceId() == *window_id)
+                        {
+                            window->HandleGalleryResponse(payload);
+                            return;
+                        }
+                    }
+                }
+                catch (...)
+                {
+                }
+            }
         });
     }
 
@@ -808,6 +858,14 @@ namespace winrt::Glance::App::implementation
                 reset_core_health();
                 core_connection_grace_until_ms_ = 0;
                 return;
+            }
+            if (active_window_ != nullptr)
+            {
+                get_self<implementation::MainWindow>(active_window_)->HandleGalleryDisconnect();
+            }
+            for (const auto& window : detached_windows_)
+            {
+                get_self<implementation::MainWindow>(window)->HandleGalleryDisconnect();
             }
             reset_core_health();
             core_connection_grace_until_ms_ = GetTickCount64();
@@ -869,17 +927,6 @@ namespace winrt::Glance::App::implementation
         std::uint32_t focused_index{};
         std::uint32_t source_kind{};
         std::uintptr_t source_window{};
-
-        const auto parse_u64 = [](const winrt::hstring& text) {
-            errno = 0;
-            wchar_t* end{};
-            const auto value = std::wcstoull(text.c_str(), &end, 10);
-            if (errno == ERANGE || end == text.c_str() || *end != L'\0')
-            {
-                return std::optional<std::uint64_t>{};
-            }
-            return std::optional<std::uint64_t>{ value };
-        };
 
         try
         {

@@ -8,16 +8,150 @@
 
 #include <algorithm>
 #include <chrono>
+#include <deque>
 #include <filesystem>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <ranges>
+#include <unordered_map>
 #include <tlhelp32.h>
 #include <wtsapi32.h>
 
 namespace
 {
+    std::optional<std::uint64_t> parse_u64(const winrt::hstring& value)
+    {
+        try
+        {
+            std::size_t consumed{};
+            const auto parsed = std::stoull(value.c_str(), &consumed);
+            return consumed == value.size()
+                ? std::optional<std::uint64_t>(parsed)
+                : std::nullopt;
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+    }
+
+    std::wstring_view gallery_operation_name(glance::core::GalleryOperation operation) noexcept
+    {
+        using glance::core::GalleryOperation;
+        switch (operation)
+        {
+        case GalleryOperation::open:
+            return L"open";
+        case GalleryOperation::page:
+            return L"page";
+        case GalleryOperation::select:
+            return L"select";
+        case GalleryOperation::close:
+            return L"close";
+        }
+        return L"";
+    }
+
+    std::optional<glance::core::GalleryCommand> parse_gallery_command(std::string_view payload)
+    {
+        using namespace winrt::Windows::Data::Json;
+        try
+        {
+            const auto root = JsonObject::Parse(winrt::to_hstring(payload));
+            glance::core::GalleryCommand command;
+            const std::wstring operation = root.GetNamedString(L"operation").c_str();
+            if (operation == L"open")
+            {
+                command.operation = glance::core::GalleryOperation::open;
+            }
+            else if (operation == L"page")
+            {
+                command.operation = glance::core::GalleryOperation::page;
+            }
+            else if (operation == L"select")
+            {
+                command.operation = glance::core::GalleryOperation::select;
+            }
+            else if (operation == L"close")
+            {
+                command.operation = glance::core::GalleryOperation::close;
+            }
+            else
+            {
+                return std::nullopt;
+            }
+
+            const auto window_id = parse_u64(root.GetNamedString(L"windowId"));
+            const auto request_id = parse_u64(root.GetNamedString(L"requestId"));
+            const auto session_id = parse_u64(root.GetNamedString(L"sessionId", L"0"));
+            if (!window_id || !request_id || !session_id)
+            {
+                return std::nullopt;
+            }
+            command.window_id = *window_id;
+            command.request_id = *request_id;
+            command.session_id = *session_id;
+            command.source_window = static_cast<std::uintptr_t>(
+                parse_u64(root.GetNamedString(L"sourceWindow", L"0")).value_or(0));
+            command.current_path = root.GetNamedString(L"currentPath", L"").c_str();
+            command.page_start = static_cast<std::uint32_t>(
+                std::max(0.0, root.GetNamedNumber(L"pageStart", 0)));
+            command.page_count = static_cast<std::uint32_t>(
+                std::max(0.0, root.GetNamedNumber(L"pageCount", 64)));
+            command.target_index = static_cast<std::uint32_t>(
+                std::max(0.0, root.GetNamedNumber(L"targetIndex", 0)));
+            if (command.operation == glance::core::GalleryOperation::open)
+            {
+                const auto extensions = root.GetNamedArray(L"extensions");
+                command.extensions.reserve(extensions.Size());
+                for (std::uint32_t index = 0; index < extensions.Size(); ++index)
+                {
+                    command.extensions.emplace_back(extensions.GetStringAt(index).c_str());
+                }
+            }
+            return command;
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+    }
+
+    std::string make_gallery_response_payload(const glance::core::GalleryResponse& response)
+    {
+        using namespace winrt::Windows::Data::Json;
+        JsonObject root;
+        root.SetNamedValue(
+            L"operation",
+            JsonValue::CreateStringValue(gallery_operation_name(response.operation)));
+        root.SetNamedValue(L"windowId", JsonValue::CreateStringValue(std::to_wstring(response.window_id)));
+        root.SetNamedValue(L"requestId", JsonValue::CreateStringValue(std::to_wstring(response.request_id)));
+        root.SetNamedValue(L"sessionId", JsonValue::CreateStringValue(std::to_wstring(response.session_id)));
+        root.SetNamedValue(L"success", JsonValue::CreateBooleanValue(response.success));
+        root.SetNamedValue(L"error", JsonValue::CreateStringValue(response.error));
+        root.SetNamedValue(L"totalCount", JsonValue::CreateNumberValue(response.total_count));
+        root.SetNamedValue(L"currentIndex", JsonValue::CreateNumberValue(response.current_index));
+        root.SetNamedValue(L"pageStart", JsonValue::CreateNumberValue(response.page_start));
+        JsonArray items;
+        for (const auto& item : response.items)
+        {
+            JsonObject file;
+            file.SetNamedValue(L"displayName", JsonValue::CreateStringValue(item.display_name));
+            file.SetNamedValue(L"path", JsonValue::CreateStringValue(item.filesystem_path));
+            file.SetNamedValue(L"parsingName", JsonValue::CreateStringValue(item.shell_parsing_name));
+            file.SetNamedValue(L"size", JsonValue::CreateStringValue(std::to_wstring(item.size)));
+            file.SetNamedValue(L"creationTime", JsonValue::CreateStringValue(std::to_wstring(item.creation_time)));
+            file.SetNamedValue(L"lastWriteTime", JsonValue::CreateStringValue(std::to_wstring(item.last_write_time)));
+            file.SetNamedValue(L"attributes", JsonValue::CreateNumberValue(item.attributes));
+            file.SetNamedValue(L"isFilesystem", JsonValue::CreateBooleanValue(item.is_filesystem));
+            file.SetNamedValue(L"isCloudPlaceholder", JsonValue::CreateBooleanValue(item.is_cloud_placeholder));
+            items.Append(file);
+        }
+        root.SetNamedValue(L"items", items);
+        return winrt::to_string(root.Stringify());
+    }
+
     bool process_is_elevated() noexcept
     {
         HANDLE raw_token{};
@@ -158,15 +292,23 @@ namespace glance::core
     struct SelectionWorkerContext
     {
         unique_handle stop_event;
+        unique_handle gallery_event;
         std::atomic<HWND> window{};
         UINT result_message{};
+        UINT gallery_result_message{};
         std::atomic_uint64_t generation{ 1 };
         std::atomic_uint64_t progress_ms{};
         std::atomic_uint64_t completed_generation{};
         std::mutex pending_mutex;
         std::optional<glance::contracts::SelectionSnapshot> pending_selection;
         std::uint64_t pending_generation{};
+        bool pending_selection_suppressed{};
         std::atomic_bool message_pending{};
+        std::mutex gallery_mutex;
+        std::deque<GalleryCommand> gallery_commands;
+        std::deque<GalleryResponse> gallery_responses;
+        std::unordered_map<std::uint64_t, std::uint64_t> latest_gallery_requests;
+        std::atomic_bool gallery_result_pending{};
     };
 
     CoreApplication::CoreApplication()
@@ -363,6 +505,12 @@ namespace glance::core
             return 0;
         case selection_result_message:
             self->apply_pending_selection();
+            return 0;
+        case gallery_command_message:
+            self->apply_pending_gallery_commands();
+            return 0;
+        case gallery_result_message:
+            self->apply_pending_gallery_responses();
             return 0;
         case heartbeat_message:
             if (self->selection_worker_healthy())
@@ -684,12 +832,14 @@ namespace glance::core
     {
         auto context = std::make_shared<SelectionWorkerContext>();
         context->stop_event.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
-        if (!context->stop_event)
+        context->gallery_event.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
+        if (!context->stop_event || !context->gallery_event)
         {
             return false;
         }
         context->window.store(window_, std::memory_order_release);
         context->result_message = selection_result_message;
+        context->gallery_result_message = gallery_result_message;
         context->progress_ms.store(GetTickCount64(), std::memory_order_release);
         context->completed_generation.store(1, std::memory_order_release);
         selection_worker_context_ = std::move(context);
@@ -738,8 +888,53 @@ namespace glance::core
             while (WaitForSingleObject(context->stop_event.get(), 0) == WAIT_TIMEOUT &&
                    context->generation.load(std::memory_order_acquire) == generation)
             {
+                std::optional<GalleryCommand> gallery_command;
+                {
+                    const std::scoped_lock lock(context->gallery_mutex);
+                    if (!context->gallery_commands.empty())
+                    {
+                        gallery_command = std::move(context->gallery_commands.front());
+                        context->gallery_commands.pop_front();
+                    }
+                }
+                if (gallery_command)
+                {
+                    const auto is_latest = [context, command = *gallery_command] {
+                        const std::scoped_lock lock(context->gallery_mutex);
+                        const auto latest = context->latest_gallery_requests.find(command.window_id);
+                        return latest != context->latest_gallery_requests.end() &&
+                            latest->second == command.request_id;
+                    };
+                    if (is_latest())
+                    {
+                        auto response = selection_service.handle_gallery_command(
+                            *gallery_command,
+                            [context, generation, is_latest] {
+                                return context->generation.load(std::memory_order_acquire) != generation ||
+                                    WaitForSingleObject(context->stop_event.get(), 0) != WAIT_TIMEOUT ||
+                                    !is_latest();
+                            },
+                            [context] {
+                                context->progress_ms.store(GetTickCount64(), std::memory_order_release);
+                            });
+                        if (!response.success && response.error != L"canceled")
+                        {
+                            glance::contracts::log_event(
+                                L"Gallery " +
+                                std::wstring(gallery_operation_name(response.operation)) +
+                                L" request failed: " + response.error + L".");
+                        }
+                        if (is_latest() && response.error != L"canceled")
+                        {
+                            publish_gallery_response(context, std::move(response));
+                        }
+                    }
+                }
+
                 const auto query_started = std::chrono::steady_clock::now();
                 auto next = selection_service.query_foreground();
+                const bool suppress_preview_update =
+                    selection_service.consume_gallery_selection_sync(next);
                 const auto query_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - query_started);
                 if (context->generation.load(std::memory_order_acquire) != generation ||
@@ -757,12 +952,16 @@ namespace glance::core
                         L"Explorer selection query took " +
                         std::to_wstring(query_duration.count()) + L" ms.");
                 }
-                publish_selection(context, generation, std::move(next));
+                publish_selection(
+                    context,
+                    generation,
+                    std::move(next),
+                    suppress_preview_update);
 
-                const HANDLE stop_event = context->stop_event.get();
+                const HANDLE events[]{ context->stop_event.get(), context->gallery_event.get() };
                 const DWORD wait_result = MsgWaitForMultipleObjectsEx(
-                    1,
-                    &stop_event,
+                    static_cast<DWORD>(std::size(events)),
+                    events,
                     selection_interval_ms,
                     QS_ALLINPUT,
                     MWMO_INPUTAVAILABLE);
@@ -770,7 +969,7 @@ namespace glance::core
                 {
                     break;
                 }
-                if (wait_result == WAIT_OBJECT_0 + 1)
+                if (wait_result == WAIT_OBJECT_0 + std::size(events))
                 {
                     MSG message{};
                     while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
@@ -802,7 +1001,8 @@ namespace glance::core
     void CoreApplication::publish_selection(
         const std::shared_ptr<SelectionWorkerContext>& context,
         std::uint64_t generation,
-        glance::contracts::SelectionSnapshot next)
+        glance::contracts::SelectionSnapshot next,
+        bool suppress_preview_update)
     {
         {
             const std::scoped_lock lock(context->pending_mutex);
@@ -810,14 +1010,41 @@ namespace glance::core
             {
                 return;
             }
+            const bool same_pending_selection = context->pending_selection &&
+                context->pending_selection->source_window == next.source_window &&
+                context->pending_selection->focused_index < context->pending_selection->items.size() &&
+                next.focused_index < next.items.size() &&
+                paths_equal(
+                    context->pending_selection->items[context->pending_selection->focused_index]
+                        .filesystem_path,
+                    next.items[next.focused_index].filesystem_path);
+            const bool keep_suppressed = same_pending_selection &&
+                context->pending_selection_suppressed;
             context->pending_selection = std::move(next);
             context->pending_generation = generation;
+            context->pending_selection_suppressed = keep_suppressed || suppress_preview_update;
         }
         const HWND window = context->window.load(std::memory_order_acquire);
         if (!context->message_pending.exchange(true, std::memory_order_acq_rel) &&
             (window == nullptr || !PostMessageW(window, context->result_message, 0, 0)))
         {
             context->message_pending.store(false, std::memory_order_release);
+        }
+    }
+
+    void CoreApplication::publish_gallery_response(
+        const std::shared_ptr<SelectionWorkerContext>& context,
+        GalleryResponse response)
+    {
+        {
+            const std::scoped_lock lock(context->gallery_mutex);
+            context->gallery_responses.push_back(std::move(response));
+        }
+        const HWND window = context->window.load(std::memory_order_acquire);
+        if (!context->gallery_result_pending.exchange(true, std::memory_order_acq_rel) &&
+            (window == nullptr || !PostMessageW(window, context->gallery_result_message, 0, 0)))
+        {
+            context->gallery_result_pending.store(false, std::memory_order_release);
         }
     }
 
@@ -914,20 +1141,96 @@ namespace glance::core
         }
         std::optional<glance::contracts::SelectionSnapshot> next;
         std::uint64_t generation{};
+        bool suppress_preview_update{};
         {
             const std::scoped_lock lock(context->pending_mutex);
             next = std::move(context->pending_selection);
             context->pending_selection.reset();
             generation = context->pending_generation;
+            suppress_preview_update = context->pending_selection_suppressed;
+            context->pending_selection_suppressed = false;
             context->message_pending.store(false, std::memory_order_release);
         }
         if (next && generation == context->generation.load(std::memory_order_acquire))
         {
-            apply_selection(std::move(*next));
+            apply_selection(std::move(*next), suppress_preview_update);
         }
     }
 
-    void CoreApplication::apply_selection(glance::contracts::SelectionSnapshot next)
+    void CoreApplication::apply_pending_gallery_commands()
+    {
+        std::vector<std::string> payloads;
+        {
+            const std::scoped_lock lock(gallery_payload_mutex_);
+            payloads.swap(pending_gallery_payloads_);
+        }
+        const auto context = selection_worker_context_;
+        if (!context)
+        {
+            return;
+        }
+        bool queued{};
+        for (const auto& payload : payloads)
+        {
+            auto command = parse_gallery_command(payload);
+            if (!command)
+            {
+                glance::contracts::log_event(L"Ignoring an invalid gallery request payload.");
+                continue;
+            }
+            {
+                const std::scoped_lock lock(context->gallery_mutex);
+                context->latest_gallery_requests[command->window_id] = command->request_id;
+                std::erase_if(context->gallery_commands, [window_id = command->window_id](const auto& pending) {
+                    return pending.window_id == window_id;
+                });
+                context->gallery_commands.push_back(std::move(*command));
+            }
+            queued = true;
+        }
+        if (queued)
+        {
+            SetEvent(context->gallery_event.get());
+        }
+    }
+
+    void CoreApplication::apply_pending_gallery_responses()
+    {
+        const auto context = selection_worker_context_;
+        if (!context)
+        {
+            return;
+        }
+        std::deque<GalleryResponse> responses;
+        {
+            const std::scoped_lock lock(context->gallery_mutex);
+            responses.swap(context->gallery_responses);
+            for (const auto& response : responses)
+            {
+                if (response.operation != GalleryOperation::close)
+                {
+                    continue;
+                }
+                const auto latest = context->latest_gallery_requests.find(response.window_id);
+                if (latest != context->latest_gallery_requests.end() &&
+                    latest->second == response.request_id)
+                {
+                    context->latest_gallery_requests.erase(latest);
+                }
+            }
+            context->gallery_result_pending.store(false, std::memory_order_release);
+        }
+        for (const auto& response : responses)
+        {
+            static_cast<void>(pipe_server_.send(
+                glance::contracts::MessageType::gallery_response,
+                make_gallery_response_payload(response)));
+        }
+    }
+
+    void CoreApplication::apply_selection(
+        glance::contracts::SelectionSnapshot next,
+        bool suppress_preview_update)
     {
         input_state_.text_input_active.store(next.text_input_active, std::memory_order_release);
 
@@ -991,7 +1294,7 @@ namespace glance::core
 
         const bool follows_selection = preview_state == glance::contracts::PreviewWindowState::active_following ||
                                        preview_state == glance::contracts::PreviewWindowState::active_topmost;
-        if (!changed || !follows_selection)
+        if (!changed || !follows_selection || suppress_preview_update)
         {
             return;
         }
@@ -1087,7 +1390,7 @@ namespace glance::core
     void CoreApplication::handle_pipe_message(
         glance::contracts::MessageType type,
         std::uint32_t flags,
-        std::string_view)
+        std::string_view payload)
     {
         if (type == glance::contracts::MessageType::terminate_unresponsive)
         {
@@ -1132,6 +1435,15 @@ namespace glance::core
             {
                 input_state_.eligible_selection.store(false, std::memory_order_release);
             }
+            return;
+        }
+        if (type == glance::contracts::MessageType::gallery_request)
+        {
+            {
+                const std::scoped_lock lock(gallery_payload_mutex_);
+                pending_gallery_payloads_.emplace_back(payload);
+            }
+            PostMessageW(window_, gallery_command_message, 0, 0);
             return;
         }
         if (type == glance::contracts::MessageType::shutdown)
