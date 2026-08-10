@@ -1471,6 +1471,17 @@ namespace glance::app
             {
             }
         }
+        std::ranges::sort(statuses, [](const auto& left, const auto& right) {
+            const auto comparison = CompareStringOrdinal(
+                left.display_name.c_str(),
+                -1,
+                right.display_name.c_str(),
+                -1,
+                TRUE);
+            return comparison == CSTR_EQUAL
+                ? left.id < right.id
+                : comparison == CSTR_LESS_THAN;
+        });
         return statuses;
     }
 

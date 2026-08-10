@@ -115,6 +115,7 @@ var
   UserDataRestartRequired: Boolean;
   UpdatingComponentSelection: Boolean;
   ComponentSelectionSnapshot: String;
+  ComponentsListClickCheckPrevious: TNotifyEvent;
 
 function HasCommandLineParameter(const Value: String): Boolean;
 var
@@ -226,18 +227,23 @@ begin
   NormalizeComponentDependencies(PreviousSelection);
   ComponentSelectionSnapshot := WizardSelectedComponents(False);
   UpdatingComponentSelection := False;
+  if ComponentsListClickCheckPrevious <> nil then
+    ComponentsListClickCheckPrevious(Sender);
 end;
 
 procedure InitializeWizard;
 var
   PreviousComponentCatalog: String;
 begin
+  ComponentsListClickCheckPrevious := WizardForm.ComponentsList.OnClickCheck;
   PreviousComponentCatalog := GetPreviousData(
     'KnownComponents', LegacyComponentCatalog);
 #include ComponentInnoDir + "\component-select-new.iss"
   NormalizeComponentDependencies('');
   ComponentSelectionSnapshot := WizardSelectedComponents(False);
   WizardForm.ComponentsList.OnClickCheck := @ComponentsListClickCheck;
+  if ComponentsListClickCheckPrevious <> nil then
+    ComponentsListClickCheckPrevious(WizardForm.ComponentsList);
 end;
 
 procedure RegisterPreviousData(PreviousDataKey: Integer);
