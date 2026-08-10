@@ -151,11 +151,12 @@ foreach ($id in $componentOrder) {
     foreach ($dependency in $dependencies) {
         $dependencyProviders.Add($dependency) | Out-Null
     }
+    $installerId = $id -replace '-', '_'
     $installerComponentNames[$id] = if ($dependencies.Count -eq 1) {
-        "$($installerComponentNames[$dependencies[0]])\$id"
+        "$($installerComponentNames[$dependencies[0]])\$installerId"
     }
     else {
-        $id
+        $installerId
     }
 }
 
