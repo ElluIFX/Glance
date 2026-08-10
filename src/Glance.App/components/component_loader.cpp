@@ -6,6 +6,8 @@
 #include "glance/contracts/diagnostics.h"
 #include "../../version.h"
 
+#include <shlobj.h>
+
 #include <algorithm>
 #include <cwctype>
 #include <filesystem>
@@ -21,6 +23,7 @@
 namespace
 {
     using glance::contracts::components::ComponentApi;
+    using glance::contracts::components::ComponentManagementActionApi;
     using glance::contracts::components::ComponentLoadingTextResult;
     using glance::contracts::components::ComponentRegistration;
     using glance::contracts::components::ConfigurablePreviewApi;
@@ -28,6 +31,7 @@ namespace
     using glance::contracts::components::GalleryMediaApi;
     using glance::contracts::components::GalleryMediaKind;
     using glance::contracts::components::HealthSeverity;
+    using glance::contracts::components::HoverInfoLayerApi;
     using glance::contracts::components::FileDirectoryPreviewApi;
     using glance::contracts::components::PreparedPreview;
     using glance::contracts::components::PagedDocumentHostDescriptor;
@@ -37,6 +41,7 @@ namespace
     using glance::contracts::components::PreviewNoticeApi;
     using glance::contracts::components::ProgressivePreviewApi;
     using glance::contracts::components::SettingsContributionApi;
+    using glance::contracts::components::StatusBarShortcutApi;
     using glance::contracts::components::WebPreviewApi;
     using glance::contracts::components::WebPreviewDescriptor;
     using glance::contracts::components::WebPreviewOptions;
@@ -87,6 +92,9 @@ namespace
         std::optional<SettingsContributionApi> settings_contribution;
         std::optional<FileDirectoryPreviewApi> file_directory_preview;
         std::optional<GalleryMediaApi> gallery_media;
+        std::optional<HoverInfoLayerApi> hover_info_layer;
+        std::optional<StatusBarShortcutApi> status_bar_shortcut;
+        std::optional<ComponentManagementActionApi> component_management_action;
         std::vector<std::wstring> extensions;
         std::vector<std::wstring> dependencies;
         std::vector<RendererRegistration> renderers;
@@ -423,9 +431,6 @@ namespace
             component->api.abi != glance::contracts::components::abi_version ||
             component->api.initialize == nullptr ||
             component->api.query_status == nullptr ||
-            component->api.can_preview == nullptr ||
-            component->api.prepare_preview == nullptr ||
-            component->api.release_preview == nullptr ||
             component->api.query_interface == nullptr ||
             component->api.shutdown == nullptr)
         {
@@ -441,11 +446,7 @@ namespace
             component->registration.size < sizeof(ComponentRegistration) ||
             manifest.id != component->registration.component_id ||
             std::wstring_view(component->registration.target_app_version) !=
-                GLANCE_VERSION_WSTRING ||
-            collector.extensions.empty() ||
-            !valid_content_pair(
-                component->registration.preferred_kind,
-                component->registration.preferred_format))
+                GLANCE_VERSION_WSTRING)
         {
             return {};
         }
@@ -590,6 +591,83 @@ namespace
             {
                 component->gallery_media = *interface_api;
             }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::hover_info_layer_api_id,
+                glance::contracts::components::hover_info_layer_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const HoverInfoLayerApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(HoverInfoLayerApi) &&
+                interface_api->version ==
+                    glance::contracts::components::hover_info_layer_api_version &&
+                interface_api->query_info != nullptr)
+            {
+                component->hover_info_layer = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::status_bar_shortcut_api_id,
+                glance::contracts::components::status_bar_shortcut_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const StatusBarShortcutApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(StatusBarShortcutApi) &&
+                interface_api->version ==
+                    glance::contracts::components::status_bar_shortcut_api_version &&
+                interface_api->enumerate_shortcuts != nullptr &&
+                interface_api->query_state != nullptr &&
+                interface_api->activate != nullptr)
+            {
+                component->status_bar_shortcut = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::component_management_action_api_id,
+                glance::contracts::components::component_management_action_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const ComponentManagementActionApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(ComponentManagementActionApi) &&
+                interface_api->version ==
+                    glance::contracts::components::component_management_action_api_version &&
+                interface_api->enumerate_actions != nullptr &&
+                interface_api->prepare_action != nullptr &&
+                interface_api->complete_action != nullptr)
+            {
+                component->component_management_action = *interface_api;
+            }
+        }
+        const bool primary_preview = !component->extensions.empty();
+        if (primary_preview)
+        {
+            if (component->api.can_preview == nullptr ||
+                component->api.prepare_preview == nullptr ||
+                component->api.release_preview == nullptr ||
+                !valid_content_pair(
+                    component->registration.preferred_kind,
+                    component->registration.preferred_format))
+            {
+                return {};
+            }
+        }
+        else if (component->registration.preferred_kind != PreviewContentKind::none ||
+            component->registration.preferred_format != PreviewContentFormat::none ||
+            (component->renderers.empty() &&
+             !component->settings_contribution.has_value() &&
+             !component->status_bar_shortcut.has_value() &&
+             !component->component_management_action.has_value()))
+        {
+            return {};
         }
         if (std::ranges::any_of(component->renderers, [&component](const auto& renderer) {
                 if (IsEqualGUID(
@@ -1085,6 +1163,137 @@ namespace
             return FALSE;
         }
     }
+
+    std::vector<glance::app::ComponentManagementAction> enumerate_management_actions(
+        const std::shared_ptr<LoadedComponent>& component,
+        std::wstring_view language_tag)
+    {
+        std::vector<glance::app::ComponentManagementAction> actions;
+        if (!component->active || !component->component_management_action.has_value())
+        {
+            return actions;
+        }
+
+        const std::wstring language(language_tag);
+        std::uint32_t count{};
+        if (!component->component_management_action->enumerate_actions(
+                language.c_str(), nullptr, 0, &count) ||
+            count == 0 ||
+            count > glance::contracts::components::maximum_component_management_actions)
+        {
+            return actions;
+        }
+
+        std::vector<glance::contracts::components::ComponentManagementActionDescriptor>
+            descriptors(count);
+        std::uint32_t written = count;
+        if (!component->component_management_action->enumerate_actions(
+                language.c_str(), descriptors.data(), count, &written) ||
+            written != count)
+        {
+            return actions;
+        }
+
+        for (const auto& descriptor : descriptors)
+        {
+            const auto action_id = bounded_string(descriptor.action_id);
+            const auto button_text = bounded_string(descriptor.button_text);
+            const auto confirmation_title = bounded_string(descriptor.confirmation_title);
+            const auto confirmation_message = bounded_string(descriptor.confirmation_message);
+            const auto confirmation_button = bounded_string(descriptor.confirmation_button);
+            const auto download_title = bounded_string(descriptor.download_title);
+            const auto download_message = bounded_string(descriptor.download_message);
+            const auto preparing_title = bounded_string(descriptor.preparing_title);
+            const auto preparing_message = bounded_string(descriptor.preparing_message);
+            const auto completed_title = bounded_string(descriptor.completed_title);
+            const auto completed_message = bounded_string(descriptor.completed_message);
+            if (descriptor.size < sizeof(descriptor) ||
+                !action_id.has_value() || !valid_setting_id(*action_id) ||
+                !button_text.has_value() || button_text->empty() ||
+                !confirmation_title.has_value() || !confirmation_message.has_value() ||
+                !confirmation_button.has_value() ||
+                (((!confirmation_title->empty() || !confirmation_message->empty() ||
+                   !confirmation_button->empty()) &&
+                  (confirmation_title->empty() || confirmation_message->empty() ||
+                   confirmation_button->empty()))) ||
+                !download_title.has_value() || download_title->empty() ||
+                !download_message.has_value() ||
+                !preparing_title.has_value() || preparing_title->empty() ||
+                !preparing_message.has_value() ||
+                !completed_title.has_value() || completed_title->empty() ||
+                !completed_message.has_value())
+            {
+                continue;
+            }
+            actions.push_back(glance::app::ComponentManagementAction{
+                .component_id = component->id,
+                .action_id = std::move(*action_id),
+                .order = descriptor.order,
+                .button_text = std::move(*button_text),
+                .confirmation_title = std::move(*confirmation_title),
+                .confirmation_message = std::move(*confirmation_message),
+                .confirmation_button = std::move(*confirmation_button),
+                .download_title = std::move(*download_title),
+                .download_message = std::move(*download_message),
+                .preparing_title = std::move(*preparing_title),
+                .preparing_message = std::move(*preparing_message),
+                .completed_title = std::move(*completed_title),
+                .completed_message = std::move(*completed_message),
+                .lease = std::static_pointer_cast<void>(component) });
+        }
+        std::ranges::sort(actions, [](const auto& left, const auto& right) {
+            return std::tie(left.order, left.action_id) <
+                std::tie(right.order, right.action_id);
+        });
+        return actions;
+    }
+
+    struct HoverInfoCollector
+    {
+        std::wstring text;
+        const std::atomic_bool* cancelled{};
+        bool valid{ true };
+    };
+
+    BOOL WINAPI append_hover_info(
+        void* context,
+        const wchar_t* text,
+        std::uint32_t length) noexcept
+    {
+        if (context == nullptr || (length != 0 && text == nullptr))
+        {
+            return FALSE;
+        }
+        auto& collector = *static_cast<HoverInfoCollector*>(context);
+        if (collector.cancelled->load(std::memory_order_acquire) ||
+            length > 256 * 1024 ||
+            collector.text.size() > 256 * 1024 - length)
+        {
+            collector.valid = false;
+            return FALSE;
+        }
+        if (length == 0)
+        {
+            return TRUE;
+        }
+        try
+        {
+            collector.text.append(text, length);
+            return TRUE;
+        }
+        catch (...)
+        {
+            collector.valid = false;
+            return FALSE;
+        }
+    }
+
+    BOOL WINAPI hover_info_cancelled(void* context) noexcept
+    {
+        return context != nullptr &&
+            static_cast<HoverInfoCollector*>(context)->cancelled->load(
+                std::memory_order_acquire);
+    }
 }
 
 namespace glance::app
@@ -1561,7 +1770,8 @@ namespace glance::app
                     .id = component->id,
                     .display_name = status.display_name,
                     .detail = std::move(detail),
-                    .state = state });
+                    .state = state,
+                    .actions = enumerate_management_actions(component, language_tag) });
             }
             catch (...)
             {
@@ -1579,6 +1789,380 @@ namespace glance::app
                 : comparison == CSTR_LESS_THAN;
         });
         return statuses;
+    }
+
+    std::vector<ComponentStatusBarShortcut> component_status_bar_shortcuts(
+        std::wstring_view path,
+        PreviewContentKind kind,
+        PreviewContentFormat format,
+        std::wstring_view language_tag) noexcept
+    {
+        std::vector<std::shared_ptr<LoadedComponent>> components;
+        {
+            initialize_components();
+            std::scoped_lock lock(registry_mutex);
+            components = registered_components;
+        }
+
+        std::vector<ComponentStatusBarShortcut> shortcuts;
+        const std::wstring source(path);
+        const std::wstring language(language_tag);
+        for (const auto& component : components)
+        {
+            if (!component->active || !component->status_bar_shortcut.has_value())
+            {
+                continue;
+            }
+            try
+            {
+                std::uint32_t count{};
+                if (!component->status_bar_shortcut->enumerate_shortcuts(
+                        language.c_str(), nullptr, 0, &count) ||
+                    count == 0 ||
+                    count > glance::contracts::components::maximum_status_bar_shortcuts)
+                {
+                    continue;
+                }
+                std::vector<glance::contracts::components::StatusBarShortcutDescriptor>
+                    descriptors(count);
+                std::uint32_t written = count;
+                if (!component->status_bar_shortcut->enumerate_shortcuts(
+                        language.c_str(), descriptors.data(), count, &written) ||
+                    written != count)
+                {
+                    continue;
+                }
+                for (const auto& descriptor : descriptors)
+                {
+                    const auto shortcut_id = bounded_string(descriptor.shortcut_id);
+                    const auto tooltip = bounded_string(descriptor.tooltip);
+                    if (descriptor.size < sizeof(descriptor) ||
+                        !shortcut_id.has_value() || !valid_setting_id(*shortcut_id) ||
+                        !tooltip.has_value() || tooltip->empty() ||
+                        descriptor.target_kind != kind ||
+                        (descriptor.target_format != PreviewContentFormat::none &&
+                         descriptor.target_format != format) ||
+                        descriptor.fluent_icon_glyph < 0xe000 ||
+                        descriptor.fluent_icon_glyph > 0xf8ff)
+                    {
+                        continue;
+                    }
+                    const auto state = component->status_bar_shortcut->query_state(
+                        shortcut_id->c_str(), source.c_str(), kind, format);
+                    if (state == glance::contracts::components::StatusBarShortcutState::hidden)
+                    {
+                        continue;
+                    }
+                    if (state != glance::contracts::components::StatusBarShortcutState::ready &&
+                        state != glance::contracts::components::StatusBarShortcutState::setup_required)
+                    {
+                        continue;
+                    }
+                    shortcuts.push_back(ComponentStatusBarShortcut{
+                        .component_id = component->id,
+                        .shortcut_id = std::move(*shortcut_id),
+                        .tooltip = std::move(*tooltip),
+                        .order = descriptor.order,
+                        .fluent_icon_glyph = descriptor.fluent_icon_glyph,
+                        .state = state == glance::contracts::components::StatusBarShortcutState::ready
+                            ? ComponentStatusBarShortcutState::ready
+                            : ComponentStatusBarShortcutState::setup_required,
+                        .lease = std::static_pointer_cast<void>(component) });
+                }
+            }
+            catch (...)
+            {
+            }
+        }
+        std::ranges::sort(shortcuts, [](const auto& left, const auto& right) {
+            return std::tie(left.order, left.component_id, left.shortcut_id) <
+                std::tie(right.order, right.component_id, right.shortcut_id);
+        });
+        return shortcuts;
+    }
+
+    ComponentStatusBarActivation activate_component_status_bar_shortcut(
+        const ComponentStatusBarShortcut& shortcut,
+        std::wstring_view path,
+        std::wstring_view language_tag,
+        bool requested_checked) noexcept
+    {
+        ComponentStatusBarActivation activation;
+        try
+        {
+            const auto component =
+                std::static_pointer_cast<LoadedComponent>(shortcut.lease);
+            if (component == nullptr || !component->active ||
+                component->id != shortcut.component_id ||
+                !component->status_bar_shortcut.has_value())
+            {
+                return activation;
+            }
+            glance::contracts::components::StatusBarShortcutActivationResult result;
+            const std::wstring source(path);
+            const std::wstring language(language_tag);
+            if (!component->status_bar_shortcut->activate(
+                    shortcut.shortcut_id.c_str(),
+                    source.c_str(),
+                    language.c_str(),
+                    requested_checked ? TRUE : FALSE,
+                    &result) ||
+                result.size < sizeof(result))
+            {
+                return activation;
+            }
+            const auto hover_info_id = bounded_string(result.hover_info_id);
+            const auto component_action_id = bounded_string(result.component_action_id);
+            const auto loading_text = bounded_string(result.loading_text);
+            if (!hover_info_id.has_value() || !component_action_id.has_value() ||
+                !loading_text.has_value())
+            {
+                return activation;
+            }
+            if (result.activation ==
+                    glance::contracts::components::StatusBarShortcutActivation::toggle_hover_info &&
+                result.checked && valid_setting_id(*hover_info_id) &&
+                component->hover_info_layer.has_value())
+            {
+                activation.kind = ComponentStatusBarActivationKind::toggle_hover_info;
+                activation.checked = true;
+                activation.hover_info_id = std::move(*hover_info_id);
+                activation.loading_text = std::move(*loading_text);
+            }
+            else if (result.activation ==
+                         glance::contracts::components::StatusBarShortcutActivation::toggle_hover_info &&
+                !result.checked)
+            {
+                activation.kind = ComponentStatusBarActivationKind::toggle_hover_info;
+            }
+            else if (result.activation ==
+                         glance::contracts::components::StatusBarShortcutActivation::request_component_action &&
+                valid_setting_id(*component_action_id) &&
+                component->component_management_action.has_value())
+            {
+                activation.kind = ComponentStatusBarActivationKind::request_component_action;
+                activation.component_action_id = std::move(*component_action_id);
+            }
+            activation.checked = result.checked != FALSE;
+            activation.component_id = component->id;
+            activation.lease = std::static_pointer_cast<void>(component);
+        }
+        catch (...)
+        {
+        }
+        return activation;
+    }
+
+    std::wstring query_component_hover_info(
+        const ComponentStatusBarActivation& activation,
+        std::wstring_view path,
+        std::wstring_view language_tag,
+        const std::atomic_bool& cancelled) noexcept
+    {
+        try
+        {
+            const auto component =
+                std::static_pointer_cast<LoadedComponent>(activation.lease);
+            if (component == nullptr || !component->active ||
+                component->id != activation.component_id ||
+                !component->hover_info_layer.has_value() ||
+                !valid_setting_id(activation.hover_info_id))
+            {
+                return {};
+            }
+            HoverInfoCollector collector{ .cancelled = &cancelled };
+            glance::contracts::components::HoverInfoTextSink sink{
+                .context = &collector,
+                .append = append_hover_info,
+                .is_cancelled = hover_info_cancelled };
+            const std::wstring source(path);
+            const std::wstring language(language_tag);
+            const auto status = component->hover_info_layer->query_info(
+                activation.hover_info_id.c_str(),
+                source.c_str(),
+                language.c_str(),
+                &sink);
+            return status == glance::contracts::components::PrepareStatus::success &&
+                    collector.valid && !cancelled.load(std::memory_order_acquire)
+                ? std::move(collector.text)
+                : std::wstring{};
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
+
+    std::optional<ComponentManagementAction> component_management_action(
+        std::wstring_view component_id,
+        std::wstring_view action_id,
+        std::wstring_view language_tag) noexcept
+    {
+        try
+        {
+            initialize_components();
+            std::shared_ptr<LoadedComponent> component;
+            {
+                std::scoped_lock lock(registry_mutex);
+                const auto match = std::ranges::find_if(
+                    registered_components,
+                    [component_id](const auto& candidate) {
+                        return candidate->id == component_id;
+                    });
+                if (match == registered_components.end())
+                {
+                    return std::nullopt;
+                }
+                component = *match;
+            }
+            auto actions = enumerate_management_actions(component, language_tag);
+            const auto match = std::ranges::find(actions, action_id, &ComponentManagementAction::action_id);
+            return match == actions.end()
+                ? std::nullopt
+                : std::optional<ComponentManagementAction>(std::move(*match));
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+    }
+
+    ComponentDownloadRequest prepare_component_management_action(
+        const ComponentManagementAction& action,
+        std::wstring_view language_tag) noexcept
+    {
+        ComponentDownloadRequest request;
+        try
+        {
+            const auto component = std::static_pointer_cast<LoadedComponent>(action.lease);
+            if (component == nullptr || !component->active ||
+                component->id != action.component_id ||
+                !component->component_management_action.has_value())
+            {
+                return request;
+            }
+            glance::contracts::components::ComponentDownloadRequest raw;
+            const std::wstring language(language_tag);
+            if (!component->component_management_action->prepare_action(
+                    action.action_id.c_str(), language.c_str(), &raw) ||
+                raw.size < sizeof(raw))
+            {
+                return request;
+            }
+            const auto url = bounded_string(raw.url);
+            const auto file_name = bounded_string(raw.file_name);
+            const auto sha256 = bounded_string(raw.sha256);
+            if (!url.has_value() || !file_name.has_value() || !sha256.has_value() ||
+                file_name->empty() ||
+                std::filesystem::path(*file_name) !=
+                    std::filesystem::path(*file_name).filename() ||
+                sha256->size() != 64 ||
+                !std::ranges::all_of(*sha256, [](wchar_t character) {
+                    return std::iswxdigit(character) != 0;
+                }) ||
+                raw.expected_size == 0 || raw.expected_size > 512ULL * 1024 * 1024)
+            {
+                return request;
+            }
+            const winrt::Windows::Foundation::Uri uri(*url);
+            if (_wcsicmp(uri.SchemeName().c_str(), L"https") != 0)
+            {
+                return request;
+            }
+            request = ComponentDownloadRequest{
+                .url = std::move(*url),
+                .file_name = std::move(*file_name),
+                .sha256 = std::move(*sha256),
+                .expected_size = raw.expected_size };
+        }
+        catch (...)
+        {
+        }
+        return request;
+    }
+
+    ComponentManagementActionCompletion complete_component_management_action(
+        const ComponentManagementAction& action,
+        const std::filesystem::path& downloaded_path,
+        std::wstring_view language_tag) noexcept
+    {
+        ComponentManagementActionCompletion completion;
+        try
+        {
+            const auto component = std::static_pointer_cast<LoadedComponent>(action.lease);
+            std::error_code error;
+            if (component == nullptr || !component->active ||
+                component->id != action.component_id ||
+                !component->component_management_action.has_value() ||
+                !downloaded_path.is_absolute() ||
+                !std::filesystem::is_regular_file(downloaded_path, error))
+            {
+                return completion;
+            }
+            const auto storage = component_storage_directory(component->id);
+            if (storage.empty())
+            {
+                return completion;
+            }
+            std::filesystem::create_directories(storage, error);
+            if (error)
+            {
+                return completion;
+            }
+            glance::contracts::components::ComponentManagementActionResult raw;
+            const std::wstring language(language_tag);
+            if (!component->component_management_action->complete_action(
+                    action.action_id.c_str(),
+                    downloaded_path.c_str(),
+                    storage.c_str(),
+                    language.c_str(),
+                    &raw) ||
+                raw.size < sizeof(raw))
+            {
+                return completion;
+            }
+            const auto detail = bounded_string(raw.detail);
+            if (!detail.has_value())
+            {
+                return completion;
+            }
+            completion.succeeded = raw.succeeded != FALSE;
+            completion.detail = std::move(*detail);
+        }
+        catch (...)
+        {
+        }
+        return completion;
+    }
+
+    std::filesystem::path component_storage_directory(
+        std::wstring_view component_id) noexcept
+    {
+        if (!valid_component_id(component_id))
+        {
+            return {};
+        }
+        PWSTR raw_path{};
+        if (FAILED(SHGetKnownFolderPath(
+                FOLDERID_LocalAppData,
+                KF_FLAG_CREATE,
+                nullptr,
+                &raw_path)))
+        {
+            return {};
+        }
+        const std::unique_ptr<wchar_t, decltype(&CoTaskMemFree)> owned_path(
+            raw_path,
+            CoTaskMemFree);
+        try
+        {
+            return std::filesystem::path(owned_path.get()) / L"Glance" / L"Components" /
+                std::wstring(component_id);
+        }
+        catch (...)
+        {
+            return {};
+        }
     }
 
     std::optional<PagedDocumentRendererRegistration>

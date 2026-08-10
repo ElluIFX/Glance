@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.xaml.h"><Filter>Application</Filter></ClInclude>
+    <ClInclude Include="application\download_service.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\localization.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\pipe_client.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\startup_registration.h"><Filter>Application</Filter></ClInclude>
@@ -32,7 +33,6 @@
     <ClInclude Include="preview\generic_file_info.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\image_metadata_provider.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\markdown_renderer.h"><Filter>Preview</Filter></ClInclude>
-    <ClInclude Include="preview\media_metadata_provider.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\pan_interaction.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\paged_document_render_client.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\preview_file.h"><Filter>Preview</Filter></ClInclude>
@@ -49,6 +49,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.xaml.cpp"><Filter>Application</Filter></ClCompile>
+    <ClCompile Include="application\download_service.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\localization.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\pipe_client.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\startup_registration.cpp"><Filter>Application</Filter></ClCompile>
@@ -68,7 +69,6 @@
     <ClCompile Include="preview\generic_file_info.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\image_metadata_provider.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\markdown_renderer.cpp"><Filter>Preview</Filter></ClCompile>
-    <ClCompile Include="preview\media_metadata_provider.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\paged_document_render_client.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\preview_provider.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="preview\scintilla_text_view.cpp"><Filter>Preview</Filter></ClCompile>

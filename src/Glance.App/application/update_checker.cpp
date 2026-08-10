@@ -2,13 +2,11 @@
 #include "update_checker.h"
 #include "../../version.h"
 
-#include <bcrypt.h>
 #include <shellapi.h>
 #include <winhttp.h>
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cwctype>
 #include <limits>
 #include <optional>
@@ -26,7 +24,6 @@ namespace
         L"{F4A2E1FC-BA77-4A24-83BF-A1D5B90A3E13}_is1";
     constexpr std::size_t maximum_response_bytes = 64 * 1024;
     constexpr std::uint64_t maximum_installer_bytes = 512ULL * 1024 * 1024;
-    constexpr DWORD download_buffer_bytes = 256 * 1024;
 
     class InternetHandle
     {
@@ -58,143 +55,6 @@ namespace
 
     private:
         HINTERNET value_{};
-    };
-
-    class FileHandle
-    {
-    public:
-        explicit FileHandle(HANDLE value = INVALID_HANDLE_VALUE) noexcept : value_(value)
-        {
-        }
-
-        ~FileHandle()
-        {
-            close();
-        }
-
-        FileHandle(const FileHandle&) = delete;
-        FileHandle& operator=(const FileHandle&) = delete;
-
-        void close() noexcept
-        {
-            if (value_ != INVALID_HANDLE_VALUE)
-            {
-                CloseHandle(value_);
-                value_ = INVALID_HANDLE_VALUE;
-            }
-        }
-
-        [[nodiscard]] HANDLE get() const noexcept
-        {
-            return value_;
-        }
-
-        [[nodiscard]] explicit operator bool() const noexcept
-        {
-            return value_ != INVALID_HANDLE_VALUE;
-        }
-
-    private:
-        HANDLE value_{ INVALID_HANDLE_VALUE };
-    };
-
-    class Sha256Hash
-    {
-    public:
-        Sha256Hash()
-        {
-            if (!BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(
-                    &algorithm_, BCRYPT_SHA256_ALGORITHM, nullptr, 0)))
-            {
-                return;
-            }
-
-            DWORD object_size{};
-            DWORD result_size{};
-            if (!BCRYPT_SUCCESS(BCryptGetProperty(
-                    algorithm_,
-                    BCRYPT_OBJECT_LENGTH,
-                    reinterpret_cast<PUCHAR>(&object_size),
-                    sizeof(object_size),
-                    &result_size,
-                    0)))
-            {
-                return;
-            }
-            object_.resize(object_size);
-            if (!BCRYPT_SUCCESS(BCryptCreateHash(
-                    algorithm_,
-                    &hash_,
-                    object_.data(),
-                    static_cast<ULONG>(object_.size()),
-                    nullptr,
-                    0,
-                    0)))
-            {
-                hash_ = nullptr;
-            }
-        }
-
-        ~Sha256Hash()
-        {
-            if (hash_ != nullptr)
-            {
-                BCryptDestroyHash(hash_);
-            }
-            if (algorithm_ != nullptr)
-            {
-                BCryptCloseAlgorithmProvider(algorithm_, 0);
-            }
-        }
-
-        Sha256Hash(const Sha256Hash&) = delete;
-        Sha256Hash& operator=(const Sha256Hash&) = delete;
-
-        [[nodiscard]] explicit operator bool() const noexcept
-        {
-            return hash_ != nullptr;
-        }
-
-        [[nodiscard]] bool append(const void* data, DWORD size) noexcept
-        {
-            return hash_ != nullptr && BCRYPT_SUCCESS(BCryptHashData(
-                hash_,
-                static_cast<PUCHAR>(const_cast<void*>(data)),
-                size,
-                0));
-        }
-
-        [[nodiscard]] std::optional<std::wstring> finish() noexcept
-        {
-            std::array<std::uint8_t, 32> digest{};
-            if (hash_ == nullptr)
-            {
-                return std::nullopt;
-            }
-            const NTSTATUS status = BCryptFinishHash(
-                hash_, digest.data(), static_cast<ULONG>(digest.size()), 0);
-            BCryptDestroyHash(hash_);
-            hash_ = nullptr;
-            if (!BCRYPT_SUCCESS(status))
-            {
-                return std::nullopt;
-            }
-
-            constexpr wchar_t hexadecimal[] = L"0123456789abcdef";
-            std::wstring result;
-            result.reserve(digest.size() * 2);
-            for (const auto value : digest)
-            {
-                result.push_back(hexadecimal[value >> 4]);
-                result.push_back(hexadecimal[value & 0x0F]);
-            }
-            return result;
-        }
-
-    private:
-        BCRYPT_ALG_HANDLE algorithm_{};
-        BCRYPT_HASH_HANDLE hash_{};
-        std::vector<std::uint8_t> object_;
     };
 
     std::optional<std::array<std::uint32_t, 4>> parse_version(std::wstring_view value) noexcept
@@ -365,41 +225,6 @@ namespace
         }
     }
 
-    std::optional<std::wstring> sha256_file(const std::filesystem::path& path) noexcept
-    {
-        FileHandle file(CreateFileW(
-            path.c_str(),
-            GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_DELETE,
-            nullptr,
-            OPEN_EXISTING,
-            FILE_FLAG_SEQUENTIAL_SCAN,
-            nullptr));
-        Sha256Hash hash;
-        if (!file || !hash)
-        {
-            return std::nullopt;
-        }
-
-        std::array<std::uint8_t, download_buffer_bytes> buffer{};
-        while (true)
-        {
-            DWORD read{};
-            if (!ReadFile(file.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr))
-            {
-                return std::nullopt;
-            }
-            if (read == 0)
-            {
-                return hash.finish();
-            }
-            if (!hash.append(buffer.data(), read))
-            {
-                return std::nullopt;
-            }
-        }
-    }
-
     std::filesystem::path executable_directory()
     {
         std::wstring path(32768, L'\0');
@@ -468,24 +293,6 @@ namespace
                    normalized_right.c_str(),
                    static_cast<int>(normalized_right.size()),
                    TRUE) == CSTR_EQUAL;
-    }
-
-    void report_progress(
-        const glance::app::UpdateProgressCallback& progress,
-        std::uint64_t downloaded,
-        std::uint64_t total) noexcept
-    {
-        if (!progress)
-        {
-            return;
-        }
-        try
-        {
-            progress(downloaded, total);
-        }
-        catch (...)
-        {
-        }
     }
 
     void clean_update_directory(
@@ -697,7 +504,6 @@ namespace glance::app
         const std::atomic_bool& cancelled,
         const UpdateProgressCallback& progress) noexcept
     {
-        std::filesystem::path partial_path;
         try
         {
             if (!asset || !parse_version(asset.version) ||
@@ -713,181 +519,19 @@ namespace glance::app
             clean_update_directory(root, version_directory);
             std::filesystem::create_directories(version_directory);
             const auto installer_path = version_directory / asset.file_name;
-            partial_path = installer_path;
-            partial_path += L".partial";
-
-            std::error_code error;
-            std::filesystem::remove(partial_path, error);
-            if (std::filesystem::is_regular_file(installer_path, error) &&
-                std::filesystem::file_size(installer_path, error) == asset.size)
-            {
-                const auto hash = sha256_file(installer_path);
-                if (hash && *hash == asset.sha256)
-                {
-                    report_progress(progress, asset.size, asset.size);
-                    return { UpdateDownloadStatus::succeeded, installer_path };
-                }
-            }
-            std::filesystem::remove(installer_path, error);
-
-            URL_COMPONENTS components{ sizeof(components) };
-            components.dwSchemeLength = static_cast<DWORD>(-1);
-            components.dwHostNameLength = static_cast<DWORD>(-1);
-            components.dwUrlPathLength = static_cast<DWORD>(-1);
-            components.dwExtraInfoLength = static_cast<DWORD>(-1);
-            if (!WinHttpCrackUrl(
-                    asset.download_url.c_str(),
-                    static_cast<DWORD>(asset.download_url.size()),
-                    0,
-                    &components) ||
-                components.nScheme != INTERNET_SCHEME_HTTPS)
-            {
-                return { UpdateDownloadStatus::integrity_error, {} };
-            }
-
-            const std::wstring host(components.lpszHostName, components.dwHostNameLength);
-            std::wstring path(components.lpszUrlPath, components.dwUrlPathLength);
-            if (components.dwExtraInfoLength > 0)
-            {
-                path.append(components.lpszExtraInfo, components.dwExtraInfoLength);
-            }
-
-            InternetHandle session(WinHttpOpen(
-                L"Glance/" GLANCE_VERSION_WSTRING,
-                WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-                WINHTTP_NO_PROXY_NAME,
-                WINHTTP_NO_PROXY_BYPASS,
-                0));
-            if (!session || !WinHttpSetTimeouts(session.get(), 5000, 5000, 5000, 8000))
-            {
-                return { UpdateDownloadStatus::network_error, {} };
-            }
-            InternetHandle connection(WinHttpConnect(session.get(), host.c_str(), components.nPort, 0));
-            InternetHandle request(connection
-                ? WinHttpOpenRequest(
-                    connection.get(),
-                    L"GET",
-                    path.c_str(),
-                    nullptr,
-                    WINHTTP_NO_REFERER,
-                    WINHTTP_DEFAULT_ACCEPT_TYPES,
-                    WINHTTP_FLAG_SECURE)
-                : nullptr);
-            if (!connection || !request ||
-                !WinHttpSendRequest(
-                    request.get(),
-                    WINHTTP_NO_ADDITIONAL_HEADERS,
-                    0,
-                    WINHTTP_NO_REQUEST_DATA,
-                    0,
-                    0,
-                    0) ||
-                !WinHttpReceiveResponse(request.get(), nullptr))
-            {
-                return { UpdateDownloadStatus::network_error, {} };
-            }
-
-            DWORD status_code{};
-            DWORD status_size = sizeof(status_code);
-            if (!WinHttpQueryHeaders(
-                    request.get(),
-                    WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                    WINHTTP_HEADER_NAME_BY_INDEX,
-                    &status_code,
-                    &status_size,
-                    WINHTTP_NO_HEADER_INDEX) || status_code != 200)
-            {
-                return { UpdateDownloadStatus::network_error, {} };
-            }
-
-            FileHandle file(CreateFileW(
-                partial_path.c_str(),
-                GENERIC_WRITE,
-                FILE_SHARE_READ,
-                nullptr,
-                CREATE_ALWAYS,
-                FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_SEQUENTIAL_SCAN,
-                nullptr));
-            Sha256Hash hash;
-            if (!file || !hash)
-            {
-                return { UpdateDownloadStatus::file_error, {} };
-            }
-
-            std::array<std::uint8_t, download_buffer_bytes> buffer{};
-            std::uint64_t downloaded{};
-            auto last_report = std::chrono::steady_clock::now() - std::chrono::seconds(1);
-            report_progress(progress, 0, asset.size);
-            while (!cancelled.load(std::memory_order_acquire))
-            {
-                DWORD read{};
-                if (!WinHttpReadData(
-                        request.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &read))
-                {
-                    file.close();
-                    std::filesystem::remove(partial_path, error);
-                    return { UpdateDownloadStatus::network_error, {} };
-                }
-                if (read == 0)
-                {
-                    break;
-                }
-                if (downloaded > asset.size ||
-                    static_cast<std::uint64_t>(read) > asset.size - downloaded)
-                {
-                    file.close();
-                    std::filesystem::remove(partial_path, error);
-                    return { UpdateDownloadStatus::integrity_error, {} };
-                }
-
-                DWORD written{};
-                if (!WriteFile(file.get(), buffer.data(), read, &written, nullptr) || written != read ||
-                    !hash.append(buffer.data(), read))
-                {
-                    file.close();
-                    std::filesystem::remove(partial_path, error);
-                    return { UpdateDownloadStatus::file_error, {} };
-                }
-                downloaded += read;
-                const auto now = std::chrono::steady_clock::now();
-                if (downloaded == asset.size || now - last_report >= std::chrono::milliseconds(100))
-                {
-                    report_progress(progress, downloaded, asset.size);
-                    last_report = now;
-                }
-            }
-
-            if (cancelled.load(std::memory_order_acquire))
-            {
-                file.close();
-                std::filesystem::remove(partial_path, error);
-                return { UpdateDownloadStatus::cancelled, {} };
-            }
-            const auto digest = hash.finish();
-            file.close();
-            if (downloaded != asset.size || !digest || *digest != asset.sha256)
-            {
-                std::filesystem::remove(partial_path, error);
-                return { UpdateDownloadStatus::integrity_error, {} };
-            }
-            report_progress(progress, asset.size, asset.size);
-            if (!MoveFileExW(
-                    partial_path.c_str(),
-                    installer_path.c_str(),
-                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-            {
-                std::filesystem::remove(partial_path, error);
-                return { UpdateDownloadStatus::file_error, {} };
-            }
-            return { UpdateDownloadStatus::succeeded, installer_path };
+            const auto result = download_file(
+                FileDownloadRequest{
+                    .url = asset.download_url,
+                    .destination_path = installer_path,
+                    .sha256 = asset.sha256,
+                    .expected_size = asset.size,
+                    .maximum_size = maximum_installer_bytes },
+                cancelled,
+                progress);
+            return { result.status, result.path };
         }
         catch (...)
         {
-            std::error_code error;
-            if (!partial_path.empty())
-            {
-                std::filesystem::remove(partial_path, error);
-            }
             return { UpdateDownloadStatus::file_error, {} };
         }
     }

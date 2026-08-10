@@ -2,6 +2,7 @@
 
 #include "SettingsWindow.g.h"
 #include "appearance_preferences.h"
+#include "component_loader.h"
 #include "footer_preferences.h"
 #include "media_preview_preferences.h"
 #include "path_copy_preferences.h"
@@ -24,6 +25,7 @@ namespace winrt::Glance::App::implementation
         using TextPreferencesChangedCallback = std::function<void()>;
         using FooterPreferencesChangedCallback = std::function<void()>;
         using WindowPreferencesChangedCallback = std::function<void()>;
+        using ComponentChangedCallback = std::function<void()>;
 
         SettingsWindow();
         void InitializeSession(
@@ -31,10 +33,14 @@ namespace winrt::Glance::App::implementation
             AppearanceChangedCallback appearance_changed_callback,
             TextPreferencesChangedCallback text_preferences_changed_callback,
             FooterPreferencesChangedCallback footer_preferences_changed_callback,
-            WindowPreferencesChangedCallback window_preferences_changed_callback);
+            WindowPreferencesChangedCallback window_preferences_changed_callback,
+            ComponentChangedCallback component_changed_callback);
         void ApplyAppearancePreferences();
         void ApplyLocalizedResources();
         void ShowAndActivate();
+        void ShowComponentAction(
+            std::wstring_view component_id,
+            std::wstring_view action_id);
         winrt::fire_and_forget ConfirmExit();
 
         void NumberBox_Loaded(
@@ -151,7 +157,11 @@ namespace winrt::Glance::App::implementation
         void rebuild_component_settings();
         [[nodiscard]] FooterFieldControls footer_field_controls(glance::app::FooterField field);
         winrt::fire_and_forget download_and_install_update(glance::app::UpdateInstallerAsset asset);
+        winrt::fire_and_forget run_component_action(
+            glance::app::ComponentManagementAction action);
         void show_update_download_card(std::wstring_view version);
+        void show_download_card(std::wstring_view title, std::wstring_view message);
+        void show_preparing_card(std::wstring_view title, std::wstring_view message);
         void set_update_progress(std::uint64_t downloaded, std::uint64_t total);
         void advance_update_progress();
         void show_update_installing_card();
@@ -189,6 +199,7 @@ namespace winrt::Glance::App::implementation
         TextPreferencesChangedCallback text_preferences_changed_callback_;
         FooterPreferencesChangedCallback footer_preferences_changed_callback_;
         WindowPreferencesChangedCallback window_preferences_changed_callback_;
+        ComponentChangedCallback component_changed_callback_;
     };
 }
 

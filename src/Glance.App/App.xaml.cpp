@@ -626,6 +626,14 @@ namespace winrt::Glance::App::implementation
                 return pipe_client_.send(
                     glance::contracts::MessageType::gallery_request,
                     payload);
+            },
+            [this](std::wstring component_id, std::wstring action_id) {
+                show_settings();
+                if (settings_window_ != nullptr)
+                {
+                    get_self<implementation::SettingsWindow>(settings_window_)
+                        ->ShowComponentAction(component_id, action_id);
+                }
             });
     }
 
@@ -639,7 +647,19 @@ namespace winrt::Glance::App::implementation
                 [this] { apply_appearance_preferences(); },
                 [this] { apply_text_preferences(); },
                 [this] { apply_footer_preferences(); },
-                [this] { apply_window_preferences(); });
+                [this] { apply_window_preferences(); },
+                [this] {
+                    if (active_window_ != nullptr)
+                    {
+                        get_self<implementation::MainWindow>(active_window_)
+                            ->RefreshComponentContributions();
+                    }
+                    for (const auto& window : detached_windows_)
+                    {
+                        get_self<implementation::MainWindow>(window)
+                            ->RefreshComponentContributions();
+                    }
+                });
             settings_window_.Closed([this](IInspectable const&, WindowEventArgs const&) {
                 settings_window_ = nullptr;
             });

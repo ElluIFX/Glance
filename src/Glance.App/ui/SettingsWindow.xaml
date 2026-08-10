@@ -954,18 +954,6 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="MediaComponentsLabel" x:Uid="MediaComponentsLabel" Text="Advanced media information availability" />
-                                    <TextBlock x:Name="MediaComponentsStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
-                                </StackPanel>
-                                <FontIcon x:Name="MediaComponentsStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="WebViewAvailabilityLabel" x:Uid="WebViewAvailabilityLabel" Text="WebView2 availability" />
                                     <TextBlock x:Name="WebViewAvailabilityStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>

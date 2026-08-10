@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="Component.DisplayName" xml:space="preserve"><value>高级媒体信息</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>FFprobe 可用</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>需要准备 FFprobe</value></data>
+  <data name="Shortcut.Tooltip" xml:space="preserve"><value>显示高级媒体信息</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在读取高级媒体信息</value></data>
+  <data name="Preview.Failed" xml:space="preserve"><value>无法读取高级媒体信息</value></data>
+  <data name="Action.Button" xml:space="preserve"><value>准备 FFprobe</value></data>
+  <data name="Action.ConfirmationTitle" xml:space="preserve"><value>准备高级媒体信息</value></data>
+  <data name="Action.ConfirmationMessage" xml:space="preserve"><value>Glance 将从 gyan.dev 直接下载 FFmpeg essentials 压缩包，并仅为当前用户安装 FFprobe</value></data>
+  <data name="Action.ConfirmationButton" xml:space="preserve"><value>下载</value></data>
+  <data name="Action.DownloadTitle" xml:space="preserve"><value>正在下载 FFprobe</value></data>
+  <data name="Action.DownloadMessage" xml:space="preserve"><value>正在从 gyan.dev 下载</value></data>
+  <data name="Action.PreparingTitle" xml:space="preserve"><value>正在准备 FFprobe</value></data>
+  <data name="Action.PreparingMessage" xml:space="preserve"><value>正在解压并校验 FFprobe</value></data>
+  <data name="Action.CompletedTitle" xml:space="preserve"><value>FFprobe 已就绪</value></data>
+  <data name="Action.CompletedMessage" xml:space="preserve"><value>现在可以查看高级媒体信息</value></data>
+  <data name="Action.ExtractFailed" xml:space="preserve"><value>无法解压 FFprobe</value></data>
+  <data name="Action.IntegrityFailed" xml:space="preserve"><value>解压后的 FFprobe 与预期校验值不一致</value></data>
+  <data name="Action.InstallFailed" xml:space="preserve"><value>无法安装 FFprobe</value></data>
+  <data name="MediaInfo.Container" xml:space="preserve"><value>封装格式</value></data>
+  <data name="MediaInfo.Duration" xml:space="preserve"><value>时长</value></data>
+  <data name="MediaInfo.OverallBitrate" xml:space="preserve"><value>总体码率</value></data>
+  <data name="MediaInfo.Chapters" xml:space="preserve"><value>章节</value></data>
+  <data name="MediaInfo.StreamHeading" xml:space="preserve"><value>{0}流 {1}</value></data>
+  <data name="MediaInfo.Codec" xml:space="preserve"><value>编码</value></data>
+  <data name="MediaInfo.Resolution" xml:space="preserve"><value>分辨率</value></data>
+  <data name="MediaInfo.FrameRate" xml:space="preserve"><value>帧率</value></data>
+  <data name="MediaInfo.PixelFormat" xml:space="preserve"><value>像素格式</value></data>
+  <data name="MediaInfo.BitDepth" xml:space="preserve"><value>位深</value></data>
+  <data name="MediaInfo.Color" xml:space="preserve"><value>色彩</value></data>
+  <data name="MediaInfo.AspectRatio" xml:space="preserve"><value>宽高比 (SAR / DAR)</value></data>
+  <data name="MediaInfo.Rotation" xml:space="preserve"><value>旋转</value></data>
+  <data name="MediaInfo.SampleRate" xml:space="preserve"><value>采样率</value></data>
+  <data name="MediaInfo.SampleFormat" xml:space="preserve"><value>采样格式</value></data>
+  <data name="MediaInfo.Channels" xml:space="preserve"><value>声道</value></data>
+  <data name="MediaInfo.Bitrate" xml:space="preserve"><value>码率</value></data>
+  <data name="MediaInfo.Frames" xml:space="preserve"><value>帧数</value></data>
+  <data name="MediaInfo.Language" xml:space="preserve"><value>语言</value></data>
+  <data name="MediaInfo.Title" xml:space="preserve"><value>标题</value></data>
+  <data name="MediaInfo.Default" xml:space="preserve"><value>默认</value></data>
+  <data name="MediaInfo.Forced" xml:space="preserve"><value>强制</value></data>
+  <data name="MediaInfo.Disposition" xml:space="preserve"><value>标记</value></data>
+  <data name="MediaInfo.Metadata" xml:space="preserve"><value>元数据</value></data>
+  <data name="MediaType.Video" xml:space="preserve"><value>视频</value></data>
+  <data name="MediaType.Audio" xml:space="preserve"><value>音频</value></data>
+  <data name="MediaType.Subtitle" xml:space="preserve"><value>字幕</value></data>
+  <data name="MediaType.Attachment" xml:space="preserve"><value>附件</value></data>
+  <data name="MediaType.Data" xml:space="preserve"><value>数据</value></data>
+</root>

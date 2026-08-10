@@ -1,0 +1,14 @@
+{
+  "schema_version": 3,
+  "id": "media-info",
+  "architecture": "x64",
+  "entry_point": "Glance.MediaInfoComponent.dll",
+  "dependencies": [],
+  "payload_files": [
+    "resources.pri"
+  ],
+  "installer_names": {
+    "en-US": "Advanced media information",
+    "zh-CN": "高级媒体信息"
+  }
+}

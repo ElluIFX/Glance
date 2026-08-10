@@ -7,7 +7,6 @@
 #include "footer_preferences.h"
 #include "folder_preview_preferences.h"
 #include "generic_preview_preferences.h"
-#include "media_metadata_provider.h"
 #include "media_preview_preferences.h"
 #include "preview_file.h"
 #include "preview_provider.h"
@@ -42,13 +41,16 @@ namespace winrt::Glance::App::implementation
             std::uint64_t,
             glance::contracts::PreviewWindowState)>;
         using GalleryRequestCallback = std::function<bool(std::string)>;
+        using ComponentActionCallback =
+            std::function<void(std::wstring, std::wstring)>;
 
         MainWindow();
 
         void InitializeSession(
             std::uint64_t instance_id,
             StateCallback callback,
-            GalleryRequestCallback gallery_request_callback);
+            GalleryRequestCallback gallery_request_callback,
+            ComponentActionCallback component_action_callback);
         void ShowPreview(
             std::vector<glance::app::PreviewFile> files,
             std::uint32_t focused_index,
@@ -64,6 +66,7 @@ namespace winrt::Glance::App::implementation
         void ApplyLocalizedResources();
         void ApplyTextPreferences();
         void ApplyFooterPreferences();
+        void RefreshComponentContributions();
         void HandleGalleryResponse(std::string_view payload);
         void HandleGalleryDisconnect();
         [[nodiscard]] std::uint64_t InstanceId() const noexcept { return instance_id_; }
@@ -174,9 +177,6 @@ namespace winrt::Glance::App::implementation
         void MediaPlayPauseButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MediaMuteButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void GalleryModeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void MediaAdvancedInfoButton_Click(
-            IInspectable const&,
-            Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MediaSeekSlider_ValueChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const&);
@@ -284,9 +284,6 @@ namespace winrt::Glance::App::implementation
             std::wstring path,
             std::uint64_t generation);
         winrt::fire_and_forget load_media_async(std::wstring path, std::uint64_t generation);
-        winrt::fire_and_forget load_media_technical_metadata_async(
-            std::wstring path,
-            std::uint64_t generation);
         winrt::fire_and_forget load_pdf_async(
             std::wstring path,
             std::uint64_t generation,
@@ -448,6 +445,18 @@ namespace winrt::Glance::App::implementation
         void set_markdown_preview_mode(bool preview);
         void update_line_number_visibility();
         void show_content_panel(glance::app::PreviewKind kind);
+        void rebuild_component_contributions();
+        void reset_component_hover_info() noexcept;
+        void activate_component_shortcut(
+            const glance::app::ComponentStatusBarShortcut& shortcut,
+            const Microsoft::UI::Xaml::Controls::Primitives::ToggleButton& button);
+        winrt::fire_and_forget load_component_hover_info_async(
+            glance::app::ComponentStatusBarActivation activation,
+            std::wstring path,
+            std::uint64_t generation,
+            std::shared_ptr<std::atomic_bool> cancellation);
+        winrt::fire_and_forget confirm_component_action(
+            glance::app::ComponentManagementAction action);
         void dismiss_preview_info_bar();
         void show_preview_notice(std::wstring resource_key);
         void show_preview_message(
@@ -473,7 +482,6 @@ namespace winrt::Glance::App::implementation
         void update_media_playback_metadata(
             const Windows::Media::Playback::MediaPlaybackItem& item,
             std::uint64_t generation);
-        void update_media_advanced_info();
         void update_footer_metadata();
         void update_generic_file_metadata();
         void request_footer_access_if_needed();
@@ -495,6 +503,7 @@ namespace winrt::Glance::App::implementation
         std::uint64_t instance_id_{};
         StateCallback state_callback_;
         GalleryRequestCallback gallery_request_callback_;
+        ComponentActionCallback component_action_callback_;
         std::vector<glance::app::PreviewFile> files_;
         std::uint32_t current_index_{};
         std::uint32_t source_kind_{};
@@ -513,7 +522,6 @@ namespace winrt::Glance::App::implementation
         bool word_wrap_{ true };
         bool media_is_audio_{};
         bool reverse_media_seek_wheel_{};
-        bool media_advanced_info_visible_{};
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};
         bool markdown_preview_{};
@@ -596,7 +604,11 @@ namespace winrt::Glance::App::implementation
         std::wstring media_playback_info_;
         Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };
         std::uint64_t media_playback_generation_{};
-        glance::app::MediaTechnicalMetadata media_metadata_;
+        std::shared_ptr<std::atomic_bool> component_hover_cancellation_;
+        glance::app::ComponentStatusBarActivation active_component_hover_;
+        std::wstring component_hover_info_text_;
+        std::wstring component_hover_cache_component_id_;
+        std::wstring component_hover_cache_info_id_;
         std::shared_ptr<glance::app::PagedDocumentRenderClient> pdf_render_client_;
         std::shared_ptr<void> active_component_preview_;
         std::shared_ptr<void> active_component_file_directory_;

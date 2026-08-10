@@ -8,7 +8,6 @@
 #include "localization.h"
 #include "markdown_renderer.h"
 #include "media_preview_preferences.h"
-#include "media_metadata_provider.h"
 #include "component_loader.h"
 #include "pan_interaction.h"
 #include "path_copy_preferences.h"
@@ -620,11 +619,13 @@ namespace winrt::Glance::App::implementation
     void MainWindow::InitializeSession(
         std::uint64_t instance_id,
         StateCallback callback,
-        GalleryRequestCallback gallery_request_callback)
+        GalleryRequestCallback gallery_request_callback,
+        ComponentActionCallback component_action_callback)
     {
         instance_id_ = instance_id;
         state_callback_ = std::move(callback);
         gallery_request_callback_ = std::move(gallery_request_callback);
+        component_action_callback_ = std::move(component_action_callback);
     }
 
     bool MainWindow::send_gallery_request(
@@ -1290,9 +1291,6 @@ namespace winrt::Glance::App::implementation
         }
         set_tooltip(MediaPlayPauseButton(), L"MediaPlayPauseButton.ToolTipService.ToolTip");
         set_tooltip(MediaMuteButton(), L"MediaMuteButton.ToolTipService.ToolTip");
-        set_tooltip(
-            MediaAdvancedInfoButton(),
-            L"MediaAdvancedInfoButton.ToolTipService.ToolTip");
         set_tooltip(GalleryModeButton(), L"GalleryModeButton.ToolTipService.ToolTip");
         set_tooltip(PreviousPdfButton(), L"PreviousPdfButton.ToolTipService.ToolTip");
         set_tooltip(NextPdfButton(), L"NextPdfButton.ToolTipService.ToolTip");
@@ -1322,10 +1320,7 @@ namespace winrt::Glance::App::implementation
         update_line_number_visibility();
         update_generic_file_metadata();
         update_footer_metadata();
-        if (current_kind_ == glance::app::PreviewKind::media)
-        {
-            update_media_advanced_info();
-        }
+        rebuild_component_contributions();
     }
 
     void MainWindow::ApplyTextPreferences()
@@ -1838,8 +1833,10 @@ namespace winrt::Glance::App::implementation
         ImagePreview().Source(nullptr);
         ImageMetadataText().Text(L"");
         ImageMetadataOverlay().Visibility(Visibility::Collapsed);
-        MediaAdvancedInfoText().Text(L"");
-        MediaAdvancedInfoOverlay().Visibility(Visibility::Collapsed);
+        reset_component_hover_info();
+        component_hover_info_text_.clear();
+        component_hover_cache_component_id_.clear();
+        component_hover_cache_info_id_.clear();
         MediaCoverImage().Source(nullptr);
         MediaTitleText().Text(L"");
         MediaAlbumText().Text(L"");
@@ -1893,7 +1890,7 @@ namespace winrt::Glance::App::implementation
         LoadCloudFileButton().Visibility(Visibility::Collapsed);
         PreviewAsTextButton().Visibility(Visibility::Collapsed);
         GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
-        MediaAdvancedInfoButton().Visibility(Visibility::Collapsed);
+        ComponentStatusControls().Children().Clear();
         PreviewModeButton().Visibility(Visibility::Collapsed);
         PreviewModeButton().IsChecked(false);
         ErrorText().Text(L"");
@@ -1925,7 +1922,6 @@ namespace winrt::Glance::App::implementation
         media_playback_info_.clear();
         media_playback_item_ = nullptr;
         media_playback_generation_ = 0;
-        media_metadata_ = {};
         footer_access_mode_.clear();
         footer_access_loaded_ = false;
         footer_access_requested_ = false;
@@ -1939,7 +1935,6 @@ namespace winrt::Glance::App::implementation
         basic_info_mode_ = false;
         generic_text_preview_allowed_ = false;
         media_is_audio_ = false;
-        media_advanced_info_visible_ = false;
         image_metadata_visible_ = false;
         image_panning_ = false;
         image_pixel_width_ = 0;
@@ -2397,7 +2392,6 @@ namespace winrt::Glance::App::implementation
         media_playback_info_.clear();
         media_playback_item_ = nullptr;
         media_playback_generation_ = 0;
-        media_metadata_ = {};
         footer_access_mode_.clear();
         footer_access_loaded_ = false;
         footer_access_requested_ = false;
@@ -2538,11 +2532,6 @@ namespace winrt::Glance::App::implementation
             media_playback_info_.clear();
             media_playback_item_ = nullptr;
             media_playback_generation_ = 0;
-            media_metadata_ = {};
-            media_advanced_info_visible_ = false;
-            MediaAdvancedInfoButton().IsChecked(false);
-            MediaAdvancedInfoText().Text(glance::app::localize(L"Loading"));
-            MediaAdvancedInfoOverlay().Visibility(Visibility::Collapsed);
             media_controls_idle_ticks_ = 0;
             show_media_controls();
             load_media_async(file.path, generation);
@@ -3041,7 +3030,6 @@ namespace winrt::Glance::App::implementation
                 }
                 reveal_deferred_preview();
             }
-            load_media_technical_metadata_async(path, generation);
         }
         catch (const hresult_error& error)
         {
@@ -3051,27 +3039,6 @@ namespace winrt::Glance::App::implementation
                 lifetime->show_provider_error(message, generation);
             }
         }
-    }
-
-    fire_and_forget MainWindow::load_media_technical_metadata_async(
-        std::wstring path,
-        std::uint64_t generation)
-    {
-        const auto lifetime = get_strong();
-        const auto dispatcher = DispatcherQueue();
-        co_await resume_background();
-        auto metadata = glance::app::probe_media_metadata(path);
-        static_cast<void>(dispatcher.TryEnqueue(
-            [lifetime,
-             generation,
-             metadata = std::move(metadata)]() mutable {
-                if (generation != lifetime->content_generation_)
-                {
-                    return;
-                }
-                lifetime->media_metadata_ = std::move(metadata);
-                lifetime->update_media_advanced_info();
-            }));
     }
 
     void MainWindow::update_media_footer()
@@ -3161,19 +3128,6 @@ namespace winrt::Glance::App::implementation
             media_playback_info_.clear();
             update_media_footer();
         }
-    }
-
-    void MainWindow::update_media_advanced_info()
-    {
-        auto text = glance::app::format_media_advanced_metadata(media_metadata_);
-        if (text.empty())
-        {
-            text = glance::app::localize(L"NoMediaMetadata");
-        }
-        MediaAdvancedInfoText().Text(std::move(text));
-        MediaAdvancedInfoOverlay().Visibility(
-            media_advanced_info_visible_ ? Visibility::Visible : Visibility::Collapsed);
-        MediaAdvancedInfoButton().IsChecked(media_advanced_info_visible_);
     }
 
     void MainWindow::update_footer_metadata()
@@ -5415,10 +5369,6 @@ namespace winrt::Glance::App::implementation
                 ? Visibility::Visible
                 : Visibility::Collapsed);
         GalleryModeButton().IsChecked(gallery_mode_ != GalleryMode::inactive);
-        MediaAdvancedInfoButton().Visibility(
-            kind == glance::app::PreviewKind::media && glance::app::media_probe_available()
-                ? Visibility::Visible
-                : Visibility::Collapsed);
         TextStatusControls().Visibility(
             text && !component_web ? Visibility::Visible : Visibility::Collapsed);
         LineNumbersButton().Visibility(
@@ -5442,9 +5392,6 @@ namespace winrt::Glance::App::implementation
         if (kind != glance::app::PreviewKind::media)
         {
             stop_media_playback();
-            media_advanced_info_visible_ = false;
-            MediaAdvancedInfoButton().IsChecked(false);
-            MediaAdvancedInfoOverlay().Visibility(Visibility::Collapsed);
         }
         if (kind != glance::app::PreviewKind::document)
         {
@@ -5457,6 +5404,256 @@ namespace winrt::Glance::App::implementation
             clear_web_view_content();
         }
         update_text_editor_visibility();
+        rebuild_component_contributions();
+    }
+
+    void MainWindow::RefreshComponentContributions()
+    {
+        rebuild_component_contributions();
+    }
+
+    void MainWindow::reset_component_hover_info() noexcept
+    {
+        if (component_hover_cancellation_ != nullptr)
+        {
+            component_hover_cancellation_->store(true, std::memory_order_release);
+            component_hover_cancellation_.reset();
+        }
+        active_component_hover_ = {};
+        ComponentHoverInfoProgressRing().IsActive(false);
+        ComponentHoverInfoProgressRing().Visibility(Visibility::Collapsed);
+        ComponentHoverInfoText().Text(L"");
+        ComponentHoverInfoOverlay().Visibility(Visibility::Collapsed);
+    }
+
+    void MainWindow::rebuild_component_contributions()
+    {
+        reset_component_hover_info();
+        component_hover_info_text_.clear();
+        component_hover_cache_component_id_.clear();
+        component_hover_cache_info_id_.clear();
+        ComponentStatusControls().Children().Clear();
+        if (current_index_ >= files_.size() || files_[current_index_].path.empty())
+        {
+            return;
+        }
+
+        using glance::contracts::components::PreviewContentFormat;
+        using glance::contracts::components::PreviewContentKind;
+        PreviewContentKind kind{ PreviewContentKind::none };
+        PreviewContentFormat format{ PreviewContentFormat::none };
+        switch (current_kind_)
+        {
+        case glance::app::PreviewKind::text:
+            kind = PreviewContentKind::text;
+            format = PreviewContentFormat::plain_text;
+            break;
+        case glance::app::PreviewKind::markdown:
+            kind = PreviewContentKind::text;
+            format = PreviewContentFormat::markdown;
+            break;
+        case glance::app::PreviewKind::image:
+            kind = PreviewContentKind::image;
+            format = PreviewContentFormat::image_file;
+            break;
+        case glance::app::PreviewKind::media:
+            kind = PreviewContentKind::media;
+            format = PreviewContentFormat::media_file;
+            break;
+        case glance::app::PreviewKind::document:
+            kind = PreviewContentKind::document;
+            format = PreviewContentFormat::pdf;
+            break;
+        case glance::app::PreviewKind::web:
+            kind = PreviewContentKind::web;
+            format = PreviewContentFormat::html;
+            break;
+        case glance::app::PreviewKind::archive:
+            kind = PreviewContentKind::directory;
+            format = PreviewContentFormat::file_directory;
+            break;
+        default:
+            return;
+        }
+
+        const auto shortcuts = glance::app::component_status_bar_shortcuts(
+            files_[current_index_].path,
+            kind,
+            format,
+            glance::app::current_ui_language());
+        const auto style = Application::Current().Resources()
+            .Lookup(box_value(L"IconToggleButtonStyle")).as<Style>();
+        const auto weak = get_weak();
+        for (const auto& shortcut : shortcuts)
+        {
+            Controls::Primitives::ToggleButton button;
+            button.Style(style);
+            Controls::FontIcon icon;
+            icon.FontSize(14);
+            icon.Glyph(std::wstring(
+                1,
+                static_cast<wchar_t>(shortcut.fluent_icon_glyph)));
+            button.Content(icon);
+            ToolTipService::SetToolTip(button, box_value(shortcut.tooltip));
+            button.Click([weak, shortcut](IInspectable const& sender, RoutedEventArgs const&) {
+                if (const auto self = weak.get())
+                {
+                    self->activate_component_shortcut(
+                        shortcut,
+                        sender.as<Controls::Primitives::ToggleButton>());
+                }
+            });
+            ComponentStatusControls().Children().Append(button);
+        }
+    }
+
+    void MainWindow::activate_component_shortcut(
+        const glance::app::ComponentStatusBarShortcut& shortcut,
+        const Controls::Primitives::ToggleButton& button)
+    {
+        if (current_index_ >= files_.size())
+        {
+            button.IsChecked(false);
+            return;
+        }
+        const bool requested_checked = button.IsChecked().Value();
+        auto activation = glance::app::activate_component_status_bar_shortcut(
+            shortcut,
+            files_[current_index_].path,
+            glance::app::current_ui_language(),
+            requested_checked);
+        if (activation.kind == glance::app::ComponentStatusBarActivationKind::request_component_action)
+        {
+            button.IsChecked(false);
+            if (const auto action = glance::app::component_management_action(
+                    activation.component_id,
+                    activation.component_action_id,
+                    glance::app::current_ui_language()))
+            {
+                confirm_component_action(*action);
+            }
+            return;
+        }
+        if (activation.kind != glance::app::ComponentStatusBarActivationKind::toggle_hover_info ||
+            !activation.checked)
+        {
+            button.IsChecked(false);
+            reset_component_hover_info();
+            return;
+        }
+
+        for (const auto& child : ComponentStatusControls().Children())
+        {
+            const auto toggle = child.try_as<Controls::Primitives::ToggleButton>();
+            if (toggle != nullptr && toggle != button)
+            {
+                toggle.IsChecked(false);
+            }
+        }
+        reset_component_hover_info();
+        active_component_hover_ = activation;
+        ComponentHoverInfoOverlay().Visibility(Visibility::Visible);
+        if (component_hover_cache_component_id_ == activation.component_id &&
+            component_hover_cache_info_id_ == activation.hover_info_id &&
+            !component_hover_info_text_.empty())
+        {
+            ComponentHoverInfoText().Text(component_hover_info_text_);
+            return;
+        }
+
+        ComponentHoverInfoText().Text(activation.loading_text);
+        ComponentHoverInfoProgressRing().Visibility(Visibility::Visible);
+        ComponentHoverInfoProgressRing().IsActive(true);
+        const auto cancellation = std::make_shared<std::atomic_bool>(false);
+        component_hover_cancellation_ = cancellation;
+        load_component_hover_info_async(
+            std::move(activation),
+            files_[current_index_].path,
+            content_generation_,
+            std::move(cancellation));
+    }
+
+    fire_and_forget MainWindow::load_component_hover_info_async(
+        glance::app::ComponentStatusBarActivation activation,
+        std::wstring path,
+        std::uint64_t generation,
+        std::shared_ptr<std::atomic_bool> cancellation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        const std::wstring language = glance::app::current_ui_language();
+        co_await resume_background();
+        auto text = glance::app::query_component_hover_info(
+            activation,
+            path,
+            language,
+            *cancellation);
+        static_cast<void>(dispatcher.TryEnqueue(
+            [lifetime,
+             activation = std::move(activation),
+             cancellation = std::move(cancellation),
+             generation,
+             text = std::move(text)]() mutable {
+                if (generation != lifetime->content_generation_ ||
+                    cancellation->load(std::memory_order_acquire) ||
+                    lifetime->component_hover_cancellation_ != cancellation ||
+                    lifetime->active_component_hover_.component_id != activation.component_id ||
+                    lifetime->active_component_hover_.hover_info_id != activation.hover_info_id)
+                {
+                    return;
+                }
+                lifetime->component_hover_cancellation_.reset();
+                lifetime->ComponentHoverInfoProgressRing().IsActive(false);
+                lifetime->ComponentHoverInfoProgressRing().Visibility(Visibility::Collapsed);
+                if (text.empty())
+                {
+                    lifetime->ComponentHoverInfoOverlay().Visibility(Visibility::Collapsed);
+                    return;
+                }
+                lifetime->component_hover_info_text_ = text;
+                lifetime->component_hover_cache_component_id_ = activation.component_id;
+                lifetime->component_hover_cache_info_id_ = activation.hover_info_id;
+                lifetime->ComponentHoverInfoText().Text(std::move(text));
+            }));
+    }
+
+    fire_and_forget MainWindow::confirm_component_action(
+        glance::app::ComponentManagementAction action)
+    {
+        const auto lifetime = get_strong();
+        try
+        {
+            Controls::ContentDialog dialog;
+            dialog.XamlRoot(RootGrid().XamlRoot());
+            dialog.Title(box_value(action.confirmation_title));
+            dialog.Content(box_value(action.confirmation_message));
+            dialog.PrimaryButtonText(action.confirmation_button);
+            dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+            dialog.DefaultButton(Controls::ContentDialogButton::Primary);
+            if (co_await dialog.ShowAsync() != Controls::ContentDialogResult::Primary)
+            {
+                co_return;
+            }
+            if (lifetime->detached_)
+            {
+                lifetime->stop_detached_focus_monitor();
+                lifetime->clear_preview_content();
+                lifetime->Close();
+            }
+            else
+            {
+                lifetime->HidePreview();
+            }
+            if (lifetime->component_action_callback_)
+            {
+                lifetime->component_action_callback_(
+                    std::move(action.component_id),
+                    std::move(action.action_id));
+            }
+        }
+        catch (...)
+        {
+        }
     }
 
     void MainWindow::dismiss_preview_info_bar()
@@ -6184,12 +6381,6 @@ namespace winrt::Glance::App::implementation
     {
         image_metadata_visible_ = ImageExifButton().IsChecked().Value();
         update_image_metadata_visibility();
-    }
-
-    void MainWindow::MediaAdvancedInfoButton_Click(IInspectable const&, RoutedEventArgs const&)
-    {
-        media_advanced_info_visible_ = MediaAdvancedInfoButton().IsChecked().Value();
-        update_media_advanced_info();
     }
 
     void MainWindow::set_image_zoom(float zoom, Windows::Foundation::Point anchor)

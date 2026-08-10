@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <atomic>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -21,12 +22,86 @@ namespace glance::app
         error,
     };
 
+    struct ComponentManagementAction
+    {
+        std::wstring component_id;
+        std::wstring action_id;
+        std::uint32_t order{};
+        std::wstring button_text;
+        std::wstring confirmation_title;
+        std::wstring confirmation_message;
+        std::wstring confirmation_button;
+        std::wstring download_title;
+        std::wstring download_message;
+        std::wstring preparing_title;
+        std::wstring preparing_message;
+        std::wstring completed_title;
+        std::wstring completed_message;
+        std::shared_ptr<void> lease;
+    };
+
     struct ComponentStatus
     {
         std::wstring id;
         std::wstring display_name;
         std::wstring detail;
         ComponentState state{ ComponentState::error };
+        std::vector<ComponentManagementAction> actions;
+    };
+
+    enum class ComponentStatusBarShortcutState
+    {
+        ready,
+        setup_required,
+    };
+
+    struct ComponentStatusBarShortcut
+    {
+        std::wstring component_id;
+        std::wstring shortcut_id;
+        std::wstring tooltip;
+        std::uint32_t order{};
+        std::uint32_t fluent_icon_glyph{};
+        ComponentStatusBarShortcutState state{ ComponentStatusBarShortcutState::ready };
+        std::shared_ptr<void> lease;
+    };
+
+    enum class ComponentStatusBarActivationKind
+    {
+        none,
+        toggle_hover_info,
+        request_component_action,
+    };
+
+    struct ComponentStatusBarActivation
+    {
+        ComponentStatusBarActivationKind kind{ ComponentStatusBarActivationKind::none };
+        bool checked{};
+        std::wstring component_id;
+        std::wstring hover_info_id;
+        std::wstring component_action_id;
+        std::wstring loading_text;
+        std::shared_ptr<void> lease;
+    };
+
+    struct ComponentDownloadRequest
+    {
+        std::wstring url;
+        std::wstring file_name;
+        std::wstring sha256;
+        std::uint64_t expected_size{};
+
+        [[nodiscard]] explicit operator bool() const noexcept
+        {
+            return !url.empty() && !file_name.empty() && sha256.size() == 64 &&
+                expected_size > 0;
+        }
+    };
+
+    struct ComponentManagementActionCompletion
+    {
+        bool succeeded{};
+        std::wstring detail;
     };
 
     struct ComponentLoadingMessage
@@ -184,6 +259,35 @@ namespace glance::app
         std::uint32_t limit) noexcept;
     [[nodiscard]] std::vector<ComponentStatus> component_statuses(
         std::wstring_view language_tag) noexcept;
+    [[nodiscard]] std::vector<ComponentStatusBarShortcut>
+        component_status_bar_shortcuts(
+            std::wstring_view path,
+            glance::contracts::components::PreviewContentKind kind,
+            glance::contracts::components::PreviewContentFormat format,
+            std::wstring_view language_tag) noexcept;
+    [[nodiscard]] ComponentStatusBarActivation activate_component_status_bar_shortcut(
+        const ComponentStatusBarShortcut& shortcut,
+        std::wstring_view path,
+        std::wstring_view language_tag,
+        bool requested_checked) noexcept;
+    [[nodiscard]] std::wstring query_component_hover_info(
+        const ComponentStatusBarActivation& activation,
+        std::wstring_view path,
+        std::wstring_view language_tag,
+        const std::atomic_bool& cancelled) noexcept;
+    [[nodiscard]] std::optional<ComponentManagementAction> component_management_action(
+        std::wstring_view component_id,
+        std::wstring_view action_id,
+        std::wstring_view language_tag) noexcept;
+    [[nodiscard]] ComponentDownloadRequest prepare_component_management_action(
+        const ComponentManagementAction& action,
+        std::wstring_view language_tag) noexcept;
+    [[nodiscard]] ComponentManagementActionCompletion complete_component_management_action(
+        const ComponentManagementAction& action,
+        const std::filesystem::path& downloaded_path,
+        std::wstring_view language_tag) noexcept;
+    [[nodiscard]] std::filesystem::path component_storage_directory(
+        std::wstring_view component_id) noexcept;
     [[nodiscard]] std::optional<PagedDocumentRendererRegistration>
         paged_document_renderer() noexcept;
     [[nodiscard]] std::vector<ComponentSetting> component_settings(

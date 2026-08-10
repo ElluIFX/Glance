@@ -1,5 +1,7 @@
 #pragma once
 
+#include "download_service.h"
+
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
@@ -41,14 +43,7 @@ namespace glance::app
         UpdateInstallerAsset installer;
     };
 
-    enum class UpdateDownloadStatus
-    {
-        succeeded,
-        cancelled,
-        network_error,
-        file_error,
-        integrity_error,
-    };
+    using UpdateDownloadStatus = FileDownloadStatus;
 
     struct UpdateDownloadResult
     {
@@ -63,8 +58,7 @@ namespace glance::app
         failed,
     };
 
-    using UpdateProgressCallback =
-        std::function<void(std::uint64_t downloaded, std::uint64_t total)>;
+    using UpdateProgressCallback = FileDownloadProgressCallback;
 
     [[nodiscard]] UpdateCheckResult check_for_updates(std::wstring_view current_version) noexcept;
     [[nodiscard]] bool managed_installation() noexcept;

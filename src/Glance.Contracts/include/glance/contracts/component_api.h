@@ -7,7 +7,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 5;
+    inline constexpr std::uint32_t abi_version = 6;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -24,6 +24,9 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t settings_contribution_api_version = 1;
     inline constexpr std::uint32_t file_directory_preview_api_version = 1;
     inline constexpr std::uint32_t gallery_media_api_version = 1;
+    inline constexpr std::uint32_t hover_info_layer_api_version = 1;
+    inline constexpr std::uint32_t status_bar_shortcut_api_version = 1;
+    inline constexpr std::uint32_t component_management_action_api_version = 1;
     inline constexpr std::size_t web_resource_host_capacity = 64;
     inline constexpr std::size_t maximum_web_resource_mappings = 4;
     inline constexpr std::size_t renderer_host_capacity = 260;
@@ -36,6 +39,13 @@ namespace glance::contracts::components
     inline constexpr std::size_t file_directory_text_capacity = 256;
     inline constexpr std::size_t maximum_file_directory_info_fields = 8;
     inline constexpr std::size_t maximum_file_directory_columns = 8;
+    inline constexpr std::size_t contribution_id_capacity = 64;
+    inline constexpr std::size_t contribution_text_capacity = 256;
+    inline constexpr std::size_t maximum_status_bar_shortcuts = 8;
+    inline constexpr std::size_t maximum_component_management_actions = 4;
+    inline constexpr std::size_t download_url_capacity = 2048;
+    inline constexpr std::size_t download_file_name_capacity = 260;
+    inline constexpr std::size_t sha256_capacity = 65;
     inline constexpr GUID configurable_preview_api_id{
         0x950742e7,
         0x0af2,
@@ -76,6 +86,21 @@ namespace glance::contracts::components
         0xa62c,
         0x4b43,
         { 0x9c, 0xcd, 0x08, 0x26, 0x09, 0xaa, 0xd2, 0xd7 } };
+    inline constexpr GUID hover_info_layer_api_id{
+        0x422e5648,
+        0x8724,
+        0x49a5,
+        { 0x8f, 0xf4, 0xb3, 0xc4, 0xc1, 0x0e, 0x9f, 0x19 } };
+    inline constexpr GUID status_bar_shortcut_api_id{
+        0xa4b14761,
+        0x38fc,
+        0x43c3,
+        { 0x89, 0xd5, 0x24, 0x71, 0x19, 0xb1, 0xdf, 0x79 } };
+    inline constexpr GUID component_management_action_api_id{
+        0xa41f0c2d,
+        0x3002,
+        0x46f6,
+        { 0x8b, 0xce, 0xb4, 0x51, 0x54, 0x4b, 0xc4, 0x62 } };
 
     enum class PreviewContentKind : std::uint32_t
     {
@@ -175,6 +200,20 @@ namespace glance::contracts::components
         invalid_password = 2,
         failed = 3,
         cancelled = 4,
+    };
+
+    enum class StatusBarShortcutState : std::uint32_t
+    {
+        hidden = 0,
+        ready = 1,
+        setup_required = 2,
+    };
+
+    enum class StatusBarShortcutActivation : std::uint32_t
+    {
+        none = 0,
+        toggle_hover_info = 1,
+        request_component_action = 2,
     };
 
     using RegisterExtensionFunction = BOOL(WINAPI*)(
@@ -337,6 +376,71 @@ namespace glance::contracts::components
         const FileDirectoryValue* values{};
     };
 
+    struct HoverInfoTextSink
+    {
+        std::uint32_t size{ sizeof(HoverInfoTextSink) };
+        void* context{};
+        BOOL(WINAPI* append)(
+            void* context,
+            const wchar_t* text,
+            std::uint32_t length) noexcept{};
+        BOOL(WINAPI* is_cancelled)(void* context) noexcept{};
+    };
+
+    struct StatusBarShortcutDescriptor
+    {
+        std::uint32_t size{ sizeof(StatusBarShortcutDescriptor) };
+        wchar_t shortcut_id[contribution_id_capacity]{};
+        PreviewContentKind target_kind{ PreviewContentKind::none };
+        PreviewContentFormat target_format{ PreviewContentFormat::none };
+        std::uint32_t order{};
+        std::uint32_t fluent_icon_glyph{};
+        wchar_t tooltip[contribution_text_capacity]{};
+    };
+
+    struct StatusBarShortcutActivationResult
+    {
+        std::uint32_t size{ sizeof(StatusBarShortcutActivationResult) };
+        StatusBarShortcutActivation activation{ StatusBarShortcutActivation::none };
+        BOOL checked{};
+        wchar_t hover_info_id[contribution_id_capacity]{};
+        wchar_t component_action_id[contribution_id_capacity]{};
+        wchar_t loading_text[contribution_text_capacity]{};
+    };
+
+    struct ComponentManagementActionDescriptor
+    {
+        std::uint32_t size{ sizeof(ComponentManagementActionDescriptor) };
+        wchar_t action_id[contribution_id_capacity]{};
+        std::uint32_t order{};
+        wchar_t button_text[contribution_text_capacity]{};
+        wchar_t confirmation_title[contribution_text_capacity]{};
+        wchar_t confirmation_message[contribution_text_capacity]{};
+        wchar_t confirmation_button[contribution_text_capacity]{};
+        wchar_t download_title[contribution_text_capacity]{};
+        wchar_t download_message[contribution_text_capacity]{};
+        wchar_t preparing_title[contribution_text_capacity]{};
+        wchar_t preparing_message[contribution_text_capacity]{};
+        wchar_t completed_title[contribution_text_capacity]{};
+        wchar_t completed_message[contribution_text_capacity]{};
+    };
+
+    struct ComponentDownloadRequest
+    {
+        std::uint32_t size{ sizeof(ComponentDownloadRequest) };
+        wchar_t url[download_url_capacity]{};
+        wchar_t file_name[download_file_name_capacity]{};
+        wchar_t sha256[sha256_capacity]{};
+        std::uint64_t expected_size{};
+    };
+
+    struct ComponentManagementActionResult
+    {
+        std::uint32_t size{ sizeof(ComponentManagementActionResult) };
+        BOOL succeeded{};
+        wchar_t detail[contribution_text_capacity]{};
+    };
+
     using AppendFileDirectoryEntryFunction = BOOL(WINAPI*)(
         void* context,
         const FileDirectoryEntry* entry) noexcept;
@@ -410,6 +514,42 @@ namespace glance::contracts::components
         std::uint32_t* total) noexcept;
     using ClassifyGalleryExtensionFunction = GalleryMediaKind(WINAPI*)(
         const wchar_t* extension) noexcept;
+    using QueryHoverInfoFunction = PrepareStatus(WINAPI*)(
+        const wchar_t* hover_info_id,
+        const wchar_t* path,
+        const wchar_t* language_tag,
+        const HoverInfoTextSink* sink) noexcept;
+    using EnumerateStatusBarShortcutsFunction = BOOL(WINAPI*)(
+        const wchar_t* language_tag,
+        StatusBarShortcutDescriptor* descriptors,
+        std::uint32_t capacity,
+        std::uint32_t* count) noexcept;
+    using QueryStatusBarShortcutStateFunction = StatusBarShortcutState(WINAPI*)(
+        const wchar_t* shortcut_id,
+        const wchar_t* path,
+        PreviewContentKind kind,
+        PreviewContentFormat format) noexcept;
+    using ActivateStatusBarShortcutFunction = BOOL(WINAPI*)(
+        const wchar_t* shortcut_id,
+        const wchar_t* path,
+        const wchar_t* language_tag,
+        BOOL requested_checked,
+        StatusBarShortcutActivationResult* result) noexcept;
+    using EnumerateComponentManagementActionsFunction = BOOL(WINAPI*)(
+        const wchar_t* language_tag,
+        ComponentManagementActionDescriptor* descriptors,
+        std::uint32_t capacity,
+        std::uint32_t* count) noexcept;
+    using PrepareComponentManagementActionFunction = BOOL(WINAPI*)(
+        const wchar_t* action_id,
+        const wchar_t* language_tag,
+        ComponentDownloadRequest* request) noexcept;
+    using CompleteComponentManagementActionFunction = BOOL(WINAPI*)(
+        const wchar_t* action_id,
+        const wchar_t* downloaded_path,
+        const wchar_t* component_storage_path,
+        const wchar_t* language_tag,
+        ComponentManagementActionResult* result) noexcept;
     using QueryInterfaceFunction = BOOL(WINAPI*)(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -473,6 +613,31 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(GalleryMediaApi) };
         std::uint32_t version{ gallery_media_api_version };
         ClassifyGalleryExtensionFunction classify_extension{};
+    };
+
+    struct HoverInfoLayerApi
+    {
+        std::uint32_t size{ sizeof(HoverInfoLayerApi) };
+        std::uint32_t version{ hover_info_layer_api_version };
+        QueryHoverInfoFunction query_info{};
+    };
+
+    struct StatusBarShortcutApi
+    {
+        std::uint32_t size{ sizeof(StatusBarShortcutApi) };
+        std::uint32_t version{ status_bar_shortcut_api_version };
+        EnumerateStatusBarShortcutsFunction enumerate_shortcuts{};
+        QueryStatusBarShortcutStateFunction query_state{};
+        ActivateStatusBarShortcutFunction activate{};
+    };
+
+    struct ComponentManagementActionApi
+    {
+        std::uint32_t size{ sizeof(ComponentManagementActionApi) };
+        std::uint32_t version{ component_management_action_api_version };
+        EnumerateComponentManagementActionsFunction enumerate_actions{};
+        PrepareComponentManagementActionFunction prepare_action{};
+        CompleteComponentManagementActionFunction complete_action{};
     };
 
     struct ComponentApi

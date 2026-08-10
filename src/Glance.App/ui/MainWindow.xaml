@@ -390,28 +390,6 @@
                         </StackPanel>
                     </Grid>
                     <Border
-                        x:Name="MediaAdvancedInfoOverlay"
-                        Margin="12"
-                        MaxWidth="440"
-                        MaxHeight="360"
-                        Padding="10,7"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top"
-                        Background="#B3202020"
-                        CornerRadius="4"
-                        Visibility="Collapsed">
-                        <ScrollViewer
-                            HorizontalScrollBarVisibility="Disabled"
-                            VerticalScrollBarVisibility="Auto">
-                            <TextBlock
-                                x:Name="MediaAdvancedInfoText"
-                                Foreground="White"
-                                FontSize="12"
-                                IsTextSelectionEnabled="True"
-                                TextWrapping="Wrap" />
-                        </ScrollViewer>
-                    </Border>
-                    <Border
                         x:Name="MediaControlsOverlay"
                         Height="56"
                         Padding="10,0"
@@ -744,6 +722,40 @@
                             Content="Open" />
                     </StackPanel>
                 </Grid>
+
+                <Border
+                    x:Name="ComponentHoverInfoOverlay"
+                    Margin="12"
+                    MaxWidth="440"
+                    MaxHeight="360"
+                    Padding="10,7"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Background="#B3202020"
+                    Canvas.ZIndex="80"
+                    CornerRadius="4"
+                    Visibility="Collapsed">
+                    <ScrollViewer
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="8">
+                            <ProgressRing
+                                x:Name="ComponentHoverInfoProgressRing"
+                                Width="20"
+                                Height="20"
+                                HorizontalAlignment="Left"
+                                Foreground="White"
+                                IsActive="False"
+                                Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="ComponentHoverInfoText"
+                                Foreground="White"
+                                FontSize="12"
+                                IsTextSelectionEnabled="True"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
             </Grid>
         </Grid>
 
@@ -920,37 +932,35 @@
                 Visibility="Collapsed">
                 <FontIcon FontSize="14" Glyph="&#xE751;" />
             </ToggleButton>
-            <ToggleButton
-                x:Name="LineNumbersButton"
-                x:Uid="LineNumbersButton"
+            <StackPanel
                 Grid.Column="4"
-                Style="{StaticResource IconToggleButtonStyle}"
-                Click="LineNumbersButton_Click"
-                IsChecked="True"
-                ToolTipService.ToolTip="Show line numbers"
-                Visibility="Collapsed">
-                <FontIcon FontSize="14" Glyph="&#xE8FD;" />
-            </ToggleButton>
-            <ToggleButton
-                x:Name="GenericAdvancedInfoButton"
-                x:Uid="GenericAdvancedInfoButton"
-                Grid.Column="4"
-                Style="{StaticResource IconToggleButtonStyle}"
-                Click="GenericAdvancedInfoButton_Click"
-                ToolTipService.ToolTip="Show advanced information"
-                Visibility="Collapsed">
-                <FontIcon FontSize="14" Glyph="&#xE946;" />
-            </ToggleButton>
-            <ToggleButton
-                x:Name="MediaAdvancedInfoButton"
-                x:Uid="MediaAdvancedInfoButton"
-                Grid.Column="4"
-                Style="{StaticResource IconToggleButtonStyle}"
-                Click="MediaAdvancedInfoButton_Click"
-                ToolTipService.ToolTip="Show media information"
-                Visibility="Collapsed">
-                <FontIcon FontSize="14" Glyph="&#xE946;" />
-            </ToggleButton>
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="4">
+                <ToggleButton
+                    x:Name="LineNumbersButton"
+                    x:Uid="LineNumbersButton"
+                    Style="{StaticResource IconToggleButtonStyle}"
+                    Click="LineNumbersButton_Click"
+                    IsChecked="True"
+                    ToolTipService.ToolTip="Show line numbers"
+                    Visibility="Collapsed">
+                    <FontIcon FontSize="14" Glyph="&#xE8FD;" />
+                </ToggleButton>
+                <ToggleButton
+                    x:Name="GenericAdvancedInfoButton"
+                    x:Uid="GenericAdvancedInfoButton"
+                    Style="{StaticResource IconToggleButtonStyle}"
+                    Click="GenericAdvancedInfoButton_Click"
+                    ToolTipService.ToolTip="Show advanced information"
+                    Visibility="Collapsed">
+                    <FontIcon FontSize="14" Glyph="&#xE946;" />
+                </ToggleButton>
+                <StackPanel
+                    x:Name="ComponentStatusControls"
+                    Orientation="Horizontal"
+                    Spacing="4" />
+            </StackPanel>
             <Button
                 x:Name="CopyPathButton"
                 x:Uid="CopyPathButton"

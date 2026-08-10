@@ -58,6 +58,7 @@
   <ItemGroup>
     <ClInclude Include="preview\archive_provider.h" />
     <ClInclude Include="components\component_loader.h" />
+    <ClInclude Include="application\download_service.h" />
     <ClInclude Include="preferences\footer_preferences.h" />
     <ClInclude Include="preferences\folder_preview_preferences.h" />
     <ClInclude Include="preview\generic_file_info.h" />
@@ -66,7 +67,6 @@
     <ClInclude Include="preview\image_metadata_provider.h" />
     <ClInclude Include="application\localization.h" />
     <ClInclude Include="preview\markdown_renderer.h" />
-    <ClInclude Include="preview\media_metadata_provider.h" />
     <ClInclude Include="preferences\media_preview_preferences.h" />
     <ClInclude Include="preview\pan_interaction.h" />
     <ClInclude Include="preferences\path_copy_preferences.h" />
@@ -107,6 +107,7 @@
   <ItemGroup>
     <ClCompile Include="preview\archive_provider.cpp" />
     <ClCompile Include="components\component_loader.cpp" />
+    <ClCompile Include="application\download_service.cpp" />
     <ClCompile Include="preferences\footer_preferences.cpp" />
     <ClCompile Include="preferences\folder_preview_preferences.cpp" />
     <ClCompile Include="preview\generic_file_info.cpp" />
@@ -115,7 +116,6 @@
     <ClCompile Include="preview\image_metadata_provider.cpp" />
     <ClCompile Include="application\localization.cpp" />
     <ClCompile Include="preview\markdown_renderer.cpp" />
-    <ClCompile Include="preview\media_metadata_provider.cpp" />
     <ClCompile Include="preferences\media_preview_preferences.cpp" />
     <ClCompile Include="preferences\path_copy_preferences.cpp" />
     <ClCompile Include="preview\paged_document_render_client.cpp" />
