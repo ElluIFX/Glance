@@ -41,11 +41,12 @@ Compared with similar tools, Glance prioritizes stability and reliability — <b
 ## Highlights
 
 - Launch previews quickly from File Explorer, common file dialogs, and Everything
-- Supports text, code, Markdown, images, audio/video, PDF, archives, and more complex formats
+- Supports text, code, Markdown, images, audio/video, PDF, archives, Office, Adobe, 3D models, and more
 - Efficient, reliable long-text preview with flexible image zoom and pan — modern essentials covered
 - Pin preview windows and open multiple independent previews — turn files into sticky notes
 - Remember window size and position by content type to match your workflow
 - Fine-grained customization of behavior and display for personal preference
+- Preloading optimized for high-volume, rapid preview workflows
 - **No complex shortcuts; Space and your mouse are enough for full access**
 - **Rigorous multi-process architecture with mutual supervision, staying responsive under demanding conditions**
 - **No heavyweight plugin system; stay lean, reliable, and fast**
@@ -56,18 +57,18 @@ Download and install Glance from [Releases](https://github.com/ElluIFX/Glance/re
 
 ### Optional components
 
-Support for complex formats is provided by isolated components, kept separate from the Glance core, and can be freely omitted during installation.
+Support for complex formats is provided by isolated components kept separate from the Glance core. The installer selects all components by default but allows them to be omitted. For portable installations, download component packages from the same release, extract them into the application's `components` directory, and restart Glance.
 
 - **PDF preview** — Previews multi-page PDF documents and provides document rendering for the Office component
-- **Microsoft Office preview** — Previews Word, PowerPoint, and Excel files; depends on locally installed Office bundle
+- **Microsoft Office preview** — Previews Word, PowerPoint, and Excel files; depends on the PDF preview component and the corresponding locally installed Office applications
 - **Archive preview** — Directly previews common compressed and archive formats such as ZIP, 7z, RAR, tar, and ISO
-- **Adobe document preview** — Previews Photoshop and Illustrator project files without requiring installed Adobe
+- **Adobe document preview** — Previews Photoshop PSD/PSB files and Illustrator AI files with PDF-compatible data without requiring Adobe applications
 - **3D model preview** — Previews common 3D files such as STEP, STL, and OBJ
+- **Advanced media information** — Shows codecs, bitrates, and stream details on demand, reusing FFprobe from `PATH` or downloading it automatically when unavailable
 
 ### Optional dependencies
 
-- **Microsoft Edge WebView2 Runtime** — Required for some formats such as Markdown. Usually included with Windows 11; if missing, download and install it from [here](https://developer.microsoft.com/en-us/microsoft-edge/webview2)
-- **ffprobe.exe** — Enables extended media metadata. Get it from the [FFmpeg download page](https://ffmpeg.org/download.html), then place it in the Glance install directory or add it to `PATH`; basic audio/video preview still works without it
+- **Microsoft Edge WebView2 Runtime** — Used for rendered Markdown, web content, and 3D model previews. Usually included with Windows 11; if missing, download and install it from [here](https://developer.microsoft.com/en-us/microsoft-edge/webview2)
 
 ## Development
 
