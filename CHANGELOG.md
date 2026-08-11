@@ -4,6 +4,18 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.11.1] - 2026-08-11
+
+### Added
+
+- Added an optional source extension framework and Everything source for previewing the focused result with gallery navigation and synchronized selection.
+- Added source location and health status to the Add-ons settings page.
+
+### Changed
+
+- Portable builds now include every supported component and source, while the installer keeps them selectable under separate add-on groups.
+- Release packaging now distributes add-ons through the installer and complete portable archive.
+
 ## [2026.08.11] - 2026-08-11
 
 ### Added
