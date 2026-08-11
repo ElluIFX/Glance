@@ -16,12 +16,13 @@ $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Get-GlanceRepositoryRoot
 $componentRoot = Join-Path $repositoryRoot "src\Glance.Components"
+$sourcesRoot = Join-Path $repositoryRoot "src\Glance.Sources"
 $installerRoot = Join-Path $OutputDirectory "installer"
+$sourceInstallerRoot = Join-Path $OutputDirectory "source-installer"
 $innoRoot = Join-Path $OutputDirectory "inno"
-$version = (Get-GlanceVersion).Version
-
 Remove-GlanceWorkspaceItem -Path $OutputDirectory
 New-Item -ItemType Directory -Path $installerRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $sourceInstallerRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $innoRoot -Force | Out-Null
 
 $manifests = @(Get-ChildItem -LiteralPath $componentRoot -Directory |
@@ -37,6 +38,8 @@ $definitionLines = [System.Collections.Generic.List[string]]::new()
 $fileLines = [System.Collections.Generic.List[string]]::new()
 $deleteLines = [System.Collections.Generic.List[string]]::new()
 $selectNewLines = [System.Collections.Generic.List[string]]::new()
+$definitionLines.Add(
+    'Name: "components"; Description: "{cm:ComponentsGroup}"; Types: full')
 $componentIdList = [System.Collections.Generic.List[string]]::new()
 $componentIds = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase)
@@ -113,9 +116,6 @@ foreach ($manifestPath in $manifests) {
         Copy-Item -LiteralPath $runtimePath -Destination (Join-Path $componentStaging $runtime) -Force
     }
 
-    $displayId = $id.Substring(0, 1).ToUpperInvariant() + $id.Substring(1)
-    $archive = Join-Path $OutputDirectory "Glance-Component-$displayId-$version-$Platform.zip"
-    Compress-Archive -Path $componentStaging -DestinationPath $archive -CompressionLevel Optimal
 }
 
 foreach ($id in $componentIdList) {
@@ -156,7 +156,7 @@ foreach ($id in $componentOrder) {
         "$($installerComponentNames[$dependencies[0]])\$installerId"
     }
     else {
-        $installerId
+        "components\$installerId"
     }
 }
 
@@ -199,10 +199,72 @@ foreach ($id in $componentIdList) {
     }
 }
 
+$sourceIds = [System.Collections.Generic.List[string]]::new()
+$definitionLines.Add(
+    'Name: "sources"; Description: "{cm:SourcesGroup}"; Types: full')
+$sourceManifests = @(Get-ChildItem -LiteralPath $sourcesRoot -Directory |
+    ForEach-Object { Join-Path $_.FullName "source.json" } |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    Sort-Object)
+foreach ($manifestPath in $sourceManifests) {
+    $descriptor = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+    if ([int] $descriptor.schema_version -ne 1) {
+        throw "Source manifest '$manifestPath' has an unsupported schema."
+    }
+    $id = [string] $descriptor.id
+    if ($id -notmatch '^[a-z][a-z0-9-]*$' -or $sourceIds.Contains($id)) {
+        throw "Source manifest '$manifestPath' has an invalid or duplicate id."
+    }
+    if ([string] $descriptor.architecture -ne $Platform) {
+        throw "Source '$id' does not support platform '$Platform'."
+    }
+    $entryPoint = [string] $descriptor.entry_point
+    $englishName = [string] $descriptor.installer_names.'en-US'
+    $chineseName = [string] $descriptor.installer_names.'zh-CN'
+    if ([System.IO.Path]::GetFileName($entryPoint) -ne $entryPoint -or
+        -not $englishName -or -not $chineseName) {
+        throw "Source '$id' has invalid package metadata."
+    }
+    $sourceIds.Add($id)
+    $source = Join-Path $BuildOutput "sources\$id"
+    $staging = Join-Path $sourceInstallerRoot $id
+    New-Item -ItemType Directory -Path $staging -Force | Out-Null
+    $files = @("source.json", $entryPoint) +
+        @($descriptor.payload_files | ForEach-Object { [string] $_ })
+    foreach ($file in $files) {
+        $path = [System.IO.Path]::GetFullPath((Join-Path $source $file))
+        $sourcePathRoot = [System.IO.Path]::GetFullPath($source).TrimEnd('\') + '\'
+        if (-not $path.StartsWith($sourcePathRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Source '$id' build output is missing or escapes its root: '$file'."
+        }
+        $destination = Join-Path $staging $file
+        New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+        Copy-Item -LiteralPath $path -Destination $destination -Force
+    }
+    foreach ($runtime in @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")) {
+        Copy-Item -LiteralPath (Join-Path $BuildOutput $runtime) `
+            -Destination (Join-Path $staging $runtime) -Force
+    }
+    $messageKey = "Source_" + ($id -replace '[^A-Za-z0-9_]', '_')
+    $installerName = "sources\" + ($id -replace '-', '_')
+    $messageLines.Add("english.$messageKey=$($englishName.Replace('"', '""'))")
+    $messageLines.Add("chinesesimplified.$messageKey=$($chineseName.Replace('"', '""'))")
+    $definitionLines.Add(
+        "Name: `"$installerName`"; Description: `"{cm:$messageKey}`"; Types: full")
+    $fileLines.Add(
+        "Source: `"{#SourcesDir}\$id\*`"; DestDir: `"{app}\sources\$id`"; Components: $installerName; Flags: ignoreversion recursesubdirs createallsubdirs")
+    $deleteLines.Add("Type: filesandordirs; Name: `"{app}\sources\$id`"")
+    $selectNewLines.Add(
+        "  SelectComponentIfNew('$id', '$installerName', PreviousSourceCatalog);")
+}
+
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllLines(
     (Join-Path $innoRoot "component-catalog.iss"),
-    @("#define CurrentComponentCatalog `"$($componentIdList -join ',')`""),
+    @(
+        "#define CurrentComponentCatalog `"$($componentIdList -join ',')`""
+        "#define CurrentSourceCatalog `"$($sourceIds -join ',')`""),
     $utf8)
 [System.IO.File]::WriteAllLines(
     (Join-Path $innoRoot "component-messages.iss"),

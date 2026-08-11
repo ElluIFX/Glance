@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 struct IUIAutomation2;
@@ -23,6 +24,7 @@ namespace glance::core
         open,
         page,
         select,
+        navigate,
         close,
     };
 
@@ -33,9 +35,12 @@ namespace glance::core
         std::uint64_t request_id{};
         std::uint64_t session_id{};
         std::uintptr_t source_window{};
+        std::wstring source_id;
         std::uint32_t page_start{};
         std::uint32_t page_count{};
         std::uint32_t target_index{};
+        int navigation_steps{};
+        bool loop{};
         std::wstring current_path;
         std::vector<std::wstring> extensions;
     };
@@ -52,6 +57,8 @@ namespace glance::core
         std::uint32_t current_index{};
         std::uint32_t page_start{};
         std::vector<glance::contracts::FileDescriptor> items;
+        std::vector<std::uint32_t> item_indices;
+        bool total_known{ true };
     };
 
     class ExplorerSelectionService
@@ -67,12 +74,15 @@ namespace glance::core
             const std::function<void()>& report_progress);
         [[nodiscard]] bool consume_gallery_selection_sync(
             const glance::contracts::SelectionSnapshot& snapshot);
+        [[nodiscard]] std::vector<ExternalHostStatus> source_statuses(
+            std::wstring_view language_tag);
 
     private:
         struct GallerySessionItem
         {
             std::wstring path;
             std::uint32_t view_index{};
+            std::uint64_t source_item_id{};
         };
 
         struct GallerySession
@@ -83,6 +93,12 @@ namespace glance::core
             std::uint32_t current_index{};
             std::wstring folder_path;
             std::vector<GallerySessionItem> items;
+            std::wstring source_id;
+            bool total_known{ true };
+            bool streaming{};
+            std::uint32_t source_item_count{};
+            std::uint32_t current_source_offset{};
+            std::unordered_set<std::wstring> extensions;
         };
 
         [[nodiscard]] bool is_text_input_focused() const;

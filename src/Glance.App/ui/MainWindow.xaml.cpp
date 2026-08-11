@@ -17,6 +17,7 @@
 #include "window_size_store.h"
 #include "window_preferences.h"
 #include "glance/contracts/diagnostics.h"
+#include "glance/contracts/source_api.h"
 #if __has_include("MainWindow.g.cpp")
 #include "MainWindow.g.cpp"
 #endif
@@ -632,7 +633,8 @@ namespace winrt::Glance::App::implementation
         std::wstring_view operation,
         std::uint64_t request_id,
         std::uint32_t page_start,
-        std::uint32_t target_index)
+        std::uint32_t target_index,
+        int navigation_steps)
     {
         if (!gallery_request_callback_)
         {
@@ -647,9 +649,12 @@ namespace winrt::Glance::App::implementation
         root.SetNamedValue(
             L"sourceWindow",
             JsonValue::CreateStringValue(std::to_wstring(reinterpret_cast<std::uintptr_t>(source_window_))));
+        root.SetNamedValue(L"sourceId", JsonValue::CreateStringValue(source_id_));
         root.SetNamedValue(L"pageStart", JsonValue::CreateNumberValue(page_start));
         root.SetNamedValue(L"pageCount", JsonValue::CreateNumberValue(64));
         root.SetNamedValue(L"targetIndex", JsonValue::CreateNumberValue(target_index));
+        root.SetNamedValue(L"navigationSteps", JsonValue::CreateNumberValue(navigation_steps));
+        root.SetNamedValue(L"loop", JsonValue::CreateBooleanValue(loop_gallery_enabled_));
         if (operation == L"open" && current_index_ < files_.size())
         {
             root.SetNamedValue(L"currentPath", JsonValue::CreateStringValue(files_[current_index_].path));
@@ -665,7 +670,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::open_gallery(bool preserve_navigation)
     {
-        if (source_kind_ != 1 || source_window_ == nullptr ||
+        if (!gallery_source_available() || source_window_ == nullptr ||
             current_index_ >= files_.size() ||
             gallery_media_kind_ ==
                 glance::contracts::components::GalleryMediaKind::none)
@@ -686,6 +691,7 @@ namespace winrt::Glance::App::implementation
         gallery_page_request_id_ = 0;
         gallery_select_request_id_ = 0;
         gallery_total_count_ = 0;
+        gallery_total_known_ = true;
         gallery_current_index_ = 0;
         gallery_desired_index_ = 0;
         gallery_pending_target_.reset();
@@ -710,6 +716,19 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    bool MainWindow::gallery_source_available() const noexcept
+    {
+        if (source_kind_ == 1)
+        {
+            return true;
+        }
+        const auto required =
+            static_cast<std::uint64_t>(glance::contracts::sources::Capability::item_list) |
+            static_cast<std::uint64_t>(glance::contracts::sources::Capability::focus_change);
+        return source_kind_ == 3 && !source_id_.empty() &&
+            (source_capabilities_ & required) == required;
+    }
+
     void MainWindow::leave_gallery(bool show_notice, bool notify_core)
     {
         const bool was_gallery = gallery_mode_ != GalleryMode::inactive;
@@ -725,6 +744,7 @@ namespace winrt::Glance::App::implementation
         gallery_page_request_id_ = 0;
         gallery_select_request_id_ = 0;
         gallery_total_count_ = 0;
+        gallery_total_known_ = true;
         gallery_current_index_ = 0;
         gallery_desired_index_ = 0;
         gallery_pending_target_.reset();
@@ -805,6 +825,22 @@ namespace winrt::Glance::App::implementation
         if (gallery_mode_ != GalleryMode::active ||
             gallery_total_count_ <= 1 || steps == 0)
         {
+            return;
+        }
+        if (!gallery_total_known_)
+        {
+            gallery_pending_navigation_steps_ += steps;
+            gallery_select_request_id_ = ++gallery_request_sequence_;
+            if (!send_gallery_request(
+                    L"navigate",
+                    gallery_select_request_id_,
+                    0,
+                    0,
+                    gallery_pending_navigation_steps_))
+            {
+                leave_gallery(false, false);
+                show_preview_notice(L"GalleryUnavailableNotice");
+            }
             return;
         }
         const auto target = glance::app::gallery_target_index(
@@ -893,7 +929,8 @@ namespace winrt::Glance::App::implementation
             const bool current_request =
                 (operation == L"open" && *request_id == gallery_open_request_id_) ||
                 (operation == L"page" && *request_id == gallery_page_request_id_) ||
-                (operation == L"select" && *request_id == gallery_select_request_id_);
+                ((operation == L"select" || operation == L"navigate") &&
+                 *request_id == gallery_select_request_id_);
             if (!current_request || gallery_mode_ == GalleryMode::inactive)
             {
                 return;
@@ -915,6 +952,7 @@ namespace winrt::Glance::App::implementation
             {
                 gallery_session_id_ = *session_id;
                 gallery_total_count_ = static_cast<std::uint32_t>(root.GetNamedNumber(L"totalCount"));
+                gallery_total_known_ = root.GetNamedBoolean(L"totalKnown", true);
                 gallery_current_index_ = static_cast<std::uint32_t>(root.GetNamedNumber(L"currentIndex"));
                 gallery_desired_index_ = gallery_current_index_;
                 gallery_mode_ = GalleryMode::active;
@@ -925,8 +963,12 @@ namespace winrt::Glance::App::implementation
                 return;
             }
 
-            if (operation == L"open" || operation == L"page")
+            if (operation == L"open" || operation == L"page" || operation == L"navigate")
             {
+                if (operation == L"navigate")
+                {
+                    gallery_items_.clear();
+                }
                 const auto page_start = static_cast<std::uint32_t>(root.GetNamedNumber(L"pageStart"));
                 const auto items = root.GetNamedArray(L"items");
                 for (std::uint32_t offset = 0; offset < items.Size(); ++offset)
@@ -949,7 +991,9 @@ namespace winrt::Glance::App::implementation
                     file.attributes = static_cast<std::uint32_t>(object.GetNamedNumber(L"attributes"));
                     file.is_filesystem = object.GetNamedBoolean(L"isFilesystem");
                     file.is_cloud_placeholder = object.GetNamedBoolean(L"isCloudPlaceholder");
-                    gallery_items_[page_start + offset] = std::move(file);
+                    const auto item_index = static_cast<std::uint32_t>(
+                        object.GetNamedNumber(L"index", page_start + offset));
+                    gallery_items_[item_index] = std::move(file);
                 }
                 if (operation == L"open" && gallery_pending_navigation_steps_ != 0)
                 {
@@ -966,10 +1010,13 @@ namespace winrt::Glance::App::implementation
                 {
                     schedule_gallery_preloads();
                 }
-                return;
+                if (operation != L"navigate")
+                {
+                    return;
+                }
             }
 
-            if (operation == L"select")
+            if (operation == L"select" || operation == L"navigate")
             {
                 const auto index = static_cast<std::uint32_t>(root.GetNamedNumber(L"currentIndex"));
                 const auto item = gallery_items_.find(index);
@@ -1009,6 +1056,7 @@ namespace winrt::Glance::App::implementation
         }
         auto title = files_[current_index_].display_name;
         if (gallery_mode_ == GalleryMode::active &&
+            gallery_total_known_ &&
             gallery_total_count_ != 0 &&
             gallery_current_index_ < gallery_total_count_)
         {
@@ -1135,7 +1183,18 @@ namespace winrt::Glance::App::implementation
 
         std::array<std::uint32_t, 2> neighbors{};
         std::size_t neighbor_count{};
-        if (gallery_current_index_ > 0)
+        if (!gallery_total_known_)
+        {
+            for (const auto& [index, file] : gallery_items_)
+            {
+                static_cast<void>(file);
+                if (index != gallery_current_index_ && neighbor_count < neighbors.size())
+                {
+                    neighbors[neighbor_count++] = index;
+                }
+            }
+        }
+        else if (gallery_current_index_ > 0)
         {
             neighbors[neighbor_count++] = gallery_current_index_ - 1;
         }
@@ -1143,11 +1202,11 @@ namespace winrt::Glance::App::implementation
         {
             neighbors[neighbor_count++] = gallery_total_count_ - 1;
         }
-        if (gallery_current_index_ + 1 < gallery_total_count_)
+        if (gallery_total_known_ && gallery_current_index_ + 1 < gallery_total_count_)
         {
             neighbors[neighbor_count++] = gallery_current_index_ + 1;
         }
-        else if (loop_gallery_enabled_)
+        else if (gallery_total_known_ && loop_gallery_enabled_)
         {
             neighbors[neighbor_count++] = 0;
         }
@@ -1607,7 +1666,9 @@ namespace winrt::Glance::App::implementation
         std::vector<glance::app::PreviewFile> files,
         std::uint32_t focused_index,
         std::uint32_t source_kind,
-        HWND source_window)
+        HWND source_window,
+        std::wstring source_id,
+        std::uint64_t source_capabilities)
     {
         const bool new_session = !visible_;
         const bool replace_deferred_session = defer_auto_fit_show_;
@@ -1620,6 +1681,8 @@ namespace winrt::Glance::App::implementation
         files_ = std::move(files);
         source_kind_ = source_kind;
         source_window_ = source_window;
+        source_id_ = std::move(source_id);
+        source_capabilities_ = source_capabilities;
         current_index_ = files_.empty() ? 0 : std::min<std::uint32_t>(focused_index, static_cast<std::uint32_t>(files_.size() - 1));
         if (new_session)
         {
@@ -5365,7 +5428,8 @@ namespace winrt::Glance::App::implementation
         ImageStatusControls().Visibility(
             kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
         GalleryModeButton().Visibility(
-            gallery_media_kind_ != glance::contracts::components::GalleryMediaKind::none
+            gallery_source_available() &&
+                    gallery_media_kind_ != glance::contracts::components::GalleryMediaKind::none
                 ? Visibility::Visible
                 : Visibility::Collapsed);
         GalleryModeButton().IsChecked(gallery_mode_ != GalleryMode::inactive);

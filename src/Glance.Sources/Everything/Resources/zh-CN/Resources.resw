@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Status.DisplayName" xml:space="preserve"><value>Everything 来源</value></data>
+  <data name="Status.Ready" xml:space="preserve"><value>已就绪，等待 Everything</value></data>
+  <data name="Status.Connected" xml:space="preserve"><value>已连接 Everything {0}</value></data>
+  <data name="Status.Limited" xml:space="preserve"><value>已连接 Everything {0}，画廊滚动不可用</value></data>
+</root>

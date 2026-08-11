@@ -380,7 +380,8 @@ namespace winrt::Glance::App::implementation
         TextPreferencesChangedCallback text_preferences_changed_callback,
         FooterPreferencesChangedCallback footer_preferences_changed_callback,
         WindowPreferencesChangedCallback window_preferences_changed_callback,
-        ComponentChangedCallback component_changed_callback)
+        ComponentChangedCallback component_changed_callback,
+        SourceStatusRequestCallback source_status_request_callback)
     {
         exit_callback_ = std::move(exit_callback);
         appearance_changed_callback_ = std::move(appearance_changed_callback);
@@ -388,6 +389,7 @@ namespace winrt::Glance::App::implementation
         footer_preferences_changed_callback_ = std::move(footer_preferences_changed_callback);
         window_preferences_changed_callback_ = std::move(window_preferences_changed_callback);
         component_changed_callback_ = std::move(component_changed_callback);
+        source_status_request_callback_ = std::move(source_status_request_callback);
     }
 
     void SettingsWindow::configure_window()
@@ -428,6 +430,7 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::ShowAndActivate()
     {
+        request_source_statuses();
         Activate();
 
         HWND window{};
@@ -649,6 +652,11 @@ namespace winrt::Glance::App::implementation
         set_text(ComponentFolderDescription(), L"ComponentFolderDescription.Text");
         set_content(OpenComponentsFolderButton(), L"OpenComponentsFolderButton.Content");
         set_text(ComponentStatusGroupTitle(), L"ComponentStatusGroupTitle.Text");
+        set_text(SourceLocationGroupTitle(), L"SourceLocationGroupTitle.Text");
+        set_text(SourceFolderLabel(), L"SourceFolderLabel.Text");
+        set_text(SourceFolderDescription(), L"SourceFolderDescription.Text");
+        set_content(OpenSourcesFolderButton(), L"OpenSourcesFolderButton.Content");
+        set_text(SourceStatusGroupTitle(), L"SourceStatusGroupTitle.Text");
         set_text(MaintenancePageTitle(), L"MaintenancePageTitle.Text");
         set_text(MaintenancePageDescription(), L"MaintenancePageDescription.Text");
         set_text(RuntimeStatusGroupTitle(), L"RuntimeStatusGroupTitle.Text");
@@ -673,6 +681,7 @@ namespace winrt::Glance::App::implementation
             L"VersionFormat", { GLANCE_VERSION_WSTRING }));
         refresh_runtime_statuses();
         refresh_component_statuses();
+        request_source_statuses();
         rebuild_component_settings();
     }
 
@@ -825,6 +834,106 @@ namespace winrt::Glance::App::implementation
             Controls::Grid::SetColumn(actions, 1);
             row.Children().Append(actions);
             ComponentStatusList().Children().Append(row);
+        }
+    }
+
+    void SettingsWindow::request_source_statuses()
+    {
+        if (source_status_request_callback_)
+        {
+            static_cast<void>(source_status_request_callback_(
+                winrt::to_string(glance::app::current_ui_language())));
+        }
+    }
+
+    void SettingsWindow::HandleSourceStatuses(std::string_view payload)
+    {
+        using namespace winrt::Windows::Data::Json;
+        try
+        {
+            const auto sources = JsonObject::Parse(winrt::to_hstring(payload))
+                .GetNamedArray(L"sources");
+            SourceStatusList().Children().Clear();
+            SourceEmptyState().Visibility(
+                sources.Size() == 0 ? Visibility::Visible : Visibility::Collapsed);
+            SourceStatusList().Visibility(
+                sources.Size() == 0 ? Visibility::Collapsed : Visibility::Visible);
+            const auto row_style = SettingsNavigation().Resources()
+                .Lookup(box_value(L"SettingsRowStyle")).as<Style>();
+            for (std::uint32_t index = 0; index < sources.Size(); ++index)
+            {
+                if (index != 0)
+                {
+                    Shapes::Rectangle divider;
+                    divider.Height(1);
+                    divider.Fill(Application::Current().Resources().TryLookup(
+                        box_value(L"DividerStrokeColorDefaultBrush")).try_as<Media::Brush>());
+                    SourceStatusList().Children().Append(divider);
+                }
+
+                const auto status = sources.GetObjectAt(index);
+                Controls::Grid row;
+                row.Style(row_style);
+                Controls::ColumnDefinition content_column;
+                content_column.Width(GridLength{ 1, GridUnitType::Star });
+                row.ColumnDefinitions().Append(content_column);
+                Controls::ColumnDefinition icon_column;
+                icon_column.Width(GridLengthHelper::Auto());
+                row.ColumnDefinitions().Append(icon_column);
+
+                Controls::StackPanel content;
+                content.Spacing(3);
+                Controls::TextBlock title;
+                title.Text(status.GetNamedString(L"name"));
+                content.Children().Append(title);
+                std::wstring detail = status.GetNamedString(L"detail", L"").c_str();
+                if (detail.empty() &&
+                    static_cast<std::uint32_t>(status.GetNamedNumber(L"code", 0)) == 1)
+                {
+                    detail = glance::app::localize(L"SourceLoadError");
+                }
+                if (!detail.empty())
+                {
+                    Controls::TextBlock detail_text;
+                    detail_text.Style(SettingsNavigation().Resources()
+                        .Lookup(box_value(L"SettingsDescriptionStyle")).as<Style>());
+                    detail_text.Text(detail);
+                    detail_text.TextWrapping(TextWrapping::Wrap);
+                    content.Children().Append(detail_text);
+                }
+                row.Children().Append(content);
+
+                const auto severity = static_cast<std::uint32_t>(
+                    status.GetNamedNumber(L"severity", 2));
+                std::wstring state_key = L"ComponentStateError";
+                Windows::UI::Color color{ 255, 196, 43, 28 };
+                std::wstring glyph = L"\xE711";
+                if (severity == 0)
+                {
+                    state_key = L"ComponentStateHealthy";
+                    color = { 255, 16, 124, 16 };
+                    glyph = L"\xE8FB";
+                }
+                else if (severity == 1)
+                {
+                    state_key = L"ComponentStateWarning";
+                    color = { 255, 157, 93, 0 };
+                    glyph = L"\xE7BA";
+                }
+                Controls::FontIcon icon;
+                icon.Glyph(glyph);
+                icon.FontSize(18);
+                icon.Foreground(Media::SolidColorBrush(color));
+                icon.VerticalAlignment(VerticalAlignment::Center);
+                Controls::ToolTipService::SetToolTip(
+                    icon, box_value(glance::app::localize(state_key)));
+                Controls::Grid::SetColumn(icon, 1);
+                row.Children().Append(icon);
+                SourceStatusList().Children().Append(row);
+            }
+        }
+        catch (...)
+        {
         }
     }
 
@@ -1915,6 +2024,27 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void SettingsWindow::OpenSourcesFolderButton_Click(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        try
+        {
+            const auto path = glance::app::application_component_root().parent_path() / L"sources";
+            std::filesystem::create_directories(path);
+            static_cast<void>(ShellExecuteW(
+                nullptr,
+                L"open",
+                path.c_str(),
+                nullptr,
+                nullptr,
+                SW_SHOWNORMAL));
+        }
+        catch (...)
+        {
+        }
+    }
+
     void SettingsWindow::ResetWindowSizesButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         WindowResetStatusText().Text(
@@ -2198,6 +2328,7 @@ namespace winrt::Glance::App::implementation
         if (tag == L"components")
         {
             refresh_component_statuses();
+            request_source_statuses();
         }
     }
 

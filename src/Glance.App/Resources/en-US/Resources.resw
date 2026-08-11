@@ -322,18 +322,26 @@
   <data name="AccentPurpleText.Text" xml:space="preserve"><value>Purple</value></data>
   <data name="EncodingSelector.Content" xml:space="preserve"><value>Detecting...</value></data>
   <data name="LineNumbersButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show line numbers</value></data>
-  <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>Components</value></data>
+  <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>Add-ons</value></data>
   <data name="AppearanceGroupTitle.Text" xml:space="preserve"><value>Appearance</value></data>
   <data name="StartupGroupTitle.Text" xml:space="preserve"><value>Startup</value></data>
-  <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>Components</value></data>
-  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>Optional preview support and runtime status</value></data>
-  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>Location</value></data>
+  <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>Add-ons</value></data>
+  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>Optional components, sources, and runtime status</value></data>
+  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>Add-on component location</value></data>
   <data name="ComponentFolderLabel.Text" xml:space="preserve"><value>Component folder</value></data>
   <data name="ComponentFolderDescription.Text" xml:space="preserve"><value>Glance loads components from this folder at startup</value></data>
   <data name="OpenComponentsFolderButton.Content" xml:space="preserve"><value>Open folder</value></data>
-  <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>Component status</value></data>
+  <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>Add-on component status</value></data>
   <data name="ComponentEmptyTitle.Text" xml:space="preserve"><value>No components installed</value></data>
   <data name="ComponentEmptyDescription.Text" xml:space="preserve"><value>Install optional components to add support for more file formats</value></data>
+  <data name="SourceLocationGroupTitle.Text" xml:space="preserve"><value>Add-on source location</value></data>
+  <data name="SourceFolderLabel.Text" xml:space="preserve"><value>Source folder</value></data>
+  <data name="SourceFolderDescription.Text" xml:space="preserve"><value>Glance loads sources from this folder at startup</value></data>
+  <data name="OpenSourcesFolderButton.Content" xml:space="preserve"><value>Open folder</value></data>
+  <data name="SourceStatusGroupTitle.Text" xml:space="preserve"><value>Add-on source status</value></data>
+  <data name="SourceEmptyTitle.Text" xml:space="preserve"><value>No sources installed</value></data>
+  <data name="SourceEmptyDescription.Text" xml:space="preserve"><value>Install optional sources to preview files from supported applications</value></data>
+  <data name="SourceLoadError" xml:space="preserve"><value>The source could not be loaded</value></data>
   <data name="ComponentStateHealthy" xml:space="preserve"><value>Available</value></data>
   <data name="ComponentStateWarning" xml:space="preserve"><value>Warning</value></data>
   <data name="ComponentStateError" xml:space="preserve"><value>Unavailable</value></data>

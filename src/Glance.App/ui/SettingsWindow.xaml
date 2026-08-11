@@ -867,7 +867,7 @@
                         <TextBlock x:Name="ComponentsPageDescription" x:Uid="ComponentsPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Install and manage optional preview support" />
                     </StackPanel>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="ComponentLocationGroupTitle" x:Uid="ComponentLocationGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Location" />
+                        <TextBlock x:Name="ComponentLocationGroupTitle" x:Uid="ComponentLocationGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on component location" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
@@ -883,7 +883,7 @@
                         </Border>
                     </StackPanel>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="ComponentStatusGroupTitle" x:Uid="ComponentStatusGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Component status" />
+                        <TextBlock x:Name="ComponentStatusGroupTitle" x:Uid="ComponentStatusGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on component status" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <Grid>
                                 <Grid
@@ -916,6 +916,37 @@
                                     </StackPanel>
                                 </Grid>
                                 <StackPanel x:Name="ComponentStatusList" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="SourceLocationGroupTitle" x:Uid="SourceLocationGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on source location" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="SourceFolderLabel" x:Uid="SourceFolderLabel" Text="Source folder" />
+                                    <TextBlock x:Name="SourceFolderDescription" x:Uid="SourceFolderDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Glance loads sources from this folder at startup" />
+                                </StackPanel>
+                                <Button x:Name="OpenSourcesFolderButton" x:Uid="OpenSourcesFolderButton" Grid.Column="1" Click="OpenSourcesFolderButton_Click" Content="Open folder" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="SourceStatusGroupTitle" x:Uid="SourceStatusGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on source status" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <Grid>
+                                <Grid x:Name="SourceEmptyState" MinHeight="120">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                                        <FontIcon HorizontalAlignment="Center" FontSize="32" Glyph="&#xE950;" Opacity="0.65" />
+                                        <TextBlock x:Name="SourceEmptyTitle" x:Uid="SourceEmptyTitle" HorizontalAlignment="Center" FontWeight="SemiBold" Text="No sources installed" />
+                                        <TextBlock x:Name="SourceEmptyDescription" x:Uid="SourceEmptyDescription" MaxWidth="360" HorizontalAlignment="Center" Style="{StaticResource SettingsDescriptionStyle}" Text="Install optional sources to preview files from supported applications" TextAlignment="Center" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel x:Name="SourceStatusList" Visibility="Collapsed" />
                             </Grid>
                         </Border>
                     </StackPanel>

@@ -47,6 +47,8 @@ namespace
             return L"page";
         case GalleryOperation::select:
             return L"select";
+        case GalleryOperation::navigate:
+            return L"navigate";
         case GalleryOperation::close:
             return L"close";
         }
@@ -73,6 +75,10 @@ namespace
             {
                 command.operation = glance::core::GalleryOperation::select;
             }
+            else if (operation == L"navigate")
+            {
+                command.operation = glance::core::GalleryOperation::navigate;
+            }
             else if (operation == L"close")
             {
                 command.operation = glance::core::GalleryOperation::close;
@@ -94,6 +100,7 @@ namespace
             command.session_id = *session_id;
             command.source_window = static_cast<std::uintptr_t>(
                 parse_u64(root.GetNamedString(L"sourceWindow", L"0")).value_or(0));
+            command.source_id = root.GetNamedString(L"sourceId", L"").c_str();
             command.current_path = root.GetNamedString(L"currentPath", L"").c_str();
             command.page_start = static_cast<std::uint32_t>(
                 std::max(0.0, root.GetNamedNumber(L"pageStart", 0)));
@@ -101,6 +108,9 @@ namespace
                 std::max(0.0, root.GetNamedNumber(L"pageCount", 64)));
             command.target_index = static_cast<std::uint32_t>(
                 std::max(0.0, root.GetNamedNumber(L"targetIndex", 0)));
+            command.navigation_steps = static_cast<int>(
+                root.GetNamedNumber(L"navigationSteps", 0));
+            command.loop = root.GetNamedBoolean(L"loop", false);
             if (command.operation == glance::core::GalleryOperation::open)
             {
                 const auto extensions = root.GetNamedArray(L"extensions");
@@ -133,10 +143,18 @@ namespace
         root.SetNamedValue(L"totalCount", JsonValue::CreateNumberValue(response.total_count));
         root.SetNamedValue(L"currentIndex", JsonValue::CreateNumberValue(response.current_index));
         root.SetNamedValue(L"pageStart", JsonValue::CreateNumberValue(response.page_start));
+        root.SetNamedValue(L"totalKnown", JsonValue::CreateBooleanValue(response.total_known));
         JsonArray items;
-        for (const auto& item : response.items)
+        for (std::size_t index = 0; index < response.items.size(); ++index)
         {
+            const auto& item = response.items[index];
             JsonObject file;
+            file.SetNamedValue(
+                L"index",
+                JsonValue::CreateNumberValue(
+                    index < response.item_indices.size()
+                        ? response.item_indices[index]
+                        : response.page_start + static_cast<std::uint32_t>(index)));
             file.SetNamedValue(L"displayName", JsonValue::CreateStringValue(item.display_name));
             file.SetNamedValue(L"path", JsonValue::CreateStringValue(item.filesystem_path));
             file.SetNamedValue(L"parsingName", JsonValue::CreateStringValue(item.shell_parsing_name));
@@ -149,6 +167,29 @@ namespace
             items.Append(file);
         }
         root.SetNamedValue(L"items", items);
+        return winrt::to_string(root.Stringify());
+    }
+
+    std::string make_source_status_payload(
+        const std::vector<glance::core::ExternalHostStatus>& statuses)
+    {
+        using namespace winrt::Windows::Data::Json;
+        JsonArray entries;
+        for (const auto& status : statuses)
+        {
+            JsonObject entry;
+            entry.SetNamedValue(L"id", JsonValue::CreateStringValue(status.source_id));
+            entry.SetNamedValue(L"name", JsonValue::CreateStringValue(status.display_name));
+            entry.SetNamedValue(L"detail", JsonValue::CreateStringValue(status.detail));
+            entry.SetNamedValue(L"severity", JsonValue::CreateNumberValue(status.severity));
+            entry.SetNamedValue(L"code", JsonValue::CreateNumberValue(status.code));
+            entry.SetNamedValue(
+                L"capabilities",
+                JsonValue::CreateStringValue(std::to_wstring(status.capabilities)));
+            entries.Append(entry);
+        }
+        JsonObject root;
+        root.SetNamedValue(L"sources", entries);
         return winrt::to_string(root.Stringify());
     }
 
@@ -296,6 +337,7 @@ namespace glance::core
         std::atomic<HWND> window{};
         UINT result_message{};
         UINT gallery_result_message{};
+        UINT source_status_result_message{};
         std::atomic_uint64_t generation{ 1 };
         std::atomic_uint64_t progress_ms{};
         std::atomic_uint64_t completed_generation{};
@@ -309,6 +351,9 @@ namespace glance::core
         std::deque<GalleryResponse> gallery_responses;
         std::unordered_map<std::uint64_t, std::uint64_t> latest_gallery_requests;
         std::atomic_bool gallery_result_pending{};
+        std::optional<std::wstring> source_status_language;
+        std::deque<std::string> source_status_responses;
+        std::atomic_bool source_status_result_pending{};
     };
 
     CoreApplication::CoreApplication()
@@ -511,6 +556,9 @@ namespace glance::core
             return 0;
         case gallery_result_message:
             self->apply_pending_gallery_responses();
+            return 0;
+        case source_status_result_message:
+            self->apply_pending_source_status_responses();
             return 0;
         case heartbeat_message:
             if (self->selection_worker_healthy())
@@ -840,6 +888,7 @@ namespace glance::core
         context->window.store(window_, std::memory_order_release);
         context->result_message = selection_result_message;
         context->gallery_result_message = gallery_result_message;
+        context->source_status_result_message = source_status_result_message;
         context->progress_ms.store(GetTickCount64(), std::memory_order_release);
         context->completed_generation.store(1, std::memory_order_release);
         selection_worker_context_ = std::move(context);
@@ -928,6 +977,31 @@ namespace glance::core
                         {
                             publish_gallery_response(context, std::move(response));
                         }
+                    }
+                }
+
+                std::optional<std::wstring> source_status_language;
+                {
+                    const std::scoped_lock lock(context->gallery_mutex);
+                    source_status_language = std::move(context->source_status_language);
+                    context->source_status_language.reset();
+                }
+                if (source_status_language)
+                {
+                    auto payload = make_source_status_payload(
+                        selection_service.source_statuses(*source_status_language));
+                    {
+                        const std::scoped_lock lock(context->gallery_mutex);
+                        context->source_status_responses.push_back(std::move(payload));
+                    }
+                    const HWND window = context->window.load(std::memory_order_acquire);
+                    if (!context->source_status_result_pending.exchange(
+                            true, std::memory_order_acq_rel) &&
+                        (window == nullptr || !PostMessageW(
+                            window, context->source_status_result_message, 0, 0)))
+                    {
+                        context->source_status_result_pending.store(
+                            false, std::memory_order_release);
                     }
                 }
 
@@ -1228,6 +1302,27 @@ namespace glance::core
         }
     }
 
+    void CoreApplication::apply_pending_source_status_responses()
+    {
+        const auto context = selection_worker_context_;
+        if (!context)
+        {
+            return;
+        }
+        std::deque<std::string> responses;
+        {
+            const std::scoped_lock lock(context->gallery_mutex);
+            responses.swap(context->source_status_responses);
+            context->source_status_result_pending.store(false, std::memory_order_release);
+        }
+        for (const auto& response : responses)
+        {
+            static_cast<void>(pipe_server_.send(
+                glance::contracts::MessageType::source_status_response,
+                response));
+        }
+    }
+
     void CoreApplication::apply_selection(
         glance::contracts::SelectionSnapshot next,
         bool suppress_preview_update)
@@ -1320,6 +1415,9 @@ namespace glance::core
     bool CoreApplication::selection_changed(const glance::contracts::SelectionSnapshot& next) const
     {
         if (selection_.source_window != next.source_window ||
+            selection_.host_kind != next.host_kind ||
+            selection_.source_id != next.source_id ||
+            selection_.source_capabilities != next.source_capabilities ||
             selection_.accepts_hotkey != next.accepts_hotkey ||
             selection_.text_input_active != next.text_input_active ||
             selection_.focused_index != next.focused_index ||
@@ -1446,6 +1544,20 @@ namespace glance::core
             PostMessageW(window_, gallery_command_message, 0, 0);
             return;
         }
+        if (type == glance::contracts::MessageType::source_status_request)
+        {
+            glance::contracts::log_event(L"Optional source status query requested.");
+            const auto context = selection_worker_context_;
+            if (context)
+            {
+                {
+                    const std::scoped_lock lock(context->gallery_mutex);
+                    context->source_status_language = winrt::to_hstring(payload).c_str();
+                }
+                SetEvent(context->gallery_event.get());
+            }
+            return;
+        }
         if (type == glance::contracts::MessageType::shutdown)
         {
             shutting_down_.store(true, std::memory_order_release);
@@ -1508,6 +1620,10 @@ namespace glance::core
         root.SetNamedValue(
             L"sourceWindow",
             JsonValue::CreateStringValue(std::to_wstring(selection.source_window)));
+        root.SetNamedValue(L"sourceId", JsonValue::CreateStringValue(selection.source_id));
+        root.SetNamedValue(
+            L"sourceCapabilities",
+            JsonValue::CreateStringValue(std::to_wstring(selection.source_capabilities)));
         root.SetNamedValue(L"generation", JsonValue::CreateStringValue(std::to_wstring(selection.generation)));
         return winrt::to_string(root.Stringify());
     }

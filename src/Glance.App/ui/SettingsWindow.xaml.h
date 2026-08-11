@@ -26,6 +26,7 @@ namespace winrt::Glance::App::implementation
         using FooterPreferencesChangedCallback = std::function<void()>;
         using WindowPreferencesChangedCallback = std::function<void()>;
         using ComponentChangedCallback = std::function<void()>;
+        using SourceStatusRequestCallback = std::function<bool(std::string)>;
 
         SettingsWindow();
         void InitializeSession(
@@ -34,13 +35,15 @@ namespace winrt::Glance::App::implementation
             TextPreferencesChangedCallback text_preferences_changed_callback,
             FooterPreferencesChangedCallback footer_preferences_changed_callback,
             WindowPreferencesChangedCallback window_preferences_changed_callback,
-            ComponentChangedCallback component_changed_callback);
+            ComponentChangedCallback component_changed_callback,
+            SourceStatusRequestCallback source_status_request_callback);
         void ApplyAppearancePreferences();
         void ApplyLocalizedResources();
         void ShowAndActivate();
         void ShowComponentAction(
             std::wstring_view component_id,
             std::wstring_view action_id);
+        void HandleSourceStatuses(std::string_view payload);
         winrt::fire_and_forget ConfirmExit();
 
         void NumberBox_Loaded(
@@ -84,6 +87,9 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OpenComponentsFolderButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void OpenSourcesFolderButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ResetWindowSizesButton_Click(
@@ -145,6 +151,7 @@ namespace winrt::Glance::App::implementation
         void configure_window();
         void refresh_runtime_statuses();
         void refresh_component_statuses();
+        void request_source_statuses();
         void refresh_diagnostic_bundle_status();
         void refresh_launch_at_sign_in();
         [[nodiscard]] bool launch_at_sign_in_enabled() const;
@@ -200,6 +207,7 @@ namespace winrt::Glance::App::implementation
         FooterPreferencesChangedCallback footer_preferences_changed_callback_;
         WindowPreferencesChangedCallback window_preferences_changed_callback_;
         ComponentChangedCallback component_changed_callback_;
+        SourceStatusRequestCallback source_status_request_callback_;
     };
 }
 

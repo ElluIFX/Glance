@@ -322,18 +322,26 @@
   <data name="AccentPurpleText.Text" xml:space="preserve"><value>紫色</value></data>
   <data name="EncodingSelector.Content" xml:space="preserve"><value>正在检测...</value></data>
   <data name="LineNumbersButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示行号</value></data>
-  <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>组件</value></data>
+  <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>附加功能</value></data>
   <data name="AppearanceGroupTitle.Text" xml:space="preserve"><value>外观</value></data>
   <data name="StartupGroupTitle.Text" xml:space="preserve"><value>启动</value></data>
-  <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>组件</value></data>
-  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>可选预览支持与运行状态</value></data>
-  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>位置</value></data>
+  <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>附加功能</value></data>
+  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>可选组件、来源及其运行状态</value></data>
+  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>附加组件位置</value></data>
   <data name="ComponentFolderLabel.Text" xml:space="preserve"><value>组件文件夹</value></data>
   <data name="ComponentFolderDescription.Text" xml:space="preserve"><value>Glance 启动时将从此目录加载组件</value></data>
   <data name="OpenComponentsFolderButton.Content" xml:space="preserve"><value>打开文件夹</value></data>
-  <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>组件状态</value></data>
+  <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>附加组件状态</value></data>
   <data name="ComponentEmptyTitle.Text" xml:space="preserve"><value>未安装任何组件</value></data>
   <data name="ComponentEmptyDescription.Text" xml:space="preserve"><value>安装可选组件以支持更多文件格式</value></data>
+  <data name="SourceLocationGroupTitle.Text" xml:space="preserve"><value>附加来源位置</value></data>
+  <data name="SourceFolderLabel.Text" xml:space="preserve"><value>来源文件夹</value></data>
+  <data name="SourceFolderDescription.Text" xml:space="preserve"><value>Glance 启动时将从此目录加载来源</value></data>
+  <data name="OpenSourcesFolderButton.Content" xml:space="preserve"><value>打开文件夹</value></data>
+  <data name="SourceStatusGroupTitle.Text" xml:space="preserve"><value>附加来源状态</value></data>
+  <data name="SourceEmptyTitle.Text" xml:space="preserve"><value>未安装任何来源</value></data>
+  <data name="SourceEmptyDescription.Text" xml:space="preserve"><value>安装可选来源以预览受支持应用中的文件</value></data>
+  <data name="SourceLoadError" xml:space="preserve"><value>无法加载该来源</value></data>
   <data name="ComponentStateHealthy" xml:space="preserve"><value>可用</value></data>
   <data name="ComponentStateWarning" xml:space="preserve"><value>警告</value></data>
   <data name="ComponentStateError" xml:space="preserve"><value>不可用</value></data>

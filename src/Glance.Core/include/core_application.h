@@ -41,6 +41,7 @@ namespace glance::core
         static constexpr UINT connection_changed_message = WM_APP + 4;
         static constexpr UINT gallery_command_message = WM_APP + 5;
         static constexpr UINT gallery_result_message = WM_APP + 6;
+        static constexpr UINT source_status_result_message = WM_APP + 7;
         static constexpr UINT selection_timer_id = 1;
         static constexpr UINT hook_refresh_timer_id = 2;
         static constexpr UINT app_watchdog_timer_id = 3;
@@ -75,6 +76,7 @@ namespace glance::core
             bool suppress_preview_update = false);
         void apply_pending_gallery_commands();
         void apply_pending_gallery_responses();
+        void apply_pending_source_status_responses();
         void monitor_selection_worker();
         [[nodiscard]] bool selection_worker_healthy() const noexcept;
         void handle_hook_action(HookAction action, std::uint64_t posted_at_ms);

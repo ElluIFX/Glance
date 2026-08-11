@@ -26,6 +26,8 @@ namespace glance::contracts
         preview_input = 14,
         gallery_request = 15,
         gallery_response = 16,
+        source_status_request = 17,
+        source_status_response = 18,
         shutdown = 20,
         terminate_unresponsive = 21,
     };

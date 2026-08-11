@@ -696,13 +696,16 @@ namespace glance::core
         snapshot.source_window = reinterpret_cast<std::uintptr_t>(root);
         snapshot.source_process_id = process_id;
         snapshot.host_kind = external_selection
-            ? external_selection->host_kind
+            ? glance::contracts::HostKind::external_source
             : (common_dialog
                 ? glance::contracts::HostKind::common_dialog
                 : glance::contracts::HostKind::explorer);
 
         if (external_selection)
         {
+            snapshot.source_id = external_selection->source_id;
+            snapshot.source_capabilities = external_selection->capabilities;
+            snapshot.text_input_active = external_selection->text_input_active;
             if (!external_selection->filesystem_path.empty())
             {
                 auto descriptor = describe_path(external_selection->filesystem_path);
@@ -950,6 +953,132 @@ namespace glance::core
 
             if (command.operation == GalleryOperation::open)
             {
+                if (!command.source_id.empty())
+                {
+                    std::unordered_set<std::wstring> extensions;
+                    for (auto extension : command.extensions)
+                    {
+                        std::ranges::transform(
+                            extension,
+                            extension.begin(),
+                            [](wchar_t value) { return std::towlower(value); });
+                        extensions.insert(std::move(extension));
+                    }
+                    if (extensions.empty())
+                    {
+                        return fail(L"unsupported");
+                    }
+
+                    std::uint32_t source_item_count{};
+                    std::uint32_t focused_offset{};
+                    std::uint64_t focused_item_id{};
+                    if (!external_hosts_.query_item_count(
+                            command.source_id,
+                            command.source_window,
+                            source_item_count,
+                            focused_offset,
+                            focused_item_id))
+                    {
+                        return fail(L"unavailable");
+                    }
+
+                    GallerySession session;
+                    session.id = ++next_gallery_session_id_;
+                    if (session.id == 0)
+                    {
+                        session.id = ++next_gallery_session_id_;
+                    }
+                    session.source_window = command.source_window;
+                    session.source_id = command.source_id;
+                    session.total_known = source_item_count <= 20000;
+                    session.source_item_count = source_item_count;
+                    session.current_source_offset = focused_offset;
+                    session.extensions = extensions;
+                    if (!session.total_known)
+                    {
+                        const auto current = external_hosts_.enumerate_items(
+                            command.source_id,
+                            command.source_window,
+                            focused_offset,
+                            1);
+                        if (current.size() != 1 || current.front().item_id != focused_item_id ||
+                            _wcsicmp(
+                                current.front().filesystem_path.c_str(),
+                                command.current_path.c_str()) != 0)
+                        {
+                            return fail(L"current_not_found");
+                        }
+                        auto extension = std::filesystem::path(current.front().filesystem_path)
+                            .extension().wstring();
+                        std::ranges::transform(
+                            extension,
+                            extension.begin(),
+                            [](wchar_t value) { return std::towlower(value); });
+                        if (!extensions.contains(extension))
+                        {
+                            return fail(L"current_not_found");
+                        }
+                        session.streaming = true;
+                        response.session_id = session.id;
+                        response.total_count = source_item_count;
+                        response.current_index = focused_offset;
+                        response.total_known = false;
+                        gallery_sessions_[command.window_id] = std::move(session);
+                    }
+                    else
+                    {
+                    bool found_current{};
+                    constexpr std::uint32_t source_page_size = 256;
+                    for (std::uint32_t offset = 0; offset < source_item_count; offset += source_page_size)
+                    {
+                        report_progress();
+                        if (canceled())
+                        {
+                            return fail(L"canceled");
+                        }
+                        const auto page = external_hosts_.enumerate_items(
+                            command.source_id,
+                            command.source_window,
+                            offset,
+                            std::min(source_page_size, source_item_count - offset));
+                        for (const auto& item : page)
+                        {
+                            auto extension = std::filesystem::path(item.filesystem_path)
+                                .extension().wstring();
+                            std::ranges::transform(
+                                extension,
+                                extension.begin(),
+                                [](wchar_t value) { return std::towlower(value); });
+                            if (!extensions.contains(extension))
+                            {
+                                continue;
+                            }
+                            if (!found_current &&
+                                (item.item_id == focused_item_id ||
+                                 _wcsicmp(item.filesystem_path.c_str(), command.current_path.c_str()) == 0))
+                            {
+                                session.current_index = static_cast<std::uint32_t>(session.items.size());
+                                found_current = true;
+                            }
+                            session.items.push_back(GallerySessionItem{
+                                item.filesystem_path,
+                                0,
+                                item.item_id });
+                        }
+                    }
+                    if (!found_current || session.items.empty())
+                    {
+                        return fail(L"current_not_found");
+                    }
+                    response.session_id = session.id;
+                    response.total_count = static_cast<std::uint32_t>(session.items.size());
+                    response.current_index = session.current_index;
+                    response.total_known = session.total_known;
+                    gallery_sessions_[command.window_id] = std::move(session);
+                    }
+                }
+                else
+                {
                 ComPtr<IFolderView2> folder_view;
                 const auto folder_path = std::filesystem::path(command.current_path)
                     .parent_path()
@@ -1057,6 +1186,7 @@ namespace glance::core
                 response.total_count = static_cast<std::uint32_t>(session.items.size());
                 response.current_index = session.current_index;
                 gallery_sessions_[command.window_id] = std::move(session);
+                }
             }
 
             const auto session = gallery_sessions_.find(command.window_id);
@@ -1066,8 +1196,157 @@ namespace glance::core
                 return fail(L"stale");
             }
             auto& active_session = session->second;
-            response.total_count = static_cast<std::uint32_t>(active_session.items.size());
-            response.current_index = active_session.current_index;
+            response.total_count = active_session.streaming
+                ? active_session.source_item_count
+                : static_cast<std::uint32_t>(active_session.items.size());
+            response.current_index = active_session.streaming
+                ? active_session.current_source_offset
+                : active_session.current_index;
+            response.total_known = active_session.total_known;
+
+            if (active_session.streaming)
+            {
+                const auto matching_item = [&](std::uint32_t offset)
+                    -> std::optional<ExternalHostItem> {
+                    const auto items = external_hosts_.enumerate_items(
+                        active_session.source_id,
+                        active_session.source_window,
+                        offset,
+                        1);
+                    if (items.size() != 1)
+                    {
+                        return std::nullopt;
+                    }
+                    auto extension = std::filesystem::path(items.front().filesystem_path)
+                        .extension().wstring();
+                    std::ranges::transform(
+                        extension,
+                        extension.begin(),
+                        [](wchar_t value) { return std::towlower(value); });
+                    return active_session.extensions.contains(extension)
+                        ? std::optional<ExternalHostItem>(items.front())
+                        : std::nullopt;
+                };
+                const auto find_next = [&](std::uint32_t start, int direction, bool loop)
+                    -> std::optional<std::pair<std::uint32_t, ExternalHostItem>> {
+                    auto offset = start;
+                    for (std::uint32_t scanned = 0;
+                         scanned + 1 < active_session.source_item_count;
+                         ++scanned)
+                    {
+                        if ((scanned & 31U) == 0)
+                        {
+                            report_progress();
+                            if (canceled())
+                            {
+                                return std::nullopt;
+                            }
+                        }
+                        if (direction > 0)
+                        {
+                            if (offset + 1 >= active_session.source_item_count)
+                            {
+                                if (!loop)
+                                {
+                                    return std::nullopt;
+                                }
+                                offset = 0;
+                            }
+                            else
+                            {
+                                ++offset;
+                            }
+                        }
+                        else if (offset == 0)
+                        {
+                            if (!loop)
+                            {
+                                return std::nullopt;
+                            }
+                            offset = active_session.source_item_count - 1;
+                        }
+                        else
+                        {
+                            --offset;
+                        }
+                        if (auto item = matching_item(offset))
+                        {
+                            return std::pair{ offset, std::move(*item) };
+                        }
+                    }
+                    return std::nullopt;
+                };
+
+                auto selected_offset = active_session.current_source_offset;
+                auto selected = matching_item(selected_offset);
+                if (!selected)
+                {
+                    gallery_sessions_.erase(session);
+                    return fail(L"stale");
+                }
+                if (command.operation == GalleryOperation::navigate)
+                {
+                    const int direction = command.navigation_steps < 0 ? -1 : 1;
+                    for (unsigned remaining = static_cast<unsigned>(
+                             std::abs(command.navigation_steps));
+                         remaining > 0;
+                         --remaining)
+                    {
+                        const auto next = find_next(selected_offset, direction, command.loop);
+                        if (!next)
+                        {
+                            break;
+                        }
+                        selected_offset = next->first;
+                        selected = next->second;
+                    }
+                    if (!external_hosts_.focus_item(
+                            active_session.source_id,
+                            active_session.source_window,
+                            selected->item_id,
+                            selected->filesystem_path))
+                    {
+                        gallery_sessions_.erase(session);
+                        return fail(L"stale");
+                    }
+                    active_session.current_source_offset = selected_offset;
+                    synchronized_source_window_ = active_session.source_window;
+                    synchronized_path_ = selected->filesystem_path;
+                    synchronized_selection_expires_ = GetTickCount64() + 2000;
+                }
+                else if (command.operation != GalleryOperation::open &&
+                         command.operation != GalleryOperation::page)
+                {
+                    return fail(L"stale");
+                }
+
+                std::vector<std::pair<std::uint32_t, ExternalHostItem>> visible;
+                if (const auto previous = find_next(selected_offset, -1, command.loop))
+                {
+                    visible.push_back(*previous);
+                }
+                visible.emplace_back(selected_offset, *selected);
+                if (const auto next = find_next(selected_offset, 1, command.loop))
+                {
+                    visible.push_back(*next);
+                }
+                for (const auto& [offset, item] : visible)
+                {
+                    response.item_indices.push_back(offset);
+                    auto descriptor = describe_path(item.filesystem_path);
+                    if (descriptor.filesystem_path.empty())
+                    {
+                        descriptor.filesystem_path = item.filesystem_path;
+                        descriptor.display_name = std::filesystem::path(item.filesystem_path)
+                            .filename().wstring();
+                        descriptor.is_filesystem = true;
+                    }
+                    response.items.push_back(std::move(descriptor));
+                }
+                response.current_index = selected_offset;
+                response.success = true;
+                return response;
+            }
 
             if (command.operation == GalleryOperation::select)
             {
@@ -1076,6 +1355,26 @@ namespace glance::core
                     return fail(L"stale");
                 }
                 const auto& target = active_session.items[command.target_index];
+                if (!active_session.source_id.empty())
+                {
+                    if (!external_hosts_.focus_item(
+                            active_session.source_id,
+                            active_session.source_window,
+                            target.source_item_id,
+                            target.path))
+                    {
+                        gallery_sessions_.erase(session);
+                        return fail(L"stale");
+                    }
+                    active_session.current_index = command.target_index;
+                    synchronized_source_window_ = active_session.source_window;
+                    synchronized_path_ = target.path;
+                    synchronized_selection_expires_ = GetTickCount64() + 2000;
+                    response.current_index = command.target_index;
+                    response.success = true;
+                    return response;
+                }
+
                 ComPtr<IFolderView2> folder_view;
                 ComPtr<IShellFolder> folder;
                 PITEMID_CHILD item_id{};
@@ -1164,6 +1463,12 @@ namespace glance::core
         {
             return fail(L"unavailable");
         }
+    }
+
+    std::vector<ExternalHostStatus> ExplorerSelectionService::source_statuses(
+        std::wstring_view language_tag)
+    {
+        return external_hosts_.statuses(language_tag);
     }
 
     bool ExplorerSelectionService::consume_gallery_selection_sync(

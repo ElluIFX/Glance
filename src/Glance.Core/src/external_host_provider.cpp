@@ -1,449 +1,344 @@
 #include "external_host_provider.h"
-#include "glance/contracts/diagnostics.h"
 
-#include <commctrl.h>
+#include "glance/contracts/diagnostics.h"
+#include "glance/contracts/source_api.h"
+#include "../../version.h"
+
+#include <winrt/Windows.Data.Json.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/base.h>
 
 #include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <memory>
+#include <ranges>
 #include <utility>
 
 namespace
 {
-    constexpr std::array everything_process_names{
-        std::wstring_view{ L"everything.exe" },
-        std::wstring_view{ L"everything32.exe" },
-        std::wstring_view{ L"everything64.exe" },
-    };
-    constexpr std::wstring_view everything_window_class = L"EVERYTHING";
-    constexpr wchar_t everything_focus_window_class[] = L"EVERYTHING_RESULT_LIST_FOCUS";
-    constexpr wchar_t everything_result_list_class[] = L"SysListView32";
-    constexpr std::size_t list_view_text_capacity = 32768;
+    using namespace glance::contracts::sources;
 
-    struct ListViewItem32
+    struct ModuleDeleter
     {
-        std::uint32_t mask{};
-        std::int32_t item{};
-        std::int32_t subitem{};
-        std::uint32_t state{};
-        std::uint32_t state_mask{};
-        std::uint32_t text{};
-        std::int32_t text_capacity{};
-        std::int32_t image{};
-        std::int32_t parameter{};
-        std::int32_t indent{};
-        std::int32_t group_id{};
-        std::uint32_t column_count{};
-        std::uint32_t columns{};
-        std::uint32_t column_formats{};
-        std::int32_t group{};
+        void operator()(std::remove_pointer_t<HMODULE>* module) const noexcept
+        {
+            if (module != nullptr)
+            {
+                FreeLibrary(module);
+            }
+        }
     };
 
-    static_assert(sizeof(ListViewItem32) == 60);
+    using UniqueModule = std::unique_ptr<std::remove_pointer_t<HMODULE>, ModuleDeleter>;
 
-    bool class_starts_with(std::wstring_view value, std::wstring_view prefix)
+    struct SourceManifest
     {
-        return value.size() >= prefix.size() &&
-            _wcsnicmp(value.data(), prefix.data(), prefix.size()) == 0;
+        std::wstring id;
+        std::filesystem::path directory;
+        std::wstring entry_point;
+        std::vector<std::wstring> process_names;
+        std::vector<std::wstring> window_class_prefixes;
+    };
+
+    struct LoadedSource
+    {
+        ~LoadedSource()
+        {
+            if (api.shutdown != nullptr)
+            {
+                api.shutdown();
+            }
+        }
+
+        UniqueModule module;
+        SourceApi api;
+        SourceRegistration registration;
+        std::optional<ItemListApi> item_list;
+        std::optional<FocusChangeApi> focus_change;
+    };
+
+    struct SourceDescriptor
+    {
+        SourceManifest manifest;
+        std::unique_ptr<LoadedSource> loaded;
+        bool load_attempted{};
+        std::wstring load_error;
+        glance::core::ExternalHostContext last_context;
+        std::wstring process_name;
+        std::wstring window_class;
+    };
+
+    std::filesystem::path executable_directory()
+    {
+        std::wstring path(32768, L'\0');
+        const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+        if (length == 0 || length >= path.size())
+        {
+            return {};
+        }
+        path.resize(length);
+        return std::filesystem::path(path).parent_path();
     }
 
-    bool strings_equal(std::wstring_view left, std::wstring_view right)
+    std::optional<winrt::Windows::Data::Json::JsonObject> read_json(
+        const std::filesystem::path& path)
+    {
+        std::ifstream stream(path, std::ios::binary);
+        if (!stream)
+        {
+            return std::nullopt;
+        }
+        const std::string content{
+            std::istreambuf_iterator<char>(stream),
+            std::istreambuf_iterator<char>() };
+        if (content.empty())
+        {
+            return std::nullopt;
+        }
+        return winrt::Windows::Data::Json::JsonObject::Parse(winrt::to_hstring(content));
+    }
+
+    std::vector<std::wstring> read_string_array(
+        const winrt::Windows::Data::Json::JsonObject& object,
+        std::wstring_view name)
+    {
+        std::vector<std::wstring> values;
+        const auto array = object.GetNamedArray(name);
+        values.reserve(array.Size());
+        for (const auto& value : array)
+        {
+            std::wstring text(value.GetString());
+            if (!text.empty())
+            {
+                std::ranges::transform(text, text.begin(), [](wchar_t value) {
+                    return static_cast<wchar_t>(std::towlower(value));
+                });
+                values.emplace_back(text);
+            }
+        }
+        return values;
+    }
+
+    std::optional<SourceManifest> read_manifest(const std::filesystem::path& path)
+    {
+        try
+        {
+            const auto root = read_json(path);
+            if (!root || static_cast<std::uint32_t>(root->GetNamedNumber(L"schema_version")) != 1)
+            {
+                return std::nullopt;
+            }
+            SourceManifest manifest;
+            manifest.id = root->GetNamedString(L"id");
+            manifest.entry_point = root->GetNamedString(L"entry_point");
+            if (manifest.id.empty() || manifest.entry_point.empty() ||
+                std::filesystem::path(manifest.entry_point).filename() != manifest.entry_point ||
+                root->GetNamedString(L"architecture") != L"x64")
+            {
+                return std::nullopt;
+            }
+            const auto match = root->GetNamedObject(L"match");
+            manifest.process_names = read_string_array(match, L"process_names");
+            manifest.window_class_prefixes = read_string_array(match, L"window_class_prefixes");
+            if (manifest.process_names.empty() || manifest.window_class_prefixes.empty())
+            {
+                return std::nullopt;
+            }
+            manifest.directory = path.parent_path();
+            return manifest;
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+    }
+
+    std::vector<SourceDescriptor> discover_sources()
+    {
+        std::vector<SourceDescriptor> sources;
+        const auto root = executable_directory() / L"sources";
+        std::error_code error;
+        for (std::filesystem::directory_iterator iterator(root, error), end;
+             !error && iterator != end;
+             iterator.increment(error))
+        {
+            if (!iterator->is_directory(error))
+            {
+                continue;
+            }
+            const auto manifest = read_manifest(iterator->path() / L"source.json");
+            if (manifest)
+            {
+                SourceDescriptor descriptor;
+                descriptor.manifest = *manifest;
+                sources.push_back(std::move(descriptor));
+            }
+            else
+            {
+                glance::contracts::log_event(
+                    L"Ignoring an invalid source manifest in " + iterator->path().wstring() + L".");
+            }
+        }
+        std::ranges::sort(sources, {}, [](const SourceDescriptor& source) {
+            return source.manifest.id;
+        });
+        glance::contracts::log_event(
+            L"Discovered " + std::to_wstring(sources.size()) + L" optional source manifest(s).");
+        return sources;
+    }
+
+    bool equal_insensitive(std::wstring_view left, std::wstring_view right)
     {
         return left.size() == right.size() &&
             _wcsnicmp(left.data(), right.data(), left.size()) == 0;
     }
 
-    bool window_has_class(HWND window, const wchar_t* expected)
+    bool starts_with_insensitive(std::wstring_view value, std::wstring_view prefix)
     {
-        wchar_t class_name[128]{};
-        return GetClassNameW(window, class_name, static_cast<int>(std::size(class_name))) > 0 &&
-            _wcsicmp(class_name, expected) == 0;
+        return value.size() >= prefix.size() &&
+            _wcsnicmp(value.data(), prefix.data(), prefix.size()) == 0;
     }
 
-    HWND find_descendant_by_class(HWND root, const wchar_t* class_name)
+    bool matches(const SourceManifest& manifest, const glance::core::ExternalHostContext& context)
     {
-        struct SearchContext
-        {
-            const wchar_t* class_name{};
-            HWND result{};
-        } context{ class_name };
-
-        EnumChildWindows(root, [](HWND window, LPARAM parameter) -> BOOL {
-            auto& search = *reinterpret_cast<SearchContext*>(parameter);
-            if (window_has_class(window, search.class_name))
-            {
-                search.result = window;
-                return FALSE;
-            }
-            return TRUE;
-        }, reinterpret_cast<LPARAM>(&context));
-        return context.result;
+        return std::ranges::any_of(manifest.process_names, [&](const auto& name) {
+            return equal_insensitive(context.process_name, name);
+        }) && std::ranges::any_of(manifest.window_class_prefixes, [&](const auto& prefix) {
+            return starts_with_insensitive(context.window_class, prefix);
+        });
     }
 
-    bool text_input_active(const GUITHREADINFO& thread_info)
+    SourceHostContext make_api_context(const glance::core::ExternalHostContext& context)
     {
-        const HWND focused = thread_info.hwndFocus;
-        const HWND root = focused == nullptr ? nullptr : GetAncestor(focused, GA_ROOT);
-        for (HWND current = focused; current != nullptr; current = GetParent(current))
-        {
-            wchar_t class_name[128]{};
-            if (GetClassNameW(current, class_name, static_cast<int>(std::size(class_name))) > 0 &&
-                (_wcsicmp(class_name, L"Edit") == 0 || _wcsnicmp(class_name, L"RichEdit", 8) == 0))
-            {
-                return true;
-            }
-            if (current == root)
-            {
-                break;
-            }
-        }
-        return thread_info.hwndCaret != nullptr;
+        SourceHostContext result;
+        result.root_window = reinterpret_cast<std::uintptr_t>(context.root_window);
+        result.focused_window = reinterpret_cast<std::uintptr_t>(context.thread_info.hwndFocus);
+        result.caret_window = reinterpret_cast<std::uintptr_t>(context.thread_info.hwndCaret);
+        result.process_id = context.process_id;
+        result.thread_id = context.thread_id;
+        result.gui_thread_flags = context.thread_info.flags;
+        result.process_name = context.process_name.data();
+        result.window_class = context.window_class.data();
+        return result;
     }
 
-    class RemoteListViewReader final
+    bool valid_optional_api(const ItemListApi& api)
     {
-    public:
-        ~RemoteListViewReader()
-        {
-            reset();
-        }
-
-        RemoteListViewReader(const RemoteListViewReader&) = delete;
-        RemoteListViewReader& operator=(const RemoteListViewReader&) = delete;
-
-        RemoteListViewReader() = default;
-
-        [[nodiscard]] int focused_item(HWND list, DWORD process_id)
-        {
-            if (!ensure_process(process_id))
-            {
-                return -1;
-            }
-
-            DWORD_PTR result{};
-            if (SendMessageTimeoutW(
-                    list,
-                    LVM_GETNEXTITEM,
-                    static_cast<WPARAM>(-1),
-                    LVNI_FOCUSED,
-                    SMTO_ABORTIFHUNG | SMTO_BLOCK,
-                    50,
-                    &result) == 0)
-            {
-                return -1;
-            }
-            return static_cast<int>(static_cast<std::intptr_t>(result));
-        }
-
-        [[nodiscard]] std::wstring item_text(HWND list, int item, int subitem, DWORD process_id)
-        {
-            if (!ensure_process(process_id))
-            {
-                return {};
-            }
-
-            const auto remote_text = static_cast<std::byte*>(remote_buffer_) + item_size_;
-            if (target_is_32_bit_)
-            {
-                ListViewItem32 list_item;
-                list_item.item = item;
-                list_item.subitem = subitem;
-                list_item.text = static_cast<std::uint32_t>(
-                    reinterpret_cast<std::uintptr_t>(remote_text));
-                list_item.text_capacity = static_cast<std::int32_t>(list_view_text_capacity);
-                if (!write_item(list_item))
-                {
-                    return {};
-                }
-            }
-            else
-            {
-                LVITEMW list_item{};
-                list_item.iItem = item;
-                list_item.iSubItem = subitem;
-                list_item.pszText = reinterpret_cast<wchar_t*>(remote_text);
-                list_item.cchTextMax = static_cast<int>(list_view_text_capacity);
-                if (!write_item(list_item))
-                {
-                    return {};
-                }
-            }
-
-            DWORD_PTR result{};
-            if (SendMessageTimeoutW(
-                    list,
-                    LVM_GETITEMTEXTW,
-                    static_cast<WPARAM>(item),
-                    reinterpret_cast<LPARAM>(remote_buffer_),
-                    SMTO_ABORTIFHUNG | SMTO_BLOCK,
-                    50,
-                    &result) == 0)
-            {
-                return {};
-            }
-
-            const auto copied = static_cast<std::size_t>(result);
-            if (copied == 0 || copied >= list_view_text_capacity)
-            {
-                return {};
-            }
-
-            std::wstring text(copied, L'\0');
-            SIZE_T bytes_read{};
-            const SIZE_T expected_bytes = copied * sizeof(wchar_t);
-            if (!ReadProcessMemory(
-                    process_,
-                    remote_text,
-                    text.data(),
-                    expected_bytes,
-                    &bytes_read) ||
-                bytes_read != expected_bytes)
-            {
-                return {};
-            }
-            return text;
-        }
-
-    private:
-        template <typename Item>
-        [[nodiscard]] bool write_item(const Item& item) const
-        {
-            SIZE_T bytes_written{};
-            return WriteProcessMemory(
-                       process_,
-                       remote_buffer_,
-                       &item,
-                       sizeof(item),
-                       &bytes_written) != FALSE &&
-                bytes_written == sizeof(item);
-        }
-
-        [[nodiscard]] bool ensure_process(DWORD process_id)
-        {
-            if (process_ != nullptr && remote_buffer_ != nullptr && process_id_ == process_id)
-            {
-                return true;
-            }
-
-            reset();
-            process_ = OpenProcess(
-                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_OPERATION |
-                    PROCESS_VM_READ | PROCESS_VM_WRITE,
-                FALSE,
-                process_id);
-            if (process_ == nullptr)
-            {
-                return false;
-            }
-
-            USHORT process_machine{};
-            USHORT native_machine{};
-            if (IsWow64Process2(process_, &process_machine, &native_machine) != FALSE)
-            {
-                target_is_32_bit_ = process_machine != IMAGE_FILE_MACHINE_UNKNOWN;
-            }
-            else
-            {
-                BOOL wow64{};
-                if (IsWow64Process(process_, &wow64) == FALSE)
-                {
-                    reset();
-                    return false;
-                }
-                target_is_32_bit_ = wow64 != FALSE;
-            }
-
-            item_size_ = target_is_32_bit_ ? sizeof(ListViewItem32) : sizeof(LVITEMW);
-            const SIZE_T allocation_size =
-                item_size_ + list_view_text_capacity * sizeof(wchar_t);
-            remote_buffer_ = VirtualAllocEx(
-                process_,
-                nullptr,
-                allocation_size,
-                MEM_COMMIT | MEM_RESERVE,
-                PAGE_READWRITE);
-            if (remote_buffer_ == nullptr)
-            {
-                reset();
-                return false;
-            }
-
-            process_id_ = process_id;
-            return true;
-        }
-
-        void reset()
-        {
-            if (remote_buffer_ != nullptr && process_ != nullptr)
-            {
-                VirtualFreeEx(process_, remote_buffer_, 0, MEM_RELEASE);
-            }
-            remote_buffer_ = nullptr;
-            if (process_ != nullptr)
-            {
-                CloseHandle(process_);
-            }
-            process_ = nullptr;
-            process_id_ = 0;
-            item_size_ = 0;
-            target_is_32_bit_ = false;
-        }
-
-        HANDLE process_{};
-        void* remote_buffer_{};
-        DWORD process_id_{};
-        std::size_t item_size_{};
-        bool target_is_32_bit_{};
-    };
-
-    class ExternalHostProvider
-    {
-    public:
-        virtual ~ExternalHostProvider() = default;
-        [[nodiscard]] virtual glance::core::ExternalHostSelection query(
-            const glance::core::ExternalHostContext& context) = 0;
-    };
-
-    class EverythingHostProvider final : public ExternalHostProvider
-    {
-    public:
-        [[nodiscard]] glance::core::ExternalHostSelection query(
-            const glance::core::ExternalHostContext& context) override
-        {
-            glance::core::ExternalHostSelection selection;
-            selection.host_kind = glance::contracts::HostKind::everything;
-
-            if (text_input_active(context.thread_info) ||
-                context.thread_info.flags != 0 ||
-                context.thread_info.hwndFocus == nullptr ||
-                GetAncestor(context.thread_info.hwndFocus, GA_ROOT) != context.root_window)
-            {
-                return selection;
-            }
-
-            const HWND focus_path_window = find_descendant_by_class(
-                context.root_window,
-                everything_focus_window_class);
-            if (focus_path_window != nullptr)
-            {
-                const int expected_length = GetWindowTextLengthW(focus_path_window);
-                if (expected_length <= 0 || expected_length > 32767)
-                {
-                    return selection;
-                }
-
-                std::wstring path(static_cast<std::size_t>(expected_length) + 1, L'\0');
-                const int actual_length = GetWindowTextW(
-                    focus_path_window,
-                    path.data(),
-                    static_cast<int>(path.size()));
-                if (actual_length <= 0)
-                {
-                    return selection;
-                }
-                path.resize(static_cast<std::size_t>(actual_length));
-                const auto line_end = path.find_first_of(L"\r\n");
-                if (line_end != std::wstring::npos)
-                {
-                    path.resize(line_end);
-                }
-                if (path.empty() || GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES)
-                {
-                    return selection;
-                }
-
-                selection.accepts_hotkey = true;
-                selection.filesystem_path = std::move(path);
-                return selection;
-            }
-
-            const HWND result_list = find_descendant_by_class(
-                context.root_window,
-                everything_result_list_class);
-            if (result_list == nullptr || context.thread_info.hwndFocus != result_list)
-            {
-                return selection;
-            }
-
-            const int focused_item = list_view_reader_.focused_item(result_list, context.process_id);
-            if (focused_item < 0)
-            {
-                return selection;
-            }
-
-            auto name = list_view_reader_.item_text(
-                result_list,
-                focused_item,
-                0,
-                context.process_id);
-            auto directory = list_view_reader_.item_text(
-                result_list,
-                focused_item,
-                1,
-                context.process_id);
-            if (name.empty() || directory.empty())
-            {
-                return selection;
-            }
-            if (directory.back() != L'\\' && directory.back() != L'/')
-            {
-                directory.push_back(L'\\');
-            }
-            directory += name;
-            if (GetFileAttributesW(directory.c_str()) == INVALID_FILE_ATTRIBUTES)
-            {
-                return selection;
-            }
-
-            selection.accepts_hotkey = true;
-            selection.filesystem_path = std::move(directory);
-            return selection;
-        }
-
-    private:
-        RemoteListViewReader list_view_reader_;
-    };
-
-    using Matcher = bool (*)(const glance::core::ExternalHostContext&);
-    using Factory = std::unique_ptr<ExternalHostProvider> (*)();
-
-    struct ProviderRegistration
-    {
-        std::wstring_view name;
-        Matcher matches{};
-        Factory create{};
-    };
-
-    bool matches_everything(const glance::core::ExternalHostContext& context)
-    {
-        return std::ranges::any_of(everything_process_names, [&](std::wstring_view process_name) {
-            return strings_equal(context.process_name, process_name);
-        }) && class_starts_with(context.window_class, everything_window_class);
+        return api.size >= sizeof(ItemListApi) && api.version == item_list_api_version &&
+            api.query_count != nullptr && api.enumerate != nullptr;
     }
 
-    std::unique_ptr<ExternalHostProvider> create_everything_provider()
+    bool valid_optional_api(const FocusChangeApi& api)
     {
-        return std::make_unique<EverythingHostProvider>();
+        return api.size >= sizeof(FocusChangeApi) && api.version == focus_change_api_version &&
+            api.focus != nullptr;
     }
 
-    constexpr std::array registrations{
-        ProviderRegistration{
-            L"Everything",
-            matches_everything,
-            create_everything_provider,
-        },
-    };
+    std::uint64_t effective_capabilities(const LoadedSource& source)
+    {
+        std::uint64_t capabilities = static_cast<std::uint64_t>(Capability::selection);
+        if (source.item_list)
+        {
+            capabilities |= static_cast<std::uint64_t>(Capability::item_list);
+        }
+        if (source.focus_change)
+        {
+            capabilities |= static_cast<std::uint64_t>(Capability::focus_change);
+        }
+        return capabilities & source.registration.capability_mask;
+    }
+
+    LoadedSource* ensure_loaded(SourceDescriptor& descriptor)
+    {
+        if (descriptor.loaded)
+        {
+            return descriptor.loaded.get();
+        }
+        if (descriptor.load_attempted)
+        {
+            return nullptr;
+        }
+        descriptor.load_attempted = true;
+        const auto library_path = descriptor.manifest.directory / descriptor.manifest.entry_point;
+        UniqueModule module(LoadLibraryExW(
+            library_path.c_str(),
+            nullptr,
+            LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                LOAD_LIBRARY_SEARCH_SYSTEM32));
+        if (!module)
+        {
+            descriptor.load_error = L"Source DLL could not be loaded (Win32 " +
+                std::to_wstring(GetLastError()) + L")";
+            return nullptr;
+        }
+        const auto get_api = reinterpret_cast<GetApiFunction>(
+            GetProcAddress(module.get(), get_api_export));
+        auto source = std::make_unique<LoadedSource>();
+        source->module = std::move(module);
+        if (get_api == nullptr || !get_api(abi_version, &source->api) ||
+            source->api.size < sizeof(SourceApi) || source->api.abi != abi_version ||
+            source->api.initialize == nullptr || source->api.query_selection == nullptr ||
+            source->api.query_status == nullptr || source->api.query_interface == nullptr ||
+            source->api.shutdown == nullptr || !source->api.initialize(&source->registration) ||
+            source->registration.size < sizeof(SourceRegistration) ||
+            descriptor.manifest.id != source->registration.source_id ||
+            std::wstring_view(source->registration.target_app_version) != GLANCE_VERSION_WSTRING)
+        {
+            descriptor.load_error = L"Source ABI or target version is incompatible";
+            return nullptr;
+        }
+
+        void* optional{};
+        if (source->api.query_interface(
+                &item_list_api_id, item_list_api_version, &optional) && optional != nullptr)
+        {
+            const auto candidate = *static_cast<ItemListApi*>(optional);
+            if (valid_optional_api(candidate))
+            {
+                source->item_list = candidate;
+            }
+        }
+        optional = nullptr;
+        if (source->api.query_interface(
+                &focus_change_api_id, focus_change_api_version, &optional) && optional != nullptr)
+        {
+            const auto candidate = *static_cast<FocusChangeApi*>(optional);
+            if (valid_optional_api(candidate))
+            {
+                source->focus_change = candidate;
+            }
+        }
+        source->registration.capability_mask = effective_capabilities(*source);
+        descriptor.loaded = std::move(source);
+        glance::contracts::log_event(L"Loaded optional source: " + descriptor.manifest.id + L".");
+        return descriptor.loaded.get();
+    }
+
+    SourceDescriptor* find_source(
+        std::vector<SourceDescriptor>& sources,
+        std::wstring_view source_id,
+        std::uintptr_t source_window)
+    {
+        const auto found = std::ranges::find(sources, source_id, [](const SourceDescriptor& source) {
+            return std::wstring_view(source.manifest.id);
+        });
+        if (found == sources.end() || !found->loaded ||
+            reinterpret_cast<std::uintptr_t>(found->last_context.root_window) != source_window ||
+            !IsWindow(found->last_context.root_window))
+        {
+            return nullptr;
+        }
+        return &*found;
+    }
 }
 
 namespace glance::core
 {
     struct ExternalHostProviderRegistry::Impl
     {
-        std::unique_ptr<ExternalHostProvider> active_provider;
-        std::size_t active_registration{ registrations.size() };
-        DWORD active_process_id{};
+        std::vector<SourceDescriptor> sources{ discover_sources() };
     };
 
     ExternalHostProviderRegistry::ExternalHostProviderRegistry() : impl_(std::make_unique<Impl>()) {}
@@ -452,35 +347,152 @@ namespace glance::core
     std::optional<ExternalHostSelection> ExternalHostProviderRegistry::query(
         const ExternalHostContext& context)
     {
-        std::size_t matching_registration = registrations.size();
-        for (std::size_t index = 0; index < registrations.size(); ++index)
+        for (auto& descriptor : impl_->sources)
         {
-            if (registrations[index].matches(context))
+            if (!matches(descriptor.manifest, context))
             {
-                matching_registration = index;
-                break;
+                continue;
             }
-        }
+            auto* source = ensure_loaded(descriptor);
+            if (source == nullptr)
+            {
+                return ExternalHostSelection{};
+            }
+            descriptor.process_name.assign(context.process_name);
+            descriptor.window_class.assign(context.window_class);
+            descriptor.last_context = context;
+            descriptor.last_context.process_name = descriptor.process_name;
+            descriptor.last_context.window_class = descriptor.window_class;
 
-        if (matching_registration == registrations.size())
-        {
-            impl_->active_provider.reset();
-            impl_->active_registration = registrations.size();
-            impl_->active_process_id = 0;
-            return std::nullopt;
+            const auto api_context = make_api_context(descriptor.last_context);
+            SourceSelectionResult result;
+            if (!source->api.query_selection(&api_context, &result))
+            {
+                return ExternalHostSelection{};
+            }
+            ExternalHostSelection selection;
+            selection.accepts_hotkey = result.accepts_hotkey != FALSE;
+            selection.text_input_active = result.text_input_active != FALSE;
+            selection.source_id = descriptor.manifest.id;
+            selection.capabilities = result.capability_mask & effective_capabilities(*source);
+            selection.filesystem_path = result.filesystem_path;
+            return selection;
         }
+        return std::nullopt;
+    }
 
-        if (impl_->active_provider == nullptr ||
-            impl_->active_registration != matching_registration ||
-            impl_->active_process_id != context.process_id)
+    bool ExternalHostProviderRegistry::query_item_count(
+        std::wstring_view source_id,
+        std::uintptr_t source_window,
+        std::uint32_t& item_count,
+        std::uint32_t& focused_offset,
+        std::uint64_t& focused_item_id)
+    {
+        auto* descriptor = find_source(impl_->sources, source_id, source_window);
+        if (descriptor == nullptr || !descriptor->loaded->item_list)
         {
-            impl_->active_provider = registrations[matching_registration].create();
-            impl_->active_registration = matching_registration;
-            impl_->active_process_id = context.process_id;
-            glance::contracts::log_event(
-                L"Activated external host provider: " +
-                std::wstring(registrations[matching_registration].name) + L".");
+            return false;
         }
-        return impl_->active_provider->query(context);
+        const auto context = make_api_context(descriptor->last_context);
+        return descriptor->loaded->item_list->query_count(
+            &context, &item_count, &focused_offset, &focused_item_id) != FALSE;
+    }
+
+    std::vector<ExternalHostItem> ExternalHostProviderRegistry::enumerate_items(
+        std::wstring_view source_id,
+        std::uintptr_t source_window,
+        std::uint32_t offset,
+        std::uint32_t limit)
+    {
+        auto* descriptor = find_source(impl_->sources, source_id, source_window);
+        if (descriptor == nullptr || !descriptor->loaded->item_list || limit == 0)
+        {
+            return {};
+        }
+        std::vector<ExternalHostItem> items;
+        items.reserve(limit);
+        SourceItemSink sink;
+        sink.context = &items;
+        sink.append = [](void* context, const SourceItem* item) noexcept -> BOOL {
+            if (context == nullptr || item == nullptr || item->filesystem_path == nullptr)
+            {
+                return FALSE;
+            }
+            try
+            {
+                static_cast<std::vector<ExternalHostItem>*>(context)->push_back(
+                    ExternalHostItem{ item->item_id, item->filesystem_path });
+                return TRUE;
+            }
+            catch (...)
+            {
+                return FALSE;
+            }
+        };
+        const auto api_context = make_api_context(descriptor->last_context);
+        if (!descriptor->loaded->item_list->enumerate(
+                &api_context, offset, limit, &sink))
+        {
+            return {};
+        }
+        return items;
+    }
+
+    bool ExternalHostProviderRegistry::focus_item(
+        std::wstring_view source_id,
+        std::uintptr_t source_window,
+        std::uint64_t item_id,
+        std::wstring_view expected_path)
+    {
+        auto* descriptor = find_source(impl_->sources, source_id, source_window);
+        if (descriptor == nullptr || !descriptor->loaded->focus_change)
+        {
+            return false;
+        }
+        const auto api_context = make_api_context(descriptor->last_context);
+        const std::wstring path(expected_path);
+        return descriptor->loaded->focus_change->focus(
+            &api_context, item_id, path.c_str()) != FALSE;
+    }
+
+    std::vector<ExternalHostStatus> ExternalHostProviderRegistry::statuses(
+        std::wstring_view language_tag)
+    {
+        std::vector<ExternalHostStatus> statuses;
+        statuses.reserve(impl_->sources.size());
+        for (auto& descriptor : impl_->sources)
+        {
+            auto* source = ensure_loaded(descriptor);
+            if (source == nullptr)
+            {
+                glance::contracts::log_event(
+                    L"Optional source " + descriptor.manifest.id +
+                    L" is unavailable: " + descriptor.load_error + L".");
+                statuses.push_back(ExternalHostStatus{
+                    descriptor.manifest.id,
+                    descriptor.manifest.id,
+                    {},
+                    static_cast<std::uint32_t>(HealthSeverity::error),
+                    1,
+                    0 });
+                continue;
+            }
+            SourceStatusResult result;
+            const std::wstring language(language_tag);
+            if (!source->api.query_status(language.c_str(), &result) ||
+                result.display_name[0] == L'\0')
+            {
+                continue;
+            }
+            statuses.push_back(ExternalHostStatus{
+                descriptor.manifest.id,
+                result.display_name,
+                result.detail,
+                static_cast<std::uint32_t>(result.severity),
+                result.code,
+                result.capability_mask });
+        }
+        std::ranges::sort(statuses, {}, &ExternalHostStatus::display_name);
+        return statuses;
     }
 }

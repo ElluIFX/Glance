@@ -57,7 +57,7 @@ Download and install Glance from [Releases](https://github.com/ElluIFX/Glance/re
 
 ### Optional components
 
-Support for complex formats is provided by isolated components kept separate from the Glance core. The installer selects all components by default but allows them to be omitted. For portable installations, download component packages from the same release, extract them into the application's `components` directory, and restart Glance.
+Support for complex formats is provided by isolated components kept separate from the Glance core. The installer selects all components by default but allows them to be omitted, while the portable package includes every component and source.
 
 - **PDF preview** — Previews multi-page PDF documents and provides document rendering for the Office component
 - **Microsoft Office preview** — Previews Word, PowerPoint, and Excel files; depends on the PDF preview component and the corresponding locally installed Office applications

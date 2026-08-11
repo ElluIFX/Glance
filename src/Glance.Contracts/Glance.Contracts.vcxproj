@@ -28,6 +28,7 @@
     <ClInclude Include="include\glance\contracts\ipc_protocol.h" />
     <ClInclude Include="include\glance\contracts\paged_document_protocol.h" />
     <ClInclude Include="include\glance\contracts\preview_state.h" />
+    <ClInclude Include="include\glance\contracts\source_api.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\contracts.cpp" />

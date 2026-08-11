@@ -40,6 +40,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.ArchiveComponent", "
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.MediaInfoComponent", "src\Glance.Components\MediaInfo\Glance.MediaInfoComponent.vcxproj", "{6F0DDFA1-9026-4C08-92E4-0542706A9BB0}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.EverythingSource", "src\Glance.Sources\Everything\Glance.EverythingSource.vcxproj", "{9F43B7E2-317D-4DC2-A739-18E2317B2541}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Tests", "tests\Glance.Tests\Glance.Tests.vcxproj", "{4D728170-2954-4B84-BA44-626E290A361F}"
 EndProject
 Global
@@ -112,6 +114,10 @@ Global
 		{6F0DDFA1-9026-4C08-92E4-0542706A9BB0}.Debug|x64.Build.0 = Debug|x64
 		{6F0DDFA1-9026-4C08-92E4-0542706A9BB0}.Release|x64.ActiveCfg = Release|x64
 		{6F0DDFA1-9026-4C08-92E4-0542706A9BB0}.Release|x64.Build.0 = Release|x64
+		{9F43B7E2-317D-4DC2-A739-18E2317B2541}.Debug|x64.ActiveCfg = Debug|x64
+		{9F43B7E2-317D-4DC2-A739-18E2317B2541}.Debug|x64.Build.0 = Debug|x64
+		{9F43B7E2-317D-4DC2-A739-18E2317B2541}.Release|x64.ActiveCfg = Release|x64
+		{9F43B7E2-317D-4DC2-A739-18E2317B2541}.Release|x64.Build.0 = Release|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Debug|x64.ActiveCfg = Debug|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Debug|x64.Build.0 = Debug|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Release|x64.ActiveCfg = Release|x64

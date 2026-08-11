@@ -162,6 +162,11 @@ foreach ($symbol in $symbolFiles) {
     -Platform $Platform
 
 Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory "components")
+Copy-Item -LiteralPath (Join-Path $componentOutputDirectory "installer") `
+    -Destination (Join-Path $payloadDirectory "components") -Recurse -Force
+Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory "sources")
+Copy-Item -LiteralPath (Join-Path $componentOutputDirectory "source-installer") `
+    -Destination (Join-Path $payloadDirectory "sources") -Recurse -Force
 Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory "plugins")
 
 $componentResidue = Get-ChildItem -LiteralPath $payloadDirectory -File | Where-Object {
@@ -211,6 +216,7 @@ $compiler = Get-InnoSetupCompiler
 $environment = @{
     GLANCE_SOURCE_DIR = $payloadDirectory
     GLANCE_COMPONENTS_DIR = (Join-Path $componentOutputDirectory "installer")
+    GLANCE_SOURCES_DIR = (Join-Path $componentOutputDirectory "source-installer")
     GLANCE_COMPONENT_INNO_DIR = (Join-Path $componentOutputDirectory "inno")
     GLANCE_OUTPUT_DIR = $installerOutputDirectory
     GLANCE_REPO_ROOT = $repositoryRoot

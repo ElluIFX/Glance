@@ -1,6 +1,7 @@
 #include "input_decision.h"
 #include "glance/contracts/component_api.h"
 #include "glance/contracts/ipc_protocol.h"
+#include "glance/contracts/source_api.h"
 #include "gallery_navigation.h"
 #include "media_preview_preferences.h"
 #include "pan_interaction.h"
@@ -379,6 +380,53 @@ int main()
         executable_path.data(),
         static_cast<DWORD>(executable_path.size()));
     executable_path.resize(executable_length);
+    const auto source_directory =
+        std::filesystem::path(executable_path).parent_path() / L"sources" / L"everything";
+    const auto source_path = source_directory / L"Glance.EverythingSource.dll";
+    const auto source_descriptor_path = source_directory / L"source.json";
+    const auto source_resource_path = source_directory / L"resources.pri";
+    expect(std::filesystem::is_regular_file(source_path), "Everything source DLL output");
+    expect(std::filesystem::is_regular_file(source_descriptor_path), "Everything source descriptor output");
+    expect(std::filesystem::is_regular_file(source_resource_path), "Everything source resource output");
+    const HMODULE source = LoadLibraryExW(
+        source_path.c_str(),
+        nullptr,
+        LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+            LOAD_LIBRARY_SEARCH_SYSTEM32);
+    expect(source != nullptr, "load Everything source DLL");
+    if (source != nullptr)
+    {
+        using namespace glance::contracts::sources;
+        const auto get_source_api = reinterpret_cast<GetApiFunction>(
+            GetProcAddress(source, get_api_export));
+        SourceApi api;
+        expect(get_source_api != nullptr, "Everything source API export");
+        expect(
+            get_source_api != nullptr && get_source_api(abi_version, &api) != FALSE,
+            "Everything source ABI negotiation");
+        SourceRegistration registration;
+        expect(
+            api.initialize != nullptr && api.initialize(&registration) != FALSE,
+            "Everything source registration");
+        expect(
+            std::wstring_view(registration.source_id) == L"everything" &&
+                std::wstring_view(registration.target_app_version) == GLANCE_VERSION_WSTRING,
+            "Everything source identity");
+        expect(
+            (registration.capability_mask & static_cast<std::uint64_t>(Capability::selection)) != 0,
+            "Everything source selection capability");
+        SourceStatusResult status;
+        expect(
+            api.query_status != nullptr && api.query_status(L"en-US", &status) != FALSE &&
+                status.severity == HealthSeverity::healthy,
+            "Everything source ready status");
+        if (api.shutdown != nullptr)
+        {
+            api.shutdown();
+        }
+        FreeLibrary(source);
+    }
     const auto component_directory =
         std::filesystem::path(executable_path).parent_path() / L"components" / L"office";
     const auto component_path = component_directory / L"Glance.OfficeComponent.dll";

@@ -659,6 +659,11 @@ namespace winrt::Glance::App::implementation
                         get_self<implementation::MainWindow>(window)
                             ->RefreshComponentContributions();
                     }
+                },
+                [this](std::string language_tag) {
+                    return pipe_client_.send(
+                        glance::contracts::MessageType::source_status_request,
+                        language_tag);
                 });
             settings_window_.Closed([this](IInspectable const&, WindowEventArgs const&) {
                 settings_window_ = nullptr;
@@ -857,6 +862,12 @@ namespace winrt::Glance::App::implementation
                 {
                 }
             }
+            else if (type == glance::contracts::MessageType::source_status_response &&
+                     settings_window_ != nullptr)
+            {
+                get_self<implementation::SettingsWindow>(settings_window_)
+                    ->HandleSourceStatuses(payload);
+            }
         });
     }
 
@@ -947,6 +958,8 @@ namespace winrt::Glance::App::implementation
         std::uint32_t focused_index{};
         std::uint32_t source_kind{};
         std::uintptr_t source_window{};
+        std::wstring source_id;
+        std::uint64_t source_capabilities{};
 
         try
         {
@@ -983,6 +996,9 @@ namespace winrt::Glance::App::implementation
                 return;
             }
             source_window = static_cast<std::uintptr_t>(*source_window_value);
+            source_id = root.GetNamedString(L"sourceId", L"").c_str();
+            source_capabilities = parse_u64(
+                root.GetNamedString(L"sourceCapabilities", L"0")).value_or(0);
         }
         catch (const hresult_error&)
         {
@@ -1028,7 +1044,9 @@ namespace winrt::Glance::App::implementation
             std::move(files),
             focused_index,
             source_kind,
-            reinterpret_cast<HWND>(source_window));
+            reinterpret_cast<HWND>(source_window),
+            std::move(source_id),
+            source_capabilities);
         glance::contracts::log_event(L"Preview request dispatch complete.");
     }
 

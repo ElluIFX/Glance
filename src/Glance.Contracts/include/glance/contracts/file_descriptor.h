@@ -11,8 +11,7 @@ namespace glance::contracts
         unsupported,
         explorer,
         common_dialog,
-        everything,
-        listary,
+        external_source,
     };
 
     struct FileDescriptor
@@ -36,6 +35,8 @@ namespace glance::contracts
         std::uintptr_t source_window{};
         std::uint32_t source_process_id{};
         HostKind host_kind{ HostKind::unsupported };
+        std::wstring source_id;
+        std::uint64_t source_capabilities{};
         bool accepts_hotkey{};
         bool text_input_active{};
         std::vector<FileDescriptor> items;

@@ -55,7 +55,9 @@ namespace winrt::Glance::App::implementation
             std::vector<glance::app::PreviewFile> files,
             std::uint32_t focused_index,
             std::uint32_t source_kind,
-            HWND source_window);
+            HWND source_window,
+            std::wstring source_id = {},
+            std::uint64_t source_capabilities = 0);
         [[nodiscard]] bool IsPreviewingFile(const std::wstring& path) const noexcept;
         void CloseForReplacement();
         void HidePreview();
@@ -430,13 +432,15 @@ namespace winrt::Glance::App::implementation
         void leave_gallery(bool show_notice, bool notify_core = true);
         void navigate_gallery(int steps);
         [[nodiscard]] bool handle_gallery_wheel(int delta);
+        [[nodiscard]] bool gallery_source_available() const noexcept;
         void request_gallery_page(std::uint32_t target_index, bool select_after_load = true);
         void request_gallery_selection(std::uint32_t target_index);
         [[nodiscard]] bool send_gallery_request(
             std::wstring_view operation,
             std::uint64_t request_id,
             std::uint32_t page_start = 0,
-            std::uint32_t target_index = 0);
+            std::uint32_t target_index = 0,
+            int navigation_steps = 0);
         void apply_gallery_file(std::uint32_t index, glance::app::PreviewFile file);
         void schedule_gallery_preloads();
         void cancel_gallery_preloads() noexcept;
@@ -508,6 +512,8 @@ namespace winrt::Glance::App::implementation
         std::uint32_t current_index_{};
         std::uint32_t source_kind_{};
         HWND source_window_{};
+        std::wstring source_id_;
+        std::uint64_t source_capabilities_{};
         HWND foreground_when_unpinned_{};
         bool visible_{};
         bool topmost_{};
@@ -547,6 +553,7 @@ namespace winrt::Glance::App::implementation
         std::uint64_t gallery_page_request_id_{};
         std::uint64_t gallery_select_request_id_{};
         std::uint32_t gallery_total_count_{};
+        bool gallery_total_known_{ true };
         std::uint32_t gallery_current_index_{};
         std::uint32_t gallery_desired_index_{};
         std::optional<std::uint32_t> gallery_pending_target_;

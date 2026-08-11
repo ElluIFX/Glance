@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "everything",
+  "architecture": "x64",
+  "entry_point": "Glance.EverythingSource.dll",
+  "match": {
+    "process_names": [
+      "everything.exe",
+      "everything32.exe",
+      "everything64.exe"
+    ],
+    "window_class_prefixes": [
+      "EVERYTHING"
+    ]
+  },
+  "payload_files": [
+    "resources.pri",
+    "MRM.dll",
+    "WindowsAppSDK-LICENSE.txt"
+  ],
+  "installer_names": {
+    "en-US": "Everything source",
+    "zh-CN": "Everything 来源"
+  }
+}

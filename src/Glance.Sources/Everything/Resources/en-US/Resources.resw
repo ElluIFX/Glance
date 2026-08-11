@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Status.DisplayName" xml:space="preserve"><value>Everything source</value></data>
+  <data name="Status.Ready" xml:space="preserve"><value>Ready for Everything</value></data>
+  <data name="Status.Connected" xml:space="preserve"><value>Connected to Everything {0}</value></data>
+  <data name="Status.Limited" xml:space="preserve"><value>Connected to Everything {0}; gallery scrolling is unavailable</value></data>
+</root>

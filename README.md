@@ -57,7 +57,7 @@
 
 ### 可选组件
 
-复杂格式支持以独立组件提供，与 Glance 主程序保持隔离。安装器默认全选，也可按需裁剪；便携版可从同版本 Release 下载组件包，解压到程序目录的 `components` 后重启 Glance
+复杂格式支持以独立组件提供，与 Glance 主程序保持隔离。安装器默认全选，也可按需裁剪；绿色版已包含全部组件与来源
 
 - **PDF 预览** — 支持 PDF 多页文档预览，并为 Office 组件提供文档渲染能力
 - **Microsoft Office 预览** — 支持预览 Word、PowerPoint 与 Excel 文件，依赖 PDF 预览组件及本机对应的 Office 应用

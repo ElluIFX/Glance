@@ -1,5 +1,6 @@
 #define PayloadDir GetEnv("GLANCE_SOURCE_DIR")
 #define ComponentsDir GetEnv("GLANCE_COMPONENTS_DIR")
+#define SourcesDir GetEnv("GLANCE_SOURCES_DIR")
 #define ComponentInnoDir GetEnv("GLANCE_COMPONENT_INNO_DIR")
 #define OutputDir GetEnv("GLANCE_OUTPUT_DIR")
 #define RepoRoot GetEnv("GLANCE_REPO_ROOT")
@@ -53,6 +54,8 @@ english.DeleteUserData=Also delete Glance settings, logs, crash dumps, and cache
 english.FullInstallation=Full installation
 english.CoreInstallation=Core only
 english.CustomInstallation=Custom installation
+english.ComponentsGroup=Add-on components
+english.SourcesGroup=Add-on sources
 chinesesimplified.AdditionalTasks=其他选项：
 chinesesimplified.CreateStartMenuShortcut=创建开始菜单快捷方式
 chinesesimplified.CreateDesktopShortcut=创建桌面快捷方式
@@ -61,6 +64,8 @@ chinesesimplified.DeleteUserData=同时删除 Glance 设置、日志、崩溃转
 chinesesimplified.FullInstallation=完整安装
 chinesesimplified.CoreInstallation=仅核心程序
 chinesesimplified.CustomInstallation=自定义安装
+chinesesimplified.ComponentsGroup=附加组件
+chinesesimplified.SourcesGroup=附加来源
 #include ComponentInnoDir + "\component-messages.iss"
 
 [Types]
@@ -77,12 +82,13 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopShortcut}"; GroupDescription
 Name: "startup"; Description: "{cm:StartAtSignIn}"; GroupDescription: "{cm:AdditionalTasks}"
 
 [Files]
-Source: "{#PayloadDir}\*"; DestDir: "{app}"; Excludes: "*.exp,*.ilk,*.lib,*.pdb,Glance.Tests.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PayloadDir}\*"; DestDir: "{app}"; Excludes: "*.exp,*.ilk,*.lib,*.pdb,Glance.Tests.exe,components\*,sources\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 #include ComponentInnoDir + "\component-files.iss"
 Source: "{#RepoRoot}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\components"
+Name: "{app}\sources"
 
 [Icons]
 Name: "{group}\Glance"; Filename: "{app}\Glance.exe"; Tasks: startmenuicon
@@ -234,10 +240,12 @@ end;
 procedure InitializeWizard;
 var
   PreviousComponentCatalog: String;
+  PreviousSourceCatalog: String;
 begin
   ComponentsListClickCheckPrevious := WizardForm.ComponentsList.OnClickCheck;
   PreviousComponentCatalog := GetPreviousData(
     'KnownComponents', LegacyComponentCatalog);
+  PreviousSourceCatalog := GetPreviousData('KnownSources', '');
 #include ComponentInnoDir + "\component-select-new.iss"
   NormalizeComponentDependencies('');
   ComponentSelectionSnapshot := WizardSelectedComponents(False);
@@ -250,6 +258,8 @@ procedure RegisterPreviousData(PreviousDataKey: Integer);
 begin
   SetPreviousData(
     PreviousDataKey, 'KnownComponents', '{#CurrentComponentCatalog}');
+  SetPreviousData(
+    PreviousDataKey, 'KnownSources', '{#CurrentSourceCatalog}');
 end;
 
 function WaitForGlanceExit: Boolean;
