@@ -4,7 +4,7 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
-## [2026.08.11.1] - 2026-08-11
+## [2026.08.11.2] - 2026-08-11
 
 ### Added
 
