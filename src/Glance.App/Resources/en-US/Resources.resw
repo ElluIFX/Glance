@@ -17,6 +17,7 @@
   <data name="LoadingFolder" xml:space="preserve"><value>Loading folder...</value></data>
   <data name="LoadingArchive" xml:space="preserve"><value>Loading directory...</value></data>
   <data name="LoadingPdf" xml:space="preserve"><value>Loading PDF...</value></data>
+  <data name="LoadingDeviceFile" xml:space="preserve"><value>Preparing file from device</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>Detecting...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="FontSizeOverlayFormat" xml:space="preserve"><value>{0} px</value></data>
@@ -43,6 +44,7 @@
   <data name="TextBinaryError" xml:space="preserve"><value>The file does not appear to contain text.</value></data>
   <data name="ArchiveReadError" xml:space="preserve"><value>The archive contents could not be read.</value></data>
   <data name="FolderReadError" xml:space="preserve"><value>The folder could not be read.</value></data>
+  <data name="DeviceFileReadError" xml:space="preserve"><value>Unable to read file from device</value></data>
   <data name="FolderType" xml:space="preserve"><value>Folder</value></data>
   <data name="FileType" xml:space="preserve"><value>File</value></data>
   <data name="ExtensionFileType" xml:space="preserve"><value>{0} file</value></data>

@@ -256,6 +256,13 @@ namespace winrt::Glance::App::implementation
             const glance::app::PreviewFile& file,
             bool allow_text_preview = false,
             bool allow_advanced_info = false);
+        winrt::fire_and_forget materialize_shell_file_async(
+            std::uint32_t index,
+            std::wstring parsing_name,
+            std::wstring display_name,
+            std::vector<std::uint8_t> shell_id_list,
+            std::uint64_t generation,
+            std::shared_ptr<std::atomic_bool> cancellation);
         winrt::fire_and_forget load_generic_icon_async(
             std::wstring path,
             bool is_folder,
@@ -576,6 +583,7 @@ namespace winrt::Glance::App::implementation
         double image_pan_vertical_offset_{};
         Windows::Foundation::Point image_pan_start_{};
         std::uint64_t content_generation_{};
+        std::shared_ptr<std::atomic_bool> shell_file_cancellation_;
         std::uint64_t component_placement_generation_{};
         std::wstring current_text_;
         std::wstring current_text_path_;

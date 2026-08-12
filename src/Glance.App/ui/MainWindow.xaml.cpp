@@ -1865,6 +1865,11 @@ namespace winrt::Glance::App::implementation
     void MainWindow::clear_preview_content()
     {
         leave_gallery(false);
+        if (shell_file_cancellation_)
+        {
+            shell_file_cancellation_->store(true, std::memory_order_release);
+            shell_file_cancellation_.reset();
+        }
         if (image_load_operation_ != nullptr)
         {
             try
@@ -2386,6 +2391,11 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        if (shell_file_cancellation_)
+        {
+            shell_file_cancellation_->store(true, std::memory_order_release);
+            shell_file_cancellation_.reset();
+        }
         if (image_load_operation_ != nullptr)
         {
             try
@@ -2440,7 +2450,7 @@ namespace winrt::Glance::App::implementation
         pdf_page_index_ = 0;
         pdf_page_count_ = 0;
         const auto& file = files_[index];
-        gallery_media_kind_ = file.path.empty()
+        gallery_media_kind_ = !file.is_filesystem || file.path.empty()
             ? glance::contracts::components::GalleryMediaKind::none
             : glance::app::gallery_media_kind(file.path);
         const auto media_preferences = glance::app::load_media_preview_preferences();
@@ -2463,12 +2473,38 @@ namespace winrt::Glance::App::implementation
 
         const bool from_explorer = source_kind_ == 1;
         OpenFolderButton().Visibility(from_explorer ? Visibility::Collapsed : Visibility::Visible);
-        OpenDefaultButton().Visibility(file.path.empty() ? Visibility::Collapsed : Visibility::Visible);
+        const bool open_target_available = file.is_filesystem
+            ? !file.path.empty()
+            : !file.parsing_name.empty();
+        OpenDefaultButton().Visibility(
+            open_target_available ? Visibility::Visible : Visibility::Collapsed);
 
-        if (file.is_cloud_placeholder || file.path.empty())
+        if (file.is_cloud_placeholder)
         {
             current_kind_ = glance::app::PreviewKind::generic;
             present_generic(file);
+            return;
+        }
+
+        if (file.path.empty())
+        {
+            current_kind_ = glance::app::PreviewKind::generic;
+            present_generic(file);
+            if (!file.is_filesystem &&
+                !file.parsing_name.empty() &&
+                (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+            {
+                ComponentLoadingText().Text(glance::app::localize(L"LoadingDeviceFile"));
+                ComponentLoadingText().Visibility(Visibility::Visible);
+                shell_file_cancellation_ = std::make_shared<std::atomic_bool>(false);
+                materialize_shell_file_async(
+                    index,
+                    file.parsing_name,
+                    file.display_name,
+                    file.shell_id_list,
+                    generation,
+                    shell_file_cancellation_);
+            }
             return;
         }
 
@@ -2632,7 +2668,8 @@ namespace winrt::Glance::App::implementation
         current_kind_ = glance::app::PreviewKind::generic;
         show_content_panel(glance::app::PreviewKind::generic);
         FileNameText().Text(file.display_name);
-        FilePathText().Text(!file.path.empty() ? file.path : file.parsing_name);
+        FilePathText().Text(
+            file.is_filesystem ? file.path : file.parsing_name);
         update_generic_file_metadata();
         GenericFileIconImage().Source(nullptr);
         GenericFileIconImage().Visibility(Visibility::Collapsed);
@@ -2646,19 +2683,20 @@ namespace winrt::Glance::App::implementation
         update_preview_as_text_button();
         PreviewAsTextButton().IsEnabled(true);
         const bool advanced_info_available =
-            allow_advanced_info && !file.path.empty() && !file.is_cloud_placeholder &&
+            allow_advanced_info && file.is_filesystem && !file.path.empty() &&
+            !file.is_cloud_placeholder &&
             (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
         GenericAdvancedInfoButton().Visibility(
             advanced_info_available ? Visibility::Visible : Visibility::Collapsed);
         ErrorText().Visibility(Visibility::Collapsed);
         ComponentLoadingText().Visibility(Visibility::Collapsed);
-        const auto icon_path = !file.path.empty() ? file.path : file.parsing_name;
+        const auto icon_path = file.is_filesystem ? file.path : file.parsing_name;
         if (!icon_path.empty())
         {
             load_generic_icon_async(
                 icon_path,
                 (file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0,
-                file.is_cloud_placeholder || file.path.empty(),
+                file.is_cloud_placeholder || !file.is_filesystem,
                 content_generation_);
         }
         if (advanced_info_available && generic_preview_preferences_.show_advanced_info)
@@ -2666,6 +2704,68 @@ namespace winrt::Glance::App::implementation
             load_generic_file_info_async(file.path, content_generation_);
         }
         update_footer_metadata();
+    }
+
+    fire_and_forget MainWindow::materialize_shell_file_async(
+        std::uint32_t index,
+        std::wstring parsing_name,
+        std::wstring display_name,
+        std::vector<std::uint8_t> shell_id_list,
+        std::uint64_t generation,
+        std::shared_ptr<std::atomic_bool> cancellation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        auto result = glance::app::materialize_shell_file(
+            parsing_name,
+            display_name,
+            shell_id_list,
+            cancellation);
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            index,
+            generation,
+            cancellation = std::move(cancellation),
+            result = std::move(result)]() mutable {
+            if (generation != lifetime->content_generation_ ||
+                index >= lifetime->files_.size() ||
+                cancellation != lifetime->shell_file_cancellation_)
+            {
+                return;
+            }
+            lifetime->shell_file_cancellation_.reset();
+            if (result.cancelled)
+            {
+                return;
+            }
+            if (result.path.empty() || result.lease == nullptr)
+            {
+                glance::contracts::log_event(
+                    L"Shell item materialization failed at " +
+                    result.error_stage + L": " +
+                    std::to_wstring(result.error));
+                lifetime->ComponentLoadingText().Visibility(Visibility::Collapsed);
+                lifetime->ErrorText().Text(
+                    glance::app::localize(L"DeviceFileReadError"));
+                lifetime->ErrorText().Visibility(Visibility::Visible);
+                return;
+            }
+
+            auto& file = lifetime->files_[index];
+            file.path = std::move(result.path);
+            file.materialized_lease = std::move(result.lease);
+            file.size = result.size;
+            if (result.creation_time != 0)
+            {
+                file.creation_time = result.creation_time;
+            }
+            if (result.last_write_time != 0)
+            {
+                file.last_write_time = result.last_write_time;
+            }
+            lifetime->present_file(index);
+        }));
     }
 
     fire_and_forget MainWindow::load_generic_icon_async(
@@ -3316,7 +3416,7 @@ namespace winrt::Glance::App::implementation
         }
 
         const auto& file = files_[current_index_];
-        if (file.path.empty() || file.is_cloud_placeholder)
+        if (!file.is_filesystem || file.path.empty() || file.is_cloud_placeholder)
         {
             footer_access_mode_ = L"--";
             footer_access_loaded_ = true;
@@ -7514,9 +7614,10 @@ namespace winrt::Glance::App::implementation
         try
         {
             Windows::ApplicationModel::DataTransfer::DataPackage package;
-            std::wstring path = !files_[current_index_].path.empty()
-                ? files_[current_index_].path
-                : files_[current_index_].parsing_name;
+            const auto& file = files_[current_index_];
+            std::wstring path = file.is_filesystem
+                ? file.path
+                : file.parsing_name;
             const auto preferences = glance::app::load_path_copy_preferences();
             if (preferences.use_unix_separators)
             {
@@ -7618,11 +7719,17 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::OpenDefaultButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        if (current_index_ >= files_.size() || files_[current_index_].path.empty())
+        if (current_index_ >= files_.size())
         {
             return;
         }
-        ShellExecuteW(nullptr, L"open", files_[current_index_].path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        const auto& file = files_[current_index_];
+        const auto& target = file.is_filesystem ? file.path : file.parsing_name;
+        if (target.empty())
+        {
+            return;
+        }
+        ShellExecuteW(nullptr, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
     }
 
     void MainWindow::OpenDefaultButton_RightTapped(

@@ -17,6 +17,7 @@
   <data name="LoadingFolder" xml:space="preserve"><value>正在加载文件夹...</value></data>
   <data name="LoadingArchive" xml:space="preserve"><value>正在读取目录...</value></data>
   <data name="LoadingPdf" xml:space="preserve"><value>正在加载 PDF...</value></data>
+  <data name="LoadingDeviceFile" xml:space="preserve"><value>正在从设备准备文件</value></data>
   <data name="EncodingDetecting" xml:space="preserve"><value>正在检测...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>未知</value></data>
   <data name="FontSizeOverlayFormat" xml:space="preserve"><value>{0} px</value></data>
@@ -43,6 +44,7 @@
   <data name="TextBinaryError" xml:space="preserve"><value>该文件不是可识别的文本格式</value></data>
   <data name="ArchiveReadError" xml:space="preserve"><value>无法读取压缩包内容</value></data>
   <data name="FolderReadError" xml:space="preserve"><value>无法读取文件夹</value></data>
+  <data name="DeviceFileReadError" xml:space="preserve"><value>无法从设备读取文件</value></data>
   <data name="FolderType" xml:space="preserve"><value>文件夹</value></data>
   <data name="FileType" xml:space="preserve"><value>文件</value></data>
   <data name="ExtensionFileType" xml:space="preserve"><value>{0} 文件</value></data>

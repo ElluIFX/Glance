@@ -5,6 +5,9 @@
 
 #include <windows.h>
 #include <icu.h>
+#include <propkey.h>
+#include <shellapi.h>
+#include <shlguid.h>
 
 #include <algorithm>
 #include <array>
@@ -22,11 +25,122 @@
 #include <ranges>
 #include <span>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace
 {
     constexpr std::size_t maximum_encoding_detection_bytes = 16U * 1024U;
+
+    class TemporaryDirectoryLease final
+    {
+    public:
+        explicit TemporaryDirectoryLease(std::filesystem::path path)
+            : path_(std::move(path))
+        {
+        }
+
+        ~TemporaryDirectoryLease()
+        {
+            std::error_code error;
+            std::filesystem::remove_all(path_, error);
+        }
+
+    private:
+        std::filesystem::path path_;
+    };
+
+    class ComApartment final
+    {
+    public:
+        ComApartment() noexcept
+            : result_(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))
+        {
+        }
+
+        ~ComApartment()
+        {
+            if (SUCCEEDED(result_))
+            {
+                CoUninitialize();
+            }
+        }
+
+        [[nodiscard]] bool available() const noexcept
+        {
+            return SUCCEEDED(result_);
+        }
+
+        [[nodiscard]] HRESULT result() const noexcept
+        {
+            return result_;
+        }
+
+    private:
+        HRESULT result_{};
+    };
+
+    std::uint64_t file_time_value(const FILETIME& value) noexcept
+    {
+        return (static_cast<std::uint64_t>(value.dwHighDateTime) << 32U) |
+            value.dwLowDateTime;
+    }
+
+    std::wstring safe_shell_file_name(std::wstring_view display_name)
+    {
+        std::wstring result(display_name.empty() ? L"item" : display_name);
+        for (auto& character : result)
+        {
+            if (character < L' ' ||
+                std::wstring_view(L"<>:\"/\\|?*").find(character) != std::wstring_view::npos)
+            {
+                character = L'_';
+            }
+        }
+        while (!result.empty() && (result.back() == L' ' || result.back() == L'.'))
+        {
+            result.pop_back();
+        }
+        if (result.empty() || result == L"." || result == L"..")
+        {
+            result = L"item";
+        }
+        constexpr std::size_t maximum_name_characters = 180;
+        if (result.size() > maximum_name_characters)
+        {
+            const auto extension = std::filesystem::path(result).extension().wstring();
+            const auto suffix = extension.size() < maximum_name_characters / 2
+                ? extension
+                : std::wstring{};
+            result.resize(maximum_name_characters - suffix.size());
+            result += suffix;
+        }
+        return result;
+    }
+
+    std::filesystem::path unique_shell_preview_directory(std::error_code& error)
+    {
+        GUID identifier{};
+        if (FAILED(CoCreateGuid(&identifier)))
+        {
+            error = std::make_error_code(std::errc::io_error);
+            return {};
+        }
+        wchar_t text[39]{};
+        if (StringFromGUID2(identifier, text, static_cast<int>(std::size(text))) == 0)
+        {
+            error = std::make_error_code(std::errc::io_error);
+            return {};
+        }
+        auto root = std::filesystem::temp_directory_path(error) /
+            L"Glance" / L"ShellPreview" / text;
+        if (error)
+        {
+            return {};
+        }
+        std::filesystem::create_directories(root, error);
+        return error ? std::filesystem::path{} : root;
+    }
 
     std::wstring lower_extension(const std::wstring& path)
     {
@@ -774,6 +888,199 @@ namespace glance::app
             std::wstring_view(L".woff2"), std::wstring_view(L".iso"),
             std::wstring_view(L".vhd"), std::wstring_view(L".vhdx") };
         return !contains(extension, excluded_extensions);
+    }
+
+    MaterializedShellFile materialize_shell_file(
+        std::wstring_view parsing_name,
+        std::wstring_view display_name,
+        std::span<const std::uint8_t> shell_id_list,
+        const std::shared_ptr<std::atomic_bool>& cancellation) noexcept
+    {
+        MaterializedShellFile result;
+        try
+        {
+            if (parsing_name.empty() && shell_id_list.empty())
+            {
+                result.error = E_INVALIDARG;
+                result.error_stage = L"input";
+                return result;
+            }
+            const std::wstring parsing_name_copy(parsing_name);
+            const std::wstring display_name_copy(display_name);
+            const std::vector<std::uint8_t> shell_id_list_copy(
+                shell_id_list.begin(),
+                shell_id_list.end());
+            std::thread worker([&] {
+                try
+                {
+                    ComApartment apartment;
+                    if (!apartment.available())
+                    {
+                        result.error = apartment.result();
+                        result.error_stage = L"COM initialization";
+                        return;
+                    }
+                    if (cancellation && cancellation->load(std::memory_order_acquire))
+                    {
+                        result.cancelled = true;
+                        return;
+                    }
+
+                    winrt::com_ptr<IShellItem> source;
+                    HRESULT operation = E_INVALIDARG;
+                    if (!shell_id_list_copy.empty())
+                    {
+                        auto* id_list = static_cast<PIDLIST_ABSOLUTE>(
+                            CoTaskMemAlloc(shell_id_list_copy.size()));
+                        if (id_list != nullptr)
+                        {
+                            std::memcpy(
+                                id_list,
+                                shell_id_list_copy.data(),
+                                shell_id_list_copy.size());
+                            operation = SHCreateItemFromIDList(
+                                id_list,
+                                IID_PPV_ARGS(source.put()));
+                            CoTaskMemFree(id_list);
+                        }
+                        else
+                        {
+                            operation = E_OUTOFMEMORY;
+                        }
+                    }
+                    if (FAILED(operation) && !parsing_name_copy.empty())
+                    {
+                        source = nullptr;
+                        operation = SHCreateItemFromParsingName(
+                            parsing_name_copy.c_str(),
+                            nullptr,
+                            IID_PPV_ARGS(source.put()));
+                    }
+                    if (FAILED(operation))
+                    {
+                        result.error = operation;
+                        result.error_stage = L"source item";
+                        return;
+                    }
+
+                    if (const auto item2 = source.try_as<IShellItem2>())
+                    {
+                        static_cast<void>(item2->GetUInt64(PKEY_Size, &result.size));
+                        FILETIME time{};
+                        if (SUCCEEDED(item2->GetFileTime(PKEY_DateCreated, &time)))
+                        {
+                            result.creation_time = file_time_value(time);
+                        }
+                        if (SUCCEEDED(item2->GetFileTime(PKEY_DateModified, &time)))
+                        {
+                            result.last_write_time = file_time_value(time);
+                        }
+                    }
+
+                    std::error_code filesystem_error;
+                    auto directory = unique_shell_preview_directory(filesystem_error);
+                    if (filesystem_error || directory.empty())
+                    {
+                        result.error = HRESULT_FROM_WIN32(
+                            filesystem_error.value() != 0
+                                ? static_cast<DWORD>(filesystem_error.value())
+                                : ERROR_CANNOT_MAKE);
+                        result.error_stage = L"temporary directory";
+                        return;
+                    }
+                    auto lease = std::make_shared<TemporaryDirectoryLease>(directory);
+                    const auto output = directory / safe_shell_file_name(display_name_copy);
+
+                    winrt::com_ptr<IShellItem> destination;
+                    operation = SHCreateItemFromParsingName(
+                        directory.c_str(),
+                        nullptr,
+                        IID_PPV_ARGS(destination.put()));
+                    if (FAILED(operation))
+                    {
+                        result.error = operation;
+                        result.error_stage = L"destination item";
+                        return;
+                    }
+
+                    winrt::com_ptr<IFileOperation> file_operation;
+                    operation = CoCreateInstance(
+                        CLSID_FileOperation,
+                        nullptr,
+                        CLSCTX_INPROC_SERVER,
+                        IID_PPV_ARGS(file_operation.put()));
+                    if (FAILED(operation))
+                    {
+                        result.error = operation;
+                        result.error_stage = L"file operation";
+                        return;
+                    }
+                    operation = file_operation->SetOperationFlags(
+                        FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI |
+                        FOF_NOCONFIRMMKDIR);
+                    if (SUCCEEDED(operation))
+                    {
+                        operation = file_operation->CopyItem(
+                            source.get(),
+                            destination.get(),
+                            output.filename().c_str(),
+                            nullptr);
+                    }
+                    if (SUCCEEDED(operation))
+                    {
+                        operation = file_operation->PerformOperations();
+                    }
+                    BOOL aborted{};
+                    if (SUCCEEDED(operation) &&
+                        (FAILED(file_operation->GetAnyOperationsAborted(&aborted)) || aborted))
+                    {
+                        operation = HRESULT_FROM_WIN32(ERROR_CANCELLED);
+                    }
+                    if (FAILED(operation))
+                    {
+                        result.error = operation;
+                        result.error_stage = L"copy";
+                        return;
+                    }
+                    if (cancellation && cancellation->load(std::memory_order_acquire))
+                    {
+                        result.cancelled = true;
+                        return;
+                    }
+
+                    WIN32_FILE_ATTRIBUTE_DATA attributes{};
+                    if (!GetFileAttributesExW(output.c_str(), GetFileExInfoStandard, &attributes))
+                    {
+                        result.error = HRESULT_FROM_WIN32(GetLastError());
+                        result.error_stage = L"copied file";
+                        return;
+                    }
+                    result.size =
+                        (static_cast<std::uint64_t>(attributes.nFileSizeHigh) << 32U) |
+                        attributes.nFileSizeLow;
+                    result.creation_time = file_time_value(attributes.ftCreationTime);
+                    result.last_write_time = file_time_value(attributes.ftLastWriteTime);
+                    result.path = output.wstring();
+                    result.lease = std::move(lease);
+                }
+                catch (...)
+                {
+                    result.error = E_FAIL;
+                    result.error_stage = L"worker";
+                    result.path.clear();
+                    result.lease.reset();
+                }
+            });
+            worker.join();
+        }
+        catch (...)
+        {
+            result.error = E_FAIL;
+            result.error_stage = L"thread";
+            result.path.clear();
+            result.lease.reset();
+        }
+        return result;
     }
 
     PreviewKind resolve_preview_kind(const std::wstring& path)

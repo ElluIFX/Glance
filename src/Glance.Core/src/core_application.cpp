@@ -14,12 +14,25 @@
 #include <mutex>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <unordered_map>
 #include <tlhelp32.h>
 #include <wtsapi32.h>
 
 namespace
 {
+    std::wstring encode_hex(std::span<const std::uint8_t> bytes)
+    {
+        constexpr wchar_t digits[] = L"0123456789abcdef";
+        std::wstring result(bytes.size() * 2U, L'0');
+        for (std::size_t index = 0; index < bytes.size(); ++index)
+        {
+            result[index * 2U] = digits[bytes[index] >> 4U];
+            result[index * 2U + 1U] = digits[bytes[index] & 0x0FU];
+        }
+        return result;
+    }
+
     std::optional<std::uint64_t> parse_u64(const winrt::hstring& value)
     {
         try
@@ -158,6 +171,7 @@ namespace
             file.SetNamedValue(L"displayName", JsonValue::CreateStringValue(item.display_name));
             file.SetNamedValue(L"path", JsonValue::CreateStringValue(item.filesystem_path));
             file.SetNamedValue(L"parsingName", JsonValue::CreateStringValue(item.shell_parsing_name));
+            file.SetNamedValue(L"shellIdList", JsonValue::CreateStringValue(encode_hex(item.shell_id_list)));
             file.SetNamedValue(L"size", JsonValue::CreateStringValue(std::to_wstring(item.size)));
             file.SetNamedValue(L"creationTime", JsonValue::CreateStringValue(std::to_wstring(item.creation_time)));
             file.SetNamedValue(L"lastWriteTime", JsonValue::CreateStringValue(std::to_wstring(item.last_write_time)));
@@ -1606,6 +1620,7 @@ namespace glance::core
             file.SetNamedValue(L"displayName", JsonValue::CreateStringValue(item.display_name));
             file.SetNamedValue(L"path", JsonValue::CreateStringValue(item.filesystem_path));
             file.SetNamedValue(L"parsingName", JsonValue::CreateStringValue(item.shell_parsing_name));
+            file.SetNamedValue(L"shellIdList", JsonValue::CreateStringValue(encode_hex(item.shell_id_list)));
             file.SetNamedValue(L"size", JsonValue::CreateStringValue(std::to_wstring(item.size)));
             file.SetNamedValue(L"creationTime", JsonValue::CreateStringValue(std::to_wstring(item.creation_time)));
             file.SetNamedValue(L"lastWriteTime", JsonValue::CreateStringValue(std::to_wstring(item.last_write_time)));

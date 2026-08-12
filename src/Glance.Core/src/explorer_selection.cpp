@@ -9,6 +9,7 @@
 #include <oleacc.h>
 #include <servprov.h>
 #include <shlguid.h>
+#include <shlobj_core.h>
 #include <shobjidl_core.h>
 #include <shldisp.h>
 #include <uiautomationclient.h>
@@ -198,6 +199,28 @@ namespace
         result.filesystem_path = shell_item_name(item, SIGDN_FILESYSPATH);
         result.shell_parsing_name = shell_item_name(item, SIGDN_DESKTOPABSOLUTEPARSING);
         result.is_filesystem = !result.filesystem_path.empty();
+
+        if (!result.is_filesystem)
+        {
+            PIDLIST_ABSOLUTE id_list{};
+            if (SUCCEEDED(SHGetIDListFromObject(item, &id_list)) && id_list != nullptr)
+            {
+                const UINT size = ILGetSize(id_list);
+                if (size > 0 && size <= 64U * 1024U)
+                {
+                    const auto* bytes = reinterpret_cast<const std::uint8_t*>(id_list);
+                    result.shell_id_list.assign(bytes, bytes + size);
+                }
+                CoTaskMemFree(id_list);
+            }
+        }
+
+        SFGAOF shell_attributes{};
+        if (SUCCEEDED(item->GetAttributes(SFGAO_FOLDER, &shell_attributes)) &&
+            (shell_attributes & SFGAO_FOLDER) != 0)
+        {
+            result.attributes |= FILE_ATTRIBUTE_DIRECTORY;
+        }
 
         if (result.is_filesystem)
         {

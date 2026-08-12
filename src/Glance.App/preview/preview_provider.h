@@ -2,7 +2,9 @@
 
 #include "glance/contracts/component_api.h"
 
+#include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -35,6 +37,18 @@ namespace glance::app
         bool has_more{};
     };
 
+    struct MaterializedShellFile
+    {
+        std::wstring path;
+        std::shared_ptr<void> lease;
+        std::uint64_t size{};
+        std::uint64_t creation_time{};
+        std::uint64_t last_write_time{};
+        std::int32_t error{};
+        std::wstring error_stage;
+        bool cancelled{};
+    };
+
     enum class TextEncoding
     {
         automatic,
@@ -54,6 +68,11 @@ namespace glance::app
     [[nodiscard]] std::vector<std::wstring> gallery_extensions(
         glance::contracts::components::GalleryMediaKind kind);
     [[nodiscard]] bool can_try_preview_as_text(const std::wstring& path);
+    [[nodiscard]] MaterializedShellFile materialize_shell_file(
+        std::wstring_view parsing_name,
+        std::wstring_view display_name,
+        std::span<const std::uint8_t> shell_id_list,
+        const std::shared_ptr<std::atomic_bool>& cancellation) noexcept;
     [[nodiscard]] TextPreview load_text_preview(
         const std::wstring& path,
         std::size_t chunk_bytes = 256U * 1024U,

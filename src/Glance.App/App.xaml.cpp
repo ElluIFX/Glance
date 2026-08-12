@@ -28,6 +28,37 @@ namespace Media = Microsoft::UI::Xaml::Media;
 
 namespace
 {
+    std::optional<std::vector<std::uint8_t>> decode_hex(std::wstring_view text)
+    {
+        if ((text.size() & 1U) != 0)
+        {
+            return std::nullopt;
+        }
+        const auto digit = [](wchar_t value) -> std::optional<std::uint8_t> {
+            if (value >= L'0' && value <= L'9')
+            {
+                return static_cast<std::uint8_t>(value - L'0');
+            }
+            if (value >= L'a' && value <= L'f')
+            {
+                return static_cast<std::uint8_t>(value - L'a' + 10);
+            }
+            return std::nullopt;
+        };
+        std::vector<std::uint8_t> result(text.size() / 2U);
+        for (std::size_t index = 0; index < result.size(); ++index)
+        {
+            const auto high = digit(text[index * 2U]);
+            const auto low = digit(text[index * 2U + 1U]);
+            if (!high || !low)
+            {
+                return std::nullopt;
+            }
+            result[index] = static_cast<std::uint8_t>((*high << 4U) | *low);
+        }
+        return result;
+    }
+
     std::filesystem::path executable_directory()
     {
         std::wstring path(32768, L'\0');
@@ -973,13 +1004,16 @@ namespace winrt::Glance::App::implementation
                 file.display_name = object.GetNamedString(L"displayName").c_str();
                 file.path = object.GetNamedString(L"path").c_str();
                 file.parsing_name = object.GetNamedString(L"parsingName").c_str();
+                const auto shell_id_list = decode_hex(
+                    object.GetNamedString(L"shellIdList", L"").c_str());
                 const auto size = parse_u64(object.GetNamedString(L"size"));
                 const auto creation_time = parse_u64(object.GetNamedString(L"creationTime"));
                 const auto last_write_time = parse_u64(object.GetNamedString(L"lastWriteTime"));
-                if (!size || !creation_time || !last_write_time)
+                if (!shell_id_list || !size || !creation_time || !last_write_time)
                 {
                     return;
                 }
+                file.shell_id_list = std::move(*shell_id_list);
                 file.size = *size;
                 file.creation_time = *creation_time;
                 file.last_write_time = *last_write_time;
