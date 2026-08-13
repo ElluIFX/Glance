@@ -8,6 +8,7 @@
 #include <propkey.h>
 #include <shellapi.h>
 #include <shlguid.h>
+#include <shlwapi.h>
 
 #include <algorithm>
 #include <array>
@@ -84,6 +85,14 @@ namespace
     {
         return (static_cast<std::uint64_t>(value.dwHighDateTime) << 32U) |
             value.dwLowDateTime;
+    }
+
+    FILETIME to_file_time(std::uint64_t value) noexcept
+    {
+        FILETIME result{};
+        result.dwLowDateTime = static_cast<DWORD>(value);
+        result.dwHighDateTime = static_cast<DWORD>(value >> 32U);
+        return result;
     }
 
     std::wstring safe_shell_file_name(std::wstring_view display_name)
@@ -991,61 +1000,90 @@ namespace glance::app
                     auto lease = std::make_shared<TemporaryDirectoryLease>(directory);
                     const auto output = directory / safe_shell_file_name(display_name_copy);
 
-                    winrt::com_ptr<IShellItem> destination;
-                    operation = SHCreateItemFromParsingName(
-                        directory.c_str(),
+                    winrt::com_ptr<IStream> source_stream;
+                    operation = source->BindToHandler(
                         nullptr,
-                        IID_PPV_ARGS(destination.put()));
+                        BHID_Stream,
+                        IID_PPV_ARGS(source_stream.put()));
                     if (FAILED(operation))
                     {
                         result.error = operation;
-                        result.error_stage = L"destination item";
+                        result.error_stage = L"source stream";
                         return;
                     }
 
-                    winrt::com_ptr<IFileOperation> file_operation;
-                    operation = CoCreateInstance(
-                        CLSID_FileOperation,
+                    winrt::com_ptr<IStream> destination_stream;
+                    operation = SHCreateStreamOnFileEx(
+                        output.c_str(),
+                        STGM_CREATE | STGM_WRITE,
+                        FILE_ATTRIBUTE_NORMAL,
+                        TRUE,
                         nullptr,
-                        CLSCTX_INPROC_SERVER,
-                        IID_PPV_ARGS(file_operation.put()));
+                        destination_stream.put());
                     if (FAILED(operation))
                     {
                         result.error = operation;
-                        result.error_stage = L"file operation";
+                        result.error_stage = L"destination stream";
                         return;
                     }
-                    operation = file_operation->SetOperationFlags(
-                        FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI |
-                        FOF_NOCONFIRMMKDIR);
-                    if (SUCCEEDED(operation))
+
+                    constexpr ULONG copy_chunk_bytes = 1U * 1024U * 1024U;
+                    for (;;)
                     {
-                        operation = file_operation->CopyItem(
-                            source.get(),
-                            destination.get(),
-                            output.filename().c_str(),
-                            nullptr);
+                        if (cancellation && cancellation->load(std::memory_order_acquire))
+                        {
+                            result.cancelled = true;
+                            return;
+                        }
+                        ULARGE_INTEGER chunk{};
+                        chunk.QuadPart = copy_chunk_bytes;
+                        ULARGE_INTEGER bytes_read{};
+                        ULARGE_INTEGER bytes_written{};
+                        operation = source_stream->CopyTo(
+                            destination_stream.get(),
+                            chunk,
+                            &bytes_read,
+                            &bytes_written);
+                        if (FAILED(operation))
+                        {
+                            result.error = operation;
+                            result.error_stage = L"copy";
+                            return;
+                        }
+                        if (bytes_read.QuadPart == 0)
+                        {
+                            break;
+                        }
                     }
-                    if (SUCCEEDED(operation))
-                    {
-                        operation = file_operation->PerformOperations();
-                    }
-                    BOOL aborted{};
-                    if (SUCCEEDED(operation) &&
-                        (FAILED(file_operation->GetAnyOperationsAborted(&aborted)) || aborted))
-                    {
-                        operation = HRESULT_FROM_WIN32(ERROR_CANCELLED);
-                    }
-                    if (FAILED(operation))
-                    {
-                        result.error = operation;
-                        result.error_stage = L"copy";
-                        return;
-                    }
+                    static_cast<void>(destination_stream->Commit(STGC_DEFAULT));
+                    destination_stream = nullptr;
                     if (cancellation && cancellation->load(std::memory_order_acquire))
                     {
                         result.cancelled = true;
                         return;
+                    }
+
+                    if (result.creation_time != 0 || result.last_write_time != 0)
+                    {
+                        const HANDLE copied_file = CreateFileW(
+                            output.c_str(),
+                            FILE_WRITE_ATTRIBUTES,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                            nullptr,
+                            OPEN_EXISTING,
+                            FILE_FLAG_BACKUP_SEMANTICS,
+                            nullptr);
+                        if (copied_file != INVALID_HANDLE_VALUE)
+                        {
+                            FILETIME creation_time = to_file_time(result.creation_time);
+                            FILETIME last_write_time = to_file_time(result.last_write_time);
+                            static_cast<void>(SetFileTime(
+                                copied_file,
+                                result.creation_time != 0 ? &creation_time : nullptr,
+                                nullptr,
+                                result.last_write_time != 0 ? &last_write_time : nullptr));
+                            CloseHandle(copied_file);
+                        }
                     }
 
                     WIN32_FILE_ATTRIBUTE_DATA attributes{};

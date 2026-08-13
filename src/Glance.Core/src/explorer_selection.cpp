@@ -213,13 +213,13 @@ namespace
                 }
                 CoTaskMemFree(id_list);
             }
-        }
 
-        SFGAOF shell_attributes{};
-        if (SUCCEEDED(item->GetAttributes(SFGAO_FOLDER, &shell_attributes)) &&
-            (shell_attributes & SFGAO_FOLDER) != 0)
-        {
-            result.attributes |= FILE_ATTRIBUTE_DIRECTORY;
+            SFGAOF shell_attributes{};
+            if (SUCCEEDED(item->GetAttributes(SFGAO_FOLDER, &shell_attributes)) &&
+                (shell_attributes & SFGAO_FOLDER) != 0)
+            {
+                result.attributes |= FILE_ATTRIBUTE_DIRECTORY;
+            }
         }
 
         if (result.is_filesystem)
