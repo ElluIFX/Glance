@@ -4,6 +4,25 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.15] - 2026-08-15
+
+### Added
+
+- Added optional HEIC, AVIF, and camera RAW preview components.
+- Added detailed grouped EXIF information and an optional capture-time field in the preview footer, including metadata from component-provided image formats.
+- Added previews for files exposed through MTP devices and other non-filesystem Shell sources.
+- Added an option to restrict gallery navigation to files with the same extension.
+
+### Changed
+
+- Refined the Add-ons and Maintenance settings layout, removed nested status-list scrolling, and added a WebView2 download link when the runtime is unavailable.
+- Update prompts now prioritize downloading and installing the available release.
+- Simplified the optional ffprobe download prompts and status text.
+
+### Fixed
+
+- Stabilized file materialization from MTP devices that expose their contents through Shell streams.
+
 ## [2026.08.11.2] - 2026-08-11
 
 ### Added
@@ -200,6 +219,7 @@ The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 - Improved preview switching, pinned-window lifecycle, adaptive sizing, image rotation, large-text rendering, and archive enumeration stability.
 - Prevented stalled Shell selection queries and expensive directory rendering from taking down the preview workflow.
 
+[2026.08.15]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.15
 [2026.08.06.3]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.06.3
 [2026.08.06.2]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.06.2
 [2026.08.06]: https://github.com/ElluIFX/Glance/releases/tag/v2026.08.06
