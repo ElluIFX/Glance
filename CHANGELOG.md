@@ -21,7 +21,7 @@ The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 ### Added
 
 - Added gallery navigation for images, audio, and video using the current File Explorer order, synchronized selection, continuous scrolling, and adjacent-image preloading.
-- Added an optional advanced media information component with on-demand, verified FFprobe preparation after user confirmation.
+- Added an optional advanced media information component with on-demand, verified ffprobe preparation after user confirmation.
 
 ### Fixed
 

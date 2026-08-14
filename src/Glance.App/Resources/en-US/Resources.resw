@@ -228,6 +228,7 @@
   <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 availability</value></data>
   <data name="WebViewAvailable" xml:space="preserve"><value>Runtime available</value></data>
   <data name="WebViewUnavailable" xml:space="preserve"><value>Runtime not found</value></data>
+  <data name="WebViewDownloadLink.Content" xml:space="preserve"><value>Download WebView2</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>Administrator access</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>Export diagnostic package</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>Export</value></data>
@@ -255,7 +256,7 @@
   <data name="CheckForUpdatesButton.Content" xml:space="preserve"><value>Check for updates</value></data>
   <data name="UpdateAvailableTitle" xml:space="preserve"><value>Update available</value></data>
   <data name="UpdateAvailableMessage" xml:space="preserve"><value>Version {0} is available</value></data>
-  <data name="UpdateDownloadAndInstall" xml:space="preserve"><value>Download and update</value></data>
+  <data name="UpdateDownloadAndInstall" xml:space="preserve"><value>Download and install</value></data>
   <data name="UpdateOpenRelease" xml:space="preserve"><value>Open release</value></data>
   <data name="UpdateDownloadTitle" xml:space="preserve"><value>Downloading update</value></data>
   <data name="UpdateDownloadMessage" xml:space="preserve"><value>Preparing version {0}</value></data>

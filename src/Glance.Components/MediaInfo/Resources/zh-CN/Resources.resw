@@ -12,24 +12,24 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
 
   <data name="Component.DisplayName" xml:space="preserve"><value>高级媒体信息</value></data>
-  <data name="Status.Available" xml:space="preserve"><value>FFprobe 可用</value></data>
-  <data name="Status.Unavailable" xml:space="preserve"><value>需要准备 FFprobe</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>ffprobe 可用</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>需要下载 ffprobe</value></data>
   <data name="Shortcut.Tooltip" xml:space="preserve"><value>显示高级媒体信息</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>正在加载高级媒体信息...</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>无法读取高级媒体信息</value></data>
-  <data name="Action.Button" xml:space="preserve"><value>准备 FFprobe</value></data>
-  <data name="Action.ConfirmationTitle" xml:space="preserve"><value>准备高级媒体信息</value></data>
-  <data name="Action.ConfirmationMessage" xml:space="preserve"><value>Glance 将从 gyan.dev 直接下载 FFmpeg essentials 压缩包，并仅为当前用户安装 FFprobe</value></data>
+  <data name="Action.Button" xml:space="preserve"><value>下载 ffprobe</value></data>
+  <data name="Action.ConfirmationTitle" xml:space="preserve"><value>下载 ffprobe</value></data>
+  <data name="Action.ConfirmationMessage" xml:space="preserve"><value>高级媒体预览需要ffprobe支持，是否立刻下载？</value></data>
   <data name="Action.ConfirmationButton" xml:space="preserve"><value>下载</value></data>
-  <data name="Action.DownloadTitle" xml:space="preserve"><value>正在下载 FFprobe</value></data>
+  <data name="Action.DownloadTitle" xml:space="preserve"><value>正在下载 ffprobe</value></data>
   <data name="Action.DownloadMessage" xml:space="preserve"><value>正在从 gyan.dev 下载</value></data>
-  <data name="Action.PreparingTitle" xml:space="preserve"><value>正在准备 FFprobe</value></data>
-  <data name="Action.PreparingMessage" xml:space="preserve"><value>正在解压并校验 FFprobe</value></data>
-  <data name="Action.CompletedTitle" xml:space="preserve"><value>FFprobe 已就绪</value></data>
+  <data name="Action.PreparingTitle" xml:space="preserve"><value>正在安装 ffprobe</value></data>
+  <data name="Action.PreparingMessage" xml:space="preserve"><value>正在解压并校验 ffprobe</value></data>
+  <data name="Action.CompletedTitle" xml:space="preserve"><value>ffprobe 已就绪</value></data>
   <data name="Action.CompletedMessage" xml:space="preserve"><value>现在可以查看高级媒体信息</value></data>
-  <data name="Action.ExtractFailed" xml:space="preserve"><value>无法解压 FFprobe</value></data>
-  <data name="Action.IntegrityFailed" xml:space="preserve"><value>解压后的 FFprobe 与预期校验值不一致</value></data>
-  <data name="Action.InstallFailed" xml:space="preserve"><value>无法安装 FFprobe</value></data>
+  <data name="Action.ExtractFailed" xml:space="preserve"><value>无法解压 ffprobe</value></data>
+  <data name="Action.IntegrityFailed" xml:space="preserve"><value>解压后的 ffprobe 与预期校验值不一致</value></data>
+  <data name="Action.InstallFailed" xml:space="preserve"><value>无法安装 ffprobe</value></data>
   <data name="MediaInfo.General" xml:space="preserve"><value>常规</value></data>
   <data name="MediaInfo.Container" xml:space="preserve"><value>封装格式</value></data>
   <data name="MediaInfo.Duration" xml:space="preserve"><value>时长</value></data>

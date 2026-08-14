@@ -64,7 +64,7 @@ Support for complex formats is provided by isolated components kept separate fro
 - **Archive preview** — Directly previews common compressed and archive formats such as ZIP, 7z, RAR, tar, and ISO
 - **Adobe document preview** — Previews Photoshop PSD/PSB files and Illustrator AI files with PDF-compatible data without requiring Adobe applications
 - **3D model preview** — Previews common 3D files such as STEP, STL, and OBJ
-- **Advanced media information** — Shows codecs, bitrates, and stream details on demand, reusing FFprobe from `PATH` or downloading it automatically when unavailable
+- **Advanced media information** — Shows codecs, bitrates, and stream details on demand, reusing ffprobe from `PATH` or downloading it automatically when unavailable
 
 ### Optional dependencies
 

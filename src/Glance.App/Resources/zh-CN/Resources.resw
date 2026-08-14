@@ -228,6 +228,7 @@
   <data name="WebViewAvailabilityLabel.Text" xml:space="preserve"><value>WebView2 可用性</value></data>
   <data name="WebViewAvailable" xml:space="preserve"><value>运行时可用</value></data>
   <data name="WebViewUnavailable" xml:space="preserve"><value>未检测到运行时</value></data>
+  <data name="WebViewDownloadLink.Content" xml:space="preserve"><value>下载 WebView2</value></data>
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>管理员权限</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>导出诊断包</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>导出</value></data>
@@ -255,7 +256,7 @@
   <data name="CheckForUpdatesButton.Content" xml:space="preserve"><value>检查更新</value></data>
   <data name="UpdateAvailableTitle" xml:space="preserve"><value>发现新版本</value></data>
   <data name="UpdateAvailableMessage" xml:space="preserve"><value>最新版本为 {0}</value></data>
-  <data name="UpdateDownloadAndInstall" xml:space="preserve"><value>下载并更新</value></data>
+  <data name="UpdateDownloadAndInstall" xml:space="preserve"><value>下载并安装</value></data>
   <data name="UpdateOpenRelease" xml:space="preserve"><value>打开 Release</value></data>
   <data name="UpdateDownloadTitle" xml:space="preserve"><value>正在下载更新</value></data>
   <data name="UpdateDownloadMessage" xml:space="preserve"><value>正在准备版本 {0}</value></data>
@@ -333,10 +334,10 @@
   <data name="AccentPurpleText.Text" xml:space="preserve"><value>紫色</value></data>
   <data name="EncodingSelector.Content" xml:space="preserve"><value>正在检测...</value></data>
   <data name="LineNumbersButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示行号</value></data>
-  <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>附加功能</value></data>
+  <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>附加</value></data>
   <data name="AppearanceGroupTitle.Text" xml:space="preserve"><value>外观</value></data>
   <data name="StartupGroupTitle.Text" xml:space="preserve"><value>启动</value></data>
-  <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>附加功能</value></data>
+  <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>附加</value></data>
   <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>可选组件、来源及其运行状态</value></data>
   <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>附加组件位置</value></data>
   <data name="ComponentFolderLabel.Text" xml:space="preserve"><value>组件文件夹</value></data>

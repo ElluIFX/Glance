@@ -671,6 +671,7 @@ namespace winrt::Glance::App::implementation
         set_text(MaintenanceActionsGroupTitle(), L"MaintenanceActionsGroupTitle.Text");
         set_text(InputCoreLabel(), L"InputCoreLabel.Text");
         set_text(WebViewAvailabilityLabel(), L"WebViewAvailabilityLabel.Text");
+        set_content(WebViewDownloadLink(), L"WebViewDownloadLink.Content");
         set_text(AdministratorAccessLabel(), L"AdministratorAccessLabel.Text");
         set_text(DiagnosticBundleLabel(), L"DiagnosticBundleLabel.Text");
         set_content(ExportDiagnosticBundleButton(), L"ExportDiagnosticBundleButton.Content");
@@ -715,6 +716,7 @@ namespace winrt::Glance::App::implementation
     void SettingsWindow::refresh_runtime_statuses()
     {
         const bool core_running = named_mutex_exists(L"Local\\Glance.Core");
+        const bool webview_available = glance::app::webview_runtime_available();
         set_status_indicator(
             CoreStatusIcon(),
             CoreStatusText(),
@@ -724,9 +726,11 @@ namespace winrt::Glance::App::implementation
         set_status_indicator(
             WebViewAvailabilityStatusIcon(),
             WebViewAvailabilityStatusText(),
-            glance::app::webview_runtime_available(),
+            webview_available,
             L"WebViewAvailable",
             L"WebViewUnavailable");
+        WebViewDownloadLink().Visibility(
+            webview_available ? Visibility::Collapsed : Visibility::Visible);
         set_status_indicator(
             AdministratorAccessStatusIcon(),
             AdministratorAccessStatusText(),
@@ -1472,7 +1476,6 @@ namespace winrt::Glance::App::implementation
             dialog.CloseButtonText(glance::app::localize(L"OK"));
             dialog.DefaultButton(Controls::ContentDialogButton::Close);
             const bool installer_available = static_cast<bool>(result.installer);
-            const bool prefer_install = installer_available && glance::app::managed_installation();
 
             switch (result.status)
             {
@@ -1488,9 +1491,7 @@ namespace winrt::Glance::App::implementation
                     dialog.SecondaryButtonText(glance::app::localize(L"UpdateOpenRelease"));
                 }
                 dialog.CloseButtonText(glance::app::localize(L"Cancel"));
-                dialog.DefaultButton(installer_available && !prefer_install
-                    ? Controls::ContentDialogButton::Secondary
-                    : Controls::ContentDialogButton::Primary);
+                dialog.DefaultButton(Controls::ContentDialogButton::Primary);
                 break;
             }
             case glance::app::UpdateCheckStatus::up_to_date:

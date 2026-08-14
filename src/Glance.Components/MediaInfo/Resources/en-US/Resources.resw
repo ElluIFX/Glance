@@ -12,24 +12,24 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
 
   <data name="Component.DisplayName" xml:space="preserve"><value>Advanced media information</value></data>
-  <data name="Status.Available" xml:space="preserve"><value>FFprobe is available</value></data>
-  <data name="Status.Unavailable" xml:space="preserve"><value>FFprobe needs to be prepared</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>ffprobe is available</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>ffprobe must be downloaded</value></data>
   <data name="Shortcut.Tooltip" xml:space="preserve"><value>Show advanced media information</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>Loading advanced media information...</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Unable to read advanced media information</value></data>
-  <data name="Action.Button" xml:space="preserve"><value>Prepare FFprobe</value></data>
-  <data name="Action.ConfirmationTitle" xml:space="preserve"><value>Prepare advanced media information</value></data>
-  <data name="Action.ConfirmationMessage" xml:space="preserve"><value>Glance will download the FFmpeg essentials archive directly from gyan.dev and install only FFprobe for the current user</value></data>
+  <data name="Action.Button" xml:space="preserve"><value>Download ffprobe</value></data>
+  <data name="Action.ConfirmationTitle" xml:space="preserve"><value>Download ffprobe</value></data>
+  <data name="Action.ConfirmationMessage" xml:space="preserve"><value>Advanced media previews require ffprobe. Download it now?</value></data>
   <data name="Action.ConfirmationButton" xml:space="preserve"><value>Download</value></data>
-  <data name="Action.DownloadTitle" xml:space="preserve"><value>Downloading FFprobe</value></data>
+  <data name="Action.DownloadTitle" xml:space="preserve"><value>Downloading ffprobe</value></data>
   <data name="Action.DownloadMessage" xml:space="preserve"><value>Downloading from gyan.dev</value></data>
-  <data name="Action.PreparingTitle" xml:space="preserve"><value>Preparing FFprobe</value></data>
-  <data name="Action.PreparingMessage" xml:space="preserve"><value>Extracting and verifying FFprobe</value></data>
-  <data name="Action.CompletedTitle" xml:space="preserve"><value>FFprobe is ready</value></data>
+  <data name="Action.PreparingTitle" xml:space="preserve"><value>Installing ffprobe</value></data>
+  <data name="Action.PreparingMessage" xml:space="preserve"><value>Extracting and verifying ffprobe</value></data>
+  <data name="Action.CompletedTitle" xml:space="preserve"><value>ffprobe is ready</value></data>
   <data name="Action.CompletedMessage" xml:space="preserve"><value>Advanced media information is now available</value></data>
-  <data name="Action.ExtractFailed" xml:space="preserve"><value>FFprobe could not be extracted</value></data>
-  <data name="Action.IntegrityFailed" xml:space="preserve"><value>The extracted FFprobe executable did not match the expected checksum</value></data>
-  <data name="Action.InstallFailed" xml:space="preserve"><value>FFprobe could not be installed</value></data>
+  <data name="Action.ExtractFailed" xml:space="preserve"><value>ffprobe could not be extracted</value></data>
+  <data name="Action.IntegrityFailed" xml:space="preserve"><value>The extracted ffprobe executable did not match the expected checksum</value></data>
+  <data name="Action.InstallFailed" xml:space="preserve"><value>ffprobe could not be installed</value></data>
   <data name="MediaInfo.General" xml:space="preserve"><value>General</value></data>
   <data name="MediaInfo.Container" xml:space="preserve"><value>Container</value></data>
   <data name="MediaInfo.Duration" xml:space="preserve"><value>Duration</value></data>

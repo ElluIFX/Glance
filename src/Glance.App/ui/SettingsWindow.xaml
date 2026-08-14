@@ -126,6 +126,8 @@
                     <FontIcon Glyph="&#xE714;" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
+        </NavigationView.MenuItems>
+        <NavigationView.FooterMenuItems>
             <NavigationViewItem
                 x:Name="ComponentsNavigationItem"
                 x:Uid="ComponentsNavigationItem"
@@ -135,9 +137,6 @@
                     <FontIcon Glyph="&#xE950;" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
-        </NavigationView.MenuItems>
-        <NavigationView.FooterMenuItems>
-            <NavigationViewItemSeparator />
             <NavigationViewItem
                 x:Name="MaintenanceNavigationItem"
                 x:Uid="MaintenanceNavigationItem"
@@ -903,7 +902,8 @@
                     <Expander
                         x:Name="ComponentStatusExpander"
                         HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Stretch">
+                        HorizontalContentAlignment="Stretch"
+                        Padding="0">
                         <Expander.Header>
                             <TextBlock x:Name="ComponentStatusGroupTitle" x:Uid="ComponentStatusGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on component status" />
                         </Expander.Header>
@@ -937,14 +937,11 @@
                                         TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
-                            <ScrollViewer
+                            <Grid
                                 x:Name="ComponentStatusScroller"
-                                MaxHeight="320"
-                                HorizontalContentAlignment="Stretch"
-                                VerticalScrollBarVisibility="Auto"
                                 Visibility="Collapsed">
                                 <StackPanel x:Name="ComponentStatusList" />
-                            </ScrollViewer>
+                            </Grid>
                         </Grid>
                     </Expander>
                     <StackPanel Spacing="8">
@@ -966,7 +963,8 @@
                     <Expander
                         x:Name="SourceStatusExpander"
                         HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Stretch">
+                        HorizontalContentAlignment="Stretch"
+                        Padding="0">
                         <Expander.Header>
                             <TextBlock x:Name="SourceStatusGroupTitle" x:Uid="SourceStatusGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on source status" />
                         </Expander.Header>
@@ -978,14 +976,11 @@
                                     <TextBlock x:Name="SourceEmptyDescription" x:Uid="SourceEmptyDescription" MaxWidth="360" HorizontalAlignment="Center" Style="{StaticResource SettingsDescriptionStyle}" Text="Install optional sources to preview files from supported applications" TextAlignment="Center" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
-                            <ScrollViewer
+                            <Grid
                                 x:Name="SourceStatusScroller"
-                                MaxHeight="320"
-                                HorizontalContentAlignment="Stretch"
-                                VerticalScrollBarVisibility="Auto"
                                 Visibility="Collapsed">
                                 <StackPanel x:Name="SourceStatusList" />
-                            </ScrollViewer>
+                            </Grid>
                         </Grid>
                     </Expander>
                 </StackPanel>
@@ -1023,10 +1018,10 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="WebViewAvailabilityLabel" x:Uid="WebViewAvailabilityLabel" Text="WebView2 availability" />
-                                    <TextBlock x:Name="WebViewAvailabilityStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
+                                    <TextBlock x:Name="AdministratorAccessLabel" x:Uid="AdministratorAccessLabel" Text="Administrator access" />
+                                    <TextBlock x:Name="AdministratorAccessStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>
-                                <FontIcon x:Name="WebViewAvailabilityStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                <FontIcon x:Name="AdministratorAccessStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
@@ -1035,10 +1030,23 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="AdministratorAccessLabel" x:Uid="AdministratorAccessLabel" Text="Administrator access" />
-                                    <TextBlock x:Name="AdministratorAccessStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
+                                    <TextBlock x:Name="WebViewAvailabilityLabel" x:Uid="WebViewAvailabilityLabel" Text="WebView2 availability" />
+                                    <TextBlock x:Name="WebViewAvailabilityStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>
-                                <FontIcon x:Name="AdministratorAccessStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                <StackPanel
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="12">
+                                    <HyperlinkButton
+                                        x:Name="WebViewDownloadLink"
+                                        x:Uid="WebViewDownloadLink"
+                                        Padding="0"
+                                        Content="Download WebView2"
+                                        NavigateUri="https://developer.microsoft.com/en-us/microsoft-edge/webview2/"
+                                        Visibility="Collapsed" />
+                                    <FontIcon x:Name="WebViewAvailabilityStatusIcon" FontSize="18" VerticalAlignment="Center" />
+                                </StackPanel>
                             </Grid>
                         </StackPanel>
                         </Border>
