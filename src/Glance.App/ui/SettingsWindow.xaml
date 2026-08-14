@@ -734,6 +734,18 @@
                                     </StackPanel>
                                     <ToggleSwitch x:Name="LoopGalleryScrollingToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                                 </Grid>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="GallerySameExtensionOnlyLabel" x:Uid="GallerySameExtensionOnlyLabel" Text="Same extension only" />
+                                        <TextBlock x:Name="GallerySameExtensionOnlyDescription" x:Uid="GallerySameExtensionOnlyDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Only scroll through files with the same extension as the current file" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="GallerySameExtensionOnlyToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                     </StackPanel>

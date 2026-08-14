@@ -79,6 +79,7 @@ namespace glance::app
             .reverse_seek_wheel = read_bool(L"ReverseSeekWheel", false),
             .middle_click_gallery_mode = read_bool(L"MiddleClickGalleryMode", true),
             .loop_gallery_scrolling = read_bool(L"LoopGalleryScrolling", true),
+            .gallery_same_extension_only = read_bool(L"GallerySameExtensionOnly", false),
             .show_image_zoom_map = read_bool(L"ShowImageZoomMap", true),
         };
     }
@@ -107,6 +108,7 @@ namespace glance::app
         write_bool(key, L"ReverseSeekWheel", preferences.reverse_seek_wheel);
         write_bool(key, L"MiddleClickGalleryMode", preferences.middle_click_gallery_mode);
         write_bool(key, L"LoopGalleryScrolling", preferences.loop_gallery_scrolling);
+        write_bool(key, L"GallerySameExtensionOnly", preferences.gallery_same_extension_only);
         write_bool(key, L"ShowImageZoomMap", preferences.show_image_zoom_map);
         RegCloseKey(key);
     }

@@ -461,6 +461,10 @@ int main()
         glance::app::gallery_target_index(1, 10, 4, false) == 3 &&
             glance::app::gallery_target_index(1, -10, 4, false) == 0,
         "gallery clamps rapid navigation when looping is disabled");
+    expect(
+        glance::app::normalize_gallery_extension(L".JpG") == L".jpg" &&
+            glance::app::normalize_gallery_extension(L".RAW") == L".raw",
+        "gallery extension matching is case insensitive");
 
     using glance::contracts::heartbeat_acknowledged;
     expect(heartbeat_acknowledged(1, 1), "heartbeat ack matches pending");
@@ -532,7 +536,8 @@ int main()
     const glance::app::MediaPreviewPreferences default_media_preferences;
     expect(
         default_media_preferences.middle_click_gallery_mode &&
-            default_media_preferences.loop_gallery_scrolling,
+            default_media_preferences.loop_gallery_scrolling &&
+            !default_media_preferences.gallery_same_extension_only,
         "gallery media preference defaults");
 
     std::wstring executable_path(32768, L'\0');

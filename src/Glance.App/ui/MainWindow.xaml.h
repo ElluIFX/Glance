@@ -554,6 +554,7 @@ namespace winrt::Glance::App::implementation
             glance::contracts::components::GalleryMediaKind::none };
         bool middle_click_gallery_enabled_{ true };
         bool loop_gallery_enabled_{ true };
+        bool gallery_same_extension_only_{};
         std::uint64_t gallery_session_id_{};
         std::uint64_t gallery_request_sequence_{};
         std::uint64_t gallery_open_request_id_{};

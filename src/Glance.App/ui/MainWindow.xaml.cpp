@@ -659,9 +659,21 @@ namespace winrt::Glance::App::implementation
         {
             root.SetNamedValue(L"currentPath", JsonValue::CreateStringValue(files_[current_index_].path));
             JsonArray extensions;
-            for (const auto& extension : glance::app::gallery_extensions(gallery_media_kind_))
+            if (gallery_same_extension_only_)
             {
-                extensions.Append(JsonValue::CreateStringValue(extension));
+                const auto extension = glance::app::normalize_gallery_extension(
+                    std::filesystem::path(files_[current_index_].path).extension().wstring());
+                if (!extension.empty())
+                {
+                    extensions.Append(JsonValue::CreateStringValue(extension));
+                }
+            }
+            else
+            {
+                for (const auto& extension : glance::app::gallery_extensions(gallery_media_kind_))
+                {
+                    extensions.Append(JsonValue::CreateStringValue(extension));
+                }
             }
             root.SetNamedValue(L"extensions", extensions);
         }
@@ -2456,6 +2468,7 @@ namespace winrt::Glance::App::implementation
         const auto media_preferences = glance::app::load_media_preview_preferences();
         middle_click_gallery_enabled_ = media_preferences.middle_click_gallery_mode;
         loop_gallery_enabled_ = media_preferences.loop_gallery_scrolling;
+        gallery_same_extension_only_ = media_preferences.gallery_same_extension_only;
         const auto generation = ++content_generation_;
         update_title_text();
         image_pixel_width_ = 0;

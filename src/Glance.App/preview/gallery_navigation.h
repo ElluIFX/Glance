@@ -2,9 +2,22 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cwctype>
+#include <string>
 
 namespace glance::app
 {
+    [[nodiscard]] inline std::wstring normalize_gallery_extension(
+        std::wstring extension) noexcept
+    {
+        std::transform(
+            extension.begin(),
+            extension.end(),
+            extension.begin(),
+            [](wchar_t value) { return std::towlower(value); });
+        return extension;
+    }
+
     [[nodiscard]] inline std::uint32_t gallery_target_index(
         std::uint32_t current_index,
         int steps,

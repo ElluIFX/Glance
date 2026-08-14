@@ -30,6 +30,7 @@ namespace glance::app
         bool reverse_seek_wheel{};
         bool middle_click_gallery_mode{ true };
         bool loop_gallery_scrolling{ true };
+        bool gallery_same_extension_only{};
         bool show_image_zoom_map{ true };
     };
 
