@@ -22,7 +22,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(AvifLibRoot)libavif\1.4.2\$(Configuration);$(AvifLibRoot)dav1d\1.5.0\$(Configuration)\dav1d;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\Common;$(ProjectDir)..\..\..\Glance.Contracts\include;$(AvifLibRoot)libavif\1.4.2\$(Configuration);$(AvifLibRoot)dav1d\1.5.0\$(Configuration)\dav1d;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>AVIF_USING_STATIC_LIBS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -31,6 +31,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Common\exif_metadata_reader.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>

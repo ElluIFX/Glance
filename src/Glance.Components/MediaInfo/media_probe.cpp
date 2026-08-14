@@ -603,6 +603,10 @@ namespace
                 localize(L"MediaInfo.Chapters"),
                 std::to_wstring(chapters.Size()));
         }
+        if (!result.empty())
+        {
+            result.insert(0, localize(L"MediaInfo.General") + L"\n");
+        }
 
         const auto streams = root.GetNamedArray(L"streams", nullptr);
         if (streams != nullptr)

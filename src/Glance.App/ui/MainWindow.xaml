@@ -319,7 +319,7 @@
                         <ScrollViewer
                             HorizontalScrollBarVisibility="Disabled"
                             VerticalScrollBarVisibility="Auto">
-                            <TextBlock
+                            <RichTextBlock
                                 x:Name="ImageMetadataText"
                                 Foreground="White"
                                 FontSize="12"
@@ -747,7 +747,7 @@
                                 Foreground="White"
                                 IsActive="False"
                                 Visibility="Collapsed" />
-                            <TextBlock
+                            <RichTextBlock
                                 x:Name="ComponentHoverInfoText"
                                 Foreground="White"
                                 FontSize="12"

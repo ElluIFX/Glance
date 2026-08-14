@@ -234,6 +234,8 @@ namespace glance::app
         component_gallery_media_kind(std::wstring_view extension) noexcept;
     [[nodiscard]] std::vector<std::wstring> component_gallery_extensions(
         glance::contracts::components::GalleryMediaKind kind) noexcept;
+    [[nodiscard]] std::vector<glance::contracts::components::ImageMetadataEntry>
+        query_component_image_metadata(const std::shared_ptr<void>& lease) noexcept;
     [[nodiscard]] ComponentLoadingMessage component_loading_text(
         const std::wstring& path,
         std::wstring_view language_tag) noexcept;

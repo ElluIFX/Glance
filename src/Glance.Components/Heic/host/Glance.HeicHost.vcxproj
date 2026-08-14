@@ -22,7 +22,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(HeicLibRoot)libheif\1.23.1\$(Configuration)\include;$(HeicLibRoot)libheif\1.23.1\$(Configuration)\include\libheif;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\Common;$(ProjectDir)..\..\..\Glance.Contracts\include;$(HeicLibRoot)libheif\1.23.1\$(Configuration)\include;$(HeicLibRoot)libheif\1.23.1\$(Configuration)\include\libheif;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -30,6 +30,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Common\exif_metadata_reader.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>

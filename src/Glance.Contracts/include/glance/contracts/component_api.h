@@ -24,6 +24,7 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t settings_contribution_api_version = 1;
     inline constexpr std::uint32_t file_directory_preview_api_version = 1;
     inline constexpr std::uint32_t gallery_media_api_version = 1;
+    inline constexpr std::uint32_t image_metadata_api_version = 1;
     inline constexpr std::uint32_t hover_info_layer_api_version = 1;
     inline constexpr std::uint32_t status_bar_shortcut_api_version = 1;
     inline constexpr std::uint32_t component_management_action_api_version = 1;
@@ -46,6 +47,8 @@ namespace glance::contracts::components
     inline constexpr std::size_t download_url_capacity = 2048;
     inline constexpr std::size_t download_file_name_capacity = 260;
     inline constexpr std::size_t sha256_capacity = 65;
+    inline constexpr std::size_t image_metadata_property_capacity = 128;
+    inline constexpr std::size_t image_metadata_text_capacity = 512;
     inline constexpr GUID configurable_preview_api_id{
         0x950742e7,
         0x0af2,
@@ -86,6 +89,11 @@ namespace glance::contracts::components
         0xa62c,
         0x4b43,
         { 0x9c, 0xcd, 0x08, 0x26, 0x09, 0xaa, 0xd2, 0xd7 } };
+    inline constexpr GUID image_metadata_api_id{
+        0xb9bfade4,
+        0xdc6c,
+        0x4dcc,
+        { 0x81, 0x4b, 0x67, 0xe8, 0x3e, 0xf4, 0x36, 0x1b } };
     inline constexpr GUID hover_info_layer_api_id{
         0x422e5648,
         0x8724,
@@ -139,6 +147,14 @@ namespace glance::contracts::components
         image = 1,
         video = 2,
         audio = 3,
+    };
+
+    enum class ImageMetadataValueKind : std::uint32_t
+    {
+        text = 0,
+        unsigned_integer = 1,
+        floating_point = 2,
+        timestamp = 3,
     };
 
     enum class HealthSeverity : std::uint32_t
@@ -387,6 +403,27 @@ namespace glance::contracts::components
         BOOL(WINAPI* is_cancelled)(void* context) noexcept{};
     };
 
+    struct ImageMetadataEntry
+    {
+        std::uint32_t size{ sizeof(ImageMetadataEntry) };
+        wchar_t canonical_name[image_metadata_property_capacity]{};
+        ImageMetadataValueKind value_kind{ ImageMetadataValueKind::text };
+        std::uint64_t unsigned_value{};
+        double floating_point{};
+        FILETIME timestamp{};
+        wchar_t text[image_metadata_text_capacity]{};
+    };
+
+    struct ImageMetadataSink
+    {
+        std::uint32_t size{ sizeof(ImageMetadataSink) };
+        void* context{};
+        BOOL(WINAPI* append)(
+            void* context,
+            const ImageMetadataEntry* entry) noexcept{};
+        BOOL(WINAPI* is_cancelled)(void* context) noexcept{};
+    };
+
     struct StatusBarShortcutDescriptor
     {
         std::uint32_t size{ sizeof(StatusBarShortcutDescriptor) };
@@ -514,6 +551,9 @@ namespace glance::contracts::components
         std::uint32_t* total) noexcept;
     using ClassifyGalleryExtensionFunction = GalleryMediaKind(WINAPI*)(
         const wchar_t* extension) noexcept;
+    using QueryImageMetadataFunction = BOOL(WINAPI*)(
+        std::uint64_t lease_token,
+        const ImageMetadataSink* sink) noexcept;
     using QueryHoverInfoFunction = PrepareStatus(WINAPI*)(
         const wchar_t* hover_info_id,
         const wchar_t* path,
@@ -613,6 +653,13 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(GalleryMediaApi) };
         std::uint32_t version{ gallery_media_api_version };
         ClassifyGalleryExtensionFunction classify_extension{};
+    };
+
+    struct ImageMetadataApi
+    {
+        std::uint32_t size{ sizeof(ImageMetadataApi) };
+        std::uint32_t version{ image_metadata_api_version };
+        QueryImageMetadataFunction query_metadata{};
     };
 
     struct HoverInfoLayerApi

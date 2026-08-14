@@ -550,6 +550,93 @@ namespace
         return output.str();
     }
 
+    std::wstring format_image_metadata(const glance::app::ImageMetadata& metadata)
+    {
+        using glance::app::ImageMetadataSection;
+        constexpr std::array sections{
+            std::pair{ ImageMetadataSection::capture, std::wstring_view{ L"ImageMetadataCaptureSection" } },
+            std::pair{ ImageMetadataSection::camera, std::wstring_view{ L"ImageMetadataCameraSection" } },
+            std::pair{ ImageMetadataSection::image, std::wstring_view{ L"ImageMetadataImageSection" } },
+            std::pair{ ImageMetadataSection::location, std::wstring_view{ L"ImageMetadataLocationSection" } },
+            std::pair{ ImageMetadataSection::details, std::wstring_view{ L"ImageMetadataDetailsSection" } },
+        };
+
+        std::wstring result;
+        for (const auto& [section, resource_key] : sections)
+        {
+            bool section_started{};
+            for (const auto& entry : metadata.entries)
+            {
+                if (entry.section != section)
+                {
+                    continue;
+                }
+                if (!section_started)
+                {
+                    if (!result.empty())
+                    {
+                        result.append(L"\n\n");
+                    }
+                    result.append(glance::app::localize(resource_key));
+                    section_started = true;
+                }
+                result.append(L"\n").append(entry.name).append(L": ").append(entry.value);
+            }
+        }
+        return result;
+    }
+
+    void set_information_panel_text(
+        const RichTextBlock& control,
+        std::wstring_view text,
+        bool sectioned)
+    {
+        control.Blocks().Clear();
+        if (text.empty())
+        {
+            return;
+        }
+
+        Paragraph paragraph;
+        bool section_start = true;
+        std::size_t cursor{};
+        while (cursor < text.size())
+        {
+            const auto line_end = text.find(L'\n', cursor);
+            auto line = text.substr(
+                cursor,
+                line_end == std::wstring_view::npos
+                    ? text.size() - cursor
+                    : line_end - cursor);
+            if (line.ends_with(L'\r'))
+            {
+                line.remove_suffix(1);
+            }
+            if (!line.empty())
+            {
+                Run run;
+                run.Text(hstring(line));
+                if (sectioned && section_start)
+                {
+                    run.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
+                }
+                paragraph.Inlines().Append(run);
+                section_start = false;
+            }
+            else
+            {
+                section_start = true;
+            }
+            if (line_end == std::wstring_view::npos)
+            {
+                break;
+            }
+            paragraph.Inlines().Append(LineBreak{});
+            cursor = line_end + 1;
+        }
+        control.Blocks().Append(paragraph);
+    }
+
 }
 
 namespace winrt::Glance::App::implementation
@@ -1911,7 +1998,7 @@ namespace winrt::Glance::App::implementation
         stop_media_playback();
 
         ImagePreview().Source(nullptr);
-        ImageMetadataText().Text(L"");
+        ImageMetadataText().Blocks().Clear();
         ImageMetadataOverlay().Visibility(Visibility::Collapsed);
         reset_component_hover_info();
         component_hover_info_text_.clear();
@@ -1998,6 +2085,7 @@ namespace winrt::Glance::App::implementation
         current_text_has_more_ = false;
         text_chunk_loading_ = false;
         image_metadata_.clear();
+        image_taken_time_.clear();
         media_dimensions_.clear();
         media_playback_info_.clear();
         media_playback_item_ = nullptr;
@@ -2474,6 +2562,7 @@ namespace winrt::Glance::App::implementation
         image_pixel_width_ = 0;
         image_pixel_height_ = 0;
         image_bits_per_pixel_ = 0;
+        image_taken_time_.clear();
         media_dimensions_.clear();
         media_playback_info_.clear();
         media_playback_item_ = nullptr;
@@ -2584,13 +2673,14 @@ namespace winrt::Glance::App::implementation
             image_pixel_height_ = 0;
             image_bits_per_pixel_ = 0;
             image_metadata_.clear();
+            image_taken_time_.clear();
             image_metadata_visible_ = false;
             ImageTransform().Rotation(image_rotation_);
             ImageTransform().ScaleX(image_scale_x_);
             ImageTransform().ScaleY(image_scale_y_);
             ImagePreview().Source(nullptr);
             ImageExifButton().IsChecked(false);
-            ImageMetadataText().Text(L"");
+            ImageMetadataText().Blocks().Clear();
             ImageMetadataOverlay().Visibility(Visibility::Collapsed);
             ImageZoomMapOverlay().Visibility(Visibility::Collapsed);
             fit_image_to_viewport();
@@ -2617,7 +2707,10 @@ namespace winrt::Glance::App::implementation
             {
                 load_image_media_info_async(file.path, generation);
             }
-            load_image_metadata_async(file.path, generation);
+            load_image_metadata_async(
+                files_[current_index_].path,
+                generation,
+                active_component_preview_);
             break;
         }
         case glance::app::PreviewKind::media:
@@ -3050,24 +3143,38 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    fire_and_forget MainWindow::load_image_metadata_async(std::wstring path, std::uint64_t generation)
+    fire_and_forget MainWindow::load_image_metadata_async(
+        std::wstring path,
+        std::uint64_t generation,
+        std::shared_ptr<void> component_preview)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
         auto metadata = glance::app::load_image_metadata(path);
+        if (component_preview != nullptr)
+        {
+            glance::app::merge_component_image_metadata(
+                metadata,
+                glance::app::query_component_image_metadata(component_preview));
+        }
         static_cast<void>(dispatcher.TryEnqueue(
             [lifetime, metadata = std::move(metadata), generation]() mutable {
                 if (generation != lifetime->content_generation_)
                 {
                     return;
                 }
-                lifetime->image_metadata_ = std::move(metadata);
-                lifetime->ImageMetadataText().Text(
-                    lifetime->image_metadata_.empty()
-                        ? glance::app::localize(L"NoImageMetadata")
-                        : lifetime->image_metadata_);
+                lifetime->image_taken_time_ = std::move(metadata.taken_time);
+                lifetime->image_metadata_ = format_image_metadata(metadata);
+                const auto display_text = lifetime->image_metadata_.empty()
+                    ? glance::app::localize(L"NoImageMetadata")
+                    : lifetime->image_metadata_;
+                set_information_panel_text(
+                    lifetime->ImageMetadataText(),
+                    display_text,
+                    !lifetime->image_metadata_.empty());
                 lifetime->update_image_metadata_visibility();
+                lifetime->update_footer_metadata();
             }));
     }
 
@@ -3347,6 +3454,15 @@ namespace winrt::Glance::App::implementation
                     append(glance::app::localize_format(
                         L"FooterCreationTimeFormat",
                         { formatted_time(file.creation_time) }));
+                }
+                break;
+            case glance::app::FooterField::taken_time:
+                if (current_kind_ == glance::app::PreviewKind::image &&
+                    !image_taken_time_.empty())
+                {
+                    append(glance::app::localize_format(
+                        L"FooterTakenTimeFormat",
+                        { image_taken_time_ }));
                 }
                 break;
             case glance::app::FooterField::permissions:
@@ -4768,7 +4884,13 @@ namespace winrt::Glance::App::implementation
             {
                 load_image_media_info_async(path, generation);
             }
-            load_image_metadata_async(path, generation);
+            if (current_index_ < files_.size())
+            {
+                load_image_metadata_async(
+                    files_[current_index_].path,
+                    generation,
+                    active_component_preview_);
+            }
         }
         catch (...)
         {
@@ -5599,7 +5721,7 @@ namespace winrt::Glance::App::implementation
         active_component_hover_ = {};
         ComponentHoverInfoProgressRing().IsActive(false);
         ComponentHoverInfoProgressRing().Visibility(Visibility::Collapsed);
-        ComponentHoverInfoText().Text(L"");
+        ComponentHoverInfoText().Blocks().Clear();
         ComponentHoverInfoOverlay().Visibility(Visibility::Collapsed);
     }
 
@@ -5734,11 +5856,17 @@ namespace winrt::Glance::App::implementation
             component_hover_cache_info_id_ == activation.hover_info_id &&
             !component_hover_info_text_.empty())
         {
-            ComponentHoverInfoText().Text(component_hover_info_text_);
+            set_information_panel_text(
+                ComponentHoverInfoText(),
+                component_hover_info_text_,
+                true);
             return;
         }
 
-        ComponentHoverInfoText().Text(activation.loading_text);
+        set_information_panel_text(
+            ComponentHoverInfoText(),
+            activation.loading_text,
+            false);
         ComponentHoverInfoProgressRing().Visibility(Visibility::Visible);
         ComponentHoverInfoProgressRing().IsActive(true);
         const auto cancellation = std::make_shared<std::atomic_bool>(false);
@@ -5790,7 +5918,10 @@ namespace winrt::Glance::App::implementation
                 lifetime->component_hover_info_text_ = text;
                 lifetime->component_hover_cache_component_id_ = activation.component_id;
                 lifetime->component_hover_cache_info_id_ = activation.hover_info_id;
-                lifetime->ComponentHoverInfoText().Text(std::move(text));
+                set_information_panel_text(
+                    lifetime->ComponentHoverInfoText(),
+                    lifetime->component_hover_info_text_,
+                    true);
             }));
     }
 
@@ -6549,7 +6680,8 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_image_metadata_visibility()
     {
-        const bool show = image_metadata_visible_ && !ImageMetadataText().Text().empty();
+        const bool show = image_metadata_visible_ &&
+            ImageMetadataText().Blocks().Size() != 0;
         ImageMetadataOverlay().Visibility(show ? Visibility::Visible : Visibility::Collapsed);
         ImageExifButton().IsChecked(image_metadata_visible_);
     }

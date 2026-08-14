@@ -11,9 +11,12 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <span>
 #include <vector>
 
 #include "avif.h"
+#include "exif_metadata_reader.h"
+#include "image_metadata_sidecar.h"
 
 namespace
 {
@@ -26,6 +29,7 @@ namespace
     {
         std::filesystem::path input;
         std::filesystem::path output;
+        std::filesystem::path metadata_output;
         std::uint32_t maximum_dimension{};
     };
 
@@ -42,6 +46,10 @@ namespace
             {
                 result.output = arguments[index + 1];
             }
+            else if (name == L"--metadata-output")
+            {
+                result.metadata_output = arguments[index + 1];
+            }
             else if (name == L"--maximum-dimension")
             {
                 wchar_t* end{};
@@ -57,9 +65,10 @@ namespace
                 return false;
             }
         }
-        return argument_count == 7 &&
+        return argument_count == 9 &&
             !result.input.empty() &&
             !result.output.empty() &&
+            !result.metadata_output.empty() &&
             (result.maximum_dimension == 1024 ||
              result.maximum_dimension == 2048 ||
              result.maximum_dimension == 4096 ||
@@ -221,6 +230,7 @@ namespace
     bool prepare_avif_preview(
         const std::filesystem::path& input,
         const std::filesystem::path& output,
+        const std::filesystem::path& metadata_output,
         std::uint32_t maximum_dimension)
     {
         avifDecoder* decoder = avifDecoderCreate();
@@ -284,6 +294,23 @@ namespace
         if (result != AVIF_RESULT_OK)
         {
             return false;
+        }
+
+        if (image->exif.data != nullptr && image->exif.size != 0)
+        {
+            std::span<const std::uint8_t> exif(image->exif.data, image->exif.size);
+            std::size_t tiff_offset{};
+            if (avifGetExifTiffHeaderOffset(
+                    image->exif.data,
+                    image->exif.size,
+                    &tiff_offset) == AVIF_RESULT_OK &&
+                tiff_offset < exif.size())
+            {
+                exif = exif.subspan(tiff_offset);
+            }
+            static_cast<void>(glance::components::write_image_metadata_sidecar(
+                metadata_output,
+                glance::components::read_exif_metadata(exif)));
         }
 
         const std::uint32_t original_width = image->width;
@@ -392,7 +419,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     }
     std::error_code output_error;
     const bool success =
-        prepare_avif_preview(parsed.input, parsed.output, parsed.maximum_dimension) &&
+        prepare_avif_preview(
+            parsed.input,
+            parsed.output,
+            parsed.metadata_output,
+            parsed.maximum_dimension) &&
         std::filesystem::is_regular_file(parsed.output, output_error);
     CoUninitialize();
     return success ? ERROR_SUCCESS : ERROR_GEN_FAILURE;

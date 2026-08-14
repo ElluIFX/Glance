@@ -128,7 +128,9 @@ namespace winrt::Glance::App::implementation
         void SettingsNavigation_SelectionChanged(
             Microsoft::UI::Xaml::Controls::NavigationView const&,
             Microsoft::UI::Xaml::Controls::NavigationViewSelectionChangedEventArgs const&);
-        winrt::fire_and_forget ExitButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        winrt::fire_and_forget ExitButton_Tapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::TappedRoutedEventArgs const&);
         void CloseSettingsButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:

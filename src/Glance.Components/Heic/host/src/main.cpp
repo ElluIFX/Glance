@@ -9,9 +9,12 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <span>
 #include <vector>
 
 #include "heif.h"
+#include "exif_metadata_reader.h"
+#include "image_metadata_sidecar.h"
 
 namespace
 {
@@ -23,6 +26,7 @@ namespace
     {
         std::filesystem::path input;
         std::filesystem::path output;
+        std::filesystem::path metadata_output;
         std::uint32_t maximum_dimension{};
     };
 
@@ -39,6 +43,10 @@ namespace
             {
                 result.output = arguments[index + 1];
             }
+            else if (name == L"--metadata-output")
+            {
+                result.metadata_output = arguments[index + 1];
+            }
             else if (name == L"--maximum-dimension")
             {
                 wchar_t* end{};
@@ -54,9 +62,10 @@ namespace
                 return false;
             }
         }
-        return argument_count == 7 &&
+        return argument_count == 9 &&
             !result.input.empty() &&
             !result.output.empty() &&
+            !result.metadata_output.empty() &&
             (result.maximum_dimension == 1024 ||
              result.maximum_dimension == 2048 ||
              result.maximum_dimension == 4096 ||
@@ -136,6 +145,7 @@ namespace
     bool prepare_heic_preview(
         const std::filesystem::path& input,
         const std::filesystem::path& output,
+        const std::filesystem::path& metadata_output,
         std::uint32_t maximum_dimension)
     {
         heif_context* context = heif_context_alloc();
@@ -205,6 +215,39 @@ namespace
         }
         const auto handle_guard = std::unique_ptr<heif_image_handle, decltype(&heif_image_handle_release)>(
             handle, heif_image_handle_release);
+        const auto metadata_count =
+            heif_image_handle_get_number_of_metadata_blocks(handle, "Exif");
+        std::vector<heif_item_id> metadata_ids(
+            metadata_count > 0 && metadata_count <= 16
+                ? static_cast<std::size_t>(metadata_count)
+                : 0);
+        if (!metadata_ids.empty())
+        {
+            const auto returned = heif_image_handle_get_list_of_metadata_block_IDs(
+                handle,
+                "Exif",
+                metadata_ids.data(),
+                static_cast<int>(metadata_ids.size()));
+            if (returned > 0)
+            {
+                const auto metadata_size =
+                    heif_image_handle_get_metadata_size(handle, metadata_ids.front());
+                if (metadata_size != 0 && metadata_size <= 16U * 1024U * 1024U)
+                {
+                    std::vector<std::uint8_t> metadata(metadata_size);
+                    const auto metadata_error = heif_image_handle_get_metadata(
+                        handle,
+                        metadata_ids.front(),
+                        metadata.data());
+                    if (metadata_error.code == heif_error_Ok)
+                    {
+                        static_cast<void>(glance::components::write_image_metadata_sidecar(
+                            metadata_output,
+                            glance::components::read_exif_metadata(metadata)));
+                    }
+                }
+            }
+        }
         const auto handle_width = heif_image_handle_get_width(handle);
         const auto handle_height = heif_image_handle_get_height(handle);
         if (handle_width <= 0 || handle_height <= 0 ||
@@ -316,7 +359,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     }
     std::error_code output_error;
     const bool success =
-        prepare_heic_preview(parsed.input, parsed.output, parsed.maximum_dimension) &&
+        prepare_heic_preview(
+            parsed.input,
+            parsed.output,
+            parsed.metadata_output,
+            parsed.maximum_dimension) &&
         std::filesystem::is_regular_file(parsed.output, output_error);
     CoUninitialize();
     return success ? ERROR_SUCCESS : ERROR_GEN_FAILURE;

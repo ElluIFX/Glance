@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "heic_preview_service.h"
+#include "../Common/image_metadata_sidecar.h"
 
 #include <atomic>
 #include <filesystem>
@@ -23,6 +24,7 @@ namespace
     {
         std::filesystem::path directory;
         std::filesystem::path output;
+        std::vector<ImageMetadataEntry> metadata;
     };
 
     std::atomic_bool shutting_down{};
@@ -186,6 +188,7 @@ namespace glance::components::heic
             }
 
             const auto output = directory / (path.stem().wstring() + L".png");
+            const auto metadata_output = directory / L"metadata.bin";
             const auto component_directory_value = component_directory();
             if (component_directory_value.empty())
             {
@@ -205,6 +208,7 @@ namespace glance::components::heic
             std::wstring command_line = quote_argument(host.wstring()) +
                 L" --input " + quote_argument(path.wstring()) +
                 L" --output " + quote_argument(output.wstring()) +
+                L" --metadata-output " + quote_argument(metadata_output.wstring()) +
                 L" --maximum-dimension " + std::to_wstring(maximum_dimension);
 
             STARTUPINFOW startup{ sizeof(STARTUPINFOW) };
@@ -262,7 +266,10 @@ namespace glance::components::heic
             {
                 std::lock_guard guard(lease_mutex);
                 leases[result.lease_token = next_lease.fetch_add(1, std::memory_order_relaxed)] =
-                    LeaseRecord{ directory, output };
+                    LeaseRecord{
+                        directory,
+                        output,
+                        read_image_metadata_sidecar(metadata_output) };
             }
             result.status = PrepareStatus::success;
             result.kind = PreviewContentKind::image;
@@ -278,6 +285,43 @@ namespace glance::components::heic
             result.lease_token = 0;
         }
         return result;
+    }
+
+    bool query_metadata(
+        std::uint64_t lease_token,
+        const ImageMetadataSink* sink) noexcept
+    {
+        if (sink == nullptr || sink->size < sizeof(ImageMetadataSink) ||
+            sink->append == nullptr)
+        {
+            return false;
+        }
+        try
+        {
+            std::vector<ImageMetadataEntry> metadata;
+            {
+                std::lock_guard guard(lease_mutex);
+                const auto found = leases.find(lease_token);
+                if (found == leases.end())
+                {
+                    return false;
+                }
+                metadata = found->second.metadata;
+            }
+            for (const auto& entry : metadata)
+            {
+                if ((sink->is_cancelled != nullptr && sink->is_cancelled(sink->context)) ||
+                    !sink->append(sink->context, &entry))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
     }
 
     void release_preview(std::uint64_t lease_token) noexcept

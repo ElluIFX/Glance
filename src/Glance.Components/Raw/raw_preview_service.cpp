@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "raw_preview_service.h"
+#include "../Common/image_metadata_sidecar.h"
 
 #include <atomic>
 #include <filesystem>
@@ -32,6 +33,7 @@ namespace
     struct LeaseRecord
     {
         std::filesystem::path directory;
+        std::vector<ImageMetadataEntry> metadata;
     };
 
     std::atomic_bool shutting_down{};
@@ -277,9 +279,11 @@ namespace glance::components::raw
             }
 
             const auto thumbnail = directory / L"thumbnail.jpg";
+            const auto metadata_output = directory / L"metadata.bin";
             const auto arguments = L"--mode thumbnail --input " +
                 quote_argument(path.wstring()) +
                 L" --output " + quote_argument(thumbnail.wstring()) +
+                L" --metadata-output " + quote_argument(metadata_output.wstring()) +
                 L" --maximum-dimension " + std::to_wstring(maximum_dimension);
             const auto host_result = run_host(host, arguments, thumbnail);
             if (host_result != HostResult::success)
@@ -297,7 +301,9 @@ namespace glance::components::raw
             {
                 std::lock_guard guard(lease_mutex);
                 token = next_lease.fetch_add(1, std::memory_order_relaxed);
-                leases[token] = LeaseRecord{ directory };
+                leases[token] = LeaseRecord{
+                    directory,
+                    read_image_metadata_sidecar(metadata_output) };
             }
             result.status = PrepareStatus::success;
             result.kind = PreviewContentKind::image;
@@ -314,6 +320,43 @@ namespace glance::components::raw
             result.lease_token = 0;
         }
         return result;
+    }
+
+    bool query_metadata(
+        std::uint64_t lease_token,
+        const ImageMetadataSink* sink) noexcept
+    {
+        if (sink == nullptr || sink->size < sizeof(ImageMetadataSink) ||
+            sink->append == nullptr)
+        {
+            return false;
+        }
+        try
+        {
+            std::vector<ImageMetadataEntry> metadata;
+            {
+                std::lock_guard guard(lease_mutex);
+                const auto found = leases.find(lease_token);
+                if (found == leases.end())
+                {
+                    return false;
+                }
+                metadata = found->second.metadata;
+            }
+            for (const auto& entry : metadata)
+            {
+                if ((sink->is_cancelled != nullptr && sink->is_cancelled(sink->context)) ||
+                    !sink->append(sink->context, &entry))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
     }
 
     void release_preview(std::uint64_t lease_token) noexcept

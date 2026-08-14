@@ -13,15 +13,17 @@ namespace glance::app
         creation_time,
         permissions,
         media_info,
+        taken_time,
     };
 
-    constexpr std::size_t footer_field_count = 5;
+    constexpr std::size_t footer_field_count = 6;
 
     struct FooterPreferences
     {
         std::array<FooterField, footer_field_count> order{
             FooterField::size,
             FooterField::modified_time,
+            FooterField::taken_time,
             FooterField::creation_time,
             FooterField::permissions,
             FooterField::media_info,

@@ -7,6 +7,7 @@ namespace
 {
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Footer";
     constexpr std::size_t legacy_field_count = 4;
+    constexpr std::size_t previous_field_count = 5;
     constexpr std::uint32_t all_fields_mask =
         (1U << static_cast<std::uint32_t>(glance::app::footer_field_count)) - 1U;
 
@@ -39,6 +40,22 @@ namespace
             seen |= 1U << value;
         }
         return seen == (1U << legacy_field_count) - 1U;
+    }
+
+    bool valid_previous_order(
+        const std::array<glance::app::FooterField, previous_field_count>& order) noexcept
+    {
+        std::uint32_t seen{};
+        for (const auto field : order)
+        {
+            const auto value = static_cast<std::uint32_t>(field);
+            if (value >= previous_field_count || (seen & (1U << value)) != 0)
+            {
+                return false;
+            }
+            seen |= 1U << value;
+        }
+        return seen == (1U << previous_field_count) - 1U;
     }
 }
 
@@ -76,14 +93,40 @@ namespace glance::app
             result.order = order;
         }
         else if (order_status == ERROR_SUCCESS &&
+                 order_size == previous_field_count * sizeof(FooterField))
+        {
+            std::array<FooterField, previous_field_count> previous_order{};
+            std::copy_n(order.begin(), previous_order.size(), previous_order.begin());
+            if (valid_previous_order(previous_order))
+            {
+                std::size_t output_index{};
+                for (const auto field : previous_order)
+                {
+                    result.order[output_index++] = field;
+                    if (field == FooterField::modified_time)
+                    {
+                        result.order[output_index++] = FooterField::taken_time;
+                    }
+                }
+            }
+        }
+        else if (order_status == ERROR_SUCCESS &&
                  order_size == legacy_field_count * sizeof(FooterField))
         {
             std::array<FooterField, legacy_field_count> legacy_order{};
             std::copy_n(order.begin(), legacy_order.size(), legacy_order.begin());
             if (valid_legacy_order(legacy_order))
             {
-                std::copy(legacy_order.begin(), legacy_order.end(), result.order.begin());
-                result.order.back() = FooterField::media_info;
+                std::size_t output_index{};
+                for (const auto field : legacy_order)
+                {
+                    result.order[output_index++] = field;
+                    if (field == FooterField::modified_time)
+                    {
+                        result.order[output_index++] = FooterField::taken_time;
+                    }
+                }
+                result.order[output_index] = FooterField::media_info;
                 result.enabled_mask |= footer_field_bit(FooterField::media_info);
             }
         }

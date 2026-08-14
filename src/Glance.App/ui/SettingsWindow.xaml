@@ -135,6 +135,9 @@
                     <FontIcon Glyph="&#xE950;" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
+        </NavigationView.MenuItems>
+        <NavigationView.FooterMenuItems>
+            <NavigationViewItemSeparator />
             <NavigationViewItem
                 x:Name="MaintenanceNavigationItem"
                 x:Uid="MaintenanceNavigationItem"
@@ -153,26 +156,17 @@
                     <FontIcon Glyph="&#xE946;" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
-        </NavigationView.MenuItems>
-        <NavigationView.PaneFooter>
-            <StackPanel>
-                <Button
-                    x:Name="ExitButton"
-                    Margin="4,0,4,8"
-                    Padding="12,8"
-                    HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Left"
-                    Background="Transparent"
-                    BorderBrush="Transparent"
-                    BorderThickness="0"
-                    Click="ExitButton_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <FontIcon FontSize="12" Glyph="&#xE8BB;" />
-                        <TextBlock x:Name="ExitButtonText" x:Uid="ExitButtonText" Text="Exit Glance" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
-        </NavigationView.PaneFooter>
+            <NavigationViewItem
+                x:Name="ExitButton"
+                Margin="0,0,0,8"
+                SelectsOnInvoked="False"
+                Tapped="ExitButton_Tapped">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE8BB;" />
+                </NavigationViewItem.Icon>
+                <TextBlock x:Name="ExitButtonText" x:Uid="ExitButtonText" Text="Exit Glance" />
+            </NavigationViewItem>
+        </NavigationView.FooterMenuItems>
 
         <Grid Padding="32,24,36,28">
             <ScrollViewer
@@ -522,6 +516,18 @@
                                         <CheckBox x:Name="FooterCreationTimeCheckBox" x:Uid="FooterCreationTimeCheckBox" VerticalAlignment="Center" Tag="created" Click="FooterFieldCheckBox_Click" Content="Created time" />
                                         <Button x:Name="FooterCreationTimeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="created" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
                                         <Button x:Name="FooterCreationTimeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="created" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
+                                    </Grid>
+                                </Border>
+                                <Border x:Name="FooterTakenTimeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                    <Grid MinHeight="44" Padding="16,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="FooterTakenTimeCheckBox" x:Uid="FooterTakenTimeCheckBox" VerticalAlignment="Center" Tag="taken" Click="FooterFieldCheckBox_Click" Content="Taken time" />
+                                        <Button x:Name="FooterTakenTimeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="taken" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
+                                        <Button x:Name="FooterTakenTimeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="taken" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
                                     </Grid>
                                 </Border>
                                 <Border x:Name="FooterPermissionsRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">

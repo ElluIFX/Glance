@@ -24,6 +24,9 @@ namespace glance::components::avif
     [[nodiscard]] PreviewResult prepare_preview(
         const std::filesystem::path& path,
         std::uint32_t maximum_dimension) noexcept;
+    [[nodiscard]] bool query_metadata(
+        std::uint64_t lease_token,
+        const glance::contracts::components::ImageMetadataSink* sink) noexcept;
     void release_preview(std::uint64_t lease_token) noexcept;
     void shutdown() noexcept;
 }

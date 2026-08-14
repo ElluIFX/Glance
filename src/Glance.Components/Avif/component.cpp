@@ -174,6 +174,16 @@ namespace
     GalleryMediaApi gallery_media_api{
         .classify_extension = classify_gallery_extension };
 
+    BOOL WINAPI query_image_metadata(
+        std::uint64_t lease_token,
+        const ImageMetadataSink* sink) noexcept
+    {
+        return glance::components::avif::query_metadata(lease_token, sink);
+    }
+
+    ImageMetadataApi image_metadata_api{
+        .query_metadata = query_image_metadata };
+
     BOOL WINAPI query_interface(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -191,6 +201,11 @@ namespace
         if (IsEqualGUID(*interface_id, gallery_media_api_id))
         {
             *interface_pointer = &gallery_media_api;
+            return TRUE;
+        }
+        if (IsEqualGUID(*interface_id, image_metadata_api_id))
+        {
+            *interface_pointer = &image_metadata_api;
             return TRUE;
         }
         return FALSE;

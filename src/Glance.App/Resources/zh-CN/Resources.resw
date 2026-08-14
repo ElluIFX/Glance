@@ -28,6 +28,11 @@
   <data name="LineNumbersTooltip" xml:space="preserve"><value>显示行号</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>自动换行时无法显示行号</value></data>
   <data name="NoImageMetadata" xml:space="preserve"><value>没有内嵌的图像元数据</value></data>
+  <data name="ImageMetadataCaptureSection" xml:space="preserve"><value>拍摄</value></data>
+  <data name="ImageMetadataCameraSection" xml:space="preserve"><value>相机</value></data>
+  <data name="ImageMetadataImageSection" xml:space="preserve"><value>图像</value></data>
+  <data name="ImageMetadataLocationSection" xml:space="preserve"><value>位置</value></data>
+  <data name="ImageMetadataDetailsSection" xml:space="preserve"><value>其他信息</value></data>
   <data name="ImageDecodeError" xml:space="preserve"><value>无法解码图像：{0}</value></data>
   <data name="MediaOpenError" xml:space="preserve"><value>无法打开媒体文件：{0}</value></data>
   <data name="PdfEmptyError" xml:space="preserve"><value>PDF 中没有页面</value></data>
@@ -123,6 +128,7 @@
   <data name="FooterSizeCheckBox.Content" xml:space="preserve"><value>大小</value></data>
   <data name="FooterModifiedTimeCheckBox.Content" xml:space="preserve"><value>修改时间</value></data>
   <data name="FooterCreationTimeCheckBox.Content" xml:space="preserve"><value>创建时间</value></data>
+  <data name="FooterTakenTimeCheckBox.Content" xml:space="preserve"><value>拍摄时间</value></data>
   <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>文件权限 (RWXD)</value></data>
   <data name="FooterMediaInfoCheckBox.Content" xml:space="preserve"><value>媒体信息</value></data>
   <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>上移</value></data>
@@ -306,6 +312,7 @@
   <data name="GenericFileId" xml:space="preserve"><value>文件 ID：{0}</value></data>
   <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>修改于 {0}</value></data>
   <data name="FooterCreationTimeFormat" xml:space="preserve"><value>创建于 {0}</value></data>
+  <data name="FooterTakenTimeFormat" xml:space="preserve"><value>拍摄于 {0}</value></data>
   <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance 设置</value></data>
   <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭设置</value></data>
   <data name="LanguageLabel.Text" xml:space="preserve"><value>语言</value></data>

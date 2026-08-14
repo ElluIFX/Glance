@@ -248,6 +248,7 @@ namespace
         if (tag == L"size") return glance::app::FooterField::size;
         if (tag == L"modified") return glance::app::FooterField::modified_time;
         if (tag == L"created") return glance::app::FooterField::creation_time;
+        if (tag == L"taken") return glance::app::FooterField::taken_time;
         if (tag == L"permissions") return glance::app::FooterField::permissions;
         if (tag == L"media") return glance::app::FooterField::media_info;
         return std::nullopt;
@@ -529,6 +530,7 @@ namespace winrt::Glance::App::implementation
         set_content(FooterSizeCheckBox(), L"FooterSizeCheckBox.Content");
         set_content(FooterModifiedTimeCheckBox(), L"FooterModifiedTimeCheckBox.Content");
         set_content(FooterCreationTimeCheckBox(), L"FooterCreationTimeCheckBox.Content");
+        set_content(FooterTakenTimeCheckBox(), L"FooterTakenTimeCheckBox.Content");
         set_content(FooterPermissionsCheckBox(), L"FooterPermissionsCheckBox.Content");
         set_content(FooterMediaInfoCheckBox(), L"FooterMediaInfoCheckBox.Content");
         for (const auto field : footer_preferences_.order)
@@ -2163,6 +2165,8 @@ namespace winrt::Glance::App::implementation
             return { FooterModifiedTimeRow(), FooterModifiedTimeCheckBox(), FooterModifiedTimeMoveUpButton(), FooterModifiedTimeMoveDownButton() };
         case FooterField::creation_time:
             return { FooterCreationTimeRow(), FooterCreationTimeCheckBox(), FooterCreationTimeMoveUpButton(), FooterCreationTimeMoveDownButton() };
+        case FooterField::taken_time:
+            return { FooterTakenTimeRow(), FooterTakenTimeCheckBox(), FooterTakenTimeMoveUpButton(), FooterTakenTimeMoveDownButton() };
         case FooterField::permissions:
             return { FooterPermissionsRow(), FooterPermissionsCheckBox(), FooterPermissionsMoveUpButton(), FooterPermissionsMoveDownButton() };
         case FooterField::media_info:
@@ -2341,7 +2345,9 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    fire_and_forget SettingsWindow::ExitButton_Click(IInspectable const&, RoutedEventArgs const&)
+    fire_and_forget SettingsWindow::ExitButton_Tapped(
+        IInspectable const&,
+        Input::TappedRoutedEventArgs const&)
     {
         ConfirmExit();
         co_return;

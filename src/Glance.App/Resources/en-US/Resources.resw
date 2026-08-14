@@ -27,7 +27,12 @@
   <data name="GalleryUnavailableNotice" xml:space="preserve"><value>Gallery scrolling is unavailable for this source</value></data>
   <data name="LineNumbersTooltip" xml:space="preserve"><value>Show line numbers</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>Line numbers are unavailable while wrapping</value></data>
-  <data name="NoImageMetadata" xml:space="preserve"><value>No embedded image metadata.</value></data>
+  <data name="NoImageMetadata" xml:space="preserve"><value>No embedded image metadata</value></data>
+  <data name="ImageMetadataCaptureSection" xml:space="preserve"><value>Capture</value></data>
+  <data name="ImageMetadataCameraSection" xml:space="preserve"><value>Camera</value></data>
+  <data name="ImageMetadataImageSection" xml:space="preserve"><value>Image</value></data>
+  <data name="ImageMetadataLocationSection" xml:space="preserve"><value>Location</value></data>
+  <data name="ImageMetadataDetailsSection" xml:space="preserve"><value>Other information</value></data>
   <data name="ImageDecodeError" xml:space="preserve"><value>The image could not be decoded. {0}</value></data>
   <data name="MediaOpenError" xml:space="preserve"><value>The media file could not be opened. {0}</value></data>
   <data name="PdfEmptyError" xml:space="preserve"><value>The PDF contains no pages.</value></data>
@@ -123,6 +128,7 @@
   <data name="FooterSizeCheckBox.Content" xml:space="preserve"><value>Size</value></data>
   <data name="FooterModifiedTimeCheckBox.Content" xml:space="preserve"><value>Modified time</value></data>
   <data name="FooterCreationTimeCheckBox.Content" xml:space="preserve"><value>Created time</value></data>
+  <data name="FooterTakenTimeCheckBox.Content" xml:space="preserve"><value>Taken time</value></data>
   <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>Permissions (RWXD)</value></data>
   <data name="FooterMediaInfoCheckBox.Content" xml:space="preserve"><value>Media information</value></data>
   <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>Move up</value></data>
@@ -306,6 +312,7 @@
   <data name="GenericFileId" xml:space="preserve"><value>File ID: {0}</value></data>
   <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>Modified at {0}</value></data>
   <data name="FooterCreationTimeFormat" xml:space="preserve"><value>Created at {0}</value></data>
+  <data name="FooterTakenTimeFormat" xml:space="preserve"><value>Taken at {0}</value></data>
   <data name="SettingsTitleText.Text" xml:space="preserve"><value>Glance Settings</value></data>
   <data name="CloseSettingsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close settings</value></data>
   <data name="LanguageLabel.Text" xml:space="preserve"><value>Language</value></data>

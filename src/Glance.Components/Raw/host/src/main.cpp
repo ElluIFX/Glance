@@ -4,6 +4,8 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 
+#include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <cstdint>
 #include <memory>
@@ -15,6 +17,8 @@
 #pragma warning(disable : 4251)
 #include "libraw.h"
 #pragma warning(pop)
+
+#include "image_metadata_sidecar.h"
 
 namespace
 {
@@ -33,6 +37,7 @@ namespace
         std::wstring mode;
         std::filesystem::path input;
         std::filesystem::path output;
+        std::filesystem::path metadata_output;
         std::uint32_t maximum_dimension{};
     };
 
@@ -53,6 +58,10 @@ namespace
             {
                 result.output = arguments[index + 1];
             }
+            else if (name == L"--metadata-output")
+            {
+                result.metadata_output = arguments[index + 1];
+            }
             else if (name == L"--maximum-dimension")
             {
                 wchar_t* end{};
@@ -69,13 +78,186 @@ namespace
             }
         }
         return result.mode == L"thumbnail" &&
-            argument_count == 9 &&
+            argument_count == 11 &&
             !result.input.empty() &&
             !result.output.empty() &&
+            !result.metadata_output.empty() &&
             (result.maximum_dimension == 1024 ||
              result.maximum_dimension == 2048 ||
              result.maximum_dimension == 4096 ||
              result.maximum_dimension == 8192);
+    }
+
+    std::wstring widen(std::string_view value)
+    {
+        if (value.empty())
+        {
+            return {};
+        }
+        int required = MultiByteToWideChar(
+            CP_UTF8,
+            MB_ERR_INVALID_CHARS,
+            value.data(),
+            static_cast<int>(value.size()),
+            nullptr,
+            0);
+        UINT code_page = CP_UTF8;
+        DWORD flags = MB_ERR_INVALID_CHARS;
+        if (required <= 0)
+        {
+            code_page = CP_ACP;
+            flags = 0;
+            required = MultiByteToWideChar(
+                code_page,
+                flags,
+                value.data(),
+                static_cast<int>(value.size()),
+                nullptr,
+                0);
+        }
+        if (required <= 0)
+        {
+            return {};
+        }
+        std::wstring result(static_cast<std::size_t>(required), L'\0');
+        return MultiByteToWideChar(
+                   code_page,
+                   flags,
+                   value.data(),
+                   static_cast<int>(value.size()),
+                   result.data(),
+                   required) == required
+            ? result
+            : std::wstring{};
+    }
+
+    void add_text(
+        std::vector<glance::contracts::components::ImageMetadataEntry>& entries,
+        std::wstring_view canonical_name,
+        std::wstring_view value)
+    {
+        using namespace glance::contracts::components;
+        if (value.empty() || canonical_name.size() >= image_metadata_property_capacity ||
+            value.size() >= image_metadata_text_capacity)
+        {
+            return;
+        }
+        ImageMetadataEntry entry;
+        entry.value_kind = ImageMetadataValueKind::text;
+        canonical_name.copy(entry.canonical_name, canonical_name.size());
+        value.copy(entry.text, value.size());
+        entries.push_back(entry);
+    }
+
+    void add_ascii(
+        std::vector<glance::contracts::components::ImageMetadataEntry>& entries,
+        std::wstring_view canonical_name,
+        const char* value,
+        std::size_t capacity)
+    {
+        if (value == nullptr)
+        {
+            return;
+        }
+        add_text(entries, canonical_name, widen({ value, strnlen_s(value, capacity) }));
+    }
+
+    void add_double(
+        std::vector<glance::contracts::components::ImageMetadataEntry>& entries,
+        std::wstring_view canonical_name,
+        double value)
+    {
+        using namespace glance::contracts::components;
+        if (!std::isfinite(value) || canonical_name.size() >= image_metadata_property_capacity)
+        {
+            return;
+        }
+        ImageMetadataEntry entry;
+        entry.value_kind = ImageMetadataValueKind::floating_point;
+        entry.floating_point = value;
+        canonical_name.copy(entry.canonical_name, canonical_name.size());
+        entries.push_back(entry);
+    }
+
+    std::vector<glance::contracts::components::ImageMetadataEntry> raw_metadata(
+        const libraw_data_t& raw)
+    {
+        using namespace glance::contracts::components;
+        std::vector<ImageMetadataEntry> entries;
+        add_ascii(entries, L"System.Photo.CameraManufacturer", raw.idata.make, sizeof(raw.idata.make));
+        add_ascii(entries, L"System.Photo.CameraModel", raw.idata.model, sizeof(raw.idata.model));
+        add_ascii(entries, L"System.Photo.LensManufacturer", raw.lens.LensMake, sizeof(raw.lens.LensMake));
+        add_ascii(entries, L"System.Photo.LensModel", raw.lens.Lens, sizeof(raw.lens.Lens));
+        if (raw.other.iso_speed > 0)
+        {
+            add_double(entries, L"System.Photo.ISOSpeed", raw.other.iso_speed);
+        }
+        if (raw.other.shutter > 0)
+        {
+            add_double(entries, L"System.Photo.ExposureTime", raw.other.shutter);
+        }
+        if (raw.other.aperture > 0)
+        {
+            add_double(entries, L"System.Photo.FNumber", raw.other.aperture);
+        }
+        if (raw.other.focal_len > 0)
+        {
+            add_double(entries, L"System.Photo.FocalLength", raw.other.focal_len);
+        }
+        if (raw.lens.FocalLengthIn35mmFormat != 0)
+        {
+            ImageMetadataEntry entry;
+            entry.value_kind = ImageMetadataValueKind::unsigned_integer;
+            entry.unsigned_value = raw.lens.FocalLengthIn35mmFormat;
+            wcscpy_s(entry.canonical_name, L"System.Photo.FocalLengthInFilm");
+            entries.push_back(entry);
+        }
+        if (raw.other.timestamp > 0)
+        {
+            constexpr std::uint64_t windows_epoch = 11644473600ULL;
+            constexpr std::uint64_t ticks_per_second = 10'000'000ULL;
+            const auto ticks =
+                (static_cast<std::uint64_t>(raw.other.timestamp) + windows_epoch) *
+                ticks_per_second;
+            ImageMetadataEntry entry;
+            entry.value_kind = ImageMetadataValueKind::timestamp;
+            entry.timestamp.dwLowDateTime = static_cast<DWORD>(ticks);
+            entry.timestamp.dwHighDateTime = static_cast<DWORD>(ticks >> 32U);
+            wcscpy_s(entry.canonical_name, L"System.Photo.DateTaken");
+            entries.push_back(entry);
+        }
+        if (raw.sizes.width != 0 && raw.sizes.height != 0)
+        {
+            add_text(
+                entries,
+                L"System.Image.Dimensions",
+                std::to_wstring(raw.sizes.width) + L" x " +
+                    std::to_wstring(raw.sizes.height));
+        }
+        add_ascii(entries, L"System.Comment", raw.other.desc, sizeof(raw.other.desc));
+        add_ascii(entries, L"System.Author", raw.other.artist, sizeof(raw.other.artist));
+        if (raw.other.parsed_gps.gpsparsed)
+        {
+            const auto coordinate = [](const float (&parts)[3]) {
+                return static_cast<double>(parts[0]) +
+                    static_cast<double>(parts[1]) / 60.0 +
+                    static_cast<double>(parts[2]) / 3600.0;
+            };
+            auto latitude = coordinate(raw.other.parsed_gps.latitude);
+            auto longitude = coordinate(raw.other.parsed_gps.longitude);
+            if (raw.other.parsed_gps.latref == 'S')
+            {
+                latitude = -latitude;
+            }
+            if (raw.other.parsed_gps.longref == 'W')
+            {
+                longitude = -longitude;
+            }
+            add_double(entries, L"System.GPS.Latitude", latitude);
+            add_double(entries, L"System.GPS.Longitude", longitude);
+            add_double(entries, L"System.GPS.Altitude", raw.other.parsed_gps.altitude);
+        }
+        return entries;
     }
 
     bool write_rotated_jpeg(
@@ -289,6 +471,7 @@ namespace
     RawPreviewResult prepare_raw_thumbnail(
         const std::filesystem::path& input,
         const std::filesystem::path& output,
+        const std::filesystem::path& metadata_output,
         std::uint32_t maximum_dimension)
     {
         libraw_data_t* raw = libraw_init(0);
@@ -303,6 +486,9 @@ namespace
         {
             return RawPreviewResult::failed;
         }
+        static_cast<void>(glance::components::write_image_metadata_sidecar(
+            metadata_output,
+            raw_metadata(*raw)));
         const auto thumbnail_result = libraw_unpack_thumb(raw);
         if (thumbnail_result == LIBRAW_NO_THUMBNAIL ||
             thumbnail_result == LIBRAW_UNSUPPORTED_THUMBNAIL)
@@ -358,6 +544,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     const auto result = prepare_raw_thumbnail(
         parsed.input,
         parsed.output,
+        parsed.metadata_output,
         parsed.maximum_dimension);
     const bool success = result == RawPreviewResult::success &&
         std::filesystem::is_regular_file(parsed.output, output_error);

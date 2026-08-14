@@ -3,6 +3,7 @@
 #include "glance/contracts/ipc_protocol.h"
 #include "glance/contracts/source_api.h"
 #include "gallery_navigation.h"
+#include "footer_preferences.h"
 #include "media_preview_preferences.h"
 #include "pan_interaction.h"
 #include "paged_document_render_client.h"
@@ -215,6 +216,18 @@ namespace
             }
             check(classifications_match, "gallery classification");
         }
+
+        void* image_metadata_pointer{};
+        check(
+            api.query_interface != nullptr &&
+                api.query_interface(
+                    &image_metadata_api_id,
+                    image_metadata_api_version,
+                    &image_metadata_pointer) != FALSE &&
+                image_metadata_pointer != nullptr &&
+                static_cast<const ImageMetadataApi*>(image_metadata_pointer)->query_metadata !=
+                    nullptr,
+            "image metadata interface");
 
         void* configurable_pointer = reinterpret_cast<void*>(1);
         check(
@@ -539,6 +552,14 @@ int main()
             default_media_preferences.loop_gallery_scrolling &&
             !default_media_preferences.gallery_same_extension_only,
         "gallery media preference defaults");
+    const glance::app::FooterPreferences default_footer_preferences;
+    expect(
+        default_footer_preferences.order[2] == glance::app::FooterField::taken_time &&
+            default_footer_preferences.order.back() == glance::app::FooterField::media_info &&
+            !glance::app::footer_field_enabled(
+                default_footer_preferences,
+                glance::app::FooterField::taken_time),
+        "capture time footer preference defaults");
 
     std::wstring executable_path(32768, L'\0');
     const DWORD executable_length = GetModuleFileNameW(

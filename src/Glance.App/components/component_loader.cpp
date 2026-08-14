@@ -32,6 +32,9 @@ namespace
     using glance::contracts::components::GalleryMediaKind;
     using glance::contracts::components::HealthSeverity;
     using glance::contracts::components::HoverInfoLayerApi;
+    using glance::contracts::components::ImageMetadataApi;
+    using glance::contracts::components::ImageMetadataEntry;
+    using glance::contracts::components::ImageMetadataSink;
     using glance::contracts::components::FileDirectoryPreviewApi;
     using glance::contracts::components::PreparedPreview;
     using glance::contracts::components::PagedDocumentHostDescriptor;
@@ -92,6 +95,7 @@ namespace
         std::optional<SettingsContributionApi> settings_contribution;
         std::optional<FileDirectoryPreviewApi> file_directory_preview;
         std::optional<GalleryMediaApi> gallery_media;
+        std::optional<ImageMetadataApi> image_metadata;
         std::optional<HoverInfoLayerApi> hover_info_layer;
         std::optional<StatusBarShortcutApi> status_bar_shortcut;
         std::optional<ComponentManagementActionApi> component_management_action;
@@ -590,6 +594,23 @@ namespace
                 interface_api->classify_extension != nullptr)
             {
                 component->gallery_media = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::image_metadata_api_id,
+                glance::contracts::components::image_metadata_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const ImageMetadataApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(ImageMetadataApi) &&
+                interface_api->version ==
+                    glance::contracts::components::image_metadata_api_version &&
+                interface_api->query_metadata != nullptr)
+            {
+                component->image_metadata = *interface_api;
             }
         }
         interface_pointer = nullptr;
@@ -1294,6 +1315,62 @@ namespace
             static_cast<HoverInfoCollector*>(context)->cancelled->load(
                 std::memory_order_acquire);
     }
+
+    struct ImageMetadataCollector
+    {
+        std::vector<ImageMetadataEntry> entries;
+        bool valid{ true };
+    };
+
+    BOOL WINAPI append_image_metadata(
+        void* context,
+        const ImageMetadataEntry* entry) noexcept
+    {
+        if (context == nullptr || entry == nullptr ||
+            entry->size < sizeof(ImageMetadataEntry))
+        {
+            return FALSE;
+        }
+        auto& collector = *static_cast<ImageMetadataCollector*>(context);
+        const auto canonical_length =
+            wcsnlen_s(entry->canonical_name, std::size(entry->canonical_name));
+        const auto text_length = wcsnlen_s(entry->text, std::size(entry->text));
+        const bool valid_kind =
+            entry->value_kind ==
+                glance::contracts::components::ImageMetadataValueKind::text ||
+            entry->value_kind ==
+                glance::contracts::components::ImageMetadataValueKind::unsigned_integer ||
+            entry->value_kind ==
+                glance::contracts::components::ImageMetadataValueKind::floating_point ||
+            entry->value_kind ==
+                glance::contracts::components::ImageMetadataValueKind::timestamp;
+        if (collector.entries.size() >= 128 ||
+            canonical_length == std::size(entry->canonical_name) ||
+            canonical_length < 8 ||
+            std::wstring_view(entry->canonical_name, canonical_length).substr(0, 7) != L"System." ||
+            text_length == std::size(entry->text) ||
+            !valid_kind)
+        {
+            collector.valid = false;
+            return FALSE;
+        }
+        try
+        {
+            collector.entries.push_back(*entry);
+            return TRUE;
+        }
+        catch (...)
+        {
+            collector.valid = false;
+            return FALSE;
+        }
+    }
+
+    BOOL WINAPI image_metadata_cancelled(void* context) noexcept
+    {
+        return context == nullptr ||
+            !static_cast<ImageMetadataCollector*>(context)->valid;
+    }
 }
 
 namespace glance::app
@@ -1366,6 +1443,39 @@ namespace glance::app
             return match == gallery_extension_index.end()
                 ? std::vector<std::wstring>{}
                 : match->second;
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
+
+    std::vector<ImageMetadataEntry> query_component_image_metadata(
+        const std::shared_ptr<void>& lease_value) noexcept
+    {
+        if (lease_value == nullptr)
+        {
+            return {};
+        }
+        try
+        {
+            const auto lease = std::static_pointer_cast<PreviewLease>(lease_value);
+            if (lease->component == nullptr || lease->token == 0 ||
+                !lease->component->image_metadata.has_value())
+            {
+                return {};
+            }
+            ImageMetadataCollector collector;
+            ImageMetadataSink sink{
+                .context = &collector,
+                .append = append_image_metadata,
+                .is_cancelled = image_metadata_cancelled };
+            if (!lease->component->image_metadata->query_metadata(lease->token, &sink) ||
+                !collector.valid)
+            {
+                return {};
+            }
+            return collector.entries;
         }
         catch (...)
         {

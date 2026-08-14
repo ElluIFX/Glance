@@ -288,7 +288,10 @@ namespace winrt::Glance::App::implementation
         Windows::Foundation::IAsyncAction preload_gallery_image_async(
             glance::app::PreviewFile file,
             std::uint64_t generation);
-        winrt::fire_and_forget load_image_metadata_async(std::wstring path, std::uint64_t generation);
+        winrt::fire_and_forget load_image_metadata_async(
+            std::wstring path,
+            std::uint64_t generation,
+            std::shared_ptr<void> component_preview);
         winrt::fire_and_forget load_image_media_info_async(
             std::wstring path,
             std::uint64_t generation);
@@ -616,6 +619,7 @@ namespace winrt::Glance::App::implementation
         bool footer_access_loaded_{};
         bool footer_access_requested_{};
         std::wstring image_metadata_;
+        std::wstring image_taken_time_;
         std::wstring media_dimensions_;
         std::wstring media_playback_info_;
         Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };
