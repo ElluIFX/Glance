@@ -100,8 +100,8 @@
   <data name="ArchiveCompressedSizeHeader" xml:space="preserve"><value>Compressed size</value></data>
   <data name="ArchiveOriginalSizeHeader" xml:space="preserve"><value>Original size</value></data>
   <data name="SyntaxHighlightButton.ToolTipService.ToolTip" xml:space="preserve"><value>Syntax highlighting</value></data>
-  <data name="ZoomOutButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom out</value></data>
-  <data name="ZoomInButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom in</value></data>
+  <data name="ImageZoomButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom&#xA;Right-click to reset zoom</value></data>
+  <data name="ImageZoomLabel.Text" xml:space="preserve"><value>Zoom</value></data>
   <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>Rotate clockwise&#xA;Right-click to rotate counterclockwise</value></data>
   <data name="FlipButton.ToolTipService.ToolTip" xml:space="preserve"><value>Flip horizontally&#xA;Right-click to flip vertically</value></data>
   <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>Image metadata (EXIF)</value></data>

@@ -54,6 +54,13 @@ using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
+    winrt::hstring formatted_zoom_factor(double zoom)
+    {
+        std::wostringstream output;
+        output << std::fixed << std::setprecision(2) << zoom << L'X';
+        return winrt::hstring{ output.str() };
+    }
+
     std::optional<std::uint64_t> parse_u64(const winrt::hstring& text)
     {
         try
@@ -1462,8 +1469,8 @@ namespace winrt::Glance::App::implementation
         update_archive_header_state();
         SystemAnsiItem().Text(glance::app::localize(L"SystemAnsiItem.Text"));
         set_tooltip(SyntaxHighlightButton(), L"SyntaxHighlightButton.ToolTipService.ToolTip");
-        set_tooltip(ZoomOutButton(), L"ZoomOutButton.ToolTipService.ToolTip");
-        set_tooltip(ZoomInButton(), L"ZoomInButton.ToolTipService.ToolTip");
+        set_tooltip(ImageZoomButton(), L"ImageZoomButton.ToolTipService.ToolTip");
+        ImageZoomLabel().Text(glance::app::localize(L"ImageZoomLabel.Text"));
         set_tooltip(RotateButton(), L"RotateButton.ToolTipService.ToolTip");
         set_tooltip(FlipButton(), L"FlipButton.ToolTipService.ToolTip");
         set_tooltip(ImageExifButton(), L"ImageExifButton.ToolTipService.ToolTip");
@@ -2678,6 +2685,7 @@ namespace winrt::Glance::App::implementation
             ImageTransform().Rotation(image_rotation_);
             ImageTransform().ScaleX(image_scale_x_);
             ImageTransform().ScaleY(image_scale_y_);
+            update_image_transform_controls();
             ImagePreview().Source(nullptr);
             ImageExifButton().IsChecked(false);
             ImageMetadataText().Blocks().Clear();
@@ -6712,50 +6720,72 @@ namespace winrt::Glance::App::implementation
             true));
     }
 
-    void MainWindow::ZoomOutButton_Click(IInspectable const&, RoutedEventArgs const&)
+    void MainWindow::update_image_zoom_controls()
     {
-        const float zoom = std::max(1.0F, ImageScroller().ZoomFactor() / 1.25F);
-        set_image_zoom(
-            zoom,
-            Windows::Foundation::Point{
-                static_cast<float>(ImageScroller().ActualWidth() / 2.0),
-                static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
+        const double zoom = std::clamp(
+            static_cast<double>(ImageScroller().ZoomFactor()),
+            1.0,
+            16.0);
+        if (std::abs(ImageZoomSlider().Value() - zoom) >= 0.001)
+        {
+            ImageZoomSlider().Value(zoom);
+        }
+        ImageZoomValueText().Text(formatted_zoom_factor(zoom));
+        if (std::abs(zoom - 1.0) >= 0.001)
+        {
+            ImageZoomIcon().Foreground(Application::Current().Resources().Lookup(
+                box_value(L"AccentTextFillColorPrimaryBrush")).as<Media::Brush>());
+        }
+        else
+        {
+            ImageZoomIcon().ClearValue(IconElement::ForegroundProperty());
+        }
     }
 
-    void MainWindow::ZoomOutButton_RightTapped(
+    void MainWindow::update_image_transform_controls()
+    {
+        const auto update_icon = [](const FontIcon& icon, bool active) {
+            if (active)
+            {
+                icon.Foreground(Application::Current().Resources().Lookup(
+                    box_value(L"AccentTextFillColorPrimaryBrush")).as<Media::Brush>());
+            }
+            else
+            {
+                icon.ClearValue(IconElement::ForegroundProperty());
+            }
+        };
+        update_icon(RotateIcon(), std::abs(image_rotation_) >= 0.001);
+        update_icon(FlipIcon(), image_scale_x_ < 0.0 || image_scale_y_ < 0.0);
+    }
+
+    void MainWindow::ImageZoomButton_RightTapped(
         IInspectable const&,
         RightTappedRoutedEventArgs const& args)
     {
-        const float zoom = std::max(1.0F, ImageScroller().ZoomFactor() / 1.05F);
         set_image_zoom(
-            zoom,
+            1.0F,
             Windows::Foundation::Point{
                 static_cast<float>(ImageScroller().ActualWidth() / 2.0),
                 static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
         args.Handled(true);
     }
 
-    void MainWindow::ZoomInButton_Click(IInspectable const&, RoutedEventArgs const&)
-    {
-        const float zoom = std::min(16.0F, ImageScroller().ZoomFactor() * 1.25F);
-        set_image_zoom(
-            zoom,
-            Windows::Foundation::Point{
-                static_cast<float>(ImageScroller().ActualWidth() / 2.0),
-                static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
-    }
-
-    void MainWindow::ZoomInButton_RightTapped(
+    void MainWindow::ImageZoomSlider_ValueChanged(
         IInspectable const&,
-        RightTappedRoutedEventArgs const& args)
+        Controls::Primitives::RangeBaseValueChangedEventArgs const& args)
     {
-        const float zoom = std::min(16.0F, ImageScroller().ZoomFactor() * 1.05F);
+        const float zoom = static_cast<float>(args.NewValue());
+        ImageZoomValueText().Text(formatted_zoom_factor(zoom));
+        if (current_kind_ != glance::app::PreviewKind::image)
+        {
+            return;
+        }
         set_image_zoom(
             zoom,
             Windows::Foundation::Point{
                 static_cast<float>(ImageScroller().ActualWidth() / 2.0),
                 static_cast<float>(ImageScroller().ActualHeight() / 2.0) });
-        args.Handled(true);
     }
 
     void MainWindow::ImageScroller_PointerWheelChanged(
@@ -6877,6 +6907,7 @@ namespace winrt::Glance::App::implementation
         IInspectable const&,
         ScrollViewerViewChangedEventArgs const&)
     {
+        update_image_zoom_controls();
         update_image_zoom_map();
     }
 
@@ -6954,6 +6985,7 @@ namespace winrt::Glance::App::implementation
     {
         image_rotation_ = std::fmod(image_rotation_ + degrees + 360.0, 360.0);
         ImageTransform().Rotation(image_rotation_);
+        update_image_transform_controls();
         fit_image_to_viewport();
     }
 
@@ -6984,6 +7016,7 @@ namespace winrt::Glance::App::implementation
             image_scale_y_ = -image_scale_y_;
             ImageTransform().ScaleY(image_scale_y_);
         }
+        update_image_transform_controls();
         update_image_zoom_map();
     }
 

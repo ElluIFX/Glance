@@ -100,8 +100,8 @@
   <data name="ArchiveCompressedSizeHeader" xml:space="preserve"><value>压缩大小</value></data>
   <data name="ArchiveOriginalSizeHeader" xml:space="preserve"><value>原始大小</value></data>
   <data name="SyntaxHighlightButton.ToolTipService.ToolTip" xml:space="preserve"><value>语法高亮</value></data>
-  <data name="ZoomOutButton.ToolTipService.ToolTip" xml:space="preserve"><value>缩小</value></data>
-  <data name="ZoomInButton.ToolTipService.ToolTip" xml:space="preserve"><value>放大</value></data>
+  <data name="ImageZoomButton.ToolTipService.ToolTip" xml:space="preserve"><value>缩放&#xA;右键重置缩放</value></data>
+  <data name="ImageZoomLabel.Text" xml:space="preserve"><value>缩放</value></data>
   <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>顺时针旋转&#xA;右键逆时针旋转</value></data>
   <data name="FlipButton.ToolTipService.ToolTip" xml:space="preserve"><value>水平翻转&#xA;右键垂直翻转</value></data>
   <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>图像元数据 (EXIF)</value></data>

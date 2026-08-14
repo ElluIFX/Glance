@@ -151,14 +151,12 @@ namespace winrt::Glance::App::implementation
         void ImageZoomMapOverlay_PointerCaptureLost(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
-        void ZoomOutButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void ZoomOutButton_RightTapped(
+        void ImageZoomButton_RightTapped(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
-        void ZoomInButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void ZoomInButton_RightTapped(
+        void ImageZoomSlider_ValueChanged(
             IInspectable const&,
-            Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
+            Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const&);
         void RotateButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void RotateButton_RightTapped(
             IInspectable const&,
@@ -503,6 +501,8 @@ namespace winrt::Glance::App::implementation
         void update_preview_as_text_button();
         void update_image_metadata_visibility();
         void set_image_zoom(float zoom, Windows::Foundation::Point anchor);
+        void update_image_zoom_controls();
+        void update_image_transform_controls();
         void end_image_pan(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         void end_pdf_pan(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         void update_state();

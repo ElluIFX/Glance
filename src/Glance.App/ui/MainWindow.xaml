@@ -868,22 +868,38 @@
                 Spacing="4"
                 Visibility="Collapsed">
                 <Button
-                    x:Name="ZoomOutButton"
-                    x:Uid="ZoomOutButton"
+                    x:Name="ImageZoomButton"
+                    x:Uid="ImageZoomButton"
                     Style="{StaticResource IconButtonStyle}"
-                    Click="ZoomOutButton_Click"
-                    RightTapped="ZoomOutButton_RightTapped"
-                    ToolTipService.ToolTip="Zoom out">
-                    <FontIcon FontSize="14" Glyph="&#xE71F;" />
-                </Button>
-                <Button
-                    x:Name="ZoomInButton"
-                    x:Uid="ZoomInButton"
-                    Style="{StaticResource IconButtonStyle}"
-                    Click="ZoomInButton_Click"
-                    RightTapped="ZoomInButton_RightTapped"
-                    ToolTipService.ToolTip="Zoom in">
-                    <FontIcon FontSize="14" Glyph="&#xE8A3;" />
+                    RightTapped="ImageZoomButton_RightTapped"
+                    ToolTipService.ToolTip="Zoom&#xA;Right-click to reset zoom">
+                    <Button.Flyout>
+                        <Flyout Placement="Top">
+                            <StackPanel Width="220" Spacing="6">
+                                <Grid>
+                                    <TextBlock
+                                        x:Name="ImageZoomLabel"
+                                        x:Uid="ImageZoomLabel"
+                                        FontWeight="SemiBold"
+                                        Text="Zoom" />
+                                    <TextBlock
+                                        x:Name="ImageZoomValueText"
+                                        HorizontalAlignment="Right"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="1.00X" />
+                                </Grid>
+                                <Slider
+                                    x:Name="ImageZoomSlider"
+                                    IsThumbToolTipEnabled="False"
+                                    Maximum="16"
+                                    Minimum="1"
+                                    StepFrequency="0.01"
+                                    Value="1"
+                                    ValueChanged="ImageZoomSlider_ValueChanged" />
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                    <FontIcon x:Name="ImageZoomIcon" FontSize="14" Glyph="&#xE71E;" />
                 </Button>
                 <Button
                     x:Name="RotateButton"
@@ -892,7 +908,7 @@
                     Click="RotateButton_Click"
                     RightTapped="RotateButton_RightTapped"
                     ToolTipService.ToolTip="Rotate clockwise&#xA;Right-click to rotate counterclockwise">
-                    <FontIcon FontSize="14" Glyph="&#xE7AD;" />
+                    <FontIcon x:Name="RotateIcon" FontSize="14" Glyph="&#xE7AD;" />
                 </Button>
                 <Button
                     x:Name="FlipButton"
@@ -901,7 +917,7 @@
                     Click="FlipButton_Click"
                     RightTapped="FlipButton_RightTapped"
                     ToolTipService.ToolTip="Flip horizontally&#xA;Right-click to flip vertically">
-                    <FontIcon FontSize="14" Glyph="&#xE8AB;" />
+                    <FontIcon x:Name="FlipIcon" FontSize="14" Glyph="&#xE8AB;" />
                 </Button>
                 <ToggleButton
                     x:Name="ImageExifButton"
