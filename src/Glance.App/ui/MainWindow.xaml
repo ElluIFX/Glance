@@ -872,7 +872,7 @@
                     x:Uid="ImageZoomButton"
                     Style="{StaticResource IconButtonStyle}"
                     RightTapped="ImageZoomButton_RightTapped"
-                    ToolTipService.ToolTip="Zoom&#xA;Right-click to reset zoom">
+                    ToolTipService.ToolTip="Zoom image&#xA;Right-click to reset zoom">
                     <Button.Flyout>
                         <Flyout Placement="Top">
                             <StackPanel Width="220" Spacing="6">
@@ -935,7 +935,8 @@
                 Grid.Column="3"
                 Style="{StaticResource IconToggleButtonStyle}"
                 Click="GalleryModeButton_Click"
-                ToolTipService.ToolTip="Gallery mode"
+                RightTapped="GalleryModeButton_RightTapped"
+                ToolTipService.ToolTip="Gallery mode&#xA;Right-click: same extension"
                 Visibility="Collapsed">
                 <FontIcon FontSize="14" Glyph="&#xE7C5;" />
             </ToggleButton>

@@ -180,6 +180,9 @@ namespace winrt::Glance::App::implementation
         void MediaPlayPauseButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MediaMuteButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void GalleryModeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void GalleryModeButton_RightTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void MediaSeekSlider_ValueChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const&);
@@ -569,6 +572,7 @@ namespace winrt::Glance::App::implementation
         bool middle_click_gallery_enabled_{ true };
         bool loop_gallery_enabled_{ true };
         bool gallery_same_extension_only_{};
+        bool gallery_same_extension_override_{};
         std::uint64_t gallery_session_id_{};
         std::uint64_t gallery_request_sequence_{};
         std::uint64_t gallery_open_request_id_{};

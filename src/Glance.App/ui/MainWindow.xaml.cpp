@@ -887,7 +887,7 @@ namespace winrt::Glance::App::implementation
         {
             root.SetNamedValue(L"currentPath", JsonValue::CreateStringValue(files_[current_index_].path));
             JsonArray extensions;
-            if (gallery_same_extension_only_)
+            if (gallery_same_extension_only_ || gallery_same_extension_override_)
             {
                 const auto extension = glance::app::normalize_gallery_extension(
                     std::filesystem::path(files_[current_index_].path).extension().wstring());
@@ -978,6 +978,7 @@ namespace winrt::Glance::App::implementation
             static_cast<void>(send_gallery_request(L"close", request_id));
         }
         gallery_mode_ = GalleryMode::inactive;
+        gallery_same_extension_override_ = false;
         GalleryModeButton().IsChecked(false);
         gallery_session_id_ = 0;
         gallery_open_request_id_ = 0;
@@ -1010,6 +1011,7 @@ namespace winrt::Glance::App::implementation
     {
         if (gallery_mode_ == GalleryMode::inactive)
         {
+            gallery_same_extension_override_ = false;
             open_gallery();
             return;
         }
@@ -7422,6 +7424,23 @@ namespace winrt::Glance::App::implementation
     {
         toggle_gallery_mode();
         GalleryModeButton().IsChecked(gallery_mode_ != GalleryMode::inactive);
+    }
+
+    void MainWindow::GalleryModeButton_RightTapped(
+        IInspectable const&,
+        RightTappedRoutedEventArgs const& args)
+    {
+        if (gallery_mode_ == GalleryMode::inactive)
+        {
+            gallery_same_extension_override_ = true;
+            open_gallery();
+        }
+        else
+        {
+            leave_gallery(true);
+        }
+        GalleryModeButton().IsChecked(gallery_mode_ != GalleryMode::inactive);
+        args.Handled(true);
     }
 
     void MainWindow::MediaSeekSlider_ValueChanged(

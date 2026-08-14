@@ -21,9 +21,9 @@
   <data name="EncodingDetecting" xml:space="preserve"><value>Detecting...</value></data>
   <data name="EncodingUnknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="FontSizeOverlayFormat" xml:space="preserve"><value>{0} px</value></data>
-  <data name="GalleryScrollModeNotice" xml:space="preserve"><value>Gallery scroll mode</value></data>
-  <data name="ImageWheelZoomModeNotice" xml:space="preserve"><value>Image wheel zoom mode</value></data>
-  <data name="MediaWheelControlModeNotice" xml:space="preserve"><value>Media wheel control mode</value></data>
+  <data name="GalleryScrollModeNotice" xml:space="preserve"><value>Mouse wheel: gallery scrolling</value></data>
+  <data name="ImageWheelZoomModeNotice" xml:space="preserve"><value>Mouse wheel: image zoom</value></data>
+  <data name="MediaWheelControlModeNotice" xml:space="preserve"><value>Mouse wheel: media control</value></data>
   <data name="GalleryUnavailableNotice" xml:space="preserve"><value>Gallery scrolling is unavailable for this source</value></data>
   <data name="LineNumbersTooltip" xml:space="preserve"><value>Show line numbers</value></data>
   <data name="LineNumbersWrappingTooltip" xml:space="preserve"><value>Line numbers are unavailable while wrapping</value></data>
@@ -86,7 +86,7 @@
   <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
   <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>Play or pause</value></data>
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mute or unmute</value></data>
-  <data name="GalleryModeButton.ToolTipService.ToolTip" xml:space="preserve"><value>Gallery mode</value></data>
+  <data name="GalleryModeButton.ToolTipService.ToolTip" xml:space="preserve"><value>Gallery mode&#xA;Right-click: same extension</value></data>
   <data name="PreviousPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Previous page</value></data>
   <data name="NextPdfButton.ToolTipService.ToolTip" xml:space="preserve"><value>Next page</value></data>
   <data name="PdfThumbnailsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Thumbnails</value></data>
@@ -100,7 +100,7 @@
   <data name="ArchiveCompressedSizeHeader" xml:space="preserve"><value>Compressed size</value></data>
   <data name="ArchiveOriginalSizeHeader" xml:space="preserve"><value>Original size</value></data>
   <data name="SyntaxHighlightButton.ToolTipService.ToolTip" xml:space="preserve"><value>Syntax highlighting</value></data>
-  <data name="ImageZoomButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom&#xA;Right-click to reset zoom</value></data>
+  <data name="ImageZoomButton.ToolTipService.ToolTip" xml:space="preserve"><value>Zoom image&#xA;Right-click to reset zoom</value></data>
   <data name="ImageZoomLabel.Text" xml:space="preserve"><value>Zoom</value></data>
   <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>Rotate clockwise&#xA;Right-click to rotate counterclockwise</value></data>
   <data name="FlipButton.ToolTipService.ToolTip" xml:space="preserve"><value>Flip horizontally&#xA;Right-click to flip vertically</value></data>
