@@ -3,7 +3,7 @@
   <data name="Component.DisplayName" xml:space="preserve"><value>压缩包预览</value></data>
   <data name="Status.Available" xml:space="preserve"><value>支持常见压缩包、归档与光盘映像格式</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>压缩包预览文件缺失</value></data>
-  <data name="Preview.Loading" xml:space="preserve"><value>正在读取归档目录</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在加载归档目录...</value></data>
   <data name="Column.Name" xml:space="preserve"><value>名称</value></data>
   <data name="Column.Type" xml:space="preserve"><value>类型</value></data>
   <data name="Column.Modified" xml:space="preserve"><value>修改日期</value></data>

@@ -15,7 +15,7 @@
   <data name="Status.Available" xml:space="preserve"><value>Supports previewing Word, PowerPoint, and Excel files</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>Office COM automation unavailable</value></data>
   <data name="Status.Partial" xml:space="preserve"><value>Some Office COM applications are unavailable</value></data>
-  <data name="Preview.Loading" xml:space="preserve"><value>Preparing this file preview in the background, you can return later</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>Preparing this file preview in the background, you can return later...</value></data>
   <data name="Preview.OfficeUnavailable" xml:space="preserve"><value>The Office COM application required by this document is unavailable</value></data>
   <data name="Preview.PrepareFailed" xml:space="preserve"><value>Microsoft Office could not prepare this document</value></data>
 </root>

@@ -1,0 +1,17 @@
+{
+  "schema_version": 3,
+  "id": "avif",
+  "architecture": "x64",
+  "entry_point": "Glance.AvifComponent.dll",
+  "dependencies": [],
+  "payload_files": [
+    "Glance.AvifHost.exe",
+    "libavif-LICENSE.txt",
+    "dav1d-LICENSE.txt",
+    "resources.pri"
+  ],
+  "installer_names": {
+    "en-US": "AVIF image preview",
+    "zh-CN": "AVIF 图片预览"
+  }
+}

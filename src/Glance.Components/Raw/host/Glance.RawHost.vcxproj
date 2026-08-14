@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}</ProjectGuid>
+    <RootNamespace>Glance.RawHost</RootNamespace>
+    <ProjectName>Glance.RawHost</ProjectName>
+    <TargetName>Glance.RawHost</TargetName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <OutDir>$(GlanceOutputRoot)components\raw\</OutDir>
+    <RawLibRoot>$(ProjectDir)..\third_party\libraw\0.22.2\</RawLibRoot>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(RawLibRoot)$(Configuration)\libraw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>$(RawLibRoot)$(Configuration)\libraw.lib;Ole32.lib;Shell32.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="app.manifest" />
+    <ResourceCompile Include="..\..\..\version.rc">
+      <PreprocessorDefinitions>GLANCE_BINARY_KIND=9;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemGroup>
+  <Target Name="CopyLibrawRuntime" AfterTargets="Build">
+    <Copy SourceFiles="$(RawLibRoot)$(Configuration)\libraw.dll" DestinationFiles="$(OutDir)libraw.dll" SkipUnchangedFiles="true" />
+  </Target>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

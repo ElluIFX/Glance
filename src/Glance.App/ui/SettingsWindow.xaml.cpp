@@ -734,23 +734,28 @@ namespace winrt::Glance::App::implementation
             glance::app::component_statuses(glance::app::current_ui_language());
         ComponentEmptyState().Visibility(
             statuses.empty() ? Visibility::Visible : Visibility::Collapsed);
-        ComponentStatusList().Visibility(
+        ComponentStatusScroller().Visibility(
             statuses.empty() ? Visibility::Collapsed : Visibility::Visible);
         const auto row_style =
-            SettingsNavigation().Resources().Lookup(box_value(L"SettingsRowStyle")).as<Style>();
+            SettingsNavigation().Resources()
+                .Lookup(box_value(L"SettingsRowStyle"))
+                .as<Style>();
+        const auto detail_style =
+            SettingsNavigation().Resources()
+                .Lookup(box_value(L"SettingsDescriptionStyle"))
+                .as<Style>();
+        const auto divider_brush = Application::Current().Resources().TryLookup(
+            box_value(L"DividerStrokeColorDefaultBrush")).try_as<Media::Brush>();
         for (std::size_t index = 0; index < statuses.size(); ++index)
         {
             const auto& status = statuses[index];
-            if (index != 0)
+            if (index != 0 && divider_brush != nullptr)
             {
                 Shapes::Rectangle divider;
                 divider.Height(1);
-                divider.Fill(
-                    Application::Current().Resources().TryLookup(
-                        box_value(L"DividerStrokeColorDefaultBrush")).try_as<Media::Brush>());
+                divider.Fill(divider_brush);
                 ComponentStatusList().Children().Append(divider);
             }
-
             Controls::Grid row;
             row.Style(row_style);
             Controls::ColumnDefinition content_column;
@@ -765,6 +770,15 @@ namespace winrt::Glance::App::implementation
             Controls::TextBlock title;
             title.Text(status.display_name);
             content.Children().Append(title);
+            if (!status.detail.empty())
+            {
+                Controls::TextBlock health_detail;
+                health_detail.Style(detail_style);
+                health_detail.Text(status.detail);
+                health_detail.TextWrapping(TextWrapping::Wrap);
+                content.Children().Append(health_detail);
+            }
+            row.Children().Append(content);
 
             std::wstring state_key;
             Windows::UI::Color color{ 255, 96, 94, 92 };
@@ -791,28 +805,6 @@ namespace winrt::Glance::App::implementation
                 break;
             }
 
-            if (!status.detail.empty())
-            {
-                Controls::TextBlock health_detail;
-                health_detail.Style(
-                    SettingsNavigation().Resources()
-                        .Lookup(box_value(L"SettingsDescriptionStyle"))
-                        .as<Style>());
-                health_detail.Text(status.detail);
-                health_detail.TextWrapping(TextWrapping::Wrap);
-                content.Children().Append(health_detail);
-            }
-            row.Children().Append(content);
-
-            Controls::FontIcon status_icon;
-            status_icon.Glyph(glyph);
-            status_icon.FontSize(18);
-            status_icon.Foreground(Media::SolidColorBrush(color));
-            status_icon.VerticalAlignment(VerticalAlignment::Center);
-            Controls::ToolTipService::SetToolTip(
-                status_icon,
-                box_value(glance::app::localize(state_key)));
-
             Controls::StackPanel actions;
             actions.Orientation(Controls::Orientation::Horizontal);
             actions.Spacing(8);
@@ -830,6 +822,14 @@ namespace winrt::Glance::App::implementation
                 });
                 actions.Children().Append(button);
             }
+            Controls::FontIcon status_icon;
+            status_icon.Glyph(glyph);
+            status_icon.FontSize(18);
+            status_icon.Foreground(Media::SolidColorBrush(color));
+            status_icon.VerticalAlignment(VerticalAlignment::Center);
+            Controls::ToolTipService::SetToolTip(
+                status_icon,
+                box_value(glance::app::localize(state_key)));
             actions.Children().Append(status_icon);
             Controls::Grid::SetColumn(actions, 1);
             row.Children().Append(actions);
@@ -856,22 +856,24 @@ namespace winrt::Glance::App::implementation
             SourceStatusList().Children().Clear();
             SourceEmptyState().Visibility(
                 sources.Size() == 0 ? Visibility::Visible : Visibility::Collapsed);
-            SourceStatusList().Visibility(
+            SourceStatusScroller().Visibility(
                 sources.Size() == 0 ? Visibility::Collapsed : Visibility::Visible);
             const auto row_style = SettingsNavigation().Resources()
                 .Lookup(box_value(L"SettingsRowStyle")).as<Style>();
+            const auto detail_style = SettingsNavigation().Resources()
+                .Lookup(box_value(L"SettingsDescriptionStyle")).as<Style>();
+            const auto divider_brush = Application::Current().Resources().TryLookup(
+                box_value(L"DividerStrokeColorDefaultBrush")).try_as<Media::Brush>();
             for (std::uint32_t index = 0; index < sources.Size(); ++index)
             {
-                if (index != 0)
+                const auto status = sources.GetObjectAt(index);
+                if (index != 0 && divider_brush != nullptr)
                 {
                     Shapes::Rectangle divider;
                     divider.Height(1);
-                    divider.Fill(Application::Current().Resources().TryLookup(
-                        box_value(L"DividerStrokeColorDefaultBrush")).try_as<Media::Brush>());
+                    divider.Fill(divider_brush);
                     SourceStatusList().Children().Append(divider);
                 }
-
-                const auto status = sources.GetObjectAt(index);
                 Controls::Grid row;
                 row.Style(row_style);
                 Controls::ColumnDefinition content_column;
@@ -895,8 +897,7 @@ namespace winrt::Glance::App::implementation
                 if (!detail.empty())
                 {
                     Controls::TextBlock detail_text;
-                    detail_text.Style(SettingsNavigation().Resources()
-                        .Lookup(box_value(L"SettingsDescriptionStyle")).as<Style>());
+                    detail_text.Style(detail_style);
                     detail_text.Text(detail);
                     detail_text.TextWrapping(TextWrapping::Wrap);
                     content.Children().Append(detail_text);

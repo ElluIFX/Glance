@@ -1,0 +1,17 @@
+{
+  "schema_version": 3,
+  "id": "raw",
+  "architecture": "x64",
+  "entry_point": "Glance.RawComponent.dll",
+  "dependencies": [],
+  "payload_files": [
+    "Glance.RawHost.exe",
+    "libraw.dll",
+    "libraw-LICENSE.txt",
+    "resources.pri"
+  ],
+  "installer_names": {
+    "en-US": "Camera RAW preview",
+    "zh-CN": "相机 RAW 预览"
+  }
+}

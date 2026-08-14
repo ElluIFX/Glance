@@ -1,0 +1,19 @@
+{
+  "schema_version": 3,
+  "id": "heic",
+  "architecture": "x64",
+  "entry_point": "Glance.HeicComponent.dll",
+  "dependencies": [],
+  "payload_files": [
+    "Glance.HeicHost.exe",
+    "heif.dll",
+    "libde265.dll",
+    "libheif-LICENSE.txt",
+    "libde265-LICENSE.txt",
+    "resources.pri"
+  ],
+  "installer_names": {
+    "en-US": "HEIC image preview",
+    "zh-CN": "HEIC 图片预览"
+  }
+}

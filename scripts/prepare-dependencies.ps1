@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet("Debug", "Release")]
+    [string] $Configuration = "Release"
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -470,6 +473,237 @@ else {
         }
     }
     Write-Host "7-Zip $sevenZipVersion archive preview dependencies are ready."
+}
+# ---------------------------------------------------------------------------
+# HEIC / AVIF / camera RAW preview codec dependencies.
+# Source archives are pinned by SHA-256; Release build artifacts are checked in
+# under each component's third_party directory, while Debug artifacts are
+# regenerated locally only when the current configuration is incomplete.
+# ---------------------------------------------------------------------------
+$codecTemporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("Glance.Codec." + [Guid]::NewGuid().ToString("N"))
+$codecSourcesRoot = Join-Path $codecTemporaryDirectory "src"
+New-Item -ItemType Directory -Path $codecSourcesRoot -Force | Out-Null
+
+try {
+
+function Invoke-CodecCommand {
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string] $Executable,
+        [Parameter(Mandatory)] [string[]] $Arguments
+    )
+    Write-Host "===== $Name ====="
+    & $Executable @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Name failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Get-CodecSource {
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string] $Uri,
+        [Parameter(Mandatory)] [string] $Sha256
+    )
+    $archive = Join-Path $codecTemporaryDirectory "$Name.tar.gz"
+    if (-not (Test-Path -LiteralPath $archive)) {
+        Write-Host "Downloading $Name codec sources..."
+        Invoke-DependencyDownload -Uri $Uri -OutFile $archive
+        $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+        if ($actualHash -ne $Sha256) {
+            throw "$Name source archive SHA-256 mismatch."
+        }
+    }
+    $directory = Join-Path $codecSourcesRoot $Name
+    if (-not (Test-Path -LiteralPath $directory)) {
+        & "$env:SystemRoot\System32\tar.exe" -xf $archive -C $codecSourcesRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to extract the $Name source archive."
+        }
+    }
+    return $directory
+}
+
+$msbuildExe = Get-GlanceMSBuild
+$codecCmakeArgs = @("-G", "Visual Studio 18 2026", "-A", "x64")
+# --- libde265 + libheif (Heic component) ---
+$libde265Version = "1.1.1"
+$libde265Out = Join-Path $repositoryRoot "src\Glance.Components\Heic\third_party\libde265\$libde265Version"
+$libheifVersion = "1.23.1"
+$libheifOut = Join-Path $repositoryRoot "src\Glance.Components\Heic\third_party\libheif\$libheifVersion"
+$libde265Destination = Join-Path $libde265Out $Configuration
+$libheifDestination = Join-Path $libheifOut $Configuration
+$codecBuildNeeded =
+    -not (Test-Path (Join-Path $libde265Destination "libde265.lib")) -or
+    -not (Test-Path (Join-Path $libde265Destination "libde265.dll")) -or
+    -not (Test-Path (Join-Path $libde265Destination "include\libde265\de265.h")) -or
+    -not (Test-Path (Join-Path $libde265Destination "include\libde265\de265-version.h")) -or
+    -not (Test-Path (Join-Path $libheifDestination "libheif.lib")) -or
+    -not (Test-Path (Join-Path $libheifDestination "heif.dll")) -or
+    -not (Test-Path (Join-Path $libheifDestination "include\libheif\heif.h")) -or
+    -not (Test-Path (Join-Path $libheifDestination "include\libheif\heif_version.h"))
+if ($codecBuildNeeded) {
+    $libde265Src = Get-CodecSource -Name "libde265-$libde265Version" -Uri "https://github.com/strukturag/libde265/archive/refs/tags/v$libde265Version.tar.gz" -Sha256 "5B4FAC677018E6074196E8F9889F3E4A5310E46AFBF22A893F620D4E24D3510E"
+    $libheifSrc = Get-CodecSource -Name "libheif-$libheifVersion" -Uri "https://github.com/strukturag/libheif/archive/refs/tags/v$libheifVersion.tar.gz" -Sha256 "0B14D6BDF5680488E3AEDE354B1E11BE1444B3FC4A30FCF2AE06BD6B601466BE"
+    foreach ($config in @($Configuration)) {
+        $rt = if ($config -eq "Release") { "MultiThreadedDLL" } else { "MultiThreadedDebugDLL" }
+        $dest = Join-Path $libde265Out $config
+        if (-not (Test-Path (Join-Path $dest "libde265.lib")) -or
+            -not (Test-Path (Join-Path $dest "libde265.dll")) -or
+            -not (Test-Path (Join-Path $dest "include\libde265\de265.h")) -or
+            -not (Test-Path (Join-Path $dest "include\libde265\de265-version.h"))) {
+            $build = Join-Path $codecTemporaryDirectory "de265-build-$config"
+            Invoke-CodecCommand "libde265 $config configure" "cmake" @($codecCmakeArgs + @("-DBUILD_SHARED_LIBS=ON", "-S", $libde265Src, "-B", $build, "-DCMAKE_MSVC_RUNTIME_LIBRARY=$rt", "-DENABLE_SDL=OFF", "-DENABLE_ENCODER=OFF"))
+            Invoke-CodecCommand "libde265 $config build" "cmake" @("--build", $build, "--config", $config, "--parallel", "8", "--target", "de265")
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            $de265Artifact = Get-ChildItem $build -Recurse -Filter "de265.lib" -ErrorAction SilentlyContinue | Select-Object -First 1
+            $de265Runtime = Get-ChildItem $build -Recurse -Filter "libde265.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $de265Artifact -or -not $de265Runtime) { throw "The shared libde265 artifacts were not produced for $config." }
+            Copy-Item $de265Artifact.FullName (Join-Path $dest "libde265.lib") -Force
+            Copy-Item $de265Runtime.FullName (Join-Path $dest "libde265.dll") -Force
+            $de265HeaderDirectory = Join-Path $dest "include\libde265"
+            New-Item -ItemType Directory -Path $de265HeaderDirectory -Force | Out-Null
+            Copy-Item (Join-Path $libde265Src "libde265\de265.h") (Join-Path $de265HeaderDirectory "de265.h") -Force
+            $de265VersionHeader = Get-ChildItem $build -Recurse -Filter "de265-version.h" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $de265VersionHeader) { throw "The generated libde265 version header was not produced for $config." }
+            Copy-Item $de265VersionHeader.FullName (Join-Path $de265HeaderDirectory "de265-version.h") -Force
+            Write-Host "libde265 $config -> $dest"
+        }
+    }
+    $de265Include = Join-Path $libde265Destination "include"
+    foreach ($config in @($Configuration)) {
+        $rt = if ($config -eq "Release") { "MultiThreadedDLL" } else { "MultiThreadedDebugDLL" }
+        $dest = Join-Path $libheifOut $config
+        if (-not (Test-Path (Join-Path $dest "libheif.lib")) -or
+            -not (Test-Path (Join-Path $dest "heif.dll")) -or
+            -not (Test-Path (Join-Path $dest "include\libheif\heif.h")) -or
+            -not (Test-Path (Join-Path $dest "include\libheif\heif_version.h"))) {
+            $build = Join-Path $codecTemporaryDirectory "heif-build-$config"
+            $de265Lib = Join-Path $libde265Out "$config\libde265.lib"
+            Invoke-CodecCommand "libheif $config configure" "cmake" @($codecCmakeArgs + @("-DBUILD_SHARED_LIBS=ON", "-S", $libheifSrc, "-B", $build, "-DCMAKE_MSVC_RUNTIME_LIBRARY=$rt", "-DWITH_LIBDE265=ON", "-DWITH_LIBDE265_PLUGIN=OFF", "-DENABLE_PLUGIN_LOADING=OFF", "-DLIBDE265_INCLUDE_DIR=$de265Include", "-DLIBDE265_LIBRARY=$de265Lib", "-DWITH_X265=OFF", "-DWITH_AOM_DECODER=OFF", "-DWITH_AOM_ENCODER=OFF", "-DWITH_DAV1D=OFF", "-DWITH_RAV1E=OFF", "-DWITH_SVT_ENCODER=OFF", "-DWITH_KVAZAAR=OFF", "-DWITH_OPENJPEG=OFF", "-DWITH_JPEG_DECODER=OFF", "-DWITH_JPEG_ENCODER=OFF", "-DWITH_PNG=OFF", "-DWITH_ZLIB=OFF"))
+            Invoke-CodecCommand "libheif $config build" "cmake" @("--build", $build, "--config", $config, "--parallel", "8", "--target", "heif")
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            $heifArtifact = Get-ChildItem $build -Recurse -Filter "heif.lib" -ErrorAction SilentlyContinue | Select-Object -First 1
+            $heifRuntime = Get-ChildItem $build -Recurse -Filter "heif.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $heifArtifact -or -not $heifRuntime) { throw "The shared libheif artifacts were not produced for $config." }
+            Copy-Item $heifArtifact.FullName (Join-Path $dest "libheif.lib") -Force
+            Copy-Item $heifRuntime.FullName (Join-Path $dest "heif.dll") -Force
+            $include = Join-Path $dest "include\libheif"
+            New-Item -ItemType Directory -Path $include -Force | Out-Null
+            Copy-Item (Join-Path $libheifSrc "libheif\api\libheif\*.h") $include -Force
+            $heifVersionHeader = Get-ChildItem $build -Recurse -Filter "heif_version.h" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($heifVersionHeader) {
+                Copy-Item $heifVersionHeader.FullName (Join-Path $include "heif_version.h") -Force
+            }
+            Write-Host "libheif $config -> $dest"
+        }
+    }
+    Write-Host "HEIC codec dependencies are ready."
+}
+# --- dav1d + libavif (Avif component) ---
+$dav1dVersion = "1.5.0"
+$dav1dOut = Join-Path $repositoryRoot "src\Glance.Components\Avif\third_party\dav1d\$dav1dVersion"
+$libavifVersion = "1.4.2"
+$libavifOut = Join-Path $repositoryRoot "src\Glance.Components\Avif\third_party\libavif\$libavifVersion"
+$codecBuildNeeded =
+    -not (Test-Path (Join-Path $dav1dOut "$Configuration\dav1d.lib")) -or
+    -not (Test-Path (Join-Path $dav1dOut "$Configuration\dav1d\dav1d.h")) -or
+    -not (Test-Path (Join-Path $libavifOut "$Configuration\avif.lib")) -or
+    -not (Test-Path (Join-Path $libavifOut "$Configuration\avif.h"))
+if ($codecBuildNeeded) {
+    $mesonCommand = Get-Command meson -ErrorAction SilentlyContinue
+    if (-not $mesonCommand) {
+        $pythonScriptsDirectory = Join-Path $env:APPDATA "Python\Python312\Scripts"
+        if (Test-Path -LiteralPath (Join-Path $pythonScriptsDirectory "meson.exe")) {
+            $env:PATH = $pythonScriptsDirectory + ";" + $env:PATH
+        }
+        else {
+            throw "meson and ninja were not found. Install them with: python -m pip install meson ninja"
+        }
+    }
+    $previousPath = $env:PATH
+    try {
+        $dav1dSrc = Get-CodecSource -Name "dav1d-$dav1dVersion" -Uri "https://github.com/videolan/dav1d/archive/refs/tags/$dav1dVersion.tar.gz" -Sha256 "78B15D9954B513EA92D27F39362535DED2243E1B0924FDE39F37A31EBED5F76B"
+        foreach ($config in @(@{ Name = $Configuration; Type = $(if ($Configuration -eq "Release") { "release" } else { "debug" }) })) {
+            $dest = Join-Path $dav1dOut $config.Name
+            if (-not (Test-Path (Join-Path $dest "dav1d.lib")) -or
+                -not (Test-Path (Join-Path $dest "dav1d\dav1d.h"))) {
+                $build = Join-Path $codecTemporaryDirectory "dav1d-build-$($config.Name)"
+                Invoke-CodecCommand "dav1d $($config.Name) meson" "meson" @("setup", $build, $dav1dSrc, "--vsenv", "--buildtype=$($config.Type)", "--default-library=static", "-Denable_tools=false", "-Denable_tests=false", "-Denable_examples=false", "-Denable_asm=false")
+                Invoke-CodecCommand "dav1d $($config.Name) compile" "meson" @("compile", "-C", $build)
+                New-Item -ItemType Directory -Path $dest -Force | Out-Null
+                $dav1dArtifact = Get-ChildItem $build -Recurse -Filter "libdav1d.a" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if (-not $dav1dArtifact) { throw "libdav1d.a was not produced for $($config.Name)." }
+                Copy-Item $dav1dArtifact.FullName (Join-Path $dest "dav1d.lib") -Force
+                $dav1dInc = Join-Path $dest "dav1d"
+                New-Item -ItemType Directory -Path $dav1dInc -Force | Out-Null
+                Copy-Item (Join-Path $dav1dSrc "include\dav1d\*.h") $dav1dInc -Force
+                $dav1dVersionHeader = Get-ChildItem $build -Recurse -Filter "version.h" | Where-Object { $_.FullName -match "dav1d" } | Select-Object -First 1
+                if ($dav1dVersionHeader) { Copy-Item $dav1dVersionHeader.FullName (Join-Path $dav1dInc "version.h") -Force }
+                Write-Host "dav1d $($config.Name) -> $dest"
+            }
+        }
+        $libavifSrc = Get-CodecSource -Name "libavif-$libavifVersion" -Uri "https://github.com/AOMediaCodec/libavif/archive/refs/tags/v$libavifVersion.tar.gz" -Sha256 "2B645287340BA5A631D268B551DC2D72BD73AC33335962DD36DCDB6D8366921D"
+        foreach ($config in @($Configuration)) {
+            $rt = if ($config -eq "Release") { "MultiThreadedDLL" } else { "MultiThreadedDebugDLL" }
+            $dest = Join-Path $libavifOut $config
+            if (-not (Test-Path (Join-Path $dest "avif.lib")) -or
+                -not (Test-Path (Join-Path $dest "avif.h"))) {
+                $build = Join-Path $codecTemporaryDirectory "avif-build-$config"
+                $dav1dLib = Join-Path $dav1dOut "$config\dav1d.lib"
+                $dav1dInclude = Join-Path $dav1dSrc "include"
+                Invoke-CodecCommand "libavif $config configure" "cmake" @($codecCmakeArgs + @("-DBUILD_SHARED_LIBS=OFF", "-S", $libavifSrc, "-B", $build, "-DCMAKE_MSVC_RUNTIME_LIBRARY=$rt", "-DAVIF_CODEC_DAV1D=SYSTEM", "-DDAV1D_INCLUDE_DIR=$(Join-Path $dav1dOut $config)", "-DDAV1D_LIBRARY=$dav1dLib", "-DAVIF_LIBYUV=OFF", "-DAVIF_BUILD_APPS=OFF", "-DAVIF_BUILD_TESTS=OFF", "-DAVIF_BUILD_UTILS=OFF", "-DAVIF_ENABLE_WERROR=OFF"))
+                Invoke-CodecCommand "libavif $config build" "cmake" @("--build", $build, "--config", $config, "--parallel", "8", "--target", "avif")
+                New-Item -ItemType Directory -Path $dest -Force | Out-Null
+                $avifArtifact = Get-ChildItem $build -Recurse -Filter "avif_internal.lib" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if (-not $avifArtifact) { throw "avif_internal.lib was not produced for $config." }
+                Copy-Item $avifArtifact.FullName (Join-Path $dest "avif.lib") -Force
+                Copy-Item (Join-Path $libavifSrc "include\avif\avif.h") (Join-Path $dest "avif.h") -Force
+                Write-Host "libavif $config -> $dest"
+            }
+        }
+    }
+    finally {
+        $env:PATH = $previousPath
+    }
+    Write-Host "AVIF codec dependencies are ready."
+}
+
+# --- libraw (Raw component) ---
+$librawVersion = "0.22.2"
+$librawOut = Join-Path $repositoryRoot "src\Glance.Components\Raw\third_party\libraw\$librawVersion"
+$librawDestination = Join-Path $librawOut $Configuration
+$librawNeeded =
+    -not (Test-Path (Join-Path $librawDestination "libraw.lib")) -or
+    -not (Test-Path (Join-Path $librawDestination "libraw.dll")) -or
+    -not (Test-Path (Join-Path $librawDestination "libraw\libraw.h"))
+if ($librawNeeded) {
+    $librawSrc = Get-CodecSource -Name "LibRaw-$librawVersion" -Uri "https://github.com/LibRaw/LibRaw/archive/refs/tags/$librawVersion.tar.gz" -Sha256 "627928088300ECDE6CA91FFD202E189203F04AD61AD12F0FE9DC57B9A7A0FB3C"
+    foreach ($config in @($Configuration)) {
+        $dest = Join-Path $librawOut $config
+        if (-not (Test-Path (Join-Path $dest "libraw.lib")) -or
+            -not (Test-Path (Join-Path $dest "libraw.dll")) -or
+            -not (Test-Path (Join-Path $dest "libraw\libraw.h"))) {
+            Invoke-CodecCommand "libraw $config build" $msbuildExe @((Join-Path $librawSrc "buildfiles\libraw.vcxproj"), "/p:Configuration=$config", "/p:Platform=x64", "/p:PlatformToolset=v145", "/p:WindowsTargetPlatformVersion=10.0.26100.0", "/m", "/v:minimal", "/nologo")
+            $outputDirectory = Join-Path $librawSrc ("buildfiles\" + $(if ($config -eq "Release") { "release-x86_64" } else { "debug-x86_64" }))
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            Copy-Item (Join-Path $outputDirectory "libraw.dll") (Join-Path $dest "libraw.dll") -Force
+            Copy-Item (Join-Path $outputDirectory "libraw.lib") (Join-Path $dest "libraw.lib") -Force
+            $librawHeaderDir = Join-Path $dest "libraw"
+            New-Item -ItemType Directory -Path $librawHeaderDir -Force | Out-Null
+            Copy-Item (Join-Path $librawSrc "libraw\*.h") $librawHeaderDir -Force
+            Copy-Item (Join-Path $librawSrc "internal") (Join-Path $dest "internal") -Recurse -Force
+            Write-Host "libraw $config -> $dest"
+        }
+    }
+    Write-Host "Camera RAW codec dependencies are ready."
+}
+
+}
+finally {
+    if (Test-Path -LiteralPath $codecTemporaryDirectory) {
+        Remove-Item -LiteralPath $codecTemporaryDirectory -Recurse -Force
+    }
 }
 
 if ($allAvailable) {

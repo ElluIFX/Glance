@@ -28,6 +28,18 @@ IDI_GLANCE_APP ICON "Glance.App\\Assets\\AppIcon.ico"
 #define GLANCE_FILE_DESCRIPTION "Glance Archive Preview Host"
 #define GLANCE_INTERNAL_NAME "Glance.ArchiveHost"
 #define GLANCE_ORIGINAL_FILENAME "Glance.ArchiveHost.exe"
+#elif GLANCE_BINARY_KIND == 7
+#define GLANCE_FILE_DESCRIPTION "Glance HEIC Preview Host"
+#define GLANCE_INTERNAL_NAME "Glance.HeicHost"
+#define GLANCE_ORIGINAL_FILENAME "Glance.HeicHost.exe"
+#elif GLANCE_BINARY_KIND == 8
+#define GLANCE_FILE_DESCRIPTION "Glance AVIF Preview Host"
+#define GLANCE_INTERNAL_NAME "Glance.AvifHost"
+#define GLANCE_ORIGINAL_FILENAME "Glance.AvifHost.exe"
+#elif GLANCE_BINARY_KIND == 9
+#define GLANCE_FILE_DESCRIPTION "Glance Camera RAW Preview Host"
+#define GLANCE_INTERNAL_NAME "Glance.RawHost"
+#define GLANCE_ORIGINAL_FILENAME "Glance.RawHost.exe"
 #else
 #error GLANCE_BINARY_KIND must identify the target executable.
 #endif

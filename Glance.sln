@@ -42,6 +42,18 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.MediaInfoComponent",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.EverythingSource", "src\Glance.Sources\Everything\Glance.EverythingSource.vcxproj", "{9F43B7E2-317D-4DC2-A739-18E2317B2541}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.HeicComponent", "src\Glance.Components\Heic\Glance.HeicComponent.vcxproj", "{0374C314-4D18-4FB0-88B3-3D3E63AA550C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.HeicHost", "src\Glance.Components\Heic\host\Glance.HeicHost.vcxproj", "{8906C5F9-D2C4-427F-96F1-7089BB9D9660}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.AvifComponent", "src\Glance.Components\Avif\Glance.AvifComponent.vcxproj", "{99FF1CCD-D8ED-4AD8-8F89-74133B90E5F3}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.AvifHost", "src\Glance.Components\Avif\host\Glance.AvifHost.vcxproj", "{645BF330-BA0A-4016-9281-572B44DC1AE6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.RawComponent", "src\Glance.Components\Raw\Glance.RawComponent.vcxproj", "{1AFD9343-94AF-4066-B05F-121F1688FEB4}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.RawHost", "src\Glance.Components\Raw\host\Glance.RawHost.vcxproj", "{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Tests", "tests\Glance.Tests\Glance.Tests.vcxproj", "{4D728170-2954-4B84-BA44-626E290A361F}"
 EndProject
 Global
@@ -118,6 +130,30 @@ Global
 		{9F43B7E2-317D-4DC2-A739-18E2317B2541}.Debug|x64.Build.0 = Debug|x64
 		{9F43B7E2-317D-4DC2-A739-18E2317B2541}.Release|x64.ActiveCfg = Release|x64
 		{9F43B7E2-317D-4DC2-A739-18E2317B2541}.Release|x64.Build.0 = Release|x64
+		{0374C314-4D18-4FB0-88B3-3D3E63AA550C}.Debug|x64.ActiveCfg = Debug|x64
+		{0374C314-4D18-4FB0-88B3-3D3E63AA550C}.Debug|x64.Build.0 = Debug|x64
+		{0374C314-4D18-4FB0-88B3-3D3E63AA550C}.Release|x64.ActiveCfg = Release|x64
+		{0374C314-4D18-4FB0-88B3-3D3E63AA550C}.Release|x64.Build.0 = Release|x64
+		{8906C5F9-D2C4-427F-96F1-7089BB9D9660}.Debug|x64.ActiveCfg = Debug|x64
+		{8906C5F9-D2C4-427F-96F1-7089BB9D9660}.Debug|x64.Build.0 = Debug|x64
+		{8906C5F9-D2C4-427F-96F1-7089BB9D9660}.Release|x64.ActiveCfg = Release|x64
+		{8906C5F9-D2C4-427F-96F1-7089BB9D9660}.Release|x64.Build.0 = Release|x64
+		{99FF1CCD-D8ED-4AD8-8F89-74133B90E5F3}.Debug|x64.ActiveCfg = Debug|x64
+		{99FF1CCD-D8ED-4AD8-8F89-74133B90E5F3}.Debug|x64.Build.0 = Debug|x64
+		{99FF1CCD-D8ED-4AD8-8F89-74133B90E5F3}.Release|x64.ActiveCfg = Release|x64
+		{99FF1CCD-D8ED-4AD8-8F89-74133B90E5F3}.Release|x64.Build.0 = Release|x64
+		{645BF330-BA0A-4016-9281-572B44DC1AE6}.Debug|x64.ActiveCfg = Debug|x64
+		{645BF330-BA0A-4016-9281-572B44DC1AE6}.Debug|x64.Build.0 = Debug|x64
+		{645BF330-BA0A-4016-9281-572B44DC1AE6}.Release|x64.ActiveCfg = Release|x64
+		{645BF330-BA0A-4016-9281-572B44DC1AE6}.Release|x64.Build.0 = Release|x64
+		{1AFD9343-94AF-4066-B05F-121F1688FEB4}.Debug|x64.ActiveCfg = Debug|x64
+		{1AFD9343-94AF-4066-B05F-121F1688FEB4}.Debug|x64.Build.0 = Debug|x64
+		{1AFD9343-94AF-4066-B05F-121F1688FEB4}.Release|x64.ActiveCfg = Release|x64
+		{1AFD9343-94AF-4066-B05F-121F1688FEB4}.Release|x64.Build.0 = Release|x64
+		{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}.Debug|x64.ActiveCfg = Debug|x64
+		{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}.Debug|x64.Build.0 = Debug|x64
+		{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}.Release|x64.ActiveCfg = Release|x64
+		{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}.Release|x64.Build.0 = Release|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Debug|x64.ActiveCfg = Debug|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Debug|x64.Build.0 = Debug|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Release|x64.ActiveCfg = Release|x64

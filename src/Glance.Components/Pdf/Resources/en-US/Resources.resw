@@ -3,7 +3,7 @@
   <data name="Component.DisplayName" xml:space="preserve"><value>PDF preview</value></data>
   <data name="Status.Available" xml:space="preserve"><value>PDF rendering is available</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>PDF rendering files are missing</value></data>
-  <data name="Preview.Loading" xml:space="preserve"><value>Loading document</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>Loading document...</value></data>
   <data name="Settings.GroupTitle" xml:space="preserve"><value>Rich document preview</value></data>
   <data name="Settings.RenderResolution.Label" xml:space="preserve"><value>Render resolution</value></data>
   <data name="Settings.RenderResolution.Description" xml:space="preserve"><value>Maximum pixel length of the rendered preview</value></data>

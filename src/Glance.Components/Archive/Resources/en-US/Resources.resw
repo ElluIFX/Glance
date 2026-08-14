@@ -3,7 +3,7 @@
   <data name="Component.DisplayName" xml:space="preserve"><value>Archive preview</value></data>
   <data name="Status.Available" xml:space="preserve"><value>Supports common archives and disc images</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>Archive preview files are missing</value></data>
-  <data name="Preview.Loading" xml:space="preserve"><value>Reading archive contents</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>Loading archive contents...</value></data>
   <data name="Column.Name" xml:space="preserve"><value>Name</value></data>
   <data name="Column.Type" xml:space="preserve"><value>Type</value></data>
   <data name="Column.Modified" xml:space="preserve"><value>Date modified</value></data>

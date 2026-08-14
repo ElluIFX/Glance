@@ -72,6 +72,167 @@ namespace
                  glance::contracts::components::file_directory_preview_api_version);
     }
 
+    struct ImageCodecComponentCase
+    {
+        const wchar_t* id;
+        const wchar_t* component_file;
+        const wchar_t* host_file;
+        std::vector<std::wstring> extensions;
+        const wchar_t* loading_extension;
+        const wchar_t* loading_text;
+        std::vector<std::wstring> payload_files;
+    };
+
+    void test_image_codec_component(
+        const std::filesystem::path& component_root,
+        const ImageCodecComponentCase& test_case)
+    {
+        using namespace glance::contracts::components;
+
+        const std::wstring id{ test_case.id };
+        std::string label;
+        label.reserve(id.size());
+        for (const auto character : id)
+        {
+            label.push_back(static_cast<char>(character));
+        }
+        const auto check = [&label](bool condition, std::string_view description)
+        {
+            expect(condition, label + " component " + std::string(description));
+        };
+        const auto directory = component_root / id;
+        const auto component_path = directory / test_case.component_file;
+        const auto descriptor_path = directory / L"component.json";
+        check(std::filesystem::is_regular_file(component_path), "DLL output");
+        check(
+            std::filesystem::is_regular_file(directory / test_case.host_file),
+            "host output");
+        check(std::filesystem::is_regular_file(descriptor_path), "descriptor output");
+        for (const auto& payload_file : test_case.payload_files)
+        {
+            check(
+                std::filesystem::is_regular_file(directory / payload_file),
+                "runtime payload");
+        }
+
+        std::ifstream descriptor_input(descriptor_path, std::ios::binary);
+        const std::string descriptor{
+            std::istreambuf_iterator<char>(descriptor_input),
+            std::istreambuf_iterator<char>() };
+        check(
+            descriptor.find("\"id\": \"" + label + "\"") != std::string::npos &&
+                descriptor.find("\"extensions\"") == std::string::npos,
+            "descriptor");
+
+        const HMODULE component = LoadLibraryExW(
+            component_path.c_str(),
+            nullptr,
+            LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                LOAD_LIBRARY_SEARCH_SYSTEM32);
+        check(component != nullptr, "load");
+        if (component == nullptr)
+        {
+            return;
+        }
+
+        const auto get_api = reinterpret_cast<GetApiFunction>(
+            GetProcAddress(component, get_api_export));
+        ComponentApi api;
+        check(
+            get_api != nullptr && get_api(abi_version, &api) != FALSE,
+            "ABI negotiation");
+        if (get_api == nullptr || api.initialize == nullptr)
+        {
+            FreeLibrary(component);
+            return;
+        }
+
+        std::vector<std::wstring> extensions;
+        ComponentRegistrar registrar{
+            .context = &extensions,
+            .register_extension = collect_extension,
+            .register_renderer = accept_renderer };
+        ComponentRegistration registration;
+        const bool initialized = api.initialize(&registrar, &registration) != FALSE;
+        check(initialized, "registration");
+        if (!initialized)
+        {
+            FreeLibrary(component);
+            return;
+        }
+        check(
+            std::wstring_view(registration.component_id) == id &&
+                std::wstring_view(registration.target_app_version) ==
+                    GLANCE_VERSION_WSTRING &&
+                registration.preferred_kind == PreviewContentKind::image &&
+                registration.preferred_format == PreviewContentFormat::image_file &&
+                extensions == test_case.extensions,
+            "registration contract");
+
+        ComponentStatusResult status;
+        check(
+            api.query_status != nullptr &&
+                api.query_status(L"zh-CN", &status) != FALSE &&
+                status.severity == HealthSeverity::healthy &&
+                status.display_name[0] != L'\0' && status.detail[0] != L'\0',
+            "localized status");
+
+        ComponentLoadingTextResult loading;
+        const auto preview_path = std::wstring{ L"C:\\GlanceComponentTest\\sample" } +
+            test_case.loading_extension;
+        check(
+            api.query_loading_text != nullptr &&
+                api.query_loading_text(
+                    preview_path.c_str(), L"zh-CN", &loading) != FALSE &&
+                std::wstring_view(loading.text) == test_case.loading_text &&
+                std::wstring_view(loading.text).ends_with(L"..."),
+            "localized loading text");
+        check(
+            api.can_preview != nullptr &&
+                api.can_preview(preview_path.c_str()) != FALSE,
+            "extension match");
+
+        void* gallery_pointer{};
+        check(
+            api.query_interface != nullptr &&
+                api.query_interface(
+                    &gallery_media_api_id,
+                    gallery_media_api_version,
+                    &gallery_pointer) != FALSE &&
+                gallery_pointer != nullptr,
+            "gallery interface");
+        if (gallery_pointer != nullptr)
+        {
+            const auto gallery = static_cast<const GalleryMediaApi*>(gallery_pointer);
+            bool classifications_match =
+                gallery->classify_extension(L".txt") == GalleryMediaKind::none;
+            for (const auto& extension : test_case.extensions)
+            {
+                classifications_match = classifications_match &&
+                    gallery->classify_extension(extension.c_str()) ==
+                        GalleryMediaKind::image;
+            }
+            check(classifications_match, "gallery classification");
+        }
+
+        void* configurable_pointer = reinterpret_cast<void*>(1);
+        check(
+            api.query_interface != nullptr &&
+                api.query_interface(
+                    &configurable_preview_api_id,
+                    configurable_preview_api_version,
+                    &configurable_pointer) == FALSE &&
+                configurable_pointer == nullptr,
+            "rejects document configuration");
+
+        if (api.shutdown != nullptr)
+        {
+            api.shutdown();
+        }
+        FreeLibrary(component);
+    }
+
     void append_be16(std::vector<unsigned char>& bytes, std::uint16_t value)
     {
         bytes.push_back(static_cast<unsigned char>(value >> 8));
@@ -380,6 +541,53 @@ int main()
         executable_path.data(),
         static_cast<DWORD>(executable_path.size()));
     executable_path.resize(executable_length);
+    const auto component_root =
+        std::filesystem::path(executable_path).parent_path() / L"components";
+    test_image_codec_component(
+        component_root,
+        {
+            .id = L"heic",
+            .component_file = L"Glance.HeicComponent.dll",
+            .host_file = L"Glance.HeicHost.exe",
+            .extensions = { L".heic", L".heif", L".hif" },
+            .loading_extension = L".heic",
+            .loading_text = L"正在加载 HEIC 图片...",
+            .payload_files = {
+                L"resources.pri",
+                L"heif.dll",
+                L"libde265.dll",
+                L"libheif-LICENSE.txt",
+                L"libde265-LICENSE.txt" } });
+    test_image_codec_component(
+        component_root,
+        {
+            .id = L"avif",
+            .component_file = L"Glance.AvifComponent.dll",
+            .host_file = L"Glance.AvifHost.exe",
+            .extensions = { L".avif" },
+            .loading_extension = L".avif",
+            .loading_text = L"正在加载 AVIF 图片...",
+            .payload_files = {
+                L"resources.pri",
+                L"libavif-LICENSE.txt",
+                L"dav1d-LICENSE.txt" } });
+    test_image_codec_component(
+        component_root,
+        {
+            .id = L"raw",
+            .component_file = L"Glance.RawComponent.dll",
+            .host_file = L"Glance.RawHost.exe",
+            .extensions = {
+                L".cr2", L".cr3", L".nef", L".nrw", L".arw", L".srf",
+                L".sr2", L".orf", L".rw2", L".raf", L".dng", L".pef",
+                L".srw", L".x3f", L".erf", L".3fr", L".fff", L".mef",
+                L".mos", L".raw" },
+            .loading_extension = L".dng",
+            .loading_text = L"正在加载相机 RAW 文件...",
+            .payload_files = {
+                L"resources.pri",
+                L"libraw.dll",
+                L"libraw-LICENSE.txt" } });
     const auto source_directory =
         std::filesystem::path(executable_path).parent_path() / L"sources" / L"everything";
     const auto source_path = source_directory / L"Glance.EverythingSource.dll";
@@ -576,7 +784,7 @@ int main()
                         "Office component loading text query");
                     expect(
                         std::wstring_view(loading_text.text) ==
-                            L"Preparing this file preview in the background, you can return later",
+                            L"Preparing this file preview in the background, you can return later...",
                         "Office component English loading text");
                 }
 
@@ -589,7 +797,7 @@ int main()
                     "Office component Chinese loading text query");
                 expect(
                     std::wstring_view(chinese_loading_text.text) ==
-                        L"正在后台准备该文件的预览，可稍后返回",
+                        L"正在后台准备该文件的预览，可稍后返回...",
                     "Office component Chinese loading text");
 
                 ComponentLoadingTextResult alias_loading_text;
@@ -601,7 +809,7 @@ int main()
                     "Office component language alias query");
                 expect(
                     std::wstring_view(alias_loading_text.text) ==
-                        L"正在后台准备该文件的预览，可稍后返回",
+                        L"正在后台准备该文件的预览，可稍后返回...",
                     "Office component language alias");
 
                 ComponentLoadingTextResult fallback_loading_text;
@@ -613,7 +821,7 @@ int main()
                     "Office component default language query");
                 expect(
                     std::wstring_view(fallback_loading_text.text) ==
-                        L"Preparing this file preview in the background, you can return later",
+                        L"Preparing this file preview in the background, you can return later...",
                     "Office component default language fallback");
                 expect(
                     api.query_loading_text(
@@ -739,7 +947,7 @@ int main()
                     L"zh-CN",
                     &loading) != FALSE &&
                     std::wstring_view(loading.text) ==
-                        L"正在后台准备 Adobe 文档预览",
+                        L"正在加载 Adobe 文档...",
                 "Adobe component localized loading text");
 
             void* configurable_pointer{};
@@ -821,7 +1029,7 @@ int main()
                         L"zh-CN",
                         &refinement_text) != FALSE &&
                     std::wstring_view(refinement_text.text) ==
-                        L"正在准备高清预览",
+                        L"正在加载高清预览...",
                 "Adobe component refinement availability");
             PreparedPreview refined_preview;
             expect(

@@ -15,7 +15,7 @@
   <data name="Status.Available" xml:space="preserve"><value>FFprobe 可用</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>需要准备 FFprobe</value></data>
   <data name="Shortcut.Tooltip" xml:space="preserve"><value>显示高级媒体信息</value></data>
-  <data name="Preview.Loading" xml:space="preserve"><value>正在读取高级媒体信息</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在加载高级媒体信息...</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>无法读取高级媒体信息</value></data>
   <data name="Action.Button" xml:space="preserve"><value>准备 FFprobe</value></data>
   <data name="Action.ConfirmationTitle" xml:space="preserve"><value>准备高级媒体信息</value></data>

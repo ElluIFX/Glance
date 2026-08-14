@@ -13,8 +13,8 @@
 
   <data name="Component.DisplayName" xml:space="preserve"><value>Adobe 文档预览</value></data>
   <data name="Status.BuiltIn" xml:space="preserve"><value>支持预览 PS、AI 工程文件</value></data>
-  <data name="Preview.Loading" xml:space="preserve"><value>正在后台准备 Adobe 文档预览</value></data>
-  <data name="Preview.Refining" xml:space="preserve"><value>正在准备高清预览</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在加载 Adobe 文档...</value></data>
+  <data name="Preview.Refining" xml:space="preserve"><value>正在加载高清预览...</value></data>
   <data name="Preview.RefinementFailed" xml:space="preserve"><value>无法准备高清预览</value></data>
   <data name="Preview.LowResolutionOnly" xml:space="preserve"><value>大型文件只支持低清预览</value></data>
   <data name="Preview.Unavailable" xml:space="preserve"><value>文件未包含兼容预览且未安装对应 Adobe 软件</value></data>

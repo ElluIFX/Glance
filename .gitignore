@@ -8,6 +8,11 @@
 /artifacts/
 bin/
 obj/
+# Codec debug builds are regenerated locally by prepare-dependencies.ps1;
+# only the Release artifacts are checked in under third_party.
+src/Glance.Components/Heic/third_party/*/*/Debug/
+src/Glance.Components/Avif/third_party/*/*/Debug/
+src/Glance.Components/Raw/third_party/libraw/*/Debug/
 packages/
 *.user
 *.suo

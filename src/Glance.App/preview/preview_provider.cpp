@@ -704,8 +704,7 @@ namespace glance::app
         static constexpr std::array image_extensions{
             std::wstring_view(L".png"), std::wstring_view(L".jpg"), std::wstring_view(L".jpeg"),
             std::wstring_view(L".bmp"), std::wstring_view(L".gif"), std::wstring_view(L".tif"),
-            std::wstring_view(L".tiff"), std::wstring_view(L".webp"), std::wstring_view(L".ico"),
-            std::wstring_view(L".heic"), std::wstring_view(L".heif") };
+            std::wstring_view(L".tiff"), std::wstring_view(L".webp"), std::wstring_view(L".ico") };
         static constexpr std::array video_extensions{
             std::wstring_view(L".mp4"), std::wstring_view(L".mkv"), std::wstring_view(L".mov"),
             std::wstring_view(L".avi"), std::wstring_view(L".webm"), std::wstring_view(L".wmv") };

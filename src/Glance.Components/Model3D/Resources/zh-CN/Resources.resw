@@ -13,11 +13,11 @@
 
   <data name="Component.DisplayName" xml:space="preserve"><value>3D 模型预览</value></data>
   <data name="Status.Available" xml:space="preserve"><value>支持预览常见 3D 文件</value></data>
-  <data name="Preview.Loading" xml:space="preserve"><value>正在准备 3D 模型预览</value></data>
-  <data name="Preview.LoadingCad" xml:space="preserve"><value>正在准备 CAD 模型预览</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在加载 3D 模型...</value></data>
+  <data name="Preview.LoadingCad" xml:space="preserve"><value>正在加载 CAD 模型...</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>无法准备 3D 模型预览</value></data>
-  <data name="Viewer.Loading" xml:space="preserve"><value>正在加载 3D 模型</value></data>
-  <data name="Viewer.LoadingCad" xml:space="preserve"><value>正在转换 CAD 模型</value></data>
+  <data name="Viewer.Loading" xml:space="preserve"><value>正在加载 3D 模型...</value></data>
+  <data name="Viewer.LoadingCad" xml:space="preserve"><value>正在加载 CAD 模型...</value></data>
   <data name="Viewer.Failed" xml:space="preserve"><value>无法加载此 3D 模型</value></data>
   <data name="Viewer.Empty" xml:space="preserve"><value>模型不包含可见几何体</value></data>
   <data name="Viewer.Fit" xml:space="preserve"><value>适配模型</value></data>

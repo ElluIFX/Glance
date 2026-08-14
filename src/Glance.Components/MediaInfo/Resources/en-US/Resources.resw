@@ -15,7 +15,7 @@
   <data name="Status.Available" xml:space="preserve"><value>FFprobe is available</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>FFprobe needs to be prepared</value></data>
   <data name="Shortcut.Tooltip" xml:space="preserve"><value>Show advanced media information</value></data>
-  <data name="Preview.Loading" xml:space="preserve"><value>Reading advanced media information</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>Loading advanced media information...</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Unable to read advanced media information</value></data>
   <data name="Action.Button" xml:space="preserve"><value>Prepare FFprobe</value></data>
   <data name="Action.ConfirmationTitle" xml:space="preserve"><value>Prepare advanced media information</value></data>
