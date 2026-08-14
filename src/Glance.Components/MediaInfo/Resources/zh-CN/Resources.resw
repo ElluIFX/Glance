@@ -14,7 +14,7 @@
   <data name="Component.DisplayName" xml:space="preserve"><value>高级媒体信息</value></data>
   <data name="Status.Available" xml:space="preserve"><value>ffprobe 可用</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>需要下载 ffprobe</value></data>
-  <data name="Shortcut.Tooltip" xml:space="preserve"><value>显示高级媒体信息</value></data>
+  <data name="Shortcut.Tooltip" xml:space="preserve"><value>显示高级媒体信息&#xA;右键复制媒体数据</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>正在加载高级媒体信息...</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>无法读取高级媒体信息</value></data>
   <data name="Action.Button" xml:space="preserve"><value>下载 ffprobe</value></data>

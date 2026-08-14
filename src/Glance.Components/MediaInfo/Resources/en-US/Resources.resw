@@ -14,7 +14,7 @@
   <data name="Component.DisplayName" xml:space="preserve"><value>Advanced media information</value></data>
   <data name="Status.Available" xml:space="preserve"><value>ffprobe is available</value></data>
   <data name="Status.Unavailable" xml:space="preserve"><value>ffprobe must be downloaded</value></data>
-  <data name="Shortcut.Tooltip" xml:space="preserve"><value>Show advanced media information</value></data>
+  <data name="Shortcut.Tooltip" xml:space="preserve"><value>Show advanced media information&#xA;Right-click to copy media data</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>Loading advanced media information...</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Unable to read advanced media information</value></data>
   <data name="Action.Button" xml:space="preserve"><value>Download ffprobe</value></data>

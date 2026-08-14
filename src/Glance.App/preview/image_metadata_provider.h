@@ -24,6 +24,7 @@ namespace glance::app
         std::wstring canonical_name;
         std::wstring name;
         std::wstring value;
+        std::wstring raw_value;
     };
 
     struct ImageMetadata

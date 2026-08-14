@@ -18,6 +18,10 @@ namespace glance::components::media_info
         std::wstring_view path,
         const wchar_t* language_tag,
         const glance::contracts::components::HoverInfoTextSink& sink) noexcept;
+    [[nodiscard]] std::wstring query_media_json(
+        const std::filesystem::path& ffprobe,
+        std::wstring_view path,
+        const glance::contracts::components::HoverInfoTextSink& sink) noexcept;
     [[nodiscard]] bool install_ffprobe(
         const std::filesystem::path& archive,
         const std::filesystem::path& storage,

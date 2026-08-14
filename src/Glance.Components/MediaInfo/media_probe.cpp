@@ -887,6 +887,32 @@ namespace
         DWORD exit_code = ERROR_GEN_FAILURE;
         return GetExitCodeProcess(process_handle.get(), &exit_code) && exit_code == 0;
     }
+
+    ProcessOutput run_media_probe(
+        const std::filesystem::path& ffprobe,
+        std::wstring_view path,
+        const glance::contracts::components::HoverInfoTextSink& sink)
+    {
+        constexpr std::wstring_view entries =
+            L"format=format_name,format_long_name,duration,bit_rate:"
+            L"format_tags:"
+            L"stream=index,codec_name,codec_long_name,codec_type,profile,level,width,height,"
+            L"sample_aspect_ratio,display_aspect_ratio,pix_fmt,color_range,color_space,"
+            L"color_transfer,color_primaries,chroma_location,field_order,avg_frame_rate,"
+            L"r_frame_rate,bit_rate,bits_per_sample,bits_per_raw_sample,sample_fmt,"
+            L"sample_rate,channels,channel_layout,duration,nb_frames:"
+            L"stream_tags=language,title:"
+            L"stream_disposition=default,forced:"
+            L"stream_side_data=rotation:"
+            L"chapter=id,start_time,end_time:"
+            L"chapter_tags=title";
+        return run_process_capture(
+            ffprobe,
+            L"-v error -show_entries " + std::wstring(entries) +
+                L" -of json " + quote_argument(path),
+            10000,
+            &sink);
+    }
 }
 
 namespace glance::components::media_info
@@ -931,25 +957,7 @@ namespace glance::components::media_info
     {
         try
         {
-            constexpr std::wstring_view entries =
-                L"format=format_name,format_long_name,duration,bit_rate:"
-                L"format_tags:"
-                L"stream=index,codec_name,codec_long_name,codec_type,profile,level,width,height,"
-                L"sample_aspect_ratio,display_aspect_ratio,pix_fmt,color_range,color_space,"
-                L"color_transfer,color_primaries,chroma_location,field_order,avg_frame_rate,"
-                L"r_frame_rate,bit_rate,bits_per_sample,bits_per_raw_sample,sample_fmt,"
-                L"sample_rate,channels,channel_layout,duration,nb_frames:"
-                L"stream_tags=language,title:"
-                L"stream_disposition=default,forced:"
-                L"stream_side_data=rotation:"
-                L"chapter=id,start_time,end_time:"
-                L"chapter_tags=title";
-            const auto output = run_process_capture(
-                ffprobe,
-                L"-v error -show_entries " + std::wstring(entries) +
-                    L" -of json " + quote_argument(path),
-                10000,
-                &sink);
+            const auto output = run_media_probe(ffprobe, path, sink);
             if (output.cancelled)
             {
                 return {};
@@ -966,6 +974,28 @@ namespace glance::components::media_info
         catch (...)
         {
             return localize_text(L"Preview.Failed", language_tag);
+        }
+    }
+
+    std::wstring query_media_json(
+        const std::filesystem::path& ffprobe,
+        std::wstring_view path,
+        const glance::contracts::components::HoverInfoTextSink& sink) noexcept
+    {
+        try
+        {
+            const auto output = run_media_probe(ffprobe, path, sink);
+            if (output.cancelled || !output.succeeded || output.text.empty())
+            {
+                return {};
+            }
+            const auto json = winrt::to_hstring(output.text);
+            static_cast<void>(winrt::Windows::Data::Json::JsonObject::Parse(json));
+            return std::wstring(json);
+        }
+        catch (...)
+        {
+            return {};
         }
     }
 

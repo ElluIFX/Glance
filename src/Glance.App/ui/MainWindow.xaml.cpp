@@ -593,6 +593,140 @@ namespace
         return result;
     }
 
+    std::wstring sanitize_metadata_json_value(std::wstring_view value)
+    {
+        std::wstring result;
+        result.reserve(value.size());
+        for (const auto character : value)
+        {
+            const bool directional_control =
+                character == L'\u061c' ||
+                character == L'\u200e' ||
+                character == L'\u200f' ||
+                (character >= L'\u202a' && character <= L'\u202e') ||
+                (character >= L'\u2066' && character <= L'\u2069') ||
+                character == L'\ufeff';
+            if (!directional_control)
+            {
+                result.push_back(character);
+            }
+        }
+        return result;
+    }
+
+    std::wstring pretty_print_json(std::wstring_view json)
+    {
+        std::wstring result;
+        result.reserve(json.size() + json.size() / 4);
+        std::size_t indentation{};
+        bool in_string{};
+        bool escaped{};
+        const auto append_new_line = [&] {
+            result.push_back(L'\n');
+            result.append(indentation * 4, L' ');
+        };
+
+        for (std::size_t index = 0; index < json.size(); ++index)
+        {
+            const auto character = json[index];
+            if (in_string)
+            {
+                result.push_back(character);
+                if (escaped)
+                {
+                    escaped = false;
+                }
+                else if (character == L'\\')
+                {
+                    escaped = true;
+                }
+                else if (character == L'"')
+                {
+                    in_string = false;
+                }
+                continue;
+            }
+            if (character == L'"')
+            {
+                in_string = true;
+                result.push_back(character);
+                continue;
+            }
+            if (std::iswspace(character))
+            {
+                continue;
+            }
+            if (character == L'{' || character == L'[')
+            {
+                result.push_back(character);
+                const wchar_t closing = character == L'{' ? L'}' : L']';
+                if (index + 1 < json.size() && json[index + 1] != closing)
+                {
+                    ++indentation;
+                    append_new_line();
+                }
+                continue;
+            }
+            if (character == L'}' || character == L']')
+            {
+                const wchar_t opening = character == L'}' ? L'{' : L'[';
+                if (index != 0 && json[index - 1] != opening)
+                {
+                    --indentation;
+                    append_new_line();
+                }
+                result.push_back(character);
+                continue;
+            }
+            if (character == L',')
+            {
+                result.push_back(character);
+                append_new_line();
+                continue;
+            }
+            if (character == L':')
+            {
+                result.append(L": ");
+                continue;
+            }
+            result.push_back(character);
+        }
+        return result;
+    }
+
+    std::wstring format_image_metadata_json(const glance::app::ImageMetadata& metadata)
+    {
+        using namespace winrt::Windows::Data::Json;
+        JsonObject root;
+        for (const auto& entry : metadata.entries)
+        {
+            if (!entry.canonical_name.empty() && !entry.raw_value.empty())
+            {
+                const auto raw_value = sanitize_metadata_json_value(entry.raw_value);
+                IJsonValue json_value = JsonValue::CreateStringValue(raw_value);
+                const auto first = std::ranges::find_if_not(raw_value, [](wchar_t character) {
+                    return std::iswspace(character) != 0;
+                });
+                if (first != raw_value.end() && (*first == L'{' || *first == L'['))
+                {
+                    try
+                    {
+                        json_value = JsonValue::Parse(hstring(raw_value));
+                    }
+                    catch (const hresult_error&)
+                    {
+                    }
+                }
+                root.SetNamedValue(
+                    entry.canonical_name,
+                    json_value);
+            }
+        }
+        return root.Size() == 0
+            ? std::wstring{}
+            : pretty_print_json(std::wstring(root.Stringify()));
+    }
+
     void set_information_panel_text(
         const RichTextBlock& control,
         std::wstring_view text,
@@ -2092,6 +2226,7 @@ namespace winrt::Glance::App::implementation
         current_text_has_more_ = false;
         text_chunk_loading_ = false;
         image_metadata_.clear();
+        image_metadata_json_.clear();
         image_taken_time_.clear();
         media_dimensions_.clear();
         media_playback_info_.clear();
@@ -2680,6 +2815,7 @@ namespace winrt::Glance::App::implementation
             image_pixel_height_ = 0;
             image_bits_per_pixel_ = 0;
             image_metadata_.clear();
+            image_metadata_json_.clear();
             image_taken_time_.clear();
             image_metadata_visible_ = false;
             ImageTransform().Rotation(image_rotation_);
@@ -3174,6 +3310,7 @@ namespace winrt::Glance::App::implementation
                 }
                 lifetime->image_taken_time_ = std::move(metadata.taken_time);
                 lifetime->image_metadata_ = format_image_metadata(metadata);
+                lifetime->image_metadata_json_ = format_image_metadata_json(metadata);
                 const auto display_text = lifetime->image_metadata_.empty()
                     ? glance::app::localize(L"NoImageMetadata")
                     : lifetime->image_metadata_;
@@ -5692,6 +5829,7 @@ namespace winrt::Glance::App::implementation
         {
             ImagePreview().Source(nullptr);
             image_metadata_.clear();
+            image_metadata_json_.clear();
             image_metadata_visible_ = false;
             ImageExifButton().IsChecked(false);
             ImageMetadataOverlay().Visibility(Visibility::Collapsed);
@@ -5725,6 +5863,11 @@ namespace winrt::Glance::App::implementation
         {
             component_hover_cancellation_->store(true, std::memory_order_release);
             component_hover_cancellation_.reset();
+        }
+        if (component_data_copy_cancellation_ != nullptr)
+        {
+            component_data_copy_cancellation_->store(true, std::memory_order_release);
+            component_data_copy_cancellation_.reset();
         }
         active_component_hover_ = {};
         ComponentHoverInfoProgressRing().IsActive(false);
@@ -5810,6 +5953,19 @@ namespace winrt::Glance::App::implementation
                         sender.as<Controls::Primitives::ToggleButton>());
                 }
             });
+            if (shortcut.supports_data_copy)
+            {
+                button.RightTapped(
+                    [weak, shortcut, icon](
+                        IInspectable const&,
+                        RightTappedRoutedEventArgs const& args) {
+                        args.Handled(true);
+                        if (const auto self = weak.get())
+                        {
+                            self->copy_component_shortcut_data_async(shortcut, icon);
+                        }
+                    });
+            }
             ComponentStatusControls().Children().Append(button);
         }
     }
@@ -5930,6 +6086,49 @@ namespace winrt::Glance::App::implementation
                     lifetime->ComponentHoverInfoText(),
                     lifetime->component_hover_info_text_,
                     true);
+            }));
+    }
+
+    fire_and_forget MainWindow::copy_component_shortcut_data_async(
+        glance::app::ComponentStatusBarShortcut shortcut,
+        FontIcon feedback_icon)
+    {
+        if (!shortcut.supports_data_copy || current_index_ >= files_.size())
+        {
+            co_return;
+        }
+        if (component_data_copy_cancellation_ != nullptr)
+        {
+            component_data_copy_cancellation_->store(true, std::memory_order_release);
+        }
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        const auto path = files_[current_index_].path;
+        const auto generation = content_generation_;
+        const auto cancellation = std::make_shared<std::atomic_bool>(false);
+        component_data_copy_cancellation_ = cancellation;
+        co_await resume_background();
+        auto json = glance::app::query_component_status_bar_shortcut_data(
+            shortcut,
+            path,
+            *cancellation);
+        static_cast<void>(dispatcher.TryEnqueue(
+            [lifetime,
+             cancellation = std::move(cancellation),
+             generation,
+             feedback_icon = std::move(feedback_icon),
+             json = std::move(json)]() mutable {
+                if (generation != lifetime->content_generation_ ||
+                    cancellation->load(std::memory_order_acquire) ||
+                    lifetime->component_data_copy_cancellation_ != cancellation)
+                {
+                    return;
+                }
+                lifetime->component_data_copy_cancellation_.reset();
+                lifetime->copy_text_to_clipboard(
+                    json,
+                    L"Copy component data",
+                    feedback_icon);
             }));
     }
 
@@ -6698,6 +6897,17 @@ namespace winrt::Glance::App::implementation
     {
         image_metadata_visible_ = ImageExifButton().IsChecked().Value();
         update_image_metadata_visibility();
+    }
+
+    void MainWindow::ImageExifButton_RightTapped(
+        IInspectable const&,
+        RightTappedRoutedEventArgs const& args)
+    {
+        args.Handled(true);
+        copy_text_to_clipboard(
+            image_metadata_json_,
+            L"Copy EXIF data",
+            ImageExifIcon());
     }
 
     void MainWindow::set_image_zoom(float zoom, Windows::Foundation::Point anchor)
@@ -7808,7 +8018,7 @@ namespace winrt::Glance::App::implementation
             package.SetText(path);
             Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
             Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
-            show_copy_feedback();
+            show_copy_feedback(CopyPathIcon());
         }
         catch (const hresult_error& error)
         {
@@ -7853,7 +8063,7 @@ namespace winrt::Glance::App::implementation
             package.SetStorageItems(items);
             Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
             Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
-            show_copy_feedback();
+            show_copy_feedback(CopyPathIcon());
         }
         catch (const hresult_error& error)
         {
@@ -7862,10 +8072,17 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void MainWindow::show_copy_feedback()
+    void MainWindow::show_copy_feedback(const FontIcon& icon)
     {
-        CopyPathIcon().Glyph(L"\xE73E");
-        CopyPathIcon().Foreground(Application::Current().Resources().Lookup(
+        if (copy_feedback_icon_ != nullptr)
+        {
+            copy_feedback_icon_.Glyph(copy_feedback_original_glyph_);
+            copy_feedback_icon_.ClearValue(IconElement::ForegroundProperty());
+        }
+        copy_feedback_icon_ = icon;
+        copy_feedback_original_glyph_ = icon.Glyph();
+        icon.Glyph(L"\xE73E");
+        icon.Foreground(Application::Current().Resources().Lookup(
             box_value(L"AccentTextFillColorPrimaryBrush")).as<Media::Brush>());
         if (copy_feedback_timer_ == nullptr)
         {
@@ -7876,13 +8093,44 @@ namespace winrt::Glance::App::implementation
                 if (const auto self = weak.get())
                 {
                     self->copy_feedback_timer_.Stop();
-                    self->CopyPathIcon().Glyph(L"\xE8C8");
-                    self->CopyPathIcon().ClearValue(IconElement::ForegroundProperty());
+                    if (self->copy_feedback_icon_ != nullptr)
+                    {
+                        self->copy_feedback_icon_.Glyph(
+                            self->copy_feedback_original_glyph_);
+                        self->copy_feedback_icon_.ClearValue(
+                            IconElement::ForegroundProperty());
+                        self->copy_feedback_icon_ = nullptr;
+                        self->copy_feedback_original_glyph_.clear();
+                    }
                 }
             });
         }
         copy_feedback_timer_.Stop();
         copy_feedback_timer_.Start();
+    }
+
+    void MainWindow::copy_text_to_clipboard(
+        std::wstring_view text,
+        std::wstring_view operation,
+        const FontIcon& feedback_icon)
+    {
+        if (text.empty())
+        {
+            return;
+        }
+        try
+        {
+            Windows::ApplicationModel::DataTransfer::DataPackage package;
+            package.SetText(hstring(text));
+            Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
+            Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
+            show_copy_feedback(feedback_icon);
+        }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(
+                std::wstring(operation) + L" failed: " + std::wstring(error.message()));
+        }
     }
 
     void MainWindow::OpenFolderButton_Click(IInspectable const&, RoutedEventArgs const&)

@@ -10,6 +10,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -183,6 +186,7 @@ namespace
         std::wstring canonical_name;
         std::wstring name;
         std::wstring value;
+        std::wstring raw_value;
     };
 
     bool metadata_entry_less(
@@ -286,6 +290,69 @@ namespace
         }
         return {};
     }
+
+    std::wstring raw_property_value(const PROPVARIANT& value)
+    {
+        PWSTR raw{};
+        if (FAILED(PropVariantToStringAlloc(value, &raw)) || raw == nullptr)
+        {
+            CoTaskMemFree(raw);
+            return {};
+        }
+        std::wstring result(raw);
+        CoTaskMemFree(raw);
+        return result;
+    }
+
+    std::wstring raw_component_value(
+        const glance::contracts::components::ImageMetadataEntry& entry)
+    {
+        using glance::contracts::components::ImageMetadataValueKind;
+        switch (entry.value_kind)
+        {
+        case ImageMetadataValueKind::text:
+        {
+            const auto length = wcsnlen_s(entry.text, std::size(entry.text));
+            return length == std::size(entry.text)
+                ? std::wstring{}
+                : std::wstring(entry.text, length);
+        }
+        case ImageMetadataValueKind::unsigned_integer:
+            return std::to_wstring(entry.unsigned_value);
+        case ImageMetadataValueKind::floating_point:
+        {
+            if (!std::isfinite(entry.floating_point))
+            {
+                return {};
+            }
+            std::wostringstream output;
+            output << std::setprecision(std::numeric_limits<double>::max_digits10)
+                   << entry.floating_point;
+            return output.str();
+        }
+        case ImageMetadataValueKind::timestamp:
+        {
+            SYSTEMTIME value{};
+            if (!FileTimeToSystemTime(&entry.timestamp, &value))
+            {
+                return {};
+            }
+            wchar_t formatted[32]{};
+            swprintf_s(
+                formatted,
+                L"%04u-%02u-%02uT%02u:%02u:%02u.%03uZ",
+                value.wYear,
+                value.wMonth,
+                value.wDay,
+                value.wHour,
+                value.wMinute,
+                value.wSecond,
+                value.wMilliseconds);
+            return formatted;
+        }
+        }
+        return {};
+    }
 }
 
 namespace glance::app
@@ -344,6 +411,7 @@ namespace glance::app
             }
 
             PWSTR raw_value{};
+            auto unlocalized_value = raw_property_value(value);
             const HRESULT format_result = PSFormatForDisplayAlloc(key, value, PDFF_DEFAULT, &raw_value);
             PropVariantClear(&value);
             if (FAILED(format_result) || raw_value == nullptr || raw_value[0] == L'\0')
@@ -364,6 +432,7 @@ namespace glance::app
                 .canonical_name = canonical_name,
                 .name = property_display_name(key, canonical_name),
                 .value = std::move(formatted_value),
+                .raw_value = std::move(unlocalized_value),
             });
         }
 
@@ -374,6 +443,7 @@ namespace glance::app
             if (SUCCEEDED(store->GetValue(PKEY_Photo_DateTaken, &value)) &&
                 value.vt != VT_EMPTY && value.vt != VT_NULL)
             {
+                auto unlocalized_value = raw_property_value(value);
                 PWSTR raw_value{};
                 if (SUCCEEDED(PSFormatForDisplayAlloc(
                         PKEY_Photo_DateTaken,
@@ -391,6 +461,7 @@ namespace glance::app
                             PKEY_Photo_DateTaken,
                             L"System.Photo.DateTaken"),
                         .value = result.taken_time,
+                        .raw_value = std::move(unlocalized_value),
                     });
                 }
                 CoTaskMemFree(raw_value);
@@ -409,6 +480,7 @@ namespace glance::app
                 .canonical_name = std::move(entry.canonical_name),
                 .name = std::move(entry.name),
                 .value = std::move(entry.value),
+                .raw_value = std::move(entry.raw_value),
             });
         }
         return result;
@@ -458,6 +530,7 @@ namespace glance::app
                 .canonical_name = canonical_name,
                 .name = property_display_name(key, canonical_name),
                 .value = std::move(formatted_value),
+                .raw_value = raw_component_value(entry),
             });
         }
         std::ranges::sort(metadata.entries, [](const auto& left, const auto& right) {

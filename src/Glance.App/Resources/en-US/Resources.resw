@@ -104,7 +104,7 @@
   <data name="ImageZoomLabel.Text" xml:space="preserve"><value>Zoom</value></data>
   <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>Rotate clockwise&#xA;Right-click to rotate counterclockwise</value></data>
   <data name="FlipButton.ToolTipService.ToolTip" xml:space="preserve"><value>Flip horizontally&#xA;Right-click to flip vertically</value></data>
-  <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>Image metadata (EXIF)</value></data>
+  <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>Image metadata (EXIF)&#xA;Right-click to copy EXIF data</value></data>
   <data name="MediaFooterChannelsFormat" xml:space="preserve"><value>{0}ch</value></data>
   <data name="WordWrapButton.ToolTipService.ToolTip" xml:space="preserve"><value>Wrap long lines</value></data>
   <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>Copy path&#xA;Right-click to copy file</value></data>

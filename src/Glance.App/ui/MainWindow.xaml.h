@@ -115,6 +115,9 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void ImageExifButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void ImageExifButton_RightTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void ImageScroller_PointerWheelChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
@@ -222,7 +225,12 @@ namespace winrt::Glance::App::implementation
             active,
         };
 
-        void show_copy_feedback();
+        void show_copy_feedback(
+            const Microsoft::UI::Xaml::Controls::FontIcon& icon);
+        void copy_text_to_clipboard(
+            std::wstring_view text,
+            std::wstring_view operation,
+            const Microsoft::UI::Xaml::Controls::FontIcon& feedback_icon);
         static LRESULT CALLBACK window_subclass(
             HWND window,
             UINT message,
@@ -467,6 +475,9 @@ namespace winrt::Glance::App::implementation
             std::wstring path,
             std::uint64_t generation,
             std::shared_ptr<std::atomic_bool> cancellation);
+        winrt::fire_and_forget copy_component_shortcut_data_async(
+            glance::app::ComponentStatusBarShortcut shortcut,
+            Microsoft::UI::Xaml::Controls::FontIcon feedback_icon);
         winrt::fire_and_forget confirm_component_action(
             glance::app::ComponentManagementAction action);
         void dismiss_preview_info_bar();
@@ -619,12 +630,14 @@ namespace winrt::Glance::App::implementation
         bool footer_access_loaded_{};
         bool footer_access_requested_{};
         std::wstring image_metadata_;
+        std::wstring image_metadata_json_;
         std::wstring image_taken_time_;
         std::wstring media_dimensions_;
         std::wstring media_playback_info_;
         Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };
         std::uint64_t media_playback_generation_{};
         std::shared_ptr<std::atomic_bool> component_hover_cancellation_;
+        std::shared_ptr<std::atomic_bool> component_data_copy_cancellation_;
         glance::app::ComponentStatusBarActivation active_component_hover_;
         std::wstring component_hover_info_text_;
         std::wstring component_hover_cache_component_id_;
@@ -659,6 +672,8 @@ namespace winrt::Glance::App::implementation
         Microsoft::UI::Xaml::DispatcherTimer focus_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer media_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer copy_feedback_timer_{ nullptr };
+        Microsoft::UI::Xaml::Controls::FontIcon copy_feedback_icon_{ nullptr };
+        winrt::hstring copy_feedback_original_glyph_;
         Microsoft::UI::Xaml::DispatcherTimer font_size_overlay_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_hide_timer_{ nullptr };

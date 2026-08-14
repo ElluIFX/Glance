@@ -45,6 +45,7 @@ namespace
     using glance::contracts::components::ProgressivePreviewApi;
     using glance::contracts::components::SettingsContributionApi;
     using glance::contracts::components::StatusBarShortcutApi;
+    using glance::contracts::components::StatusBarShortcutDataApi;
     using glance::contracts::components::WebPreviewApi;
     using glance::contracts::components::WebPreviewDescriptor;
     using glance::contracts::components::WebPreviewOptions;
@@ -98,6 +99,7 @@ namespace
         std::optional<ImageMetadataApi> image_metadata;
         std::optional<HoverInfoLayerApi> hover_info_layer;
         std::optional<StatusBarShortcutApi> status_bar_shortcut;
+        std::optional<StatusBarShortcutDataApi> status_bar_shortcut_data;
         std::optional<ComponentManagementActionApi> component_management_action;
         std::vector<std::wstring> extensions;
         std::vector<std::wstring> dependencies;
@@ -647,6 +649,23 @@ namespace
                 interface_api->activate != nullptr)
             {
                 component->status_bar_shortcut = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::status_bar_shortcut_data_api_id,
+                glance::contracts::components::status_bar_shortcut_data_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const StatusBarShortcutDataApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(StatusBarShortcutDataApi) &&
+                interface_api->version ==
+                    glance::contracts::components::status_bar_shortcut_data_api_version &&
+                interface_api->query_json != nullptr)
+            {
+                component->status_bar_shortcut_data = *interface_api;
             }
         }
         interface_pointer = nullptr;
@@ -1977,6 +1996,9 @@ namespace glance::app
                         .state = state == glance::contracts::components::StatusBarShortcutState::ready
                             ? ComponentStatusBarShortcutState::ready
                             : ComponentStatusBarShortcutState::setup_required,
+                        .supports_data_copy =
+                            state == glance::contracts::components::StatusBarShortcutState::ready &&
+                            component->status_bar_shortcut_data.has_value(),
                         .lease = std::static_pointer_cast<void>(component) });
                 }
             }
@@ -2091,6 +2113,44 @@ namespace glance::app
                 activation.hover_info_id.c_str(),
                 source.c_str(),
                 language.c_str(),
+                &sink);
+            return status == glance::contracts::components::PrepareStatus::success &&
+                    collector.valid && !cancelled.load(std::memory_order_acquire)
+                ? std::move(collector.text)
+                : std::wstring{};
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
+
+    std::wstring query_component_status_bar_shortcut_data(
+        const ComponentStatusBarShortcut& shortcut,
+        std::wstring_view path,
+        const std::atomic_bool& cancelled) noexcept
+    {
+        try
+        {
+            const auto component =
+                std::static_pointer_cast<LoadedComponent>(shortcut.lease);
+            if (component == nullptr || !component->active ||
+                component->id != shortcut.component_id ||
+                !shortcut.supports_data_copy ||
+                !component->status_bar_shortcut_data.has_value() ||
+                !valid_setting_id(shortcut.shortcut_id))
+            {
+                return {};
+            }
+            HoverInfoCollector collector{ .cancelled = &cancelled };
+            glance::contracts::components::HoverInfoTextSink sink{
+                .context = &collector,
+                .append = append_hover_info,
+                .is_cancelled = hover_info_cancelled };
+            const std::wstring source(path);
+            const auto status = component->status_bar_shortcut_data->query_json(
+                shortcut.shortcut_id.c_str(),
+                source.c_str(),
                 &sink);
             return status == glance::contracts::components::PrepareStatus::success &&
                     collector.valid && !cancelled.load(std::memory_order_acquire)

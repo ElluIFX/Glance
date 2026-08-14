@@ -27,6 +27,7 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t image_metadata_api_version = 1;
     inline constexpr std::uint32_t hover_info_layer_api_version = 1;
     inline constexpr std::uint32_t status_bar_shortcut_api_version = 1;
+    inline constexpr std::uint32_t status_bar_shortcut_data_api_version = 1;
     inline constexpr std::uint32_t component_management_action_api_version = 1;
     inline constexpr std::size_t web_resource_host_capacity = 64;
     inline constexpr std::size_t maximum_web_resource_mappings = 4;
@@ -104,6 +105,11 @@ namespace glance::contracts::components
         0x38fc,
         0x43c3,
         { 0x89, 0xd5, 0x24, 0x71, 0x19, 0xb1, 0xdf, 0x79 } };
+    inline constexpr GUID status_bar_shortcut_data_api_id{
+        0xd32a7c73,
+        0xc6e6,
+        0x472b,
+        { 0xa7, 0xc0, 0x69, 0x95, 0xfd, 0x74, 0x68, 0xd1 } };
     inline constexpr GUID component_management_action_api_id{
         0xa41f0c2d,
         0x3002,
@@ -575,6 +581,10 @@ namespace glance::contracts::components
         const wchar_t* language_tag,
         BOOL requested_checked,
         StatusBarShortcutActivationResult* result) noexcept;
+    using QueryStatusBarShortcutDataFunction = PrepareStatus(WINAPI*)(
+        const wchar_t* shortcut_id,
+        const wchar_t* path,
+        const HoverInfoTextSink* sink) noexcept;
     using EnumerateComponentManagementActionsFunction = BOOL(WINAPI*)(
         const wchar_t* language_tag,
         ComponentManagementActionDescriptor* descriptors,
@@ -676,6 +686,13 @@ namespace glance::contracts::components
         EnumerateStatusBarShortcutsFunction enumerate_shortcuts{};
         QueryStatusBarShortcutStateFunction query_state{};
         ActivateStatusBarShortcutFunction activate{};
+    };
+
+    struct StatusBarShortcutDataApi
+    {
+        std::uint32_t size{ sizeof(StatusBarShortcutDataApi) };
+        std::uint32_t version{ status_bar_shortcut_data_api_version };
+        QueryStatusBarShortcutDataFunction query_json{};
     };
 
     struct ComponentManagementActionApi

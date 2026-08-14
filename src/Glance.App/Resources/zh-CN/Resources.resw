@@ -104,7 +104,7 @@
   <data name="ImageZoomLabel.Text" xml:space="preserve"><value>缩放</value></data>
   <data name="RotateButton.ToolTipService.ToolTip" xml:space="preserve"><value>顺时针旋转&#xA;右键逆时针旋转</value></data>
   <data name="FlipButton.ToolTipService.ToolTip" xml:space="preserve"><value>水平翻转&#xA;右键垂直翻转</value></data>
-  <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>图像元数据 (EXIF)</value></data>
+  <data name="ImageExifButton.ToolTipService.ToolTip" xml:space="preserve"><value>图像元数据 (EXIF)&#xA;右键复制EXIF数据</value></data>
   <data name="MediaFooterChannelsFormat" xml:space="preserve"><value>{0}声道</value></data>
   <data name="WordWrapButton.ToolTipService.ToolTip" xml:space="preserve"><value>自动换行</value></data>
   <data name="CopyPathButton.ToolTipService.ToolTip" xml:space="preserve"><value>复制路径&#xA;右键复制文件</value></data>

@@ -63,6 +63,7 @@ namespace glance::app
         std::uint32_t order{};
         std::uint32_t fluent_icon_glyph{};
         ComponentStatusBarShortcutState state{ ComponentStatusBarShortcutState::ready };
+        bool supports_data_copy{};
         std::shared_ptr<void> lease;
     };
 
@@ -276,6 +277,10 @@ namespace glance::app
         const ComponentStatusBarActivation& activation,
         std::wstring_view path,
         std::wstring_view language_tag,
+        const std::atomic_bool& cancelled) noexcept;
+    [[nodiscard]] std::wstring query_component_status_bar_shortcut_data(
+        const ComponentStatusBarShortcut& shortcut,
+        std::wstring_view path,
         const std::atomic_bool& cancelled) noexcept;
     [[nodiscard]] std::optional<ComponentManagementAction> component_management_action(
         std::wstring_view component_id,

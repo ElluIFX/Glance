@@ -924,8 +924,9 @@
                     x:Uid="ImageExifButton"
                     Style="{StaticResource IconToggleButtonStyle}"
                     Click="ImageExifButton_Click"
-                    ToolTipService.ToolTip="Image metadata (EXIF)">
-                    <FontIcon FontSize="14" Glyph="&#xE946;" />
+                    RightTapped="ImageExifButton_RightTapped"
+                    ToolTipService.ToolTip="Image metadata (EXIF)&#xA;Right-click to copy EXIF data">
+                    <FontIcon x:Name="ImageExifIcon" FontSize="14" Glyph="&#xE946;" />
                 </ToggleButton>
             </StackPanel>
             <ToggleButton

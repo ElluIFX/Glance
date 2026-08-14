@@ -230,6 +230,47 @@ namespace
         return PrepareStatus::success;
     }
 
+    PrepareStatus WINAPI query_shortcut_data(
+        const wchar_t* requested_shortcut_id,
+        const wchar_t* path,
+        const HoverInfoTextSink* sink) noexcept
+    {
+        if (requested_shortcut_id == nullptr || path == nullptr || sink == nullptr ||
+            sink->size < sizeof(HoverInfoTextSink) || sink->append == nullptr ||
+            wcscmp(requested_shortcut_id, shortcut_id) != 0)
+        {
+            return PrepareStatus::failed;
+        }
+        std::filesystem::path executable;
+        {
+            std::scoped_lock lock(state_mutex);
+            executable = ffprobe_path;
+        }
+        if (executable.empty())
+        {
+            return PrepareStatus::unavailable;
+        }
+        const auto json = glance::components::media_info::query_media_json(
+            executable,
+            path,
+            *sink);
+        if (json.empty())
+        {
+            return sink->is_cancelled != nullptr && sink->is_cancelled(sink->context)
+                ? PrepareStatus::cancelled
+                : PrepareStatus::failed;
+        }
+        if (json.size() > std::numeric_limits<std::uint32_t>::max() ||
+            !sink->append(
+                sink->context,
+                json.c_str(),
+                static_cast<std::uint32_t>(json.size())))
+        {
+            return PrepareStatus::failed;
+        }
+        return PrepareStatus::success;
+    }
+
     BOOL WINAPI enumerate_actions(
         const wchar_t* language_tag,
         ComponentManagementActionDescriptor* descriptors,
@@ -340,6 +381,8 @@ namespace
         .enumerate_shortcuts = enumerate_shortcuts,
         .query_state = query_shortcut_state,
         .activate = activate_shortcut };
+    const StatusBarShortcutDataApi shortcut_data_api{
+        .query_json = query_shortcut_data };
     const ComponentManagementActionApi management_action_api{
         .enumerate_actions = enumerate_actions,
         .prepare_action = prepare_action,
@@ -365,6 +408,13 @@ namespace
             minimum_version <= status_bar_shortcut_api_version)
         {
             *interface_pointer = const_cast<StatusBarShortcutApi*>(&shortcut_api);
+            return TRUE;
+        }
+        if (IsEqualGUID(*interface_id, status_bar_shortcut_data_api_id) &&
+            minimum_version <= status_bar_shortcut_data_api_version)
+        {
+            *interface_pointer =
+                const_cast<StatusBarShortcutDataApi*>(&shortcut_data_api);
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, component_management_action_api_id) &&
