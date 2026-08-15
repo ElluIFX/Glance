@@ -19,6 +19,7 @@
 #endif
 
 #include <microsoft.ui.xaml.window.h>
+#include <dwmapi.h>
 #include <shellapi.h>
 #include <algorithm>
 #include <array>
@@ -280,6 +281,11 @@ namespace winrt::Glance::App::implementation
         Closed([weak](IInspectable const&, WindowEventArgs const&) {
             if (const auto self = weak.get())
             {
+                if (self->first_frame_rendered_token_.value != 0)
+                {
+                    Media::CompositionTarget::Rendered(self->first_frame_rendered_token_);
+                    self->first_frame_rendered_token_ = {};
+                }
                 self->cancel_update_download();
             }
         });
@@ -447,24 +453,60 @@ namespace winrt::Glance::App::implementation
     void SettingsWindow::ShowAndActivate()
     {
         request_source_statuses();
-        Activate();
-
         HWND window{};
         if (FAILED(this->try_as<::IWindowNative>()->get_WindowHandle(&window)) || window == nullptr)
         {
+            Activate();
             return;
         }
+
+        BOOL cloaked = TRUE;
+        const bool cloak_applied = SUCCEEDED(
+            DwmSetWindowAttribute(window, DWMWA_CLOAK, &cloaked, sizeof(cloaked)));
+        if (cloak_applied)
+        {
+            const auto weak = get_weak();
+            first_frame_rendered_token_ = Media::CompositionTarget::Rendered(
+                [weak, window](IInspectable const&, Media::RenderedEventArgs const&) {
+                    const auto self = weak.get();
+                    if (self == nullptr)
+                    {
+                        return;
+                    }
+                    Media::CompositionTarget::Rendered(self->first_frame_rendered_token_);
+                    self->first_frame_rendered_token_ = {};
+                    UpdateWindow(window);
+                    static_cast<void>(DwmFlush());
+                    BOOL reveal = FALSE;
+                    static_cast<void>(
+                        DwmSetWindowAttribute(window, DWMWA_CLOAK, &reveal, sizeof(reveal)));
+                    SetWindowPos(
+                        window,
+                        HWND_TOP,
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                    SetForegroundWindow(window);
+                    SetActiveWindow(window);
+                });
+        }
         ShowWindow(window, IsIconic(window) ? SW_RESTORE : SW_SHOW);
-        SetWindowPos(
-            window,
-            HWND_TOP,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-        SetForegroundWindow(window);
-        SetActiveWindow(window);
+        UpdateWindow(window);
+        if (!cloak_applied)
+        {
+            SetWindowPos(
+                window,
+                HWND_TOP,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+            SetForegroundWindow(window);
+            SetActiveWindow(window);
+        }
     }
 
     void SettingsWindow::ShowComponentAction(

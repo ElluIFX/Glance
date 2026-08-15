@@ -219,6 +219,7 @@ namespace winrt::Glance::App::implementation
         bool update_download_in_progress_{};
         bool update_installing_{};
         bool update_animations_enabled_{ true };
+        winrt::event_token first_frame_rendered_token_{};
         std::shared_ptr<std::atomic_bool> update_download_cancellation_;
         Microsoft::UI::Xaml::DispatcherTimer update_progress_timer_{ nullptr };
         double update_displayed_progress_{};
