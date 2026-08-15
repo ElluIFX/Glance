@@ -157,8 +157,7 @@
   <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>Remember window position</value></data>
   <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>Remember the window center offset for each preview type</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>Reset</value></data>
-  <data name="WindowOpacityLabel.Text" xml:space="preserve"><value>Window opacity</value></data>
-  <data name="WindowOpacityDescription.Text" xml:space="preserve"><value>Set the opacity of all preview windows</value></data>
+  <data name="AcrylicOpacityLabel.Text" xml:space="preserve"><value>Acrylic opacity</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>Media preview</value></data>
   <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>Appearance and behavior of image, audio, and video previewers</value></data>
   <data name="MediaGeneralGroupTitle.Text" xml:space="preserve"><value>Gallery</value></data>
@@ -324,6 +323,7 @@
   <data name="ThemeSystemItem.Content" xml:space="preserve"><value>System</value></data>
   <data name="ThemeLightItem.Content" xml:space="preserve"><value>Light</value></data>
   <data name="ThemeDarkItem.Content" xml:space="preserve"><value>Dark</value></data>
+  <data name="AcrylicMaterialLabel.Text" xml:space="preserve"><value>Acrylic material</value></data>
   <data name="AccentColorLabel.Text" xml:space="preserve"><value>Accent color</value></data>
   <data name="AccentSystemText.Text" xml:space="preserve"><value>System</value></data>
   <data name="AccentBlueText.Text" xml:space="preserve"><value>Blue</value></data>
@@ -339,7 +339,7 @@
   <data name="AppearanceGroupTitle.Text" xml:space="preserve"><value>Appearance</value></data>
   <data name="StartupGroupTitle.Text" xml:space="preserve"><value>Startup</value></data>
   <data name="UpdateGroupTitle.Text" xml:space="preserve"><value>Updates</value></data>
-  <data name="AutomaticUpdateCheckLabel.Text" xml:space="preserve"><value>Check for updates automatically</value></data>
+  <data name="AutomaticUpdateCheckLabel.Text" xml:space="preserve"><value>Check for updates periodically</value></data>
   <data name="AutomaticUpdateCheckDescription.Text" xml:space="preserve"><value>Check in the background when opening a preview</value></data>
   <data name="UpdateCheckFrequencyLabel.Text" xml:space="preserve"><value>Check frequency</value></data>
   <data name="UpdateFrequencyHourlyItem.Content" xml:space="preserve"><value>Hourly</value></data>

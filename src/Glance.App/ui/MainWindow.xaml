@@ -2,7 +2,12 @@
     x:Class="Glance.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid x:Name="RootGrid" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+    <Grid x:Name="RootGrid">
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+            </Style>
+        </Grid.Style>
         <Grid.RowDefinitions>
             <RowDefinition Height="40" />
             <RowDefinition Height="*" />
@@ -201,9 +206,13 @@
                         Visibility="Collapsed" />
                     <Grid
                         x:Name="TextLoadingOverlay"
-                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                         IsHitTestVisible="False"
                         Visibility="Collapsed">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+                            </Style>
+                        </Grid.Style>
                         <StackPanel
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
@@ -687,8 +696,12 @@
 
                 <Grid
                     x:Name="PasswordPromptOverlay"
-                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                     Visibility="Collapsed">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+                        </Style>
+                    </Grid.Style>
                     <StackPanel
                         Width="320"
                         HorizontalAlignment="Center"

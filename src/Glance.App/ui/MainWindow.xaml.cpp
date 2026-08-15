@@ -793,11 +793,16 @@ namespace winrt::Glance::App::implementation
         text_preferences_ = glance::app::load_text_preferences();
         footer_preferences_ = glance::app::load_footer_preferences();
         configure_window();
-        ApplyWindowPreferences();
         glance::contracts::log_event(L"MainWindow native configuration complete.");
         media_timer_ = DispatcherTimer();
         media_timer_.Interval(std::chrono::milliseconds(250));
         const auto weak = get_weak();
+        Closed([weak](IInspectable const&, WindowEventArgs const&) {
+            if (const auto self = weak.get())
+            {
+                self->acrylic_backdrop_.reset();
+            }
+        });
         media_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
             if (const auto self = weak.get())
             {
@@ -1505,8 +1510,30 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::ApplyAppearancePreferences()
     {
-        RootGrid().RequestedTheme(glance::app::element_theme(
-            glance::app::load_appearance_preferences().theme));
+        const auto preferences = glance::app::load_appearance_preferences();
+        RootGrid().RequestedTheme(glance::app::element_theme(preferences.theme));
+        if (preferences.acrylic_enabled && glance::app::acrylic_material_supported())
+        {
+            if (acrylic_backdrop_ == nullptr)
+            {
+                acrylic_backdrop_ = glance::app::WindowAcrylicBackdrop::create(
+                    *this,
+                    RootGrid(),
+                    true,
+                    preferences.acrylic_opacity_percent);
+            }
+            else
+            {
+                acrylic_backdrop_->set_opacity(preferences.acrylic_opacity_percent);
+            }
+        }
+        else
+        {
+            acrylic_backdrop_.reset();
+        }
+        const bool acrylic_enabled = acrylic_backdrop_ != nullptr;
+        acrylic_enabled_ = acrylic_enabled;
+        apply_background_surfaces(acrylic_enabled_);
         if (text_editor_ != nullptr)
         {
             text_editor_->set_preferences(
@@ -1520,32 +1547,43 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void MainWindow::ApplyWindowPreferences()
+    void MainWindow::apply_background_surfaces(bool acrylic_enabled)
     {
-        if (window_ == nullptr)
+        if (acrylic_enabled)
         {
-            return;
+            const auto transparent = Media::SolidColorBrush(
+                Windows::UI::Color{ 0, 0, 0, 0 });
+            RootGrid().Background(transparent);
+            const auto overlay = Application::Current().Resources().Lookup(
+                box_value(L"AcrylicInAppFillColorBaseBrush")).as<Media::Brush>();
+            TextLoadingOverlay().Background(overlay);
+            PasswordPromptOverlay().Background(overlay);
         }
+        else
+        {
+            RootGrid().ClearValue(Controls::Panel::BackgroundProperty());
+            TextLoadingOverlay().ClearValue(Controls::Panel::BackgroundProperty());
+            PasswordPromptOverlay().ClearValue(Controls::Panel::BackgroundProperty());
+        }
+        update_media_surface_background();
+    }
 
-        const auto preferences = glance::app::load_window_preferences();
-        LONG_PTR extended_style = GetWindowLongPtrW(window_, GWL_EXSTYLE);
-        if (preferences.opacity_percent < 100)
+    void MainWindow::update_media_surface_background()
+    {
+        if (acrylic_enabled_)
         {
-            extended_style |= WS_EX_LAYERED;
-            SetWindowLongPtrW(window_, GWL_EXSTYLE, extended_style);
-            const BYTE alpha = static_cast<BYTE>(MulDiv(
-                static_cast<int>(preferences.opacity_percent),
-                255,
-                100));
-            SetLayeredWindowAttributes(window_, 0, alpha, LWA_ALPHA);
+            MediaPanel().Background(Media::SolidColorBrush(
+                Windows::UI::Color{ 0, 0, 0, 0 }));
         }
-        else if ((extended_style & WS_EX_LAYERED) != 0)
+        else if (media_is_audio_)
         {
-            SetWindowLongPtrW(window_, GWL_EXSTYLE, extended_style & ~WS_EX_LAYERED);
+            MediaPanel().Background(Application::Current().Resources().Lookup(
+                box_value(L"SolidBackgroundFillColorBaseBrush")).as<Media::Brush>());
         }
-        if (text_editor_ != nullptr)
+        else
         {
-            text_editor_->set_opacity(preferences.opacity_percent);
+            MediaPanel().Background(Media::SolidColorBrush(
+                Windows::UI::Color{ 255, 0, 0, 0 }));
         }
     }
 
@@ -1883,6 +1921,10 @@ namespace winrt::Glance::App::implementation
         if (message == WM_WINDOWPOSCHANGED && self != nullptr)
         {
             self->update_text_editor_bounds();
+        }
+        if (message == WM_DESTROY && self != nullptr)
+        {
+            self->acrylic_backdrop_.reset();
         }
         if (message == WM_NCDESTROY && self != nullptr)
         {
@@ -3126,10 +3168,13 @@ namespace winrt::Glance::App::implementation
             (markdown || web) && glance::app::webview_runtime_available();
         if (web_preview_ != nullptr)
         {
+            const bool dark = RootGrid().ActualTheme() == ElementTheme::Dark;
             web_preview_.DefaultBackgroundColor(
                 web
                     ? Windows::UI::Color{ 255, 255, 255, 255 }
-                    : Windows::UI::Color{ 0, 0, 0, 0 });
+                    : dark
+                        ? Windows::UI::Color{ 255, 32, 32, 32 }
+                        : Windows::UI::Color{ 255, 255, 255, 255 });
         }
         current_text_reader_.reset();
         current_text_has_more_ = false;
@@ -3366,8 +3411,6 @@ namespace winrt::Glance::App::implementation
             MediaPreview().Visibility(media_is_audio_ ? Visibility::Collapsed : Visibility::Visible);
             if (media_is_audio_)
             {
-                MediaPanel().Background(Application::Current().Resources().Lookup(
-                    box_value(L"SolidBackgroundFillColorBaseBrush")).as<Media::Brush>());
                 MediaControlsOverlay().Background(Application::Current().Resources().Lookup(
                     box_value(L"LayerFillColorDefaultBrush")).as<Media::Brush>());
                 MediaPlayPauseIcon().ClearValue(IconElement::ForegroundProperty());
@@ -3376,13 +3419,13 @@ namespace winrt::Glance::App::implementation
             }
             else
             {
-                MediaPanel().Background(Media::SolidColorBrush(Windows::UI::Color{ 255, 0, 0, 0 }));
                 MediaControlsOverlay().Background(Media::SolidColorBrush(Windows::UI::Color{ 153, 0, 0, 0 }));
                 const auto white = Media::SolidColorBrush(Windows::UI::Color{ 255, 255, 255, 255 });
                 MediaPlayPauseIcon().Foreground(white);
                 MediaMuteIcon().Foreground(white);
                 MediaTimeText().Foreground(white);
             }
+            update_media_surface_background();
             media_playback_item_ = playback_item;
             media_playback_generation_ = generation;
             MediaPreview().Source(playback_item);
@@ -5404,7 +5447,9 @@ namespace winrt::Glance::App::implementation
                 ? dark_theme
                     ? Windows::UI::Color{ 255, 32, 32, 32 }
                     : Windows::UI::Color{ 255, 255, 255, 255 }
-                : Windows::UI::Color{ 0, 0, 0, 0 });
+                : dark_theme
+                    ? Windows::UI::Color{ 255, 32, 32, 32 }
+                    : Windows::UI::Color{ 255, 255, 255, 255 });
         return web_preview_;
     }
 
@@ -5617,8 +5662,6 @@ namespace winrt::Glance::App::implementation
         {
             return false;
         }
-        text_editor_->set_opacity(
-            glance::app::load_window_preferences().opacity_percent);
         update_text_editor_bounds();
         return true;
     }

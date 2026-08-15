@@ -442,47 +442,6 @@ namespace glance::app
         }
     }
 
-    void ScintillaTextView::set_opacity(std::uint32_t opacity_percent) noexcept
-    {
-        if (host_ == nullptr)
-        {
-            return;
-        }
-
-        const auto opacity = std::clamp(opacity_percent, 10U, 100U);
-        if (opacity_percent_ == opacity)
-        {
-            return;
-        }
-        opacity_percent_ = opacity;
-
-        const LONG_PTR extended_style = GetWindowLongPtrW(host_, GWL_EXSTYLE);
-        if (opacity < 100)
-        {
-            if ((extended_style & WS_EX_LAYERED) == 0)
-            {
-                SetWindowLongPtrW(
-                    host_,
-                    GWL_EXSTYLE,
-                    extended_style | WS_EX_LAYERED);
-            }
-            const BYTE alpha = static_cast<BYTE>(MulDiv(
-                static_cast<int>(opacity),
-                255,
-                100));
-            SetLayeredWindowAttributes(host_, 0, alpha, LWA_ALPHA);
-        }
-        else if ((extended_style & WS_EX_LAYERED) != 0)
-        {
-            SetWindowLongPtrW(host_, GWL_EXSTYLE, extended_style & ~WS_EX_LAYERED);
-            RedrawWindow(
-                host_,
-                nullptr,
-                nullptr,
-                RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
-        }
-    }
-
     void ScintillaTextView::set_occlusions(
         std::span<const RECT> rectangles) noexcept
     {

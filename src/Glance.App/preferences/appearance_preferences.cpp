@@ -72,6 +72,22 @@ namespace
 
 namespace glance::app
 {
+    bool acrylic_material_supported() noexcept
+    {
+        static const bool supported = []() noexcept {
+            try
+            {
+                return Microsoft::UI::Composition::SystemBackdrops::
+                    DesktopAcrylicController::IsSupported();
+            }
+            catch (...)
+            {
+                return false;
+            }
+        }();
+        return supported;
+    }
+
     AppearancePreferences load_appearance_preferences() noexcept
     {
         AppearancePreferences result;
@@ -81,6 +97,9 @@ namespace glance::app
         result.accent = static_cast<AccentPreference>(std::min<DWORD>(
             read_dword(L"Accent", 0),
             static_cast<DWORD>(AccentPreference::purple)));
+        result.acrylic_enabled = read_dword(L"Acrylic", 1) != 0;
+        result.acrylic_opacity_percent = std::clamp<DWORD>(
+            read_dword(L"AcrylicOpacityPercent", 100), 10, 100);
 
         wchar_t language[32]{};
         DWORD size = sizeof(language);
@@ -117,8 +136,19 @@ namespace glance::app
         }
         const DWORD theme = static_cast<DWORD>(preferences.theme);
         const DWORD accent = static_cast<DWORD>(preferences.accent);
+        const DWORD acrylic = preferences.acrylic_enabled ? 1 : 0;
+        const DWORD acrylic_opacity = std::clamp<std::uint32_t>(
+            preferences.acrylic_opacity_percent, 10, 100);
         RegSetValueExW(key, L"Theme", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&theme), sizeof(theme));
         RegSetValueExW(key, L"Accent", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&accent), sizeof(accent));
+        RegSetValueExW(key, L"Acrylic", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&acrylic), sizeof(acrylic));
+        RegSetValueExW(
+            key,
+            L"AcrylicOpacityPercent",
+            0,
+            REG_DWORD,
+            reinterpret_cast<const BYTE*>(&acrylic_opacity),
+            sizeof(acrylic_opacity));
         RegSetValueExW(
             key,
             L"Language",

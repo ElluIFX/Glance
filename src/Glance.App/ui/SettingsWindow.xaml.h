@@ -10,6 +10,7 @@
 #include "update_checker.h"
 #include "update_preferences.h"
 #include "window_preferences.h"
+#include "window_acrylic_backdrop.h"
 
 #include <atomic>
 #include <cstdint>
@@ -33,7 +34,6 @@ namespace winrt::Glance::App::implementation
         using AppearanceChangedCallback = std::function<void()>;
         using TextPreferencesChangedCallback = std::function<void()>;
         using FooterPreferencesChangedCallback = std::function<void()>;
-        using WindowPreferencesChangedCallback = std::function<void()>;
         using ComponentChangedCallback = std::function<void()>;
         using SourceStatusRequestCallback = std::function<bool(std::string)>;
         using UpdateCheckCallback =
@@ -50,7 +50,6 @@ namespace winrt::Glance::App::implementation
             AppearanceChangedCallback appearance_changed_callback,
             TextPreferencesChangedCallback text_preferences_changed_callback,
             FooterPreferencesChangedCallback footer_preferences_changed_callback,
-            WindowPreferencesChangedCallback window_preferences_changed_callback,
             ComponentChangedCallback component_changed_callback,
             SourceStatusRequestCallback source_status_request_callback,
             UpdateCheckCallback update_check_callback,
@@ -156,6 +155,12 @@ namespace winrt::Glance::App::implementation
         void AppearanceComboBox_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+        void AcrylicMaterialToggle_Toggled(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void AcrylicOpacitySlider_ValueChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const&);
         void SettingsNavigation_SelectionChanged(
             Microsoft::UI::Xaml::Controls::NavigationView const&,
             Microsoft::UI::Xaml::Controls::NavigationViewSelectionChangedEventArgs const&);
@@ -165,6 +170,26 @@ namespace winrt::Glance::App::implementation
         void CloseSettingsButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
+        struct DependentSettingsRegion
+        {
+            DependentSettingsRegion() = default;
+            ~DependentSettingsRegion();
+
+            DependentSettingsRegion(const DependentSettingsRegion&) = delete;
+            DependentSettingsRegion& operator=(const DependentSettingsRegion&) = delete;
+
+            void initialize(
+                Microsoft::UI::Xaml::FrameworkElement const& element,
+                bool visible);
+            void set_visible(bool visible, bool animate);
+
+        private:
+            Microsoft::UI::Xaml::FrameworkElement element_{ nullptr };
+            Microsoft::UI::Xaml::DispatcherTimer hide_timer_{ nullptr };
+            winrt::event_token hide_timer_token_{};
+            bool target_visible_{};
+        };
+
         enum class DiagnosticBundleState
         {
             idle,
@@ -191,8 +216,11 @@ namespace winrt::Glance::App::implementation
         void set_launch_at_sign_in(bool enabled);
         void save_text_preferences();
         void save_appearance_preferences();
+        void apply_background_surface(bool acrylic_enabled);
+        void update_acrylic_dependency(bool animate);
+        void update_update_frequency_dependency(bool animate);
+        void update_auto_fit_dependency(bool animate);
         void save_footer_preferences();
-        void update_auto_fit_controls_enabled() noexcept;
         void rebuild_footer_field_rows();
         void rebuild_component_settings();
         [[nodiscard]] FooterFieldControls footer_field_controls(glance::app::FooterField field);
@@ -212,7 +240,7 @@ namespace winrt::Glance::App::implementation
             double value,
             std::uint32_t& destination);
 
-        bool initializing_{};
+        bool initializing_{ true };
         bool exit_confirmation_open_{};
         bool reset_confirmation_open_{};
         bool update_check_in_progress_{};
@@ -232,6 +260,10 @@ namespace winrt::Glance::App::implementation
         glance::app::TextPreferences text_preferences_{};
         glance::app::PathCopyPreferences path_copy_preferences_{};
         glance::app::AppearancePreferences appearance_preferences_{};
+        std::unique_ptr<glance::app::WindowAcrylicBackdrop> acrylic_backdrop_;
+        DependentSettingsRegion acrylic_opacity_region_;
+        DependentSettingsRegion update_frequency_region_;
+        DependentSettingsRegion auto_fit_options_region_;
         glance::app::UpdatePreferences update_preferences_{};
         glance::app::MediaPreviewPreferences media_preview_preferences_{};
         glance::app::WindowPreferences window_preferences_{};
@@ -240,7 +272,6 @@ namespace winrt::Glance::App::implementation
         AppearanceChangedCallback appearance_changed_callback_;
         TextPreferencesChangedCallback text_preferences_changed_callback_;
         FooterPreferencesChangedCallback footer_preferences_changed_callback_;
-        WindowPreferencesChangedCallback window_preferences_changed_callback_;
         ComponentChangedCallback component_changed_callback_;
         SourceStatusRequestCallback source_status_request_callback_;
         UpdateCheckCallback update_check_callback_;

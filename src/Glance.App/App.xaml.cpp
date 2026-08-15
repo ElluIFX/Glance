@@ -690,7 +690,6 @@ namespace winrt::Glance::App::implementation
                 [this] { apply_appearance_preferences(); },
                 [this] { apply_text_preferences(); },
                 [this] { apply_footer_preferences(); },
-                [this] { apply_window_preferences(); },
                 [this] {
                     if (active_window_ != nullptr)
                     {
@@ -773,18 +772,6 @@ namespace winrt::Glance::App::implementation
         for (const auto& window : detached_windows_)
         {
             get_self<implementation::MainWindow>(window)->ApplyFooterPreferences();
-        }
-    }
-
-    void App::apply_window_preferences()
-    {
-        if (active_window_ != nullptr)
-        {
-            get_self<implementation::MainWindow>(active_window_)->ApplyWindowPreferences();
-        }
-        for (const auto& window : detached_windows_)
-        {
-            get_self<implementation::MainWindow>(window)->ApplyWindowPreferences();
         }
     }
 

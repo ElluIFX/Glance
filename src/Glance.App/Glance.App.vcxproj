@@ -76,6 +76,7 @@
     <ClInclude Include="App.xaml.h"><DependentUpon>App.xaml</DependentUpon></ClInclude>
     <ClInclude Include="ui\MainWindow.xaml.h"><DependentUpon>MainWindow.xaml</DependentUpon></ClInclude>
     <ClInclude Include="ui\SettingsWindow.xaml.h"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClInclude>
+    <ClInclude Include="ui\window_acrylic_backdrop.h" />
     <ClInclude Include="application\pipe_client.h" />
     <ClInclude Include="preview\preview_file.h" />
     <ClInclude Include="preview\preview_provider.h" />
@@ -123,6 +124,7 @@
     <ClCompile Include="App.xaml.cpp"><DependentUpon>App.xaml</DependentUpon></ClCompile>
     <ClCompile Include="ui\MainWindow.xaml.cpp"><DependentUpon>MainWindow.xaml</DependentUpon></ClCompile>
     <ClCompile Include="ui\SettingsWindow.xaml.cpp"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClCompile>
+    <ClCompile Include="ui\window_acrylic_backdrop.cpp" />
     <ClCompile Include="application\pipe_client.cpp" />
     <ClCompile Include="preview\preview_provider.cpp" />
     <ClCompile Include="preview\scintilla_text_view.cpp" />

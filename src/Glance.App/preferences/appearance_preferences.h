@@ -30,9 +30,12 @@ namespace glance::app
     {
         ThemePreference theme{ ThemePreference::system };
         AccentPreference accent{ AccentPreference::system };
+        bool acrylic_enabled{};
+        std::uint32_t acrylic_opacity_percent{ 100 };
         std::wstring language;
     };
 
+    [[nodiscard]] bool acrylic_material_supported() noexcept;
     [[nodiscard]] AppearancePreferences load_appearance_preferences() noexcept;
     void save_appearance_preferences(const AppearancePreferences& preferences) noexcept;
     [[nodiscard]] winrt::Microsoft::UI::Xaml::ElementTheme element_theme(ThemePreference preference) noexcept;

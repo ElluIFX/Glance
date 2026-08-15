@@ -2,7 +2,12 @@
     x:Class="Glance.App.SettingsWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid x:Name="RootGrid" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+    <Grid x:Name="RootGrid">
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+            </Style>
+        </Grid.Style>
         <Grid.RowDefinitions>
             <RowDefinition Height="40" />
             <RowDefinition Height="*" />
@@ -181,6 +186,11 @@
                         <TextBlock x:Name="AppearanceGroupTitle" x:Uid="AppearanceGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Appearance" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <StackPanel>
+                            <StackPanel.ChildrenTransitions>
+                                <TransitionCollection>
+                                    <RepositionThemeTransition IsStaggeringEnabled="False" />
+                                </TransitionCollection>
+                            </StackPanel.ChildrenTransitions>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -283,6 +293,46 @@
                                     </ComboBoxItem>
                                 </ComboBox>
                             </Grid>
+                            <Rectangle x:Name="AcrylicMaterialDivider" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" Visibility="Collapsed" />
+                            <Grid
+                                x:Name="AcrylicMaterialRow"
+                                Style="{StaticResource SettingsRowStyle}"
+                                Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="AcrylicMaterialLabel" x:Uid="AcrylicMaterialLabel" VerticalAlignment="Center" Text="Acrylic material" />
+                                <ToggleSwitch
+                                    x:Name="AcrylicMaterialToggle"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    OffContent="{x:Null}"
+                                    OnContent="{x:Null}"
+                                    Toggled="AcrylicMaterialToggle_Toggled"
+                                    VerticalAlignment="Center" />
+                            </Grid>
+                            <StackPanel x:Name="AcrylicOpacityRegion" Visibility="Collapsed">
+                                <StackPanel.OpacityTransition>
+                                    <ScalarTransition Duration="0:0:0.12" />
+                                </StackPanel.OpacityTransition>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="220" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="AcrylicOpacityLabel" x:Uid="AcrylicOpacityLabel" VerticalAlignment="Center" Text="Acrylic opacity" />
+                                    <Slider
+                                        x:Name="AcrylicOpacitySlider"
+                                        Grid.Column="1"
+                                        HorizontalAlignment="Stretch"
+                                        Maximum="100"
+                                        Minimum="10"
+                                        StepFrequency="1"
+                                        ValueChanged="AcrylicOpacitySlider_ValueChanged" />
+                                </Grid>
+                            </StackPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -315,13 +365,18 @@
                         <TextBlock x:Name="UpdateGroupTitle" x:Uid="UpdateGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Updates" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <StackPanel>
+                                <StackPanel.ChildrenTransitions>
+                                    <TransitionCollection>
+                                        <RepositionThemeTransition IsStaggeringEnabled="False" />
+                                    </TransitionCollection>
+                                </StackPanel.ChildrenTransitions>
                                 <Grid Style="{StaticResource SettingsRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Spacing="3">
-                                        <TextBlock x:Name="AutomaticUpdateCheckLabel" x:Uid="AutomaticUpdateCheckLabel" Text="Check for updates automatically" />
+                                        <TextBlock x:Name="AutomaticUpdateCheckLabel" x:Uid="AutomaticUpdateCheckLabel" Text="Check for updates periodically" />
                                         <TextBlock x:Name="AutomaticUpdateCheckDescription" x:Uid="AutomaticUpdateCheckDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Check in the background when opening a preview" />
                                     </StackPanel>
                                     <ToggleSwitch
@@ -333,26 +388,31 @@
                                         VerticalAlignment="Center"
                                         Toggled="AutomaticUpdateCheckToggle_Toggled" />
                                 </Grid>
-                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                                <Grid Style="{StaticResource SettingsRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="220" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center" Spacing="3">
-                                        <TextBlock x:Name="UpdateCheckFrequencyLabel" x:Uid="UpdateCheckFrequencyLabel" Text="Check frequency" />
-                                    </StackPanel>
-                                    <ComboBox
-                                        x:Name="UpdateCheckFrequencyComboBox"
-                                        Grid.Column="1"
-                                        HorizontalAlignment="Stretch"
-                                        SelectionChanged="UpdateCheckFrequencyComboBox_SelectionChanged">
-                                        <ComboBoxItem x:Name="UpdateFrequencyHourlyItem" x:Uid="UpdateFrequencyHourlyItem" Content="Hourly" />
-                                        <ComboBoxItem x:Name="UpdateFrequencyDailyItem" x:Uid="UpdateFrequencyDailyItem" Content="Daily" />
-                                        <ComboBoxItem x:Name="UpdateFrequencyWeeklyItem" x:Uid="UpdateFrequencyWeeklyItem" Content="Weekly" />
-                                        <ComboBoxItem x:Name="UpdateFrequencyMonthlyItem" x:Uid="UpdateFrequencyMonthlyItem" Content="Monthly" />
-                                    </ComboBox>
-                                </Grid>
+                                <StackPanel x:Name="UpdateFrequencyRegion">
+                                    <StackPanel.OpacityTransition>
+                                        <ScalarTransition Duration="0:0:0.12" />
+                                    </StackPanel.OpacityTransition>
+                                    <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                    <Grid Style="{StaticResource SettingsRowStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="220" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center" Spacing="3">
+                                            <TextBlock x:Name="UpdateCheckFrequencyLabel" x:Uid="UpdateCheckFrequencyLabel" Text="Check frequency" />
+                                        </StackPanel>
+                                        <ComboBox
+                                            x:Name="UpdateCheckFrequencyComboBox"
+                                            Grid.Column="1"
+                                            HorizontalAlignment="Stretch"
+                                            SelectionChanged="UpdateCheckFrequencyComboBox_SelectionChanged">
+                                            <ComboBoxItem x:Name="UpdateFrequencyHourlyItem" x:Uid="UpdateFrequencyHourlyItem" Content="Hourly" />
+                                            <ComboBoxItem x:Name="UpdateFrequencyDailyItem" x:Uid="UpdateFrequencyDailyItem" Content="Daily" />
+                                            <ComboBoxItem x:Name="UpdateFrequencyWeeklyItem" x:Uid="UpdateFrequencyWeeklyItem" Content="Weekly" />
+                                            <ComboBoxItem x:Name="UpdateFrequencyMonthlyItem" x:Uid="UpdateFrequencyMonthlyItem" Content="Monthly" />
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -418,21 +478,6 @@
                                     <ToggleSwitch x:Name="RememberWindowPositionToggle" Toggled="WindowPreferenceToggle_Toggled" />
                                 </StackPanel>
                             </Grid>
-                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                            <Grid Style="{StaticResource SettingsRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="220" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="WindowOpacityLabel" x:Uid="WindowOpacityLabel" Text="Window opacity" />
-                                    <TextBlock x:Name="WindowOpacityDescription" x:Uid="WindowOpacityDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Set the opacity of all preview windows" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
-                                    <NumberBox x:Name="WindowOpacityNumberBox" Width="184" Minimum="10" Maximum="100" SmallChange="5" SpinButtonPlacementMode="Inline" Loaded="NumberBox_Loaded" ValueChanged="WindowNumberBox_ValueChanged" />
-                                    <TextBlock VerticalAlignment="Center" Text="%" />
-                                </StackPanel>
-                            </Grid>
                         </StackPanel>
                         </Border>
                     </StackPanel>
@@ -440,6 +485,11 @@
                         <TextBlock x:Name="AdaptiveMediaSizeSectionTitle" x:Uid="AdaptiveMediaSizeSectionTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Media auto fit" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
+                            <StackPanel.ChildrenTransitions>
+                                <TransitionCollection>
+                                    <RepositionThemeTransition IsStaggeringEnabled="False" />
+                                </TransitionCollection>
+                            </StackPanel.ChildrenTransitions>
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -451,6 +501,10 @@
                                 </StackPanel>
                                 <ToggleSwitch x:Name="AutoFitWindowSizeToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
                             </Grid>
+                            <StackPanel x:Name="AutoFitOptionsRegion">
+                            <StackPanel.OpacityTransition>
+                                <ScalarTransition Duration="0:0:0.12" />
+                            </StackPanel.OpacityTransition>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
@@ -504,6 +558,7 @@
                                 </StackPanel>
                                 <TextBox x:Name="AutoFitIgnoredExtensionsTextBox" x:Uid="AutoFitIgnoredExtensionsTextBox" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" PlaceholderText=".gif; webp; mp4" TextChanged="AutoFitIgnoredExtensionsTextBox_TextChanged" />
                             </Grid>
+                            </StackPanel>
                         </StackPanel>
                         </Border>
                     </StackPanel>
@@ -758,48 +813,6 @@
                         <TextBlock x:Name="MediaPreviewPageDescription" x:Uid="MediaPreviewPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Appearance and behavior of image, audio, and video previewers" />
                     </StackPanel>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="MediaGeneralGroupTitle" x:Uid="MediaGeneralGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="General" />
-                        <Border Style="{StaticResource SettingsGroupStyle}">
-                            <StackPanel>
-                                <Grid Style="{StaticResource SettingsRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center" Spacing="3">
-                                        <TextBlock x:Name="MiddleClickGalleryModeLabel" x:Uid="MiddleClickGalleryModeLabel" Text="Middle-click gallery mode" />
-                                        <TextBlock x:Name="MiddleClickGalleryModeDescription" x:Uid="MiddleClickGalleryModeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use the middle mouse button to switch gallery mode" />
-                                    </StackPanel>
-                                    <ToggleSwitch x:Name="MiddleClickGalleryModeToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
-                                </Grid>
-                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                                <Grid Style="{StaticResource SettingsRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center" Spacing="3">
-                                        <TextBlock x:Name="LoopGalleryScrollingLabel" x:Uid="LoopGalleryScrollingLabel" Text="Loop gallery scrolling" />
-                                        <TextBlock x:Name="LoopGalleryScrollingDescription" x:Uid="LoopGalleryScrollingDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Continue from the opposite end after the first or last item" />
-                                    </StackPanel>
-                                    <ToggleSwitch x:Name="LoopGalleryScrollingToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
-                                </Grid>
-                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                                <Grid Style="{StaticResource SettingsRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center" Spacing="3">
-                                        <TextBlock x:Name="GallerySameExtensionOnlyLabel" x:Uid="GallerySameExtensionOnlyLabel" Text="Same extension only" />
-                                        <TextBlock x:Name="GallerySameExtensionOnlyDescription" x:Uid="GallerySameExtensionOnlyDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Only scroll through files with the same extension as the current file" />
-                                    </StackPanel>
-                                    <ToggleSwitch x:Name="GallerySameExtensionOnlyToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                    <StackPanel Spacing="8">
                         <TextBlock x:Name="AudioVideoPreviewGroupTitle" x:Uid="AudioVideoPreviewGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Audio and video preview" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                         <StackPanel>
@@ -913,6 +926,48 @@
                                     OnContent="{x:Null}"
                                     Toggled="MediaPreferenceToggle_Toggled" />
                             </Grid>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="MediaGeneralGroupTitle" x:Uid="MediaGeneralGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="General" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <StackPanel>
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="MiddleClickGalleryModeLabel" x:Uid="MiddleClickGalleryModeLabel" Text="Middle-click gallery mode" />
+                                        <TextBlock x:Name="MiddleClickGalleryModeDescription" x:Uid="MiddleClickGalleryModeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use the middle mouse button to switch gallery mode" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="MiddleClickGalleryModeToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                                </Grid>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="LoopGalleryScrollingLabel" x:Uid="LoopGalleryScrollingLabel" Text="Loop gallery scrolling" />
+                                        <TextBlock x:Name="LoopGalleryScrollingDescription" x:Uid="LoopGalleryScrollingDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Continue from the opposite end after the first or last item" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="LoopGalleryScrollingToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                                </Grid>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="GallerySameExtensionOnlyLabel" x:Uid="GallerySameExtensionOnlyLabel" Text="Same extension only" />
+                                        <TextBlock x:Name="GallerySameExtensionOnlyDescription" x:Uid="GallerySameExtensionOnlyDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Only scroll through files with the same extension as the current file" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="GallerySameExtensionOnlyToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                                </Grid>
+                            </StackPanel>
                         </Border>
                     </StackPanel>
                 </StackPanel>

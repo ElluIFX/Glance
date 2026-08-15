@@ -18,7 +18,6 @@ namespace glance::app
         std::uint32_t adaptive_maximum_percent{ 75 };
         std::wstring auto_fit_ignored_extensions;
         bool remember_position{};
-        std::uint32_t opacity_percent{ 100 };
     };
 
     [[nodiscard]] WindowPreferences load_window_preferences() noexcept;

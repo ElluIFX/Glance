@@ -45,6 +45,7 @@
     <ClInclude Include="preview\webview_availability.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="ui\MainWindow.xaml.h"><Filter>UI</Filter></ClInclude>
     <ClInclude Include="ui\SettingsWindow.xaml.h"><Filter>UI</Filter></ClInclude>
+    <ClInclude Include="ui\window_acrylic_backdrop.h"><Filter>UI</Filter></ClInclude>
     <ClInclude Include="common\pch.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="common\resource.h"><Filter>Common</Filter></ClInclude>
   </ItemGroup>
@@ -79,6 +80,7 @@
     <ClCompile Include="preview\webview_availability.cpp"><Filter>Preview</Filter></ClCompile>
     <ClCompile Include="ui\MainWindow.xaml.cpp"><Filter>UI</Filter></ClCompile>
     <ClCompile Include="ui\SettingsWindow.xaml.cpp"><Filter>UI</Filter></ClCompile>
+    <ClCompile Include="ui\window_acrylic_backdrop.cpp"><Filter>UI</Filter></ClCompile>
     <ClCompile Include="common\pch.cpp"><Filter>Common</Filter></ClCompile>
     <ClCompile Include="third_party\md4c\entity.c"><Filter>Third Party</Filter></ClCompile>
     <ClCompile Include="third_party\md4c\md4c.c"><Filter>Third Party</Filter></ClCompile>

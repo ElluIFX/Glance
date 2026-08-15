@@ -15,6 +15,7 @@
 #include "scintilla_text_view.h"
 #include "shell_icon_provider.h"
 #include "text_preferences.h"
+#include "window_acrylic_backdrop.h"
 
 #include "glance/contracts/preview_state.h"
 
@@ -64,7 +65,6 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool ActivateSelectedFolderEntry();
         [[nodiscard]] bool NavigateBack();
         void ApplyAppearancePreferences();
-        void ApplyWindowPreferences();
         void ApplyLocalizedResources();
         void ApplyTextPreferences();
         void ApplyFooterPreferences();
@@ -441,6 +441,8 @@ namespace winrt::Glance::App::implementation
         void update_text_editor_visibility() noexcept;
         void ensure_text_viewport_filled();
         void apply_text_preferences();
+        void apply_background_surfaces(bool acrylic_enabled);
+        void update_media_surface_background();
         void apply_text_font_metrics();
         void update_text_layout();
         void adjust_text_font_size(int steps);
@@ -610,6 +612,8 @@ namespace winrt::Glance::App::implementation
         bool current_text_web_{};
         std::shared_ptr<glance::app::IncrementalTextReader> current_text_reader_;
         std::unique_ptr<glance::app::ScintillaTextView> text_editor_;
+        std::unique_ptr<glance::app::WindowAcrylicBackdrop> acrylic_backdrop_;
+        bool acrylic_enabled_{};
         bool current_text_has_more_{};
         bool text_chunk_loading_{};
         bool text_loading_{};

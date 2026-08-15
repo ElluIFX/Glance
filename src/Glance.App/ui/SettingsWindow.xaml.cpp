@@ -258,6 +258,75 @@ namespace
 
 namespace winrt::Glance::App::implementation
 {
+    SettingsWindow::DependentSettingsRegion::~DependentSettingsRegion()
+    {
+        if (hide_timer_ != nullptr)
+        {
+            hide_timer_.Stop();
+            if (hide_timer_token_.value != 0)
+            {
+                hide_timer_.Tick(hide_timer_token_);
+            }
+        }
+    }
+
+    void SettingsWindow::DependentSettingsRegion::initialize(
+        FrameworkElement const& element,
+        bool visible)
+    {
+        element_ = element;
+        hide_timer_ = DispatcherTimer();
+        hide_timer_.Interval(std::chrono::milliseconds(120));
+        hide_timer_token_ = hide_timer_.Tick(
+            [this](IInspectable const&, IInspectable const&) {
+                hide_timer_.Stop();
+                if (!target_visible_ && element_ != nullptr)
+                {
+                    element_.Visibility(Visibility::Collapsed);
+                    element_.Opacity(1.0);
+                }
+            });
+        set_visible(visible, false);
+    }
+
+    void SettingsWindow::DependentSettingsRegion::set_visible(
+        bool visible,
+        bool animate)
+    {
+        if (element_ == nullptr)
+        {
+            return;
+        }
+
+        target_visible_ = visible;
+        if (hide_timer_ != nullptr)
+        {
+            hide_timer_.Stop();
+        }
+        element_.IsHitTestVisible(visible);
+        if (!animate)
+        {
+            element_.Opacity(1.0);
+            element_.Visibility(visible ? Visibility::Visible : Visibility::Collapsed);
+            return;
+        }
+
+        if (visible)
+        {
+            if (element_.Visibility() == Visibility::Collapsed)
+            {
+                element_.Opacity(0.0);
+                element_.Visibility(Visibility::Visible);
+            }
+            element_.Opacity(1.0);
+        }
+        else if (element_.Visibility() != Visibility::Collapsed)
+        {
+            element_.Opacity(0.0);
+            hide_timer_.Start();
+        }
+    }
+
     void SettingsWindow::NumberBox_Loaded(IInspectable const& sender, RoutedEventArgs const&)
     {
         const auto number_box = sender.as<Controls::NumberBox>();
@@ -286,6 +355,7 @@ namespace winrt::Glance::App::implementation
                     Media::CompositionTarget::Rendered(self->first_frame_rendered_token_);
                     self->first_frame_rendered_token_ = {};
                 }
+                self->acrylic_backdrop_.reset();
                 self->cancel_update_download();
             }
         });
@@ -305,18 +375,23 @@ namespace winrt::Glance::App::implementation
         const int y = monitor_info.rcWork.top + ((monitor_info.rcWork.bottom - monitor_info.rcWork.top) - height) / 2;
         SetWindowPos(window, nullptr, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
 
-        initializing_ = true;
         appearance_preferences_ = glance::app::load_appearance_preferences();
         LanguageComboBox().SelectedIndex(appearance_preferences_.language == L"zh-CN" ? 1 : 0);
         ThemeComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.theme));
         AccentComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.accent));
+        const bool acrylic_supported = glance::app::acrylic_material_supported();
+        AcrylicMaterialRow().Visibility(acrylic_supported ? Visibility::Visible : Visibility::Collapsed);
+        AcrylicMaterialDivider().Visibility(acrylic_supported ? Visibility::Visible : Visibility::Collapsed);
+        AcrylicOpacitySlider().Value(appearance_preferences_.acrylic_opacity_percent);
+        if (acrylic_supported)
+        {
+            AcrylicMaterialToggle().IsOn(appearance_preferences_.acrylic_enabled);
+        }
         LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
         update_preferences_ = glance::app::load_update_preferences();
         AutomaticUpdateCheckToggle().IsOn(update_preferences_.automatic_check_enabled);
         UpdateCheckFrequencyComboBox().SelectedIndex(
             static_cast<int>(update_preferences_.frequency));
-        UpdateCheckFrequencyComboBox().IsEnabled(
-            update_preferences_.automatic_check_enabled);
         DiagnosticsToggle().IsOn(glance::contracts::diagnostics_enabled());
         window_preferences_ = glance::app::load_window_preferences();
         DefaultWindowWidthNumberBox().Value(window_preferences_.default_width);
@@ -329,8 +404,6 @@ namespace winrt::Glance::App::implementation
         AdaptiveMaximumPercentNumberBox().Value(window_preferences_.adaptive_maximum_percent);
         AutoFitIgnoredExtensionsTextBox().Text(window_preferences_.auto_fit_ignored_extensions);
         RememberWindowPositionToggle().IsOn(window_preferences_.remember_position);
-        WindowOpacityNumberBox().Value(window_preferences_.opacity_percent);
-        update_auto_fit_controls_enabled();
         media_preview_preferences_ = glance::app::load_media_preview_preferences();
         DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
         DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
@@ -379,9 +452,23 @@ namespace winrt::Glance::App::implementation
         UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
         footer_preferences_ = glance::app::load_footer_preferences();
         rebuild_footer_field_rows();
+        acrylic_opacity_region_.initialize(
+            AcrylicOpacityRegion(),
+            acrylic_supported && appearance_preferences_.acrylic_enabled);
+        update_frequency_region_.initialize(
+            UpdateFrequencyRegion(),
+            update_preferences_.automatic_check_enabled);
+        auto_fit_options_region_.initialize(
+            AutoFitOptionsRegion(),
+            window_preferences_.auto_fit_media);
         initializing_ = false;
         refresh_diagnostic_bundle_status();
         Activated([this](IInspectable const&, WindowActivatedEventArgs const& args) {
+            if (acrylic_backdrop_ != nullptr)
+            {
+                acrylic_backdrop_->set_input_active(
+                    args.WindowActivationState() != WindowActivationState::Deactivated);
+            }
             if (args.WindowActivationState() != WindowActivationState::Deactivated)
             {
                 refresh_launch_at_sign_in();
@@ -394,7 +481,6 @@ namespace winrt::Glance::App::implementation
         AppearanceChangedCallback appearance_changed_callback,
         TextPreferencesChangedCallback text_preferences_changed_callback,
         FooterPreferencesChangedCallback footer_preferences_changed_callback,
-        WindowPreferencesChangedCallback window_preferences_changed_callback,
         ComponentChangedCallback component_changed_callback,
         SourceStatusRequestCallback source_status_request_callback,
         UpdateCheckCallback update_check_callback,
@@ -405,7 +491,6 @@ namespace winrt::Glance::App::implementation
         appearance_changed_callback_ = std::move(appearance_changed_callback);
         text_preferences_changed_callback_ = std::move(text_preferences_changed_callback);
         footer_preferences_changed_callback_ = std::move(footer_preferences_changed_callback);
-        window_preferences_changed_callback_ = std::move(window_preferences_changed_callback);
         component_changed_callback_ = std::move(component_changed_callback);
         source_status_request_callback_ = std::move(source_status_request_callback);
         update_check_callback_ = std::move(update_check_callback);
@@ -446,8 +531,41 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::ApplyAppearancePreferences()
     {
-        RootGrid().RequestedTheme(glance::app::element_theme(
-            glance::app::load_appearance_preferences().theme));
+        const auto preferences = glance::app::load_appearance_preferences();
+        RootGrid().RequestedTheme(glance::app::element_theme(preferences.theme));
+        if (preferences.acrylic_enabled && glance::app::acrylic_material_supported())
+        {
+            if (acrylic_backdrop_ == nullptr)
+            {
+                acrylic_backdrop_ = glance::app::WindowAcrylicBackdrop::create(
+                    *this,
+                    RootGrid(),
+                    true,
+                    preferences.acrylic_opacity_percent);
+            }
+            else
+            {
+                acrylic_backdrop_->set_opacity(preferences.acrylic_opacity_percent);
+            }
+        }
+        else
+        {
+            acrylic_backdrop_.reset();
+        }
+        apply_background_surface(acrylic_backdrop_ != nullptr);
+    }
+
+    void SettingsWindow::apply_background_surface(bool acrylic_enabled)
+    {
+        if (acrylic_enabled)
+        {
+            RootGrid().Background(Media::SolidColorBrush(
+                Windows::UI::Color{ 0, 0, 0, 0 }));
+        }
+        else
+        {
+            RootGrid().ClearValue(Controls::Panel::BackgroundProperty());
+        }
     }
 
     void SettingsWindow::ShowAndActivate()
@@ -562,6 +680,7 @@ namespace winrt::Glance::App::implementation
         set_content(EnglishLanguageItem(), L"EnglishLanguageItem.Content");
         set_content(ChineseLanguageItem(), L"ChineseLanguageItem.Content");
         set_text(ThemeLabel(), L"ThemeLabel.Text");
+        set_text(AcrylicMaterialLabel(), L"AcrylicMaterialLabel.Text");
         const int selected_theme = ThemeComboBox().SelectedIndex();
         const bool was_initializing = initializing_;
         initializing_ = true;
@@ -636,8 +755,7 @@ namespace winrt::Glance::App::implementation
         set_text(RememberWindowPositionLabel(), L"RememberWindowPositionLabel.Text");
         set_text(RememberWindowPositionDescription(), L"RememberWindowPositionDescription.Text");
         set_content(ResetWindowPositionsButton(), L"ResetWindowPositionsButton.Content");
-        set_text(WindowOpacityLabel(), L"WindowOpacityLabel.Text");
-        set_text(WindowOpacityDescription(), L"WindowOpacityDescription.Text");
+        set_text(AcrylicOpacityLabel(), L"AcrylicOpacityLabel.Text");
         set_text(MediaPreviewPageTitle(), L"MediaPreviewPageTitle.Text");
         set_text(MediaPreviewPageDescription(), L"MediaPreviewPageDescription.Text");
         set_text(MediaGeneralGroupTitle(), L"MediaGeneralGroupTitle.Text");
@@ -1238,8 +1356,7 @@ namespace winrt::Glance::App::implementation
         update_preferences_.last_successful_check = 0;
         update_preferences_.retry_after = 0;
         update_preferences_.skipped_version.clear();
-        UpdateCheckFrequencyComboBox().IsEnabled(
-            update_preferences_.automatic_check_enabled);
+        update_update_frequency_dependency(true);
         glance::app::save_update_preferences(update_preferences_);
         if (update_preferences_changed_callback_)
         {
@@ -1278,12 +1395,8 @@ namespace winrt::Glance::App::implementation
             window_preferences_.show_after_auto_fit = ShowAfterAutoFitToggle().IsOn();
             window_preferences_.dynamic_auto_fit = DynamicAutoFitToggle().IsOn();
             window_preferences_.remember_position = RememberWindowPositionToggle().IsOn();
-            update_auto_fit_controls_enabled();
+            update_auto_fit_dependency(true);
             glance::app::save_window_preferences(window_preferences_);
-            if (window_preferences_changed_callback_)
-            {
-                window_preferences_changed_callback_();
-            }
         }
     }
 
@@ -1298,16 +1411,14 @@ namespace winrt::Glance::App::implementation
 
         const double width = DefaultWindowWidthNumberBox().Value();
         const double height = DefaultWindowHeightNumberBox().Value();
-        const double opacity = WindowOpacityNumberBox().Value();
         const double adaptive_minimum = AdaptiveMinimumPercentNumberBox().Value();
         const double adaptive_maximum = AdaptiveMaximumPercentNumberBox().Value();
-        if (!std::isfinite(width) || !std::isfinite(height) || !std::isfinite(opacity) ||
+        if (!std::isfinite(width) || !std::isfinite(height) ||
             !std::isfinite(adaptive_minimum) || !std::isfinite(adaptive_maximum))
         {
             initializing_ = true;
             DefaultWindowWidthNumberBox().Value(window_preferences_.default_width);
             DefaultWindowHeightNumberBox().Value(window_preferences_.default_height);
-            WindowOpacityNumberBox().Value(window_preferences_.opacity_percent);
             AdaptiveMinimumPercentNumberBox().Value(window_preferences_.adaptive_minimum_percent);
             AdaptiveMaximumPercentNumberBox().Value(window_preferences_.adaptive_maximum_percent);
             initializing_ = false;
@@ -1318,8 +1429,6 @@ namespace winrt::Glance::App::implementation
             std::clamp(std::lround(width), 480L, 7680L));
         window_preferences_.default_height = static_cast<std::uint32_t>(
             std::clamp(std::lround(height), 320L, 4320L));
-        window_preferences_.opacity_percent = static_cast<std::uint32_t>(
-            std::clamp(std::lround(opacity), 10L, 100L));
         auto minimum_percent = static_cast<std::uint32_t>(
             std::clamp(std::lround(adaptive_minimum), 10L, 100L));
         auto maximum_percent = static_cast<std::uint32_t>(
@@ -1343,10 +1452,6 @@ namespace winrt::Glance::App::implementation
         window_preferences_.adaptive_minimum_percent = minimum_percent;
         window_preferences_.adaptive_maximum_percent = maximum_percent;
         glance::app::save_window_preferences(window_preferences_);
-        if (window_preferences_changed_callback_)
-        {
-            window_preferences_changed_callback_();
-        }
     }
 
     void SettingsWindow::AutoFitIgnoredExtensionsTextBox_TextChanged(
@@ -1360,20 +1465,27 @@ namespace winrt::Glance::App::implementation
         window_preferences_.auto_fit_ignored_extensions =
             AutoFitIgnoredExtensionsTextBox().Text().c_str();
         glance::app::save_window_preferences(window_preferences_);
-        if (window_preferences_changed_callback_)
-        {
-            window_preferences_changed_callback_();
-        }
     }
 
-    void SettingsWindow::update_auto_fit_controls_enabled() noexcept
+    void SettingsWindow::update_acrylic_dependency(bool animate)
     {
-        const bool enabled = AutoFitWindowSizeToggle().IsOn();
-        ShowAfterAutoFitToggle().IsEnabled(enabled);
-        DynamicAutoFitToggle().IsEnabled(enabled);
-        AdaptiveMinimumPercentNumberBox().IsEnabled(enabled);
-        AdaptiveMaximumPercentNumberBox().IsEnabled(enabled);
-        AutoFitIgnoredExtensionsTextBox().IsEnabled(enabled);
+        acrylic_opacity_region_.set_visible(
+            glance::app::acrylic_material_supported() && AcrylicMaterialToggle().IsOn(),
+            animate && update_animations_enabled_);
+    }
+
+    void SettingsWindow::update_update_frequency_dependency(bool animate)
+    {
+        update_frequency_region_.set_visible(
+            AutomaticUpdateCheckToggle().IsOn(),
+            animate && update_animations_enabled_);
+    }
+
+    void SettingsWindow::update_auto_fit_dependency(bool animate)
+    {
+        auto_fit_options_region_.set_visible(
+            AutoFitWindowSizeToggle().IsOn(),
+            animate && update_animations_enabled_);
     }
 
     void SettingsWindow::set_media_volume(
@@ -2425,14 +2537,24 @@ namespace winrt::Glance::App::implementation
             std::clamp(ThemeComboBox().SelectedIndex(), 0, 2));
         appearance_preferences_.accent = static_cast<glance::app::AccentPreference>(
             std::clamp(AccentComboBox().SelectedIndex(), 0, 7));
+        if (glance::app::acrylic_material_supported())
+        {
+            appearance_preferences_.acrylic_enabled = AcrylicMaterialToggle().IsOn();
+        }
+        appearance_preferences_.acrylic_opacity_percent =
+            static_cast<std::uint32_t>(std::clamp(
+                std::lround(AcrylicOpacitySlider().Value()), 10L, 100L));
         glance::app::save_appearance_preferences(appearance_preferences_);
         glance::app::apply_ui_language(appearance_preferences_.language);
         glance::app::apply_accent_resources(appearance_preferences_);
         ApplyLocalizedResources();
-        ApplyAppearancePreferences();
         if (appearance_changed_callback_)
         {
             appearance_changed_callback_();
+        }
+        else
+        {
+            ApplyAppearancePreferences();
         }
     }
 
@@ -2441,6 +2563,37 @@ namespace winrt::Glance::App::implementation
         Controls::SelectionChangedEventArgs const&)
     {
         save_appearance_preferences();
+    }
+
+    void SettingsWindow::AcrylicMaterialToggle_Toggled(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        update_acrylic_dependency(true);
+        save_appearance_preferences();
+    }
+
+    void SettingsWindow::AcrylicOpacitySlider_ValueChanged(
+        IInspectable const&,
+        Controls::Primitives::RangeBaseValueChangedEventArgs const& args)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+
+        appearance_preferences_.acrylic_opacity_percent =
+            static_cast<std::uint32_t>(std::clamp(
+                std::lround(args.NewValue()), 10L, 100L));
+        glance::app::save_appearance_preferences(appearance_preferences_);
+        if (appearance_changed_callback_)
+        {
+            appearance_changed_callback_();
+        }
+        else
+        {
+            ApplyAppearancePreferences();
+        }
     }
 
     void SettingsWindow::SettingsNavigation_SelectionChanged(
