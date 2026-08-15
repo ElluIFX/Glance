@@ -4,6 +4,24 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.15.1] - 2026-08-15
+
+### Added
+
+- Added periodic automatic update checks with configurable intervals, deferred prompts, and per-version skipping.
+- Added optional Windows acrylic backgrounds with adjustable acrylic opacity on supported systems.
+- Added right-click JSON copying for raw EXIF and advanced media metadata.
+- Added a temporary same-extension navigation mode to the gallery button.
+
+### Changed
+
+- Consolidated image zoom controls into a smooth slider with right-click reset and active transform indicators.
+- Dependent settings now appear with a short animation when their parent feature is enabled.
+
+### Fixed
+
+- Prepared the settings window before its first visible frame to prevent a black opening frame.
+
 ## [2026.08.15] - 2026-08-15
 
 ### Added
