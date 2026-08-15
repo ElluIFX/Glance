@@ -9,6 +9,7 @@
 #include "startup_registration.h"
 #include "webview_availability.h"
 #include "glance/contracts/diagnostics.h"
+#include "../version.h"
 
 #include <shellapi.h>
 #include <tlhelp32.h>
@@ -134,6 +135,12 @@ namespace
         return signaled;
     }
 
+    std::uint64_t unix_time_now() noexcept
+    {
+        return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
+    }
+
     HANDLE open_supervised_process(DWORD process_id) noexcept
     {
         HANDLE process = OpenProcess(
@@ -200,7 +207,10 @@ namespace winrt::Glance::App::implementation
               [this](auto type, auto flags, auto payload) {
                   handle_pipe_message(type, flags, std::move(payload));
               },
-              [this](bool connected) { handle_connection_changed(connected); })
+              [this](bool connected) { handle_connection_changed(connected); }),
+          core_network_client_(
+              [this](auto type, auto payload) { return pipe_client_.send(type, payload); },
+              [this](auto result) { handle_automatic_update_result(std::move(result)); })
     {
         UnhandledException([](IInspectable const&, UnhandledExceptionEventArgs const& event)
         {
@@ -223,6 +233,7 @@ namespace winrt::Glance::App::implementation
     App::~App()
     {
         shutting_down_.store(true, std::memory_order_release);
+        core_network_client_.disconnect();
         pipe_client_.stop();
         close_core_process();
         if (shutdown_event_ != nullptr)
@@ -326,6 +337,7 @@ namespace winrt::Glance::App::implementation
                     0,
                     0,
                     nullptr);
+                request_automatic_update_check();
             }
         }
 #endif
@@ -695,6 +707,20 @@ namespace winrt::Glance::App::implementation
                     return pipe_client_.send(
                         glance::contracts::MessageType::source_status_request,
                         language_tag);
+                },
+                [this] {
+                    return core_network_client_.check_for_updates(GLANCE_VERSION_WSTRING);
+                },
+                [this](
+                    const glance::contracts::NetworkDownloadRequest& request,
+                    const std::atomic_bool& cancelled,
+                    const glance::app::CoreNetworkClient::DownloadProgressCallback& progress) {
+                    return core_network_client_.download(request, cancelled, progress);
+                },
+                [this] {
+                    pending_update_.reset();
+                    automatic_update_check_in_flight_ = false;
+                    core_network_client_.forget_automatic_update_requests();
                 });
             settings_window_.Closed([this](IInspectable const&, WindowEventArgs const&) {
                 settings_window_ = nullptr;
@@ -762,6 +788,152 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void App::request_automatic_update_check()
+    {
+        if (automatic_update_check_in_flight_ || pending_update_)
+        {
+            return;
+        }
+        const auto preferences = glance::app::load_update_preferences();
+        if (!glance::app::automatic_update_check_due(preferences, unix_time_now()))
+        {
+            return;
+        }
+        automatic_update_check_in_flight_ =
+            core_network_client_.request_automatic_update_check(
+                GLANCE_VERSION_WSTRING,
+                preferences.last_successful_check);
+    }
+
+    void App::handle_automatic_update_result(
+        std::optional<glance::contracts::UpdateCheckResult> result)
+    {
+        if (dispatcher_ == nullptr)
+        {
+            return;
+        }
+        static_cast<void>(dispatcher_.TryEnqueue(
+            [this, result = std::move(result)]() mutable {
+                automatic_update_check_in_flight_ = false;
+                if (!result)
+                {
+                    return;
+                }
+                auto preferences = glance::app::load_update_preferences();
+                if (!preferences.automatic_check_enabled)
+                {
+                    pending_update_.reset();
+                    return;
+                }
+
+                const auto now = unix_time_now();
+                if (glance::contracts::update_check_succeeded(result->status))
+                {
+                    preferences.last_successful_check = result->checked_at != 0
+                        ? result->checked_at
+                        : now;
+                    preferences.retry_after = 0;
+                    glance::app::save_update_preferences(preferences);
+                    if (result->status == glance::contracts::UpdateCheckStatus::update_available)
+                    {
+                        if (glance::app::update_version_is_skipped(
+                                preferences,
+                                result->latest_version))
+                        {
+                            pending_update_.reset();
+                            return;
+                        }
+                        pending_update_ = std::move(*result);
+                    }
+                    return;
+                }
+
+                preferences.retry_after = now + 60ULL * 60ULL;
+                glance::app::save_update_preferences(preferences);
+            }));
+    }
+
+    void App::show_pending_update_prompt()
+    {
+        if (!pending_update_ || update_prompt_active_ || active_window_ == nullptr)
+        {
+            return;
+        }
+        if (!glance::app::load_update_preferences().automatic_check_enabled)
+        {
+            pending_update_.reset();
+            return;
+        }
+
+        auto update = std::move(*pending_update_);
+        pending_update_.reset();
+        update_prompt_active_ = true;
+        show_update_prompt(std::move(update));
+    }
+
+    fire_and_forget App::show_update_prompt(
+        glance::contracts::UpdateCheckResult update)
+    {
+        const auto host = active_window_;
+        const auto close_host = [&] {
+            update_prompt_active_ = false;
+            if (host != nullptr)
+            {
+                get_self<implementation::MainWindow>(host)->HidePreview();
+            }
+        };
+
+        try
+        {
+            if (host == nullptr)
+            {
+                close_host();
+                co_return;
+            }
+
+            const auto result = co_await implementation::SettingsWindow::ShowUpdateResultDialog(
+                get_self<implementation::MainWindow>(host)->RootGrid().XamlRoot(),
+                update,
+                true);
+            close_host();
+
+            if (result == static_cast<std::int32_t>(
+                    implementation::SettingsWindow::UpdatePromptResult::failed))
+            {
+                pending_update_ = std::move(update);
+                glance::contracts::log_event(L"Update prompt could not be shown.");
+            }
+            else if (result == static_cast<std::int32_t>(
+                    implementation::SettingsWindow::UpdatePromptResult::download))
+            {
+                show_settings();
+                if (settings_window_ != nullptr)
+                {
+                    get_self<implementation::SettingsWindow>(settings_window_)
+                        ->ShowUpdateDownload(std::move(update.installer));
+                }
+            }
+            else if (result == static_cast<std::int32_t>(
+                         implementation::SettingsWindow::UpdatePromptResult::skip))
+            {
+                auto preferences = glance::app::load_update_preferences();
+                preferences.skipped_version = std::move(update.latest_version);
+                glance::app::save_update_preferences(preferences);
+            }
+        }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(
+                L"Update prompt failed: " + std::wstring(error.message()));
+            close_host();
+        }
+        catch (...)
+        {
+            glance::contracts::log_event(L"Update prompt failed.");
+            close_host();
+        }
+    }
+
     void App::exit_application()
     {
         if (shutting_down_.exchange(true, std::memory_order_acq_rel))
@@ -825,6 +997,10 @@ namespace winrt::Glance::App::implementation
             return;
         }
         if (shutting_down_.load(std::memory_order_acquire))
+        {
+            return;
+        }
+        if (core_network_client_.handle_message(type, payload))
         {
             return;
         }
@@ -904,6 +1080,10 @@ namespace winrt::Glance::App::implementation
 
     void App::handle_connection_changed(bool connected)
     {
+        if (!connected)
+        {
+            core_network_client_.disconnect();
+        }
         if (shutting_down_.load(std::memory_order_acquire))
         {
             return;
@@ -921,6 +1101,7 @@ namespace winrt::Glance::App::implementation
                 core_connection_grace_until_ms_ = 0;
                 return;
             }
+            automatic_update_check_in_flight_ = false;
             if (active_window_ != nullptr)
             {
                 get_self<implementation::MainWindow>(active_window_)->HandleGalleryDisconnect();
@@ -1081,6 +1262,7 @@ namespace winrt::Glance::App::implementation
             reinterpret_cast<HWND>(source_window),
             std::move(source_id),
             source_capabilities);
+        request_automatic_update_check();
         glance::contracts::log_event(L"Preview request dispatch complete.");
     }
 
@@ -1116,6 +1298,15 @@ namespace winrt::Glance::App::implementation
 
         if (!handled)
         {
+            if (action == glance::contracts::PreviewInputAction::activate_selection &&
+                pending_update_ && !update_prompt_active_)
+            {
+                show_pending_update_prompt();
+            }
+            if (update_prompt_active_)
+            {
+                return;
+            }
             window->HidePreview();
         }
     }

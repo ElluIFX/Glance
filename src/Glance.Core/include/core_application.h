@@ -1,6 +1,7 @@
 #pragma once
 
 #include "keyboard_hook.h"
+#include "network_service.h"
 #include "pipe_server.h"
 #include "unique_handle.h"
 
@@ -118,6 +119,7 @@ namespace glance::core
         std::mutex gallery_payload_mutex_;
         std::vector<std::string> pending_gallery_payloads_;
         PipeServer pipe_server_;
+        NetworkService network_service_;
         KeyboardHookService* keyboard_hook_{};
         std::atomic_uint64_t raw_input_count_{};
         std::uint64_t previous_raw_input_count_{};

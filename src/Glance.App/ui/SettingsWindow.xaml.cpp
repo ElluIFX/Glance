@@ -305,6 +305,12 @@ namespace winrt::Glance::App::implementation
         ThemeComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.theme));
         AccentComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.accent));
         LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
+        update_preferences_ = glance::app::load_update_preferences();
+        AutomaticUpdateCheckToggle().IsOn(update_preferences_.automatic_check_enabled);
+        UpdateCheckFrequencyComboBox().SelectedIndex(
+            static_cast<int>(update_preferences_.frequency));
+        UpdateCheckFrequencyComboBox().IsEnabled(
+            update_preferences_.automatic_check_enabled);
         DiagnosticsToggle().IsOn(glance::contracts::diagnostics_enabled());
         window_preferences_ = glance::app::load_window_preferences();
         DefaultWindowWidthNumberBox().Value(window_preferences_.default_width);
@@ -384,7 +390,10 @@ namespace winrt::Glance::App::implementation
         FooterPreferencesChangedCallback footer_preferences_changed_callback,
         WindowPreferencesChangedCallback window_preferences_changed_callback,
         ComponentChangedCallback component_changed_callback,
-        SourceStatusRequestCallback source_status_request_callback)
+        SourceStatusRequestCallback source_status_request_callback,
+        UpdateCheckCallback update_check_callback,
+        NetworkDownloadCallback network_download_callback,
+        UpdatePreferencesChangedCallback update_preferences_changed_callback)
     {
         exit_callback_ = std::move(exit_callback);
         appearance_changed_callback_ = std::move(appearance_changed_callback);
@@ -393,6 +402,10 @@ namespace winrt::Glance::App::implementation
         window_preferences_changed_callback_ = std::move(window_preferences_changed_callback);
         component_changed_callback_ = std::move(component_changed_callback);
         source_status_request_callback_ = std::move(source_status_request_callback);
+        update_check_callback_ = std::move(update_check_callback);
+        network_download_callback_ = std::move(network_download_callback);
+        update_preferences_changed_callback_ =
+            std::move(update_preferences_changed_callback);
     }
 
     void SettingsWindow::configure_window()
@@ -469,6 +482,12 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void SettingsWindow::ShowUpdateDownload(glance::app::UpdateInstallerAsset asset)
+    {
+        SettingsNavigation().SelectedItem(AboutNavigationItem());
+        download_and_install_update(std::move(asset));
+    }
+
     void SettingsWindow::ApplyLocalizedResources()
     {
         const auto set_text = [](const auto& control, wchar_t const* key) {
@@ -524,6 +543,16 @@ namespace winrt::Glance::App::implementation
         set_text(AccentPurpleText(), L"AccentPurpleText.Text");
         set_text(LaunchTitle(), L"LaunchTitle.Text");
         set_text(LaunchDescription(), L"LaunchDescription.Text");
+        set_text(UpdateGroupTitle(), L"UpdateGroupTitle.Text");
+        set_text(AutomaticUpdateCheckLabel(), L"AutomaticUpdateCheckLabel.Text");
+        set_text(
+            AutomaticUpdateCheckDescription(),
+            L"AutomaticUpdateCheckDescription.Text");
+        set_text(UpdateCheckFrequencyLabel(), L"UpdateCheckFrequencyLabel.Text");
+        set_content(UpdateFrequencyHourlyItem(), L"UpdateFrequencyHourlyItem.Content");
+        set_content(UpdateFrequencyDailyItem(), L"UpdateFrequencyDailyItem.Content");
+        set_content(UpdateFrequencyWeeklyItem(), L"UpdateFrequencyWeeklyItem.Content");
+        set_content(UpdateFrequencyMonthlyItem(), L"UpdateFrequencyMonthlyItem.Content");
         set_text(FooterPageTitle(), L"FooterPageTitle.Text");
         set_text(FooterPageDescription(), L"FooterPageDescription.Text");
         set_text(FooterFieldsLabel(), L"FooterFieldsLabel.Text");
@@ -1155,6 +1184,41 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void SettingsWindow::AutomaticUpdateCheckToggle_Toggled(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+        update_preferences_.automatic_check_enabled = AutomaticUpdateCheckToggle().IsOn();
+        update_preferences_.last_successful_check = 0;
+        update_preferences_.retry_after = 0;
+        update_preferences_.skipped_version.clear();
+        UpdateCheckFrequencyComboBox().IsEnabled(
+            update_preferences_.automatic_check_enabled);
+        glance::app::save_update_preferences(update_preferences_);
+        if (update_preferences_changed_callback_)
+        {
+            update_preferences_changed_callback_();
+        }
+    }
+
+    void SettingsWindow::UpdateCheckFrequencyComboBox_SelectionChanged(
+        IInspectable const&,
+        Controls::SelectionChangedEventArgs const&)
+    {
+        if (initializing_)
+        {
+            return;
+        }
+        update_preferences_ = glance::app::load_update_preferences();
+        update_preferences_.frequency = static_cast<glance::app::UpdateCheckFrequency>(
+            std::clamp(UpdateCheckFrequencyComboBox().SelectedIndex(), 0, 3));
+        glance::app::save_update_preferences(update_preferences_);
+    }
+
     void SettingsWindow::DiagnosticsToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
     {
         if (!initializing_)
@@ -1457,7 +1521,7 @@ namespace winrt::Glance::App::implementation
         apartment_context ui_thread;
         glance::app::UpdateCheckResult result;
         co_await resume_background();
-        result = glance::app::check_for_updates(GLANCE_VERSION_WSTRING);
+        result = update_check_callback_ ? update_check_callback_() : glance::app::UpdateCheckResult{};
         co_await ui_thread;
 
         lifetime->update_check_in_progress_ = false;
@@ -1469,10 +1533,31 @@ namespace winrt::Glance::App::implementation
             co_return;
         }
 
+        const auto dialog_result = co_await ShowUpdateResultDialog(
+            lifetime->RootGrid().XamlRoot(),
+            result,
+            false);
+        if (dialog_result == static_cast<std::int32_t>(UpdatePromptResult::download))
+        {
+            lifetime->ShowUpdateDownload(std::move(result.installer));
+        }
+    }
+
+    Windows::Foundation::IAsyncOperation<std::int32_t>
+    SettingsWindow::ShowUpdateResultDialog(
+        XamlRoot const& xaml_root,
+        glance::app::UpdateCheckResult result,
+        bool automatic_prompt)
+    {
         try
         {
+            if (xaml_root == nullptr)
+            {
+                co_return static_cast<std::int32_t>(UpdatePromptResult::failed);
+            }
+
             Controls::ContentDialog dialog;
-            dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
+            dialog.XamlRoot(xaml_root);
             dialog.CloseButtonText(glance::app::localize(L"OK"));
             dialog.DefaultButton(Controls::ContentDialogButton::Close);
             const bool installer_available = static_cast<bool>(result.installer);
@@ -1480,7 +1565,6 @@ namespace winrt::Glance::App::implementation
             switch (result.status)
             {
             case glance::app::UpdateCheckStatus::update_available:
-            {
                 dialog.Title(box_value(glance::app::localize(L"UpdateAvailableTitle")));
                 dialog.Content(box_value(glance::app::localize_format(
                     L"UpdateAvailableMessage", { result.latest_version })));
@@ -1490,10 +1574,10 @@ namespace winrt::Glance::App::implementation
                 {
                     dialog.SecondaryButtonText(glance::app::localize(L"UpdateOpenRelease"));
                 }
-                dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+                dialog.CloseButtonText(glance::app::localize(
+                    automatic_prompt ? L"UpdateSkipVersion" : L"Cancel"));
                 dialog.DefaultButton(Controls::ContentDialogButton::Primary);
                 break;
-            }
             case glance::app::UpdateCheckStatus::up_to_date:
                 dialog.Title(box_value(glance::app::localize(L"UpdateUpToDateTitle")));
                 dialog.Content(box_value(glance::app::localize_format(
@@ -1513,26 +1597,33 @@ namespace winrt::Glance::App::implementation
                 break;
             }
 
-            const auto dialog_result = co_await dialog.ShowAsync();
-            if (result.status != glance::app::UpdateCheckStatus::update_available)
+            auto dialog_result = co_await dialog.ShowAsync();
+            if (result.status == glance::app::UpdateCheckStatus::update_available)
             {
-                co_return;
+                if (installer_available &&
+                    dialog_result == Controls::ContentDialogResult::Primary)
+                {
+                    co_return static_cast<std::int32_t>(UpdatePromptResult::download);
+                }
+                if ((!installer_available &&
+                          dialog_result == Controls::ContentDialogResult::Primary) ||
+                         dialog_result == Controls::ContentDialogResult::Secondary)
+                {
+                    static_cast<void>(co_await Windows::System::Launcher::LaunchUriAsync(
+                        Windows::Foundation::Uri(safe_release_url(result.release_url))));
+                    co_return static_cast<std::int32_t>(UpdatePromptResult::other);
+                }
+                if (automatic_prompt &&
+                    dialog_result == Controls::ContentDialogResult::None)
+                {
+                    co_return static_cast<std::int32_t>(UpdatePromptResult::skip);
+                }
             }
-
-            if (installer_available && dialog_result == Controls::ContentDialogResult::Primary)
-            {
-                lifetime->download_and_install_update(std::move(result.installer));
-            }
-            else if ((!installer_available &&
-                      dialog_result == Controls::ContentDialogResult::Primary) ||
-                     dialog_result == Controls::ContentDialogResult::Secondary)
-            {
-                static_cast<void>(co_await Windows::System::Launcher::LaunchUriAsync(
-                    Windows::Foundation::Uri(safe_release_url(result.release_url))));
-            }
+            co_return static_cast<std::int32_t>(UpdatePromptResult::other);
         }
         catch (...)
         {
+            co_return static_cast<std::int32_t>(UpdatePromptResult::failed);
         }
     }
 
@@ -1555,12 +1646,17 @@ namespace winrt::Glance::App::implementation
         const auto dispatcher = DispatcherQueue();
         const auto weak = get_weak();
         apartment_context ui_thread;
-        glance::app::UpdateDownloadResult download_result;
+        glance::contracts::NetworkDownloadResult download_result;
         co_await resume_background();
-        download_result = glance::app::download_update_installer(
-            asset,
-            *cancellation,
-            [dispatcher, weak, cancellation](std::uint64_t downloaded, std::uint64_t total) {
+        download_result = network_download_callback_
+            ? network_download_callback_(
+                glance::contracts::NetworkDownloadRequest{
+                    asset.download_url,
+                    asset.file_name,
+                    asset.sha256,
+                    asset.size },
+                *cancellation,
+                [dispatcher, weak, cancellation](std::uint64_t downloaded, std::uint64_t total) {
                 static_cast<void>(dispatcher.TryEnqueue([weak, cancellation, downloaded, total] {
                     if (const auto self = weak.get();
                         self != nullptr &&
@@ -1570,7 +1666,8 @@ namespace winrt::Glance::App::implementation
                         self->set_update_progress(downloaded, total);
                     }
                 }));
-            });
+                })
+            : glance::contracts::NetworkDownloadResult{};
         co_await ui_thread;
 
         if (lifetime->RootGrid().XamlRoot() == nullptr)
@@ -1578,19 +1675,19 @@ namespace winrt::Glance::App::implementation
             lifetime->update_download_in_progress_ = false;
             co_return;
         }
-        if (download_result.status == glance::app::UpdateDownloadStatus::cancelled)
+        if (download_result.status == glance::contracts::NetworkDownloadStatus::cancelled)
         {
             lifetime->hide_update_card();
             co_return;
         }
-        if (download_result.status != glance::app::UpdateDownloadStatus::succeeded)
+        if (download_result.status != glance::contracts::NetworkDownloadStatus::succeeded)
         {
             const wchar_t* message_key = L"UpdateDownloadNetworkFailedMessage";
-            if (download_result.status == glance::app::UpdateDownloadStatus::file_error)
+            if (download_result.status == glance::contracts::NetworkDownloadStatus::file_error)
             {
                 message_key = L"UpdateDownloadFileFailedMessage";
             }
-            else if (download_result.status == glance::app::UpdateDownloadStatus::integrity_error)
+            else if (download_result.status == glance::contracts::NetworkDownloadStatus::integrity_error)
             {
                 message_key = L"UpdateDownloadIntegrityFailedMessage";
             }
@@ -1635,7 +1732,7 @@ namespace winrt::Glance::App::implementation
         lifetime->show_update_installing_card();
         glance::app::UpdateLaunchStatus launch_status{};
         co_await resume_background();
-        launch_status = glance::app::launch_update_installer(download_result.installer_path);
+        launch_status = glance::app::launch_update_installer(download_result.path);
         co_await ui_thread;
         if (launch_status == glance::app::UpdateLaunchStatus::launched ||
             lifetime->RootGrid().XamlRoot() == nullptr)
@@ -1707,31 +1804,20 @@ namespace winrt::Glance::App::implementation
             update_download_cancellation_ = cancellation;
             show_download_card(action.download_title, action.download_message);
 
-            std::filesystem::path destination;
-            try
-            {
-                destination = std::filesystem::temp_directory_path() / L"Glance" /
-                              L"ComponentDownloads" / action.component_id / request.file_name;
-            }
-            catch (...)
-            {
-                hide_update_card();
-                co_return;
-            }
-
             const auto dispatcher = DispatcherQueue();
             const auto weak = get_weak();
             apartment_context ui_thread;
-            glance::app::FileDownloadResult download_result;
+            glance::contracts::NetworkDownloadResult download_result;
             co_await resume_background();
-            download_result = glance::app::download_file(
-                glance::app::FileDownloadRequest{.url = request.url,
-                                                 .destination_path = destination,
-                                                 .sha256 = request.sha256,
-                                                 .expected_size = request.expected_size,
-                                                 .maximum_size = 512ULL * 1024 * 1024},
-                *cancellation,
-                [dispatcher, weak, cancellation](std::uint64_t downloaded, std::uint64_t total) {
+            download_result = network_download_callback_
+                ? network_download_callback_(
+                    glance::contracts::NetworkDownloadRequest{
+                        request.url,
+                        request.file_name,
+                        request.sha256,
+                        request.expected_size },
+                    *cancellation,
+                    [dispatcher, weak, cancellation](std::uint64_t downloaded, std::uint64_t total) {
                     static_cast<void>(
                         dispatcher.TryEnqueue([weak, cancellation, downloaded, total] {
                             if (const auto self = weak.get();
@@ -1741,7 +1827,8 @@ namespace winrt::Glance::App::implementation
                                 self->set_update_progress(downloaded, total);
                             }
                         }));
-                });
+                    })
+                : glance::contracts::NetworkDownloadResult{};
             co_await ui_thread;
 
             if (lifetime->RootGrid().XamlRoot() == nullptr)
@@ -1749,19 +1836,19 @@ namespace winrt::Glance::App::implementation
                 lifetime->update_download_in_progress_ = false;
                 co_return;
             }
-            if (download_result.status == glance::app::FileDownloadStatus::cancelled)
+            if (download_result.status == glance::contracts::NetworkDownloadStatus::cancelled)
             {
                 lifetime->hide_update_card();
                 co_return;
             }
-            if (download_result.status != glance::app::FileDownloadStatus::succeeded)
+            if (download_result.status != glance::contracts::NetworkDownloadStatus::succeeded)
             {
                 const wchar_t* message_key = L"ComponentActionDownloadNetworkFailedMessage";
-                if (download_result.status == glance::app::FileDownloadStatus::file_error)
+                if (download_result.status == glance::contracts::NetworkDownloadStatus::file_error)
                 {
                     message_key = L"ComponentActionDownloadFileFailedMessage";
                 }
-                else if (download_result.status == glance::app::FileDownloadStatus::integrity_error)
+                else if (download_result.status == glance::contracts::NetworkDownloadStatus::integrity_error)
                 {
                     message_key = L"ComponentActionDownloadIntegrityFailedMessage";
                 }

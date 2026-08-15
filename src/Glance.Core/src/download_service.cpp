@@ -1,7 +1,7 @@
-#include "pch.h"
-#include "download_service.h"
+#include "network_service.h"
 #include "../../version.h"
 
+#include <windows.h>
 #include <bcrypt.h>
 #include <winhttp.h>
 
@@ -192,7 +192,7 @@ namespace
     }
 
     void report_progress(
-        const glance::app::FileDownloadProgressCallback& progress,
+        const glance::core::FileDownloadProgressCallback& progress,
         std::uint64_t downloaded,
         std::uint64_t total) noexcept
     {
@@ -246,9 +246,9 @@ namespace
     }
 }
 
-namespace glance::app
+namespace glance::core
 {
-    FileDownloadResult download_file(
+    glance::contracts::NetworkDownloadResult download_file(
         const FileDownloadRequest& request,
         const std::atomic_bool& cancelled,
         const FileDownloadProgressCallback& progress) noexcept
@@ -263,7 +263,7 @@ namespace glance::app
                 request.expected_size == 0 || request.maximum_size == 0 ||
                 request.expected_size > request.maximum_size)
             {
-                return { FileDownloadStatus::integrity_error, {} };
+                return { glance::contracts::NetworkDownloadStatus::integrity_error, {} };
             }
 
             URL_COMPONENTS components{ sizeof(components) };
@@ -278,7 +278,7 @@ namespace glance::app
                     &components) ||
                 components.nScheme != INTERNET_SCHEME_HTTPS)
             {
-                return { FileDownloadStatus::integrity_error, {} };
+                return { glance::contracts::NetworkDownloadStatus::integrity_error, {} };
             }
 
             std::filesystem::create_directories(request.destination_path.parent_path());
@@ -294,7 +294,8 @@ namespace glance::app
                 if (hash && _wcsicmp(hash->c_str(), request.sha256.c_str()) == 0)
                 {
                     report_progress(progress, request.expected_size, request.expected_size);
-                    return { FileDownloadStatus::succeeded, request.destination_path };
+                    return { glance::contracts::NetworkDownloadStatus::succeeded,
+                             request.destination_path.wstring() };
                 }
             }
             std::filesystem::remove(request.destination_path, error);
@@ -314,7 +315,7 @@ namespace glance::app
                 0));
             if (!session || !WinHttpSetTimeouts(session.get(), 5000, 5000, 5000, 8000))
             {
-                return { FileDownloadStatus::network_error, {} };
+                return { glance::contracts::NetworkDownloadStatus::network_error, {} };
             }
             InternetHandle connection(
                 WinHttpConnect(session.get(), host.c_str(), components.nPort, 0));
@@ -339,7 +340,7 @@ namespace glance::app
                     0) ||
                 !WinHttpReceiveResponse(web_request.get(), nullptr))
             {
-                return { FileDownloadStatus::network_error, {} };
+                return { glance::contracts::NetworkDownloadStatus::network_error, {} };
             }
 
             DWORD status_code{};
@@ -353,7 +354,7 @@ namespace glance::app
                     WINHTTP_NO_HEADER_INDEX) ||
                 status_code != 200)
             {
-                return { FileDownloadStatus::network_error, {} };
+                return { glance::contracts::NetworkDownloadStatus::network_error, {} };
             }
 
             FileHandle file(CreateFileW(
@@ -367,7 +368,7 @@ namespace glance::app
             Sha256Hash hash;
             if (!file || !hash)
             {
-                return { FileDownloadStatus::file_error, {} };
+                return { glance::contracts::NetworkDownloadStatus::file_error, {} };
             }
 
             std::array<std::uint8_t, download_buffer_bytes> buffer{};
@@ -385,7 +386,7 @@ namespace glance::app
                 {
                     file.close();
                     std::filesystem::remove(partial_path, error);
-                    return { FileDownloadStatus::network_error, {} };
+                    return { glance::contracts::NetworkDownloadStatus::network_error, {} };
                 }
                 if (read == 0)
                 {
@@ -396,7 +397,7 @@ namespace glance::app
                 {
                     file.close();
                     std::filesystem::remove(partial_path, error);
-                    return { FileDownloadStatus::integrity_error, {} };
+                    return { glance::contracts::NetworkDownloadStatus::integrity_error, {} };
                 }
 
                 DWORD written{};
@@ -405,7 +406,7 @@ namespace glance::app
                 {
                     file.close();
                     std::filesystem::remove(partial_path, error);
-                    return { FileDownloadStatus::file_error, {} };
+                    return { glance::contracts::NetworkDownloadStatus::file_error, {} };
                 }
                 downloaded += read;
                 const auto now = std::chrono::steady_clock::now();
@@ -421,7 +422,7 @@ namespace glance::app
             {
                 file.close();
                 std::filesystem::remove(partial_path, error);
-                return { FileDownloadStatus::cancelled, {} };
+                return { glance::contracts::NetworkDownloadStatus::cancelled, {} };
             }
             const auto digest = hash.finish();
             file.close();
@@ -429,7 +430,7 @@ namespace glance::app
                 _wcsicmp(digest->c_str(), request.sha256.c_str()) != 0)
             {
                 std::filesystem::remove(partial_path, error);
-                return { FileDownloadStatus::integrity_error, {} };
+                return { glance::contracts::NetworkDownloadStatus::integrity_error, {} };
             }
             report_progress(progress, request.expected_size, request.expected_size);
             if (!MoveFileExW(
@@ -438,9 +439,10 @@ namespace glance::app
                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
             {
                 std::filesystem::remove(partial_path, error);
-                return { FileDownloadStatus::file_error, {} };
+                return { glance::contracts::NetworkDownloadStatus::file_error, {} };
             }
-            return { FileDownloadStatus::succeeded, request.destination_path };
+            return { glance::contracts::NetworkDownloadStatus::succeeded,
+                     request.destination_path.wstring() };
         }
         catch (...)
         {
@@ -449,7 +451,7 @@ namespace glance::app
             {
                 std::filesystem::remove(partial_path, error);
             }
-            return { FileDownloadStatus::file_error, {} };
+            return { glance::contracts::NetworkDownloadStatus::file_error, {} };
         }
     }
 }

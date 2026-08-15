@@ -119,7 +119,7 @@
   <data name="MaintenanceNavigationItem.Content" xml:space="preserve"><value>Maintenance</value></data>
   <data name="AboutNavigationItem.Content" xml:space="preserve"><value>About</value></data>
   <data name="GeneralPageTitle.Text" xml:space="preserve"><value>General</value></data>
-  <data name="GeneralPageDescription.Text" xml:space="preserve"><value>Appearance and application startup</value></data>
+  <data name="GeneralPageDescription.Text" xml:space="preserve"><value>Appearance, startup, and updates</value></data>
   <data name="LaunchTitle.Text" xml:space="preserve"><value>Launch at sign-in</value></data>
   <data name="LaunchDescription.Text" xml:space="preserve"><value>Start Glance automatically when you sign in to Windows</value></data>
   <data name="FooterPageTitle.Text" xml:space="preserve"><value>Footer</value></data>
@@ -254,10 +254,11 @@
   <data name="AboutLicenseText.Text" xml:space="preserve"><value>License: GPL-3.0</value></data>
   <data name="AboutProjectLink.Content" xml:space="preserve"><value>GitHub repository</value></data>
   <data name="CheckForUpdatesButton.Content" xml:space="preserve"><value>Check for updates</value></data>
-  <data name="UpdateAvailableTitle" xml:space="preserve"><value>Update available</value></data>
+  <data name="UpdateAvailableTitle" xml:space="preserve"><value>New Glance version available</value></data>
   <data name="UpdateAvailableMessage" xml:space="preserve"><value>Version {0} is available</value></data>
   <data name="UpdateDownloadAndInstall" xml:space="preserve"><value>Download and install</value></data>
   <data name="UpdateOpenRelease" xml:space="preserve"><value>Open release</value></data>
+  <data name="UpdateSkipVersion" xml:space="preserve"><value>Skip this version</value></data>
   <data name="UpdateDownloadTitle" xml:space="preserve"><value>Downloading update</value></data>
   <data name="UpdateDownloadMessage" xml:space="preserve"><value>Preparing version {0}</value></data>
   <data name="UpdateDownloadBytesFormat" xml:space="preserve"><value>{0}MB / {1}MB</value></data>
@@ -337,6 +338,14 @@
   <data name="ComponentsNavigationItem.Content" xml:space="preserve"><value>Add-ons</value></data>
   <data name="AppearanceGroupTitle.Text" xml:space="preserve"><value>Appearance</value></data>
   <data name="StartupGroupTitle.Text" xml:space="preserve"><value>Startup</value></data>
+  <data name="UpdateGroupTitle.Text" xml:space="preserve"><value>Updates</value></data>
+  <data name="AutomaticUpdateCheckLabel.Text" xml:space="preserve"><value>Check for updates automatically</value></data>
+  <data name="AutomaticUpdateCheckDescription.Text" xml:space="preserve"><value>Check in the background when opening a preview</value></data>
+  <data name="UpdateCheckFrequencyLabel.Text" xml:space="preserve"><value>Check frequency</value></data>
+  <data name="UpdateFrequencyHourlyItem.Content" xml:space="preserve"><value>Hourly</value></data>
+  <data name="UpdateFrequencyDailyItem.Content" xml:space="preserve"><value>Daily</value></data>
+  <data name="UpdateFrequencyWeeklyItem.Content" xml:space="preserve"><value>Weekly</value></data>
+  <data name="UpdateFrequencyMonthlyItem.Content" xml:space="preserve"><value>Monthly</value></data>
   <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>Add-ons</value></data>
   <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>Optional components, sources, and runtime status</value></data>
   <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>Add-on component location</value></data>

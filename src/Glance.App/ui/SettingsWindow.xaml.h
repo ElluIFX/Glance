@@ -8,6 +8,7 @@
 #include "path_copy_preferences.h"
 #include "text_preferences.h"
 #include "update_checker.h"
+#include "update_preferences.h"
 #include "window_preferences.h"
 
 #include <atomic>
@@ -20,6 +21,14 @@ namespace winrt::Glance::App::implementation
 {
     struct SettingsWindow : SettingsWindowT<SettingsWindow>
     {
+        enum class UpdatePromptResult : std::int32_t
+        {
+            failed,
+            download,
+            skip,
+            other,
+        };
+
         using ExitCallback = std::function<void()>;
         using AppearanceChangedCallback = std::function<void()>;
         using TextPreferencesChangedCallback = std::function<void()>;
@@ -27,6 +36,13 @@ namespace winrt::Glance::App::implementation
         using WindowPreferencesChangedCallback = std::function<void()>;
         using ComponentChangedCallback = std::function<void()>;
         using SourceStatusRequestCallback = std::function<bool(std::string)>;
+        using UpdateCheckCallback =
+            std::function<glance::contracts::UpdateCheckResult()>;
+        using NetworkDownloadCallback = std::function<glance::contracts::NetworkDownloadResult(
+            const glance::contracts::NetworkDownloadRequest&,
+            const std::atomic_bool&,
+            const std::function<void(std::uint64_t, std::uint64_t)>&)>;
+        using UpdatePreferencesChangedCallback = std::function<void()>;
 
         SettingsWindow();
         void InitializeSession(
@@ -36,13 +52,22 @@ namespace winrt::Glance::App::implementation
             FooterPreferencesChangedCallback footer_preferences_changed_callback,
             WindowPreferencesChangedCallback window_preferences_changed_callback,
             ComponentChangedCallback component_changed_callback,
-            SourceStatusRequestCallback source_status_request_callback);
+            SourceStatusRequestCallback source_status_request_callback,
+            UpdateCheckCallback update_check_callback,
+            NetworkDownloadCallback network_download_callback,
+            UpdatePreferencesChangedCallback update_preferences_changed_callback);
         void ApplyAppearancePreferences();
         void ApplyLocalizedResources();
         void ShowAndActivate();
         void ShowComponentAction(
             std::wstring_view component_id,
             std::wstring_view action_id);
+        void ShowUpdateDownload(glance::app::UpdateInstallerAsset asset);
+        static winrt::Windows::Foundation::IAsyncOperation<std::int32_t>
+            ShowUpdateResultDialog(
+            Microsoft::UI::Xaml::XamlRoot const& xaml_root,
+            glance::app::UpdateCheckResult result,
+            bool automatic_prompt);
         void HandleSourceStatuses(std::string_view payload);
         winrt::fire_and_forget ConfirmExit();
 
@@ -53,6 +78,12 @@ namespace winrt::Glance::App::implementation
         void LaunchAtSignInToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void AutomaticUpdateCheckToggle_Toggled(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void UpdateCheckFrequencyComboBox_SelectionChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
         void DiagnosticsToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -200,6 +231,7 @@ namespace winrt::Glance::App::implementation
         glance::app::TextPreferences text_preferences_{};
         glance::app::PathCopyPreferences path_copy_preferences_{};
         glance::app::AppearancePreferences appearance_preferences_{};
+        glance::app::UpdatePreferences update_preferences_{};
         glance::app::MediaPreviewPreferences media_preview_preferences_{};
         glance::app::WindowPreferences window_preferences_{};
         glance::app::FooterPreferences footer_preferences_{};
@@ -210,6 +242,9 @@ namespace winrt::Glance::App::implementation
         WindowPreferencesChangedCallback window_preferences_changed_callback_;
         ComponentChangedCallback component_changed_callback_;
         SourceStatusRequestCallback source_status_request_callback_;
+        UpdateCheckCallback update_check_callback_;
+        NetworkDownloadCallback network_download_callback_;
+        UpdatePreferencesChangedCallback update_preferences_changed_callback_;
     };
 }
 

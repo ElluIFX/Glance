@@ -373,7 +373,13 @@ namespace glance::core
     CoreApplication::CoreApplication()
         : pipe_server_(
               [this](auto type, auto flags, auto payload) { handle_pipe_message(type, flags, payload); },
-              [this](bool connected) { handle_connection_changed(connected); })
+              [this](bool connected) { handle_connection_changed(connected); }),
+          network_service_(
+              [this](auto type, auto payload) { return pipe_server_.send(type, payload); },
+              [this] {
+                  return preview_state_.load(std::memory_order_acquire) !=
+                      glance::contracts::PreviewWindowState::hidden;
+              })
     {
     }
 
@@ -390,6 +396,7 @@ namespace glance::core
             delete keyboard_hook_;
             keyboard_hook_ = nullptr;
         }
+        network_service_.stop();
         pipe_server_.stop();
     }
 
@@ -1569,6 +1576,45 @@ namespace glance::core
                     context->source_status_language = winrt::to_hstring(payload).c_str();
                 }
                 SetEvent(context->gallery_event.get());
+            }
+            return;
+        }
+        if (type == glance::contracts::MessageType::update_check_request)
+        {
+            if (auto request = glance::contracts::decode_update_check_request(payload))
+            {
+                try
+                {
+                    network_service_.request_update_check(std::move(*request));
+                }
+                catch (...)
+                {
+                    glance::contracts::log_event(L"Failed to queue an update check request.");
+                }
+            }
+            return;
+        }
+        if (type == glance::contracts::MessageType::network_download_request)
+        {
+            if (auto request = glance::contracts::decode_network_download_request(payload))
+            {
+                try
+                {
+                    network_service_.request_download(std::move(*request));
+                }
+                catch (...)
+                {
+                    glance::contracts::log_event(L"Failed to queue a network download request.");
+                }
+            }
+            return;
+        }
+        if (type == glance::contracts::MessageType::network_download_cancel)
+        {
+            if (const auto request_id =
+                    glance::contracts::decode_network_download_cancel(payload))
+            {
+                network_service_.cancel_download(*request_id);
             }
             return;
         }

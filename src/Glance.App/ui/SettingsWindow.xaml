@@ -311,6 +311,51 @@
                             </StackPanel>
                         </Border>
                     </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="UpdateGroupTitle" x:Uid="UpdateGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Updates" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <StackPanel>
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="AutomaticUpdateCheckLabel" x:Uid="AutomaticUpdateCheckLabel" Text="Check for updates automatically" />
+                                        <TextBlock x:Name="AutomaticUpdateCheckDescription" x:Uid="AutomaticUpdateCheckDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Check in the background when opening a preview" />
+                                    </StackPanel>
+                                    <ToggleSwitch
+                                        x:Name="AutomaticUpdateCheckToggle"
+                                        Grid.Column="1"
+                                        HorizontalAlignment="Right"
+                                        OffContent="{x:Null}"
+                                        OnContent="{x:Null}"
+                                        VerticalAlignment="Center"
+                                        Toggled="AutomaticUpdateCheckToggle_Toggled" />
+                                </Grid>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="220" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="UpdateCheckFrequencyLabel" x:Uid="UpdateCheckFrequencyLabel" Text="Check frequency" />
+                                    </StackPanel>
+                                    <ComboBox
+                                        x:Name="UpdateCheckFrequencyComboBox"
+                                        Grid.Column="1"
+                                        HorizontalAlignment="Stretch"
+                                        SelectionChanged="UpdateCheckFrequencyComboBox_SelectionChanged">
+                                        <ComboBoxItem x:Name="UpdateFrequencyHourlyItem" x:Uid="UpdateFrequencyHourlyItem" Content="Hourly" />
+                                        <ComboBoxItem x:Name="UpdateFrequencyDailyItem" x:Uid="UpdateFrequencyDailyItem" Content="Daily" />
+                                        <ComboBoxItem x:Name="UpdateFrequencyWeeklyItem" x:Uid="UpdateFrequencyWeeklyItem" Content="Weekly" />
+                                        <ComboBoxItem x:Name="UpdateFrequencyMonthlyItem" x:Uid="UpdateFrequencyMonthlyItem" Content="Monthly" />
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 

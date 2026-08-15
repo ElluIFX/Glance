@@ -30,6 +30,13 @@ namespace glance::contracts
         source_status_response = 18,
         shutdown = 20,
         terminate_unresponsive = 21,
+        update_check_request = 22,
+        update_check_response = 23,
+        network_download_request = 24,
+        network_download_progress = 25,
+        network_download_response = 26,
+        network_download_cancel = 27,
+        update_check_deferred = 28,
     };
 
     // Heartbeat acknowledgements arrive on the pipe thread while the watchdog

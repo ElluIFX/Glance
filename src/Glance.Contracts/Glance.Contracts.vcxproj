@@ -26,6 +26,7 @@
     <ClInclude Include="include\glance\contracts\file_descriptor.h" />
     <ClInclude Include="include\glance\contracts\diagnostics.h" />
     <ClInclude Include="include\glance\contracts\ipc_protocol.h" />
+    <ClInclude Include="include\glance\contracts\network_protocol.h" />
     <ClInclude Include="include\glance\contracts\paged_document_protocol.h" />
     <ClInclude Include="include\glance\contracts\preview_state.h" />
     <ClInclude Include="include\glance\contracts\source_api.h" />
@@ -33,6 +34,7 @@
   <ItemGroup>
     <ClCompile Include="src\contracts.cpp" />
     <ClCompile Include="src\diagnostics.cpp" />
+    <ClCompile Include="src\network_protocol.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

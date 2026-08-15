@@ -9,7 +9,7 @@ IDI_GLANCE_APP ICON "Glance.App\\Assets\\AppIcon.ico"
 #define GLANCE_INTERNAL_NAME "Glance"
 #define GLANCE_ORIGINAL_FILENAME "Glance.exe"
 #elif GLANCE_BINARY_KIND == 2
-#define GLANCE_FILE_DESCRIPTION "Glance Input Core"
+#define GLANCE_FILE_DESCRIPTION "Glance Core"
 #define GLANCE_INTERNAL_NAME "Glance.Core"
 #define GLANCE_ORIGINAL_FILENAME "Glance.Core.exe"
 #elif GLANCE_BINARY_KIND == 3

@@ -37,6 +37,9 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Glance.Contracts\Glance.Contracts.vcxproj">
+      <Project>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\Glance.Components\Pdf\host\Glance.PdfHost.vcxproj">
       <Project>{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>

@@ -45,8 +45,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Bcrypt.lib;Comctl32.lib;Dbghelp.lib;Delayimp.lib;Dwrite.lib;Dwmapi.lib;icu.lib;Ole32.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;Winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <DelayLoadDLLs>Winhttp.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
+      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;Dwmapi.lib;icu.lib;Ole32.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -58,7 +57,7 @@
   <ItemGroup>
     <ClInclude Include="preview\archive_provider.h" />
     <ClInclude Include="components\component_loader.h" />
-    <ClInclude Include="application\download_service.h" />
+    <ClInclude Include="application\core_network_client.h" />
     <ClInclude Include="preferences\footer_preferences.h" />
     <ClInclude Include="preferences\folder_preview_preferences.h" />
     <ClInclude Include="preview\generic_file_info.h" />
@@ -85,6 +84,7 @@
     <ClInclude Include="application\startup_registration.h" />
     <ClInclude Include="preview\text_font_fallback.h" />
     <ClInclude Include="preferences\text_preferences.h" />
+    <ClInclude Include="preferences\update_preferences.h" />
     <ClInclude Include="application\tray_icon.h" />
     <ClInclude Include="application\update_checker.h" />
     <ClInclude Include="preview\webview_availability.h" />
@@ -107,7 +107,7 @@
   <ItemGroup>
     <ClCompile Include="preview\archive_provider.cpp" />
     <ClCompile Include="components\component_loader.cpp" />
-    <ClCompile Include="application\download_service.cpp" />
+    <ClCompile Include="application\core_network_client.cpp" />
     <ClCompile Include="preferences\footer_preferences.cpp" />
     <ClCompile Include="preferences\folder_preview_preferences.cpp" />
     <ClCompile Include="preview\generic_file_info.cpp" />
@@ -130,6 +130,7 @@
     <ClCompile Include="preview\syntax_theme.cpp" />
     <ClCompile Include="application\startup_registration.cpp" />
     <ClCompile Include="preferences\text_preferences.cpp" />
+    <ClCompile Include="preferences\update_preferences.cpp" />
     <ClCompile Include="application\tray_icon.cpp" />
     <ClCompile Include="application\update_checker.cpp" />
     <ClCompile Include="preview\webview_availability.cpp" />

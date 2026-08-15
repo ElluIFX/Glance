@@ -13,13 +13,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.xaml.h"><Filter>Application</Filter></ClInclude>
-    <ClInclude Include="application\download_service.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\localization.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\pipe_client.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\startup_registration.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\tray_icon.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="application\update_checker.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="components\component_loader.h"><Filter>Components</Filter></ClInclude>
+    <ClInclude Include="application\core_network_client.h"><Filter>Application</Filter></ClInclude>
     <ClInclude Include="preferences\appearance_preferences.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preferences\folder_preview_preferences.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preferences\footer_preferences.h"><Filter>Preferences</Filter></ClInclude>
@@ -27,6 +27,7 @@
     <ClInclude Include="preferences\media_preview_preferences.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preferences\path_copy_preferences.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preferences\text_preferences.h"><Filter>Preferences</Filter></ClInclude>
+    <ClInclude Include="preferences\update_preferences.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preferences\window_preferences.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preferences\window_size_store.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preview\archive_provider.h"><Filter>Preview</Filter></ClInclude>
@@ -49,13 +50,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.xaml.cpp"><Filter>Application</Filter></ClCompile>
-    <ClCompile Include="application\download_service.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\localization.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\pipe_client.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\startup_registration.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\tray_icon.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="application\update_checker.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="components\component_loader.cpp"><Filter>Components</Filter></ClCompile>
+    <ClCompile Include="application\core_network_client.cpp"><Filter>Application</Filter></ClCompile>
     <ClCompile Include="preferences\appearance_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
     <ClCompile Include="preferences\folder_preview_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
     <ClCompile Include="preferences\footer_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
@@ -63,6 +64,7 @@
     <ClCompile Include="preferences\media_preview_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
     <ClCompile Include="preferences\path_copy_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
     <ClCompile Include="preferences\text_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
+    <ClCompile Include="preferences\update_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
     <ClCompile Include="preferences\window_preferences.cpp"><Filter>Preferences</Filter></ClCompile>
     <ClCompile Include="preferences\window_size_store.cpp"><Filter>Preferences</Filter></ClCompile>
     <ClCompile Include="preview\archive_provider.cpp"><Filter>Preview</Filter></ClCompile>

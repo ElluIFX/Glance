@@ -1,6 +1,7 @@
 #include "input_decision.h"
 #include "glance/contracts/component_api.h"
 #include "glance/contracts/ipc_protocol.h"
+#include "glance/contracts/network_protocol.h"
 #include "glance/contracts/source_api.h"
 #include "gallery_navigation.h"
 #include "footer_preferences.h"
@@ -8,6 +9,7 @@
 #include "pan_interaction.h"
 #include "paged_document_render_client.h"
 #include "text_font_fallback.h"
+#include "update_preferences.h"
 #include "../../src/version.h"
 
 #include <array>
@@ -494,6 +496,153 @@ int main()
     expect(
         glance::contracts::process_watchdog_connect_grace_ms >= 10000,
         "watchdog keeps a long connection grace for slow startup");
+
+    const glance::app::UpdatePreferences default_update_preferences;
+    expect(
+        default_update_preferences.automatic_check_enabled &&
+            default_update_preferences.frequency == glance::app::UpdateCheckFrequency::daily,
+        "automatic updates default to daily checks");
+    expect(
+        glance::app::update_check_interval_seconds(
+            glance::app::UpdateCheckFrequency::hourly) == 60ULL * 60ULL &&
+            glance::app::update_check_interval_seconds(
+                glance::app::UpdateCheckFrequency::daily) == 24ULL * 60ULL * 60ULL &&
+            glance::app::update_check_interval_seconds(
+                glance::app::UpdateCheckFrequency::weekly) == 7ULL * 24ULL * 60ULL * 60ULL &&
+            glance::app::update_check_interval_seconds(
+                glance::app::UpdateCheckFrequency::monthly) == 30ULL * 24ULL * 60ULL * 60ULL,
+        "automatic update intervals");
+
+    auto update_preferences = default_update_preferences;
+    expect(
+        glance::app::automatic_update_check_due(update_preferences, 1000),
+        "automatic update is due without a successful check");
+    update_preferences.last_successful_check = 1000;
+    expect(
+        !glance::app::automatic_update_check_due(
+            update_preferences,
+            1000 + 24ULL * 60ULL * 60ULL - 1) &&
+            glance::app::automatic_update_check_due(
+                update_preferences,
+                1000 + 24ULL * 60ULL * 60ULL),
+        "automatic update daily boundary");
+    update_preferences.retry_after = 1000 + 25ULL * 60ULL * 60ULL;
+    expect(
+        !glance::app::automatic_update_check_due(
+            update_preferences,
+            update_preferences.retry_after - 1) &&
+            glance::app::automatic_update_check_due(
+                update_preferences,
+                update_preferences.retry_after),
+        "automatic update retry boundary");
+    update_preferences.automatic_check_enabled = false;
+    expect(
+        !glance::app::automatic_update_check_due(update_preferences, UINT64_MAX),
+        "disabled automatic update never checks");
+    update_preferences.skipped_version = L"v2026.8.15";
+    expect(
+        glance::app::update_version_is_skipped(update_preferences, L"V2026.8.15") &&
+            !glance::app::update_version_is_skipped(update_preferences, L"v2026.8.16"),
+        "automatic update skips only the selected version");
+
+    using glance::contracts::UpdateCheckStatus;
+    expect(
+        glance::contracts::cached_update_result_is_newer(101, 100) &&
+            !glance::contracts::cached_update_result_is_newer(100, 100) &&
+            !glance::contracts::cached_update_result_is_newer(0, 0),
+        "Core update cache freshness");
+    expect(
+        glance::contracts::should_publish_automatic_update_result(
+            UpdateCheckStatus::update_available,
+            true) &&
+            !glance::contracts::should_publish_automatic_update_result(
+                UpdateCheckStatus::up_to_date,
+                false) &&
+            glance::contracts::should_publish_automatic_update_result(
+                UpdateCheckStatus::unavailable,
+                false),
+        "Core automatic update publication policy");
+
+    const glance::contracts::UpdateCheckRequest update_request{
+        42, 1234, true, L"2026.8.15" };
+    const auto encoded_update_request =
+        glance::contracts::encode_update_check_request(update_request);
+    const auto decoded_update_request =
+        glance::contracts::decode_update_check_request(encoded_update_request);
+    expect(
+        decoded_update_request && decoded_update_request->request_id == 42 &&
+            decoded_update_request->last_successful_check == 1234 &&
+            decoded_update_request->automatic &&
+            decoded_update_request->current_version == L"2026.8.15",
+        "update request IPC round trip");
+    expect(
+        !glance::contracts::decode_update_check_request(
+            std::string_view(encoded_update_request).substr(
+                0,
+                encoded_update_request.size() - 1)) &&
+            !glance::contracts::decode_update_check_request(
+                encoded_update_request + std::string(1, '\0')),
+        "update request IPC rejects malformed payloads");
+
+    glance::contracts::UpdateCheckResult available_update;
+    available_update.status = UpdateCheckStatus::update_available;
+    available_update.latest_version = L"v2026.8.16";
+    available_update.release_url = L"https://github.com/ElluIFX/Glance/releases/tag/v2026.8.16";
+    available_update.installer = {
+        L"2026.8.16",
+        L"Glance-Setup-2026.8.16-x64.exe",
+        L"https://github.com/ElluIFX/Glance/releases/download/v2026.8.16/Glance-Setup-2026.8.16-x64.exe",
+        std::wstring(64, L'a'),
+        123456 };
+    available_update.checked_at = 5678;
+    const auto decoded_update_response = glance::contracts::decode_update_check_response(
+        glance::contracts::encode_update_check_response({ 43, available_update }));
+    expect(
+        decoded_update_response && decoded_update_response->request_id == 43 &&
+            decoded_update_response->result.status == UpdateCheckStatus::update_available &&
+            decoded_update_response->result.installer.file_name ==
+                L"Glance-Setup-2026.8.16-x64.exe" &&
+            decoded_update_response->result.checked_at == 5678,
+        "update response IPC round trip");
+    const auto deferred_update = glance::contracts::encode_update_check_deferred(43);
+    expect(
+        glance::contracts::decode_update_check_deferred(deferred_update) == 43 &&
+            !glance::contracts::decode_update_check_deferred(
+                deferred_update + std::string(1, '\0')),
+        "deferred update IPC round trip");
+
+    const glance::contracts::NetworkDownloadMessage download_request{
+        44,
+        { L"https://example.com/file.zip", L"file.zip", std::wstring(64, L'b'), 2048 } };
+    const auto decoded_download_request = glance::contracts::decode_network_download_request(
+        glance::contracts::encode_network_download_request(download_request));
+    expect(
+        decoded_download_request && decoded_download_request->request_id == 44 &&
+            decoded_download_request->request.file_name == L"file.zip" &&
+            decoded_download_request->request.expected_size == 2048,
+        "download request IPC round trip");
+    const auto decoded_download_progress = glance::contracts::decode_network_download_progress(
+        glance::contracts::encode_network_download_progress({ 44, 1024, 2048 }));
+    expect(
+        decoded_download_progress && decoded_download_progress->request_id == 44 &&
+            decoded_download_progress->downloaded == 1024 &&
+            decoded_download_progress->total == 2048,
+        "download progress IPC round trip");
+    const auto decoded_download_response = glance::contracts::decode_network_download_response(
+        glance::contracts::encode_network_download_response(
+            { 44,
+              { glance::contracts::NetworkDownloadStatus::succeeded,
+                L"C:\\Temp\\Glance\\file.zip" } }));
+    expect(
+        decoded_download_response && decoded_download_response->request_id == 44 &&
+            decoded_download_response->result.status ==
+                glance::contracts::NetworkDownloadStatus::succeeded &&
+            decoded_download_response->result.path == L"C:\\Temp\\Glance\\file.zip",
+        "download response IPC round trip");
+    expect(
+        glance::contracts::decode_network_download_cancel(
+            glance::contracts::encode_network_download_cancel(44)) == 44,
+        "download cancellation IPC round trip");
 
     expect(!glance::app::zoom_allows_pan(1.0F), "fit zoom does not pan");
     expect(!glance::app::zoom_allows_pan(1.001F), "zoom tolerance does not pan");
