@@ -152,6 +152,62 @@ namespace
     constexpr std::uint32_t folder_thumbnail_pixel_size = 32;
     constexpr std::size_t thumbnail_update_batch_size = 8;
     constexpr auto web_view_idle_timeout = std::chrono::minutes(1);
+    constexpr auto fullscreen_chrome_interval = std::chrono::milliseconds(50);
+    constexpr ULONGLONG fullscreen_chrome_hide_delay_ms = 500;
+    constexpr int fullscreen_edge_reveal_dips = 4;
+    constexpr int fullscreen_title_height_dips = 40;
+    constexpr int fullscreen_footer_height_dips = 42;
+    constexpr wchar_t web_double_click_fullscreen_enabled[] =
+        L"glance:double-click-fullscreen:enabled";
+    constexpr wchar_t web_double_click_fullscreen_disabled[] =
+        L"glance:double-click-fullscreen:disabled";
+    constexpr wchar_t web_toggle_fullscreen[] = L"glance:toggle-fullscreen";
+    constexpr wchar_t web_double_click_fullscreen_script[] = LR"JS(
+(() => {
+  if (window.__glanceDoubleClickFullscreenInstalled) {
+    return;
+  }
+  window.__glanceDoubleClickFullscreenInstalled = true;
+  let enabled = false;
+  const interactiveTags = new Set([
+    "BUTTON", "INPUT", "TEXTAREA", "SELECT", "OPTION", "SUMMARY"
+  ]);
+  const interactiveRoles = new Set([
+    "button", "checkbox", "combobox", "link", "menuitem", "radio",
+    "slider", "spinbutton", "switch", "tab", "textbox"
+  ]);
+  window.chrome.webview.addEventListener("message", (event) => {
+    if (event.data === "glance:double-click-fullscreen:enabled") {
+      enabled = true;
+    } else if (event.data === "glance:double-click-fullscreen:disabled") {
+      enabled = false;
+    }
+  });
+  window.addEventListener("dblclick", (event) => {
+    if (!enabled || event.button !== 0) {
+      return;
+    }
+    const interactive = event.composedPath().some((node) => {
+      if (!(node instanceof Element)) {
+        return false;
+      }
+      if (interactiveTags.has(node.tagName) || node.isContentEditable) {
+        return true;
+      }
+      if (node.tagName === "A" && node.hasAttribute("href")) {
+        return true;
+      }
+      return interactiveRoles.has((node.getAttribute("role") || "").toLowerCase());
+    });
+    if (interactive) {
+      return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    window.chrome.webview.postMessage("glance:toggle-fullscreen");
+  }, true);
+})();
+)JS";
 
     std::optional<std::wstring> file_url_from_path(const std::wstring& path)
     {
@@ -792,15 +848,33 @@ namespace winrt::Glance::App::implementation
         ApplyAppearancePreferences();
         text_preferences_ = glance::app::load_text_preferences();
         footer_preferences_ = glance::app::load_footer_preferences();
+        ApplyWindowPreferences();
+        PreviewContentHost().AddHandler(
+            UIElement::DoubleTappedEvent(),
+            box_value<Input::DoubleTappedEventHandler>(
+                { this, &MainWindow::PreviewContentHost_DoubleTapped }),
+            true);
         configure_window();
         glance::contracts::log_event(L"MainWindow native configuration complete.");
+        fullscreen_chrome_timer_ = DispatcherTimer();
+        fullscreen_chrome_timer_.Interval(fullscreen_chrome_interval);
         media_timer_ = DispatcherTimer();
         media_timer_.Interval(std::chrono::milliseconds(250));
         const auto weak = get_weak();
         Closed([weak](IInspectable const&, WindowEventArgs const&) {
             if (const auto self = weak.get())
             {
+                if (self->fullscreen_chrome_timer_ != nullptr)
+                {
+                    self->fullscreen_chrome_timer_.Stop();
+                }
                 self->acrylic_backdrop_.reset();
+            }
+        });
+        fullscreen_chrome_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
+            if (const auto self = weak.get())
+            {
+                self->update_fullscreen_chrome();
             }
         });
         media_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
@@ -1566,6 +1640,7 @@ namespace winrt::Glance::App::implementation
             PasswordPromptOverlay().ClearValue(Controls::Panel::BackgroundProperty());
         }
         update_media_surface_background();
+        update_fullscreen_chrome_surfaces();
     }
 
     void MainWindow::update_media_surface_background()
@@ -1597,6 +1672,7 @@ namespace winrt::Glance::App::implementation
         set_tooltip(PinButton(), L"PinButton.ToolTipService.ToolTip");
         set_tooltip(BackButton(), L"BackButton.ToolTipService.ToolTip");
         set_tooltip(ClosePreviewButton(), L"ClosePreviewButton.ToolTipService.ToolTip");
+        update_fullscreen_button();
         update_preview_mode_button();
         set_tooltip(
             GenericAdvancedInfoButton(),
@@ -1809,6 +1885,28 @@ namespace winrt::Glance::App::implementation
         request_footer_access_if_needed();
     }
 
+    void MainWindow::ApplyWindowPreferences()
+    {
+        double_click_fullscreen_enabled_ =
+            glance::app::load_window_preferences().double_click_fullscreen;
+        try
+        {
+            if (web_preview_ != nullptr)
+            {
+                if (const auto core = web_preview_.CoreWebView2())
+                {
+                    core.PostWebMessageAsString(
+                        double_click_fullscreen_enabled_
+                            ? web_double_click_fullscreen_enabled
+                            : web_double_click_fullscreen_disabled);
+                }
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
     void MainWindow::configure_window()
     {
         glance::contracts::log_event(L"Resolving the native window handle.");
@@ -1854,6 +1952,250 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"Assigning the window title.");
         const std::wstring window_title = glance::app::localize(L"AppName");
         SetWindowTextW(window_, window_title.c_str());
+    }
+
+    void MainWindow::set_fullscreen(bool enabled) noexcept
+    {
+        if (window_ == nullptr || fullscreen_ == enabled)
+        {
+            update_fullscreen_button();
+            return;
+        }
+
+        if (enabled)
+        {
+            fullscreen_restore_placement_ = WINDOWPLACEMENT{ sizeof(WINDOWPLACEMENT) };
+            fullscreen_restore_placement_valid_ =
+                GetWindowPlacement(window_, &fullscreen_restore_placement_) != FALSE;
+            try
+            {
+                AppWindow().SetPresenter(
+                    Microsoft::UI::Windowing::AppWindowPresenterKind::FullScreen);
+            }
+            catch (const hresult_error& error)
+            {
+                glance::contracts::log_event(
+                    L"Unable to enter full screen: " + std::wstring(error.message()));
+                fullscreen_restore_placement_valid_ = false;
+                update_fullscreen_button();
+                return;
+            }
+
+            fullscreen_ = true;
+            Grid::SetRow(PreviewContentHost(), 0);
+            Grid::SetRowSpan(PreviewContentHost(), 3);
+            update_fullscreen_chrome_surfaces();
+            set_fullscreen_chrome_visibility(false, false);
+            fullscreen_title_hover_tick_ = 0;
+            fullscreen_footer_hover_tick_ = 0;
+            if (fullscreen_chrome_timer_ != nullptr)
+            {
+                fullscreen_chrome_timer_.Start();
+            }
+        }
+        else
+        {
+            try
+            {
+                AppWindow().SetPresenter(
+                    Microsoft::UI::Windowing::AppWindowPresenterKind::Default);
+                if (const auto presenter = AppWindow().Presenter().try_as<
+                        Microsoft::UI::Windowing::OverlappedPresenter>())
+                {
+                    presenter.IsMinimizable(false);
+                    presenter.IsMaximizable(true);
+                    presenter.SetBorderAndTitleBar(true, false);
+                }
+            }
+            catch (const hresult_error& error)
+            {
+                glance::contracts::log_event(
+                    L"Unable to exit full screen: " + std::wstring(error.message()));
+                update_fullscreen_button();
+                return;
+            }
+
+            fullscreen_ = false;
+            if (fullscreen_chrome_timer_ != nullptr)
+            {
+                fullscreen_chrome_timer_.Stop();
+            }
+            Grid::SetRow(PreviewContentHost(), 1);
+            Grid::SetRowSpan(PreviewContentHost(), 1);
+            set_fullscreen_chrome_visibility(true, true);
+            update_fullscreen_chrome_surfaces();
+
+            if (fullscreen_restore_placement_valid_)
+            {
+                auto placement = fullscreen_restore_placement_;
+                if (!visible_)
+                {
+                    placement.showCmd = SW_HIDE;
+                }
+                static_cast<void>(SetWindowPlacement(window_, &placement));
+            }
+            fullscreen_restore_placement_valid_ = false;
+            set_topmost(topmost_);
+        }
+
+        update_fullscreen_button();
+        queue_text_editor_occlusion_update();
+        static_cast<void>(DispatcherQueue().TryEnqueue([weak = get_weak()] {
+            if (const auto self = weak.get())
+            {
+                self->update_text_editor_bounds();
+            }
+        }));
+    }
+
+    void MainWindow::update_fullscreen_button()
+    {
+        FullscreenButton().IsChecked(fullscreen_);
+        FullscreenIcon().Glyph(fullscreen_ ? L"\xE73F" : L"\xE740");
+        ToolTipService::SetToolTip(
+            FullscreenButton(),
+            box_value(glance::app::localize(
+                fullscreen_ ? L"ExitFullscreenToolTip" : L"EnterFullscreenToolTip")));
+    }
+
+    void MainWindow::update_fullscreen_chrome_surfaces()
+    {
+        if (!fullscreen_)
+        {
+            PreviewTitleBar().ClearValue(Panel::BackgroundProperty());
+            PreviewFooterBar().ClearValue(Panel::BackgroundProperty());
+            return;
+        }
+
+        const auto resource_key = acrylic_enabled_
+            ? L"AcrylicInAppFillColorBaseBrush"
+            : L"SolidBackgroundFillColorBaseBrush";
+        const auto brush = Application::Current().Resources().Lookup(
+            box_value(resource_key)).as<Media::Brush>();
+        PreviewTitleBar().Background(brush);
+        PreviewFooterBar().Background(brush);
+    }
+
+    void MainWindow::set_fullscreen_chrome_visibility(
+        bool title_visible,
+        bool footer_visible)
+    {
+        if (!fullscreen_)
+        {
+            title_visible = true;
+            footer_visible = true;
+        }
+        if (fullscreen_title_visible_ == title_visible &&
+            fullscreen_footer_visible_ == footer_visible)
+        {
+            return;
+        }
+
+        fullscreen_title_visible_ = title_visible;
+        fullscreen_footer_visible_ = footer_visible;
+        PreviewTitleBar().Opacity(title_visible ? 1.0 : 0.0);
+        PreviewTitleBar().IsHitTestVisible(title_visible);
+        PreviewFooterBar().Opacity(footer_visible ? 1.0 : 0.0);
+        PreviewFooterBar().IsHitTestVisible(footer_visible);
+        queue_text_editor_occlusion_update();
+    }
+
+    void MainWindow::update_fullscreen_chrome() noexcept
+    {
+        if (!fullscreen_ || window_ == nullptr)
+        {
+            return;
+        }
+
+        const ULONGLONG now = GetTickCount64();
+        POINT cursor{};
+        RECT client{};
+        bool cursor_over_window = false;
+        if (GetCursorPos(&cursor) && GetClientRect(window_, &client))
+        {
+            const HWND target = WindowFromPoint(cursor);
+            cursor_over_window = target == window_ ||
+                (target != nullptr &&
+                    (IsChild(window_, target) ||
+                     GetAncestor(target, GA_ROOTOWNER) == window_));
+            if (cursor_over_window)
+            {
+                ScreenToClient(window_, &cursor);
+                const int dpi = static_cast<int>(GetDpiForWindow(window_));
+                const int edge = MulDiv(fullscreen_edge_reveal_dips, dpi, 96);
+                const int title_height = MulDiv(fullscreen_title_height_dips, dpi, 96);
+                const int footer_height = MulDiv(fullscreen_footer_height_dips, dpi, 96);
+                const bool inside = cursor.x >= client.left && cursor.x < client.right &&
+                    cursor.y >= client.top && cursor.y < client.bottom;
+                if (inside &&
+                    cursor.y <= (fullscreen_title_visible_ ? title_height : edge))
+                {
+                    fullscreen_title_hover_tick_ = now;
+                }
+                if (inside &&
+                    cursor.y >= client.bottom -
+                        (fullscreen_footer_visible_ ? footer_height : edge))
+                {
+                    fullscreen_footer_hover_tick_ = now;
+                }
+            }
+        }
+
+        const bool title_visible = fullscreen_title_hover_tick_ != 0 &&
+            now - fullscreen_title_hover_tick_ <= fullscreen_chrome_hide_delay_ms;
+        const bool footer_visible = fullscreen_footer_hover_tick_ != 0 &&
+            now - fullscreen_footer_hover_tick_ <= fullscreen_chrome_hide_delay_ms;
+        set_fullscreen_chrome_visibility(title_visible, footer_visible);
+    }
+
+    bool MainWindow::handle_preview_content_double_click()
+    {
+        if (!visible_ || !double_click_fullscreen_enabled_ ||
+            password_prompt_target_ != PasswordPromptTarget::none ||
+            fullscreen_toggle_pending_)
+        {
+            return false;
+        }
+
+        fullscreen_toggle_pending_ = true;
+        const bool queued = DispatcherQueue().TryEnqueue([weak = get_weak()] {
+            if (const auto self = weak.get())
+            {
+                self->fullscreen_toggle_pending_ = false;
+                if (self->visible_ && self->double_click_fullscreen_enabled_ &&
+                    self->password_prompt_target_ == PasswordPromptTarget::none)
+                {
+                    self->set_fullscreen(!self->fullscreen_);
+                }
+            }
+        });
+        if (!queued)
+        {
+            fullscreen_toggle_pending_ = false;
+        }
+        return queued;
+    }
+
+    bool MainWindow::is_interactive_preview_source(IInspectable const& source)
+    {
+        auto current = source.try_as<DependencyObject>();
+        const auto host = PreviewContentHost();
+        while (current != nullptr && get_abi(current) != get_abi(host))
+        {
+            if (current.try_as<Controls::Primitives::ButtonBase>() != nullptr ||
+                current.try_as<Controls::Primitives::RangeBase>() != nullptr ||
+                current.try_as<Controls::Primitives::SelectorItem>() != nullptr ||
+                current.try_as<TextBox>() != nullptr ||
+                current.try_as<PasswordBox>() != nullptr ||
+                current.try_as<RichEditBox>() != nullptr ||
+                current.try_as<ToggleSwitch>() != nullptr ||
+                current.try_as<TreeViewItem>() != nullptr)
+            {
+                return true;
+            }
+            current = Media::VisualTreeHelper::GetParent(current);
+        }
+        return false;
     }
 
     LRESULT CALLBACK MainWindow::window_subclass(
@@ -1933,6 +2275,10 @@ namespace winrt::Glance::App::implementation
             self->release_web_view_control();
             RemoveWindowSubclass(window, window_subclass, 1);
             self->stop_detached_focus_monitor();
+            if (self->fullscreen_chrome_timer_ != nullptr)
+            {
+                self->fullscreen_chrome_timer_.Stop();
+            }
             if (self->media_timer_ != nullptr)
             {
                 self->media_timer_.Stop();
@@ -2035,6 +2381,7 @@ namespace winrt::Glance::App::implementation
         visible_ = false;
         defer_auto_fit_show_ = false;
         ShowWindow(window_, SW_HIDE);
+        set_fullscreen(false);
         clear_preview_content();
         reset_hidden_window_size();
         state_ = glance::contracts::PreviewWindowState::hidden;
@@ -2089,6 +2436,11 @@ namespace winrt::Glance::App::implementation
 
     bool MainWindow::NavigateBack()
     {
+        if (fullscreen_)
+        {
+            set_fullscreen(false);
+            return true;
+        }
         if (preview_navigation_.empty() || current_index_ >= files_.size())
         {
             return false;
@@ -2355,6 +2707,11 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::position_initial_window(bool ignore_saved_size)
     {
+        if (fullscreen_)
+        {
+            reveal_deferred_preview();
+            return;
+        }
         const auto preferences = glance::app::load_window_preferences();
         const auto storage_kind = basic_info_mode_ ? content_preview_kind_ : current_kind_;
         const HWND reference_window = source_window_ != nullptr
@@ -2480,7 +2837,7 @@ namespace winrt::Glance::App::implementation
     bool MainWindow::auto_fit_applies(bool dynamic_update) const noexcept
     {
         const auto preferences = glance::app::load_window_preferences();
-        if (topmost_ || user_sized_ || !preferences.auto_fit_media ||
+        if (fullscreen_ || topmost_ || user_sized_ || !preferences.auto_fit_media ||
             (dynamic_update && !preferences.dynamic_auto_fit) ||
             (current_index_ < files_.size() &&
                 glance::app::auto_fit_ignores_path(preferences, files_[current_index_].path)))
@@ -2619,7 +2976,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::save_current_window_placement() const noexcept
     {
-        if (!visible_ || window_ == nullptr || IsZoomed(window_) || detached_ ||
+        if (!visible_ || fullscreen_ || window_ == nullptr || IsZoomed(window_) || detached_ ||
             (pinned_ && topmost_))
         {
             return;
@@ -5283,7 +5640,7 @@ namespace winrt::Glance::App::implementation
             const auto environment =
                 co_await glance::app::shared_webview_environment_async();
             co_await web_view.EnsureCoreWebView2Async(environment);
-            configure_web_view_core(web_view.CoreWebView2());
+            co_await configure_web_view_core(web_view.CoreWebView2());
             web_view_ready_ = true;
             web_view_initializing_ = false;
             if (current_text_markdown_ && web_preview_available_ &&
@@ -5376,7 +5733,7 @@ namespace winrt::Glance::App::implementation
             const auto environment =
                 co_await glance::app::shared_webview_environment_async();
             co_await web_view.EnsureCoreWebView2Async(environment);
-            configure_web_view_core(web_view.CoreWebView2());
+            co_await configure_web_view_core(web_view.CoreWebView2());
             web_view_ready_ = true;
             if (generation != content_generation_ ||
                 current_kind_ != glance::app::PreviewKind::web)
@@ -5453,17 +5810,22 @@ namespace winrt::Glance::App::implementation
         return web_preview_;
     }
 
-    void MainWindow::configure_web_view_core(
+    Windows::Foundation::IAsyncAction MainWindow::configure_web_view_core(
         Microsoft::Web::WebView2::Core::CoreWebView2 const& core)
     {
+        const auto lifetime = get_strong();
+        static_cast<void>(lifetime);
         const auto settings = core.Settings();
         settings.AreDefaultContextMenusEnabled(false);
         settings.AreDevToolsEnabled(false);
         settings.IsStatusBarEnabled(false);
         if (web_view_handlers_registered_)
         {
-            return;
+            co_return;
         }
+
+        co_await core.AddScriptToExecuteOnDocumentCreatedAsync(
+            web_double_click_fullscreen_script);
 
         const auto weak = get_weak();
         core.NavigationStarting(
@@ -5476,7 +5838,7 @@ namespace winrt::Glance::App::implementation
                 }
             });
         core.ContentLoading(
-            [weak](auto const&, auto const& args) {
+            [weak](auto const& sender, auto const& args) {
                 const auto self = weak.get();
                 if (self == nullptr ||
                     self->web_navigation_generation_ != self->content_generation_ ||
@@ -5487,6 +5849,10 @@ namespace winrt::Glance::App::implementation
                 }
 
                 self->web_content_ready_ = true;
+                sender.PostWebMessageAsString(
+                    self->double_click_fullscreen_enabled_
+                        ? web_double_click_fullscreen_enabled
+                        : web_double_click_fullscreen_disabled);
                 self->web_preview_.Opacity(1.0);
                 self->WebPreviewHost().Visibility(
                     self->markdown_preview_ ? Visibility::Visible : Visibility::Collapsed);
@@ -5515,9 +5881,15 @@ namespace winrt::Glance::App::implementation
                 {
                     try
                     {
+                        const std::wstring message =
+                            args.TryGetWebMessageAsString().c_str();
+                        if (message == web_toggle_fullscreen)
+                        {
+                            static_cast<void>(self->handle_preview_content_double_click());
+                            return;
+                        }
                         glance::contracts::log_event(
-                            L"Web preview: " +
-                            std::wstring(args.TryGetWebMessageAsString()));
+                            L"Web preview: " + message);
                     }
                     catch (...)
                     {
@@ -5657,6 +6029,13 @@ namespace winrt::Glance::App::implementation
                 {
                     self->adjust_text_font_size(steps);
                 }
+            },
+            [weak] {
+                if (const auto self = weak.get())
+                {
+                    return self->handle_preview_content_double_click();
+                }
+                return false;
             });
         if (!text_editor_->available())
         {
@@ -5733,6 +6112,14 @@ namespace winrt::Glance::App::implementation
             if (PreviewErrorInfoBar().IsOpen())
             {
                 append(PreviewErrorInfoBar());
+            }
+            if (fullscreen_ && fullscreen_title_visible_)
+            {
+                append(PreviewTitleBar());
+            }
+            if (fullscreen_ && fullscreen_footer_visible_)
+            {
+                append(PreviewFooterBar());
             }
             append(TextFontSizeOverlay());
             text_editor_->set_occlusions(rectangles);
@@ -6641,6 +7028,11 @@ namespace winrt::Glance::App::implementation
         present_generic(file, false, true);
     }
 
+    void MainWindow::FullscreenButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        set_fullscreen(!fullscreen_);
+    }
+
     void MainWindow::ClosePreviewButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         if (detached_)
@@ -6810,6 +7202,22 @@ namespace winrt::Glance::App::implementation
         DoubleTappedRoutedEventArgs const& args)
     {
         if (ActivateSelectedFolderEntry())
+        {
+            args.Handled(true);
+        }
+    }
+
+    void MainWindow::PreviewContentHost_DoubleTapped(
+        IInspectable const&,
+        DoubleTappedRoutedEventArgs const& args)
+    {
+        if (args.Handled() ||
+            WebPreviewHost().Visibility() == Visibility::Visible ||
+            is_interactive_preview_source(args.OriginalSource()))
+        {
+            return;
+        }
+        if (handle_preview_content_double_click())
         {
             args.Handled(true);
         }

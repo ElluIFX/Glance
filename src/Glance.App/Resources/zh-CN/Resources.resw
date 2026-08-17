@@ -75,6 +75,8 @@
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>钉住文件</value></data>
   <data name="BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>返回上一级</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>关闭预览</value></data>
+  <data name="EnterFullscreenToolTip" xml:space="preserve"><value>进入全屏</value></data>
+  <data name="ExitFullscreenToolTip" xml:space="preserve"><value>退出全屏</value></data>
   <data name="PreviewModeShowInfoTooltip" xml:space="preserve"><value>显示基础信息</value></data>
   <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>显示内容预览</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>加载文件</value></data>
@@ -156,6 +158,8 @@
   <data name="AutoFitIgnoredExtensionsTextBox.PlaceholderText" xml:space="preserve"><value>.gif; webp; mp4</value></data>
   <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>记忆窗口位置</value></data>
   <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>按预览类型保存窗口中心相对屏幕中心的偏移</value></data>
+  <data name="DoubleClickFullscreenLabel.Text" xml:space="preserve"><value>双击全屏</value></data>
+  <data name="DoubleClickFullscreenDescription.Text" xml:space="preserve"><value>双击预览内容以切换全屏模式</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>重置</value></data>
   <data name="AcrylicOpacityLabel.Text" xml:space="preserve"><value>亚克力不透明度</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>媒体预览</value></data>

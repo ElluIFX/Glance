@@ -14,10 +14,18 @@
             <RowDefinition Height="42" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Padding="12,0,6,0">
+        <Grid
+            x:Name="PreviewTitleBar"
+            Grid.Row="0"
+            Padding="12,0,6,0"
+            Canvas.ZIndex="100">
+            <Grid.OpacityTransition>
+                <ScalarTransition Duration="0:0:0.15" />
+            </Grid.OpacityTransition>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -74,10 +82,23 @@
                 ToolTipService.ToolTip="Always visible">
                 <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE74A;" />
             </ToggleButton>
+            <ToggleButton
+                x:Name="FullscreenButton"
+                Grid.Column="5"
+                Style="{StaticResource IconToggleButtonStyle}"
+                Margin="4,0,0,0"
+                Click="FullscreenButton_Click"
+                ToolTipService.ToolTip="Enter full screen">
+                <FontIcon
+                    x:Name="FullscreenIcon"
+                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                    FontSize="16"
+                    Glyph="&#xE740;" />
+            </ToggleButton>
             <Button
                 x:Name="ClosePreviewButton"
                 x:Uid="ClosePreviewButton"
-                Grid.Column="5"
+                Grid.Column="6"
                 Style="{StaticResource IconButtonStyle}"
                 Margin="4,0,0,0"
                 Click="ClosePreviewButton_Click"
@@ -86,7 +107,9 @@
             </Button>
         </Grid>
 
-        <Grid Grid.Row="1">
+        <Grid
+            x:Name="PreviewContentHost"
+            Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="FileListColumn" Width="0" />
                 <ColumnDefinition Width="*" />
@@ -772,7 +795,14 @@
             </Grid>
         </Grid>
 
-        <Grid Grid.Row="2" Padding="12,0">
+        <Grid
+            x:Name="PreviewFooterBar"
+            Grid.Row="2"
+            Padding="12,0"
+            Canvas.ZIndex="100">
+            <Grid.OpacityTransition>
+                <ScalarTransition Duration="0:0:0.15" />
+            </Grid.OpacityTransition>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

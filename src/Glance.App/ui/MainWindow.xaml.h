@@ -68,6 +68,7 @@ namespace winrt::Glance::App::implementation
         void ApplyLocalizedResources();
         void ApplyTextPreferences();
         void ApplyFooterPreferences();
+        void ApplyWindowPreferences();
         void RefreshComponentContributions();
         void HandleGalleryResponse(std::string_view payload);
         void HandleGalleryDisconnect();
@@ -75,6 +76,7 @@ namespace winrt::Glance::App::implementation
 
         void TopmostButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PreviewModeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void FullscreenButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ClosePreviewButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void BackButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PinButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -85,6 +87,9 @@ namespace winrt::Glance::App::implementation
         void WordWrapButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ArchiveHeaderButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void FolderEntryList_DoubleTapped(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::DoubleTappedRoutedEventArgs const&);
+        void PreviewContentHost_DoubleTapped(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::DoubleTappedRoutedEventArgs const&);
         void EncodingOption_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -242,6 +247,14 @@ namespace winrt::Glance::App::implementation
             UINT_PTR subclass_id,
             DWORD_PTR reference_data) noexcept;
         void configure_window();
+        void set_fullscreen(bool enabled) noexcept;
+        void update_fullscreen_button();
+        void update_fullscreen_chrome() noexcept;
+        void update_fullscreen_chrome_surfaces();
+        void set_fullscreen_chrome_visibility(bool title_visible, bool footer_visible);
+        [[nodiscard]] bool handle_preview_content_double_click();
+        [[nodiscard]] bool is_interactive_preview_source(
+            IInspectable const& source);
         void position_initial_window(bool ignore_saved_size = false);
         [[nodiscard]] bool should_defer_auto_fit_show(
             glance::app::PreviewKind kind) const noexcept;
@@ -426,7 +439,7 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget render_markdown_async(std::wstring html, std::uint64_t generation);
         winrt::fire_and_forget render_web_document_async(std::wstring path, std::uint64_t generation);
         Microsoft::UI::Xaml::Controls::WebView2 ensure_web_view_control();
-        void configure_web_view_core(
+        winrt::Windows::Foundation::IAsyncAction configure_web_view_core(
             Microsoft::Web::WebView2::Core::CoreWebView2 const& core);
         void clear_web_resource_mappings(
             Microsoft::Web::WebView2::Core::CoreWebView2 const& core) noexcept;
@@ -542,6 +555,11 @@ namespace winrt::Glance::App::implementation
         std::uint64_t source_capabilities_{};
         HWND foreground_when_unpinned_{};
         bool visible_{};
+        bool fullscreen_{};
+        bool fullscreen_title_visible_{ true };
+        bool fullscreen_footer_visible_{ true };
+        bool double_click_fullscreen_enabled_{};
+        bool fullscreen_toggle_pending_{};
         bool topmost_{};
         bool pinned_{};
         bool detached_{};
@@ -549,6 +567,10 @@ namespace winrt::Glance::App::implementation
         bool user_sized_{};
         bool tracking_move_size_{};
         RECT move_size_start_bounds_{};
+        WINDOWPLACEMENT fullscreen_restore_placement_{ sizeof(WINDOWPLACEMENT) };
+        bool fullscreen_restore_placement_valid_{};
+        ULONGLONG fullscreen_title_hover_tick_{};
+        ULONGLONG fullscreen_footer_hover_tick_{};
         bool line_numbers_visible_{ true };
         bool syntax_highlighting_{ true };
         bool word_wrap_{ true };
@@ -678,6 +700,7 @@ namespace winrt::Glance::App::implementation
         int media_seek_wheel_delta_{};
         int media_volume_wheel_delta_{};
         Microsoft::UI::Xaml::DispatcherTimer focus_timer_{ nullptr };
+        Microsoft::UI::Xaml::DispatcherTimer fullscreen_chrome_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer media_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer copy_feedback_timer_{ nullptr };
         Microsoft::UI::Xaml::Controls::FontIcon copy_feedback_icon_{ nullptr };

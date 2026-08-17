@@ -15,11 +15,13 @@ namespace glance::app
     public:
         using NearEndCallback = std::function<void()>;
         using FontZoomCallback = std::function<void(int)>;
+        using DoubleClickCallback = std::function<bool()>;
 
         ScintillaTextView(
             HWND parent,
             NearEndCallback near_end_callback,
-            FontZoomCallback font_zoom_callback);
+            FontZoomCallback font_zoom_callback,
+            DoubleClickCallback double_click_callback);
         ~ScintillaTextView();
 
         ScintillaTextView(const ScintillaTextView&) = delete;
@@ -75,6 +77,7 @@ namespace glance::app
         HWND editor_{};
         NearEndCallback near_end_callback_;
         FontZoomCallback font_zoom_callback_;
+        DoubleClickCallback double_click_callback_;
         std::wstring error_;
         std::wstring path_;
         std::string lexer_name_;

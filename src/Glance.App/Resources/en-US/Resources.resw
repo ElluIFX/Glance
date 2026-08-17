@@ -75,6 +75,8 @@
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>Pin file</value></data>
   <data name="BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
   <data name="ClosePreviewButton.ToolTipService.ToolTip" xml:space="preserve"><value>Close preview</value></data>
+  <data name="EnterFullscreenToolTip" xml:space="preserve"><value>Enter full screen</value></data>
+  <data name="ExitFullscreenToolTip" xml:space="preserve"><value>Exit full screen</value></data>
   <data name="PreviewModeShowInfoTooltip" xml:space="preserve"><value>Show basic information</value></data>
   <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>Show content preview</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>Load file</value></data>
@@ -156,6 +158,8 @@
   <data name="AutoFitIgnoredExtensionsTextBox.PlaceholderText" xml:space="preserve"><value>.gif; webp; mp4</value></data>
   <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>Remember window position</value></data>
   <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>Remember the window center offset for each preview type</value></data>
+  <data name="DoubleClickFullscreenLabel.Text" xml:space="preserve"><value>Double-click full screen</value></data>
+  <data name="DoubleClickFullscreenDescription.Text" xml:space="preserve"><value>Double-click preview content to toggle full screen</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>Reset</value></data>
   <data name="AcrylicOpacityLabel.Text" xml:space="preserve"><value>Acrylic opacity</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>Media preview</value></data>

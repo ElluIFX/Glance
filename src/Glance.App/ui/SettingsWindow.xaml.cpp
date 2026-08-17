@@ -404,6 +404,7 @@ namespace winrt::Glance::App::implementation
         AdaptiveMaximumPercentNumberBox().Value(window_preferences_.adaptive_maximum_percent);
         AutoFitIgnoredExtensionsTextBox().Text(window_preferences_.auto_fit_ignored_extensions);
         RememberWindowPositionToggle().IsOn(window_preferences_.remember_position);
+        DoubleClickFullscreenToggle().IsOn(window_preferences_.double_click_fullscreen);
         media_preview_preferences_ = glance::app::load_media_preview_preferences();
         DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
         DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
@@ -481,6 +482,7 @@ namespace winrt::Glance::App::implementation
         AppearanceChangedCallback appearance_changed_callback,
         TextPreferencesChangedCallback text_preferences_changed_callback,
         FooterPreferencesChangedCallback footer_preferences_changed_callback,
+        WindowPreferencesChangedCallback window_preferences_changed_callback,
         ComponentChangedCallback component_changed_callback,
         SourceStatusRequestCallback source_status_request_callback,
         UpdateCheckCallback update_check_callback,
@@ -491,6 +493,7 @@ namespace winrt::Glance::App::implementation
         appearance_changed_callback_ = std::move(appearance_changed_callback);
         text_preferences_changed_callback_ = std::move(text_preferences_changed_callback);
         footer_preferences_changed_callback_ = std::move(footer_preferences_changed_callback);
+        window_preferences_changed_callback_ = std::move(window_preferences_changed_callback);
         component_changed_callback_ = std::move(component_changed_callback);
         source_status_request_callback_ = std::move(source_status_request_callback);
         update_check_callback_ = std::move(update_check_callback);
@@ -755,6 +758,10 @@ namespace winrt::Glance::App::implementation
         set_text(RememberWindowPositionLabel(), L"RememberWindowPositionLabel.Text");
         set_text(RememberWindowPositionDescription(), L"RememberWindowPositionDescription.Text");
         set_content(ResetWindowPositionsButton(), L"ResetWindowPositionsButton.Content");
+        set_text(DoubleClickFullscreenLabel(), L"DoubleClickFullscreenLabel.Text");
+        set_text(
+            DoubleClickFullscreenDescription(),
+            L"DoubleClickFullscreenDescription.Text");
         set_text(AcrylicOpacityLabel(), L"AcrylicOpacityLabel.Text");
         set_text(MediaPreviewPageTitle(), L"MediaPreviewPageTitle.Text");
         set_text(MediaPreviewPageDescription(), L"MediaPreviewPageDescription.Text");
@@ -1395,8 +1402,13 @@ namespace winrt::Glance::App::implementation
             window_preferences_.show_after_auto_fit = ShowAfterAutoFitToggle().IsOn();
             window_preferences_.dynamic_auto_fit = DynamicAutoFitToggle().IsOn();
             window_preferences_.remember_position = RememberWindowPositionToggle().IsOn();
+            window_preferences_.double_click_fullscreen = DoubleClickFullscreenToggle().IsOn();
             update_auto_fit_dependency(true);
             glance::app::save_window_preferences(window_preferences_);
+            if (window_preferences_changed_callback_)
+            {
+                window_preferences_changed_callback_();
+            }
         }
     }
 

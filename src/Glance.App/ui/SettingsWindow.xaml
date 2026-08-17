@@ -478,6 +478,18 @@
                                     <ToggleSwitch x:Name="RememberWindowPositionToggle" Toggled="WindowPreferenceToggle_Toggled" />
                                 </StackPanel>
                             </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="DoubleClickFullscreenLabel" x:Uid="DoubleClickFullscreenLabel" Text="Double-click full screen" />
+                                    <TextBlock x:Name="DoubleClickFullscreenDescription" x:Uid="DoubleClickFullscreenDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Double-click preview content to toggle full screen" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="DoubleClickFullscreenToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
+                            </Grid>
                         </StackPanel>
                         </Border>
                     </StackPanel>

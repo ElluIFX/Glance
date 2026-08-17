@@ -111,6 +111,7 @@ namespace glance::app
                 read_dword(L"AdaptiveMaximumPercent", 75), 10, 100),
             .auto_fit_ignored_extensions = read_string(L"AutoFitIgnoredExtensions"),
             .remember_position = read_dword(L"RememberPosition", 0) != 0,
+            .double_click_fullscreen = read_dword(L"DoubleClickFullscreen", 0) != 0,
         };
         preferences.adaptive_minimum_percent = std::min(
             preferences.adaptive_minimum_percent,
@@ -151,6 +152,10 @@ namespace glance::app
             std::clamp<std::uint32_t>(preferences.adaptive_maximum_percent, 10, 100));
         write_string(key, L"AutoFitIgnoredExtensions", preferences.auto_fit_ignored_extensions);
         write_dword(key, L"RememberPosition", preferences.remember_position ? 1U : 0U);
+        write_dword(
+            key,
+            L"DoubleClickFullscreen",
+            preferences.double_click_fullscreen ? 1U : 0U);
         RegCloseKey(key);
     }
 

@@ -42,6 +42,7 @@ namespace winrt::Glance::App::implementation
         void apply_appearance_preferences();
         void apply_text_preferences();
         void apply_footer_preferences();
+        void apply_window_preferences();
         void request_automatic_update_check();
         void handle_automatic_update_result(
             std::optional<glance::contracts::UpdateCheckResult> result);

@@ -314,10 +314,12 @@ namespace glance::app
     ScintillaTextView::ScintillaTextView(
         HWND parent,
         NearEndCallback near_end_callback,
-        FontZoomCallback font_zoom_callback)
+        FontZoomCallback font_zoom_callback,
+        DoubleClickCallback double_click_callback)
         : parent_(parent),
           near_end_callback_(std::move(near_end_callback)),
-          font_zoom_callback_(std::move(font_zoom_callback))
+          font_zoom_callback_(std::move(font_zoom_callback)),
+          double_click_callback_(std::move(double_click_callback))
     {
         if (!load_scintilla())
         {
@@ -668,6 +670,11 @@ namespace glance::app
         DWORD_PTR reference_data) noexcept
     {
         auto* self = reinterpret_cast<ScintillaTextView*>(reference_data);
+        if (message == WM_LBUTTONDBLCLK && self != nullptr &&
+            self->double_click_callback_ && self->double_click_callback_())
+        {
+            return 0;
+        }
         if (message == WM_MOUSEWHEEL && self != nullptr &&
             (GET_KEYSTATE_WPARAM(wparam) & MK_CONTROL) != 0)
         {
