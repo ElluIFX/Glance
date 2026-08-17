@@ -4,6 +4,13 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.18] - 2026-08-18
+
+### Added
+
+- Added fullscreen preview with edge-triggered title and shortcut bars.
+- Added an optional setting to toggle fullscreen by double-clicking preview content.
+
 ## [2026.08.15.1] - 2026-08-15
 
 ### Added
