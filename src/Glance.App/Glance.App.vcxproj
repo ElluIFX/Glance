@@ -56,6 +56,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="preview\archive_provider.h" />
+    <ClInclude Include="preview\fullscreen_interaction.h" />
     <ClInclude Include="components\component_loader.h" />
     <ClInclude Include="application\core_network_client.h" />
     <ClInclude Include="preferences\footer_preferences.h" />

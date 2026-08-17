@@ -5,6 +5,7 @@
 #include "glance/contracts/source_api.h"
 #include "gallery_navigation.h"
 #include "footer_preferences.h"
+#include "fullscreen_interaction.h"
 #include "media_preview_preferences.h"
 #include "pan_interaction.h"
 #include "paged_document_render_client.h"
@@ -18,6 +19,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <ranges>
 #include <sstream>
 #include <string>
@@ -402,6 +404,361 @@ namespace
         return static_cast<bool>(output);
     }
 
+    void test_model3d_component(const std::filesystem::path& component_root)
+    {
+        using namespace glance::contracts::components;
+
+        const auto directory = component_root / L"model3d";
+        const auto component_path = directory / L"Glance.Model3DComponent.dll";
+        expect(std::filesystem::is_regular_file(component_path), "Model3D component DLL output");
+        for (const auto* payload : {
+                 L"component.json",
+                 L"resources.pri",
+                 L"three-LICENSE.txt",
+                 L"occt-import-js-LICENSE.md",
+                 L"web/cad.html",
+                 L"web/index.html",
+                 L"web/viewer.css",
+                 L"web/vendor/draco/draco_decoder.wasm",
+                 L"web/vendor/draco/draco_wasm_wrapper.js",
+                 L"web/vendor/occt/occt-import-js.wasm" })
+        {
+            expect(
+                std::filesystem::is_regular_file(directory / payload),
+                "Model3D component runtime output");
+        }
+
+        const HMODULE component = LoadLibraryExW(
+            component_path.c_str(),
+            nullptr,
+            LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                LOAD_LIBRARY_SEARCH_SYSTEM32);
+        expect(component != nullptr, "load Model3D component DLL");
+        if (component == nullptr)
+        {
+            return;
+        }
+
+        const auto get_api = reinterpret_cast<GetApiFunction>(
+            GetProcAddress(component, get_api_export));
+        ComponentApi api;
+        expect(
+            get_api != nullptr && get_api(abi_version, &api) != FALSE,
+            "Model3D component ABI negotiation");
+        if (get_api == nullptr || api.initialize == nullptr)
+        {
+            FreeLibrary(component);
+            return;
+        }
+
+        std::vector<std::wstring> extensions;
+        ComponentRegistrar registrar{
+            .context = &extensions,
+            .register_extension = collect_extension,
+            .register_renderer = accept_renderer };
+        ComponentRegistration registration;
+        const bool initialized = api.initialize(&registrar, &registration) != FALSE;
+        expect(initialized, "Model3D component registration");
+        if (!initialized)
+        {
+            FreeLibrary(component);
+            return;
+        }
+        const std::vector<std::wstring> expected_extensions{
+            L".stl", L".3mf", L".obj", L".ply", L".gltf", L".glb", L".fbx",
+            L".step", L".stp", L".iges", L".igs", L".brep", L".brp" };
+        expect(
+            std::wstring_view(registration.component_id) == L"model3d" &&
+                std::wstring_view(registration.target_app_version) == GLANCE_VERSION_WSTRING &&
+                registration.preferred_kind == PreviewContentKind::web &&
+                registration.preferred_format == PreviewContentFormat::html &&
+                extensions == expected_extensions,
+            "Model3D component registration contract");
+
+        ComponentStatusResult status;
+        expect(
+            api.query_status != nullptr &&
+                api.query_status(L"zh-CN", &status) != FALSE &&
+                status.severity == HealthSeverity::healthy &&
+                status.display_name[0] != L'\0' && status.detail[0] != L'\0',
+            "Model3D component localized status");
+        ComponentLoadingTextResult loading;
+        expect(
+            api.query_loading_text != nullptr &&
+                api.query_loading_text(L"C:\\sample.STL", L"zh-CN", &loading) != FALSE &&
+                std::wstring_view(loading.text) == L"正在加载 3D 模型..." &&
+                api.query_loading_text(L"C:\\sample.STEP", L"zh-CN", &loading) != FALSE &&
+                std::wstring_view(loading.text) == L"正在加载 CAD 模型...",
+            "Model3D component localized loading text");
+
+        void* interface_pointer{};
+        expect(
+            api.query_interface != nullptr &&
+                api.query_interface(
+                    &web_preview_api_id,
+                    web_preview_api_version,
+                    &interface_pointer) != FALSE &&
+                interface_pointer != nullptr,
+            "Model3D component web preview interface");
+        void* unsupported_interface = reinterpret_cast<void*>(1);
+        expect(
+            api.query_interface(
+                &web_preview_api_id,
+                web_preview_api_version + 1,
+                &unsupported_interface) == FALSE &&
+                unsupported_interface == nullptr,
+            "Model3D component rejects unsupported web preview version");
+
+        const auto test_directory = std::filesystem::temp_directory_path() /
+            (L"GlanceModel3DTests-" + std::to_wstring(GetCurrentProcessId()));
+        std::error_code cleanup_error;
+        std::filesystem::remove_all(test_directory, cleanup_error);
+        std::filesystem::create_directories(test_directory, cleanup_error);
+        const auto model_path = test_directory / L"sample model.STL";
+        expect(
+            !cleanup_error && write_bytes(model_path, {}),
+            "Model3D preview fixture");
+        if (interface_pointer != nullptr && std::filesystem::is_regular_file(model_path))
+        {
+            auto preview = std::make_unique<PreparedPreview>();
+            expect(
+                api.can_preview(model_path.c_str()) != FALSE &&
+                    api.prepare_preview(model_path.c_str(), L"en-US", preview.get()) ==
+                        PrepareStatus::success &&
+                    preview->kind == PreviewContentKind::web &&
+                    preview->format == PreviewContentFormat::html &&
+                    preview->lease_token != 0 &&
+                    std::filesystem::path(preview->path).filename() == L"index.html",
+                "Model3D component prepares standard web output");
+
+            WebPreviewOptions options;
+            options.color_scheme = PreviewColorScheme::dark;
+            auto descriptor = std::make_unique<WebPreviewDescriptor>();
+            const auto web_api = static_cast<const WebPreviewApi*>(interface_pointer);
+            expect(
+                web_api->query_preview(preview->lease_token, &options, descriptor.get()) != FALSE &&
+                    descriptor->mapping_count == 2 &&
+                    std::wstring_view(descriptor->navigation_uri).starts_with(
+                        L"https://glance-model-viewer.invalid/index.html?") &&
+                    std::wstring_view(descriptor->navigation_uri).find(L"sample%2520model.STL") !=
+                        std::wstring_view::npos &&
+                    std::wstring_view(descriptor->navigation_uri).find(L"theme=dark") !=
+                        std::wstring_view::npos &&
+                    std::wstring_view(descriptor->mappings[0].host_name) ==
+                        L"glance-model-viewer.invalid" &&
+                    descriptor->mappings[0].access_kind == WebResourceAccessKind::deny_cors &&
+                    std::wstring_view(descriptor->mappings[1].host_name) ==
+                        L"glance-model-source.invalid" &&
+                    descriptor->mappings[1].access_kind == WebResourceAccessKind::allow,
+                "Model3D component web preview descriptor");
+            api.release_preview(preview->lease_token);
+        }
+        expect(api.can_preview(L"C:\\missing.STL") == FALSE, "Model3D rejects missing files");
+        std::filesystem::remove_all(test_directory, cleanup_error);
+        api.shutdown();
+        FreeLibrary(component);
+    }
+
+    void test_media_info_component(const std::filesystem::path& component_root)
+    {
+        using namespace glance::contracts::components;
+
+        const auto directory = component_root / L"media-info";
+        const auto component_path = directory / L"Glance.MediaInfoComponent.dll";
+        expect(std::filesystem::is_regular_file(component_path), "MediaInfo component DLL output");
+        expect(
+            std::filesystem::is_regular_file(directory / L"component.json") &&
+                std::filesystem::is_regular_file(directory / L"resources.pri"),
+            "MediaInfo component runtime output");
+
+        const HMODULE component = LoadLibraryExW(
+            component_path.c_str(),
+            nullptr,
+            LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                LOAD_LIBRARY_SEARCH_SYSTEM32);
+        expect(component != nullptr, "load MediaInfo component DLL");
+        if (component == nullptr)
+        {
+            return;
+        }
+
+        const auto get_api = reinterpret_cast<GetApiFunction>(
+            GetProcAddress(component, get_api_export));
+        ComponentApi api;
+        expect(
+            get_api != nullptr && get_api(abi_version, &api) != FALSE,
+            "MediaInfo component ABI negotiation");
+        if (get_api == nullptr || api.initialize == nullptr)
+        {
+            FreeLibrary(component);
+            return;
+        }
+
+        std::vector<std::wstring> extensions;
+        ComponentRegistrar registrar{
+            .context = &extensions,
+            .register_extension = collect_extension,
+            .register_renderer = accept_renderer };
+        ComponentRegistration registration;
+        const bool initialized = api.initialize(&registrar, &registration) != FALSE;
+        expect(initialized, "MediaInfo component registration");
+        if (!initialized)
+        {
+            FreeLibrary(component);
+            return;
+        }
+        expect(
+            std::wstring_view(registration.component_id) == L"media-info" &&
+                std::wstring_view(registration.target_app_version) == GLANCE_VERSION_WSTRING &&
+                registration.preferred_kind == PreviewContentKind::none &&
+                registration.preferred_format == PreviewContentFormat::none &&
+                extensions.empty() && api.can_preview == nullptr &&
+                api.prepare_preview == nullptr && api.release_preview == nullptr,
+            "MediaInfo component auxiliary registration contract");
+
+        ComponentStatusResult status;
+        expect(
+            api.query_status != nullptr && api.query_status(L"zh-CN", &status) != FALSE &&
+                status.display_name[0] != L'\0' && status.detail[0] != L'\0',
+            "MediaInfo component localized status");
+        const bool ffprobe_available = status.capability_mask == 1;
+        expect(
+            status.capability_mask <= 1 &&
+                status.severity == (ffprobe_available
+                    ? HealthSeverity::healthy
+                    : HealthSeverity::error),
+            "MediaInfo component capability status");
+
+        const auto query_interface = [&api](
+                                         const GUID& id,
+                                         std::uint32_t version,
+                                         std::string_view name)
+        {
+            void* pointer{};
+            expect(
+                api.query_interface != nullptr &&
+                    api.query_interface(&id, version, &pointer) != FALSE &&
+                    pointer != nullptr,
+                name);
+            return pointer;
+        };
+        const auto hover = static_cast<const HoverInfoLayerApi*>(query_interface(
+            hover_info_layer_api_id,
+            hover_info_layer_api_version,
+            "MediaInfo component hover interface"));
+        const auto shortcuts = static_cast<const StatusBarShortcutApi*>(query_interface(
+            status_bar_shortcut_api_id,
+            status_bar_shortcut_api_version,
+            "MediaInfo component shortcut interface"));
+        const auto shortcut_data = static_cast<const StatusBarShortcutDataApi*>(query_interface(
+            status_bar_shortcut_data_api_id,
+            status_bar_shortcut_data_api_version,
+            "MediaInfo component shortcut data interface"));
+        const auto actions = static_cast<const ComponentManagementActionApi*>(query_interface(
+            component_management_action_api_id,
+            component_management_action_api_version,
+            "MediaInfo component management interface"));
+        expect(
+            hover != nullptr && hover->query_info != nullptr &&
+                shortcut_data != nullptr && shortcut_data->query_json != nullptr,
+            "MediaInfo component information callbacks");
+
+        if (shortcuts != nullptr)
+        {
+            std::uint32_t count{};
+            expect(
+                shortcuts->enumerate_shortcuts(L"zh-CN", nullptr, 0, &count) != FALSE &&
+                    count == 1,
+                "MediaInfo component shortcut count");
+            StatusBarShortcutDescriptor shortcut;
+            expect(
+                shortcuts->enumerate_shortcuts(L"zh-CN", &shortcut, 1, &count) != FALSE &&
+                    std::wstring_view(shortcut.shortcut_id) == L"advanced-media-info" &&
+                    shortcut.target_kind == PreviewContentKind::media &&
+                    shortcut.target_format == PreviewContentFormat::media_file &&
+                    shortcut.order == 500 && shortcut.fluent_icon_glyph == 0xe946 &&
+                    std::wstring_view(shortcut.tooltip).find(L'\n') != std::wstring_view::npos,
+                "MediaInfo component shortcut descriptor");
+            expect(
+                shortcuts->query_state(
+                    L"advanced-media-info",
+                    L"C:\\sample.mp4",
+                    PreviewContentKind::media,
+                    PreviewContentFormat::media_file) ==
+                    (ffprobe_available
+                        ? StatusBarShortcutState::ready
+                        : StatusBarShortcutState::setup_required) &&
+                    shortcuts->query_state(
+                        L"invalid",
+                        L"C:\\sample.mp4",
+                        PreviewContentKind::media,
+                        PreviewContentFormat::media_file) == StatusBarShortcutState::hidden,
+                "MediaInfo component shortcut state");
+
+            StatusBarShortcutActivationResult activation;
+            expect(
+                shortcuts->activate(
+                    L"advanced-media-info",
+                    L"C:\\sample.mp4",
+                    L"zh-CN",
+                    TRUE,
+                    &activation) != FALSE &&
+                    activation.activation == (ffprobe_available
+                        ? StatusBarShortcutActivation::toggle_hover_info
+                        : StatusBarShortcutActivation::request_component_action) &&
+                    (ffprobe_available
+                        ? std::wstring_view(activation.hover_info_id) ==
+                              L"advanced-media-info" && activation.checked != FALSE &&
+                              std::wstring_view(activation.loading_text).ends_with(L"...")
+                        : std::wstring_view(activation.component_action_id) ==
+                              L"prepare-ffprobe"),
+                "MediaInfo component shortcut activation");
+        }
+
+        if (actions != nullptr)
+        {
+            std::uint32_t count{};
+            expect(
+                actions->enumerate_actions(L"zh-CN", nullptr, 0, &count) != FALSE &&
+                    count == (ffprobe_available ? 0U : 1U),
+                "MediaInfo component management action count");
+            if (!ffprobe_available)
+            {
+                ComponentManagementActionDescriptor action;
+                expect(
+                    actions->enumerate_actions(L"zh-CN", &action, 1, &count) != FALSE &&
+                        std::wstring_view(action.action_id) == L"prepare-ffprobe" &&
+                        action.button_text[0] != L'\0' &&
+                        action.confirmation_message[0] != L'\0',
+                    "MediaInfo component management action descriptor");
+                ComponentDownloadRequest download;
+                expect(
+                    actions->prepare_action(L"prepare-ffprobe", L"zh-CN", &download) != FALSE &&
+                        std::wstring_view(download.url) ==
+                            L"https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.7z" &&
+                        std::wstring_view(download.file_name) ==
+                            L"ffmpeg-8.1.2-essentials_build.7z" &&
+                        std::wstring_view(download.sha256) ==
+                            L"e25b682664025d49034c981afb4bae36238a40f29a3cc1c713ad9a8b5b3528f6" &&
+                        download.expected_size == 33876939,
+                    "MediaInfo component download contract");
+            }
+        }
+
+        void* unsupported_interface = reinterpret_cast<void*>(1);
+        expect(
+            api.query_interface(
+                &status_bar_shortcut_api_id,
+                status_bar_shortcut_api_version + 1,
+                &unsupported_interface) == FALSE &&
+                unsupported_interface == nullptr,
+            "MediaInfo component rejects unsupported shortcut version");
+        api.shutdown();
+        FreeLibrary(component);
+    }
+
     std::vector<unsigned char> make_pdf_fixture()
     {
         std::string pdf = "%PDF-1.4\n";
@@ -453,6 +810,24 @@ int main()
     expect(!should_capture_key('A', true, true, true, false, false), "unrelated key");
 
     expect(
+        glance::app::can_toggle_preview_fullscreen(true, true, false, false),
+        "fullscreen toggle eligibility");
+    expect(
+        !glance::app::can_toggle_preview_fullscreen(false, true, false, false) &&
+            !glance::app::can_toggle_preview_fullscreen(true, false, false, false) &&
+            !glance::app::can_toggle_preview_fullscreen(true, true, true, false) &&
+            !glance::app::can_toggle_preview_fullscreen(true, true, false, true),
+        "fullscreen toggle guards");
+    expect(
+        glance::app::should_handle_xaml_fullscreen_double_tap(false, false, false),
+        "XAML fullscreen double tap eligibility");
+    expect(
+        !glance::app::should_handle_xaml_fullscreen_double_tap(true, false, false) &&
+            !glance::app::should_handle_xaml_fullscreen_double_tap(false, true, false) &&
+            !glance::app::should_handle_xaml_fullscreen_double_tap(false, false, true),
+        "XAML fullscreen double tap guards");
+
+    expect(
         glance::app::gallery_target_index(1, 1, 4, true) == 2,
         "gallery advances to the next image");
     expect(
@@ -496,6 +871,20 @@ int main()
     expect(
         glance::contracts::process_watchdog_connect_grace_ms >= 10000,
         "watchdog keeps a long connection grace for slow startup");
+
+    glance::contracts::FrameHeader frame_header;
+    frame_header.type = glance::contracts::MessageType::open_active_preview;
+    frame_header.payload_size = glance::contracts::maximum_payload_size;
+    expect(glance::contracts::valid_header(frame_header), "IPC frame maximum payload");
+    auto invalid_frame = frame_header;
+    invalid_frame.magic ^= 1;
+    expect(!glance::contracts::valid_header(invalid_frame), "IPC frame rejects invalid magic");
+    invalid_frame = frame_header;
+    ++invalid_frame.version;
+    expect(!glance::contracts::valid_header(invalid_frame), "IPC frame rejects invalid version");
+    invalid_frame = frame_header;
+    ++invalid_frame.payload_size;
+    expect(!glance::contracts::valid_header(invalid_frame), "IPC frame rejects oversized payload");
 
     const glance::app::UpdatePreferences default_update_preferences;
     expect(
@@ -763,6 +1152,8 @@ int main()
                 L"resources.pri",
                 L"libraw.dll",
                 L"libraw-LICENSE.txt" } });
+    test_model3d_component(component_root);
+    test_media_info_component(component_root);
     const auto source_directory =
         std::filesystem::path(executable_path).parent_path() / L"sources" / L"everything";
     const auto source_path = source_directory / L"Glance.EverythingSource.dll";

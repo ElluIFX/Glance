@@ -31,6 +31,7 @@
     <ClInclude Include="preferences\window_preferences.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preferences\window_size_store.h"><Filter>Preferences</Filter></ClInclude>
     <ClInclude Include="preview\archive_provider.h"><Filter>Preview</Filter></ClInclude>
+    <ClInclude Include="preview\fullscreen_interaction.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\generic_file_info.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\image_metadata_provider.h"><Filter>Preview</Filter></ClInclude>
     <ClInclude Include="preview\markdown_renderer.h"><Filter>Preview</Filter></ClInclude>

@@ -2,6 +2,7 @@
 #include "MainWindow.xaml.h"
 #include "appearance_preferences.h"
 #include "footer_preferences.h"
+#include "fullscreen_interaction.h"
 #include "generic_file_info.h"
 #include "gallery_navigation.h"
 #include "image_metadata_provider.h"
@@ -2150,9 +2151,11 @@ namespace winrt::Glance::App::implementation
 
     bool MainWindow::handle_preview_content_double_click()
     {
-        if (!visible_ || !double_click_fullscreen_enabled_ ||
-            password_prompt_target_ != PasswordPromptTarget::none ||
-            fullscreen_toggle_pending_)
+        if (!glance::app::can_toggle_preview_fullscreen(
+                visible_,
+                double_click_fullscreen_enabled_,
+                password_prompt_target_ != PasswordPromptTarget::none,
+                fullscreen_toggle_pending_))
         {
             return false;
         }
@@ -7211,9 +7214,10 @@ namespace winrt::Glance::App::implementation
         IInspectable const&,
         DoubleTappedRoutedEventArgs const& args)
     {
-        if (args.Handled() ||
-            WebPreviewHost().Visibility() == Visibility::Visible ||
-            is_interactive_preview_source(args.OriginalSource()))
+        if (!glance::app::should_handle_xaml_fullscreen_double_tap(
+                args.Handled(),
+                WebPreviewHost().Visibility() == Visibility::Visible,
+                is_interactive_preview_source(args.OriginalSource())))
         {
             return;
         }
