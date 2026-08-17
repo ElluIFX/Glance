@@ -12,11 +12,26 @@ jobs:
   release:
     name: Package x64 release
     runs-on: windows-2025-vs2026
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Restore build dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/Glance.App/third_party/scintilla/bin/x64
+            src/Glance.Components/Model3D/third_party/three/bin
+            src/Glance.Components/Model3D/third_party/occt-import-js/bin
+            src/Glance.Components/Model3D/third_party/esbuild/bin
+            src/Glance.Components/Model3D/third_party/web/bin
+            src/Glance.Components/Archive/third_party/7zip/bin
+          key: glance-dependencies-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare-dependencies.ps1') }}
+          restore-keys: |
+            glance-dependencies-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Install Inno Setup
         shell: pwsh
