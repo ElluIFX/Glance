@@ -194,6 +194,18 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
     <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
   </ItemGroup>
+  <Target Name="ExcludeUnsupportedWindowsAppSDKSatelliteResources"
+          BeforeTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromComponents"
+          Condition="'$(WindowsAppSDKSelfContained)' == 'true'">
+    <ItemGroup>
+      <MicrosoftWindowsAppSDKFilesExcluded
+        Include="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\**\*.mui" />
+      <MicrosoftWindowsAppSDKFilesExcluded
+        Remove="@(MicrosoftWindowsAppSDKFilesExcluded)"
+        Condition="'%(MicrosoftWindowsAppSDKFilesExcluded.RecursiveDir)' == 'en-us\' or
+                   '%(MicrosoftWindowsAppSDKFilesExcluded.RecursiveDir)' == 'zh-CN\'" />
+    </ItemGroup>
+  </Target>
   <Target Name="MirrorCategorizedXamlGeneratedHeaders" AfterTargets="MarkupCompilePass2">
     <MakeDir Directories="$(GeneratedFilesDir)ui" />
     <Copy
