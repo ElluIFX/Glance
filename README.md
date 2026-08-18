@@ -59,8 +59,8 @@
 
 复杂格式支持以独立组件提供，与 Glance 主程序保持隔离。安装器默认全选，也可按需裁剪；绿色版已包含全部组件与来源
 
-- **PDF 预览** — 支持 PDF 多页文档预览，并为 Office 组件提供文档渲染能力
-- **Microsoft Office 预览** — 支持预览 Word、PowerPoint 与 Excel 文件，依赖 PDF 预览组件及本机对应的 Office 应用
+- **PDF 预览** — 支持 PDF 多页文档预览
+- **Microsoft Office 预览** — 使用本机 Office 预览处理器显示 Word、PowerPoint 与 Excel 文件
 - **压缩包预览** — 支持直接预览 ZIP、7z、RAR、tar、ISO 等常见压缩与归档格式
 - **Adobe 文档预览** — 支持预览 Photoshop PSD/PSB 与带 PDF 兼容数据的 Illustrator AI 工程文件，无需安装 Adobe 应用
 - **3D 模型预览** — 支持预览常见 3D 文件，如 STEP、STL、OBJ 等

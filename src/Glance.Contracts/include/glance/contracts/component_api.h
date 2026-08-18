@@ -7,7 +7,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 6;
+    inline constexpr std::uint32_t abi_version = 8;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -21,6 +21,7 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t preview_notice_api_version = 1;
     inline constexpr std::uint32_t web_preview_api_version = 1;
     inline constexpr std::uint32_t paged_document_renderer_api_version = 1;
+    inline constexpr std::uint32_t native_preview_renderer_api_version = 1;
     inline constexpr std::uint32_t settings_contribution_api_version = 1;
     inline constexpr std::uint32_t file_directory_preview_api_version = 1;
     inline constexpr std::uint32_t gallery_media_api_version = 1;
@@ -75,6 +76,11 @@ namespace glance::contracts::components
         0x620e,
         0x4fc2,
         { 0x89, 0x41, 0x19, 0xd2, 0x39, 0x29, 0xe2, 0x66 } };
+    inline constexpr GUID native_preview_renderer_api_id{
+        0x8d72ce55,
+        0x479f,
+        0x4fa5,
+        { 0x95, 0x12, 0x70, 0x68, 0xa1, 0x77, 0x63, 0x8b } };
     inline constexpr GUID settings_contribution_api_id{
         0xd1ef7371,
         0x3b06,
@@ -137,6 +143,7 @@ namespace glance::contracts::components
         pdf = 5,
         html = 6,
         file_directory = 7,
+        native_surface = 8,
     };
 
     enum class PrepareStatus : std::uint32_t
@@ -168,6 +175,12 @@ namespace glance::contracts::components
         healthy = 0,
         warning = 1,
         error = 2,
+    };
+
+    enum class PreviewNoticeSeverity : std::uint32_t
+    {
+        informational = 0,
+        warning = 1,
     };
 
     enum class PreviewColorScheme : std::uint32_t
@@ -281,6 +294,14 @@ namespace glance::contracts::components
         wchar_t text[loading_text_capacity]{};
     };
 
+    struct PreviewNoticeResult
+    {
+        std::uint32_t size{ sizeof(PreviewNoticeResult) };
+        PreviewNoticeSeverity severity{ PreviewNoticeSeverity::informational };
+        std::uint32_t duration_ms{};
+        wchar_t text[loading_text_capacity]{};
+    };
+
     struct PreparedPreview
     {
         std::uint32_t size{ sizeof(PreparedPreview) };
@@ -321,6 +342,12 @@ namespace glance::contracts::components
     struct PagedDocumentHostDescriptor
     {
         std::uint32_t size{ sizeof(PagedDocumentHostDescriptor) };
+        wchar_t host_executable[renderer_host_capacity]{};
+    };
+
+    struct NativePreviewHostDescriptor
+    {
+        std::uint32_t size{ sizeof(NativePreviewHostDescriptor) };
         wchar_t host_executable[renderer_host_capacity]{};
     };
 
@@ -530,13 +557,15 @@ namespace glance::contracts::components
     using QueryPreviewNoticeFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token,
         const wchar_t* language_tag,
-        ComponentLoadingTextResult* result) noexcept;
+        PreviewNoticeResult* result) noexcept;
     using QueryWebPreviewFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token,
         const WebPreviewOptions* options,
         WebPreviewDescriptor* descriptor) noexcept;
     using QueryPagedDocumentHostFunction = BOOL(WINAPI*)(
         PagedDocumentHostDescriptor* descriptor) noexcept;
+    using QueryNativePreviewHostFunction = BOOL(WINAPI*)(
+        NativePreviewHostDescriptor* descriptor) noexcept;
     using EnumerateComponentSettingsFunction = BOOL(WINAPI*)(
         const wchar_t* language_tag,
         ComponentSettingDescriptor* descriptors,
@@ -641,6 +670,13 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(PagedDocumentRendererApi) };
         std::uint32_t version{ paged_document_renderer_api_version };
         QueryPagedDocumentHostFunction query_host{};
+    };
+
+    struct NativePreviewRendererApi
+    {
+        std::uint32_t size{ sizeof(NativePreviewRendererApi) };
+        std::uint32_t version{ native_preview_renderer_api_version };
+        QueryNativePreviewHostFunction query_host{};
     };
 
     struct SettingsContributionApi

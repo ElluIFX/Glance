@@ -37,20 +37,18 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\Glance.Contracts\include;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>Advapi32.lib;Bcrypt.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\Common\component_localization.h" />
     <ClInclude Include="office_availability.h" />
-    <ClInclude Include="office_pdf_service.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Common\component_localization.cpp" />
     <ClCompile Include="component.cpp" />
     <ClCompile Include="office_availability.cpp" />
-    <ClCompile Include="office_pdf_service.cpp" />
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
   </ItemGroup>
   <ItemGroup>

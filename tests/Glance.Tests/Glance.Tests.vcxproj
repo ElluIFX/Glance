@@ -31,9 +31,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="input_decision_tests.cpp" />
+    <ClCompile Include="office_preview_benchmark.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\native_preview_surface.cpp" />
     <ClCompile Include="..\..\src\Glance.App\preview\paged_document_render_client.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="office_preview_benchmark.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
@@ -42,6 +45,10 @@
     </ProjectReference>
     <ProjectReference Include="..\..\src\Glance.Components\Pdf\host\Glance.PdfHost.vcxproj">
       <Project>{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Glance.Components\Office\host\Glance.OfficeHost.vcxproj">
+      <Project>{D890E6BE-551D-498E-94EC-E219044D3B77}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
   </ItemGroup>

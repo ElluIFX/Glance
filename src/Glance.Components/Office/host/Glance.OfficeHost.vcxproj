@@ -26,15 +26,15 @@
   <ItemDefinitionGroup>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Ole32.lib;OleAut32.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Ole32.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\office_automation.cpp" />
+    <ClCompile Include="src\preview_handler_host.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\office_automation.h" />
+    <ClInclude Include="include\preview_handler_host.h" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />

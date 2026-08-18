@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "office_availability.h"
 
+#include <objbase.h>
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -18,8 +20,19 @@ namespace
         powerpoint = 1U << 2U,
     };
 
+    enum OfficeFormat : unsigned int
+    {
+        doc = 1U << 0U,
+        docx = 1U << 1U,
+        xls = 1U << 2U,
+        xlsx = 1U << 3U,
+        ppt = 1U << 4U,
+        pptx = 1U << 5U,
+    };
+
     std::once_flag initialization_flag;
     std::atomic_uint available_components{};
+    std::atomic_uint available_formats{};
 
     bool read_default_value(std::wstring_view subkey, REGSAM view, std::wstring& value)
     {
@@ -57,23 +70,28 @@ namespace
         return !value.empty();
     }
 
-    bool component_registered(std::wstring_view programmatic_id)
+    bool preview_handler_registered(std::wstring_view extension)
     {
-        static constexpr std::array registry_views{ KEY_WOW64_64KEY, KEY_WOW64_32KEY };
-        for (const REGSAM view : registry_views)
+        std::wstring class_id;
+        constexpr std::wstring_view preview_handler_key =
+            L"\\shellex\\{8895b1c6-b41f-4c1c-a562-0d564250836f}";
+        if (!read_default_value(
+                std::wstring(extension) + std::wstring(preview_handler_key),
+                KEY_WOW64_64KEY,
+                class_id))
         {
-            std::wstring class_id;
-            if (!read_default_value(std::wstring(programmatic_id) + L"\\CLSID", view, class_id))
+            std::wstring programmatic_id;
+            if (!read_default_value(extension, KEY_WOW64_64KEY, programmatic_id) ||
+                !read_default_value(
+                    programmatic_id + std::wstring(preview_handler_key),
+                    KEY_WOW64_64KEY,
+                    class_id))
             {
-                continue;
-            }
-            std::wstring local_server;
-            if (read_default_value(L"CLSID\\" + class_id + L"\\LocalServer32", view, local_server))
-            {
-                return true;
+                return false;
             }
         }
-        return false;
+        CLSID parsed{};
+        return SUCCEEDED(CLSIDFromString(class_id.c_str(), &parsed));
     }
 
     std::wstring lower_extension(std::wstring_view path)
@@ -94,17 +112,27 @@ namespace glance::app
         {
             std::call_once(initialization_flag, [] {
                 unsigned int components{};
+                unsigned int formats{};
                 try
                 {
-                    if (component_registered(L"Word.Application"))
+                    if (preview_handler_registered(L".doc")) formats |= OfficeFormat::doc;
+                    if (preview_handler_registered(L".docx")) formats |= OfficeFormat::docx;
+                    if (preview_handler_registered(L".xls")) formats |= OfficeFormat::xls;
+                    if (preview_handler_registered(L".xlsx")) formats |= OfficeFormat::xlsx;
+                    if (preview_handler_registered(L".ppt")) formats |= OfficeFormat::ppt;
+                    if (preview_handler_registered(L".pptx")) formats |= OfficeFormat::pptx;
+                    if ((formats & (OfficeFormat::doc | OfficeFormat::docx)) ==
+                        (OfficeFormat::doc | OfficeFormat::docx))
                     {
                         components |= OfficeComponent::word;
                     }
-                    if (component_registered(L"Excel.Application"))
+                    if ((formats & (OfficeFormat::xls | OfficeFormat::xlsx)) ==
+                        (OfficeFormat::xls | OfficeFormat::xlsx))
                     {
                         components |= OfficeComponent::excel;
                     }
-                    if (component_registered(L"PowerPoint.Application"))
+                    if ((formats & (OfficeFormat::ppt | OfficeFormat::pptx)) ==
+                        (OfficeFormat::ppt | OfficeFormat::pptx))
                     {
                         components |= OfficeComponent::powerpoint;
                     }
@@ -112,20 +140,17 @@ namespace glance::app
                 catch (...)
                 {
                     components = 0;
+                    formats = 0;
                 }
+                available_formats.store(formats, std::memory_order_release);
                 available_components.store(components, std::memory_order_release);
             });
         }
         catch (...)
         {
             available_components.store(0, std::memory_order_release);
+            available_formats.store(0, std::memory_order_release);
         }
-    }
-
-    bool office_com_available() noexcept
-    {
-        initialize_office_availability();
-        return available_components.load(std::memory_order_acquire) != 0;
     }
 
     unsigned int office_available_components() noexcept
@@ -137,7 +162,7 @@ namespace glance::app
     bool office_preview_available(std::wstring_view path) noexcept
     {
         initialize_office_availability();
-        const auto components = available_components.load(std::memory_order_acquire);
+        const auto formats = available_formats.load(std::memory_order_acquire);
         std::wstring extension;
         try
         {
@@ -147,18 +172,12 @@ namespace glance::app
         {
             return false;
         }
-        if (extension == L".doc" || extension == L".docx")
-        {
-            return (components & OfficeComponent::word) != 0;
-        }
-        if (extension == L".xls" || extension == L".xlsx")
-        {
-            return (components & OfficeComponent::excel) != 0;
-        }
-        if (extension == L".ppt" || extension == L".pptx")
-        {
-            return (components & OfficeComponent::powerpoint) != 0;
-        }
+        if (extension == L".doc") return (formats & OfficeFormat::doc) != 0;
+        if (extension == L".docx") return (formats & OfficeFormat::docx) != 0;
+        if (extension == L".xls") return (formats & OfficeFormat::xls) != 0;
+        if (extension == L".xlsx") return (formats & OfficeFormat::xlsx) != 0;
+        if (extension == L".ppt") return (formats & OfficeFormat::ppt) != 0;
+        if (extension == L".pptx") return (formats & OfficeFormat::pptx) != 0;
         return false;
     }
 }

@@ -125,6 +125,8 @@ namespace glance::app
         std::vector<ComponentWebResourceMapping> mappings;
     };
 
+    struct NativePreviewRendererRegistration;
+
     struct ComponentPreviewResult
     {
         glance::contracts::components::PrepareStatus status{
@@ -139,8 +141,12 @@ namespace glance::app
         std::shared_ptr<void> refinement;
         std::shared_ptr<ComponentWebPreview> web_preview;
         std::shared_ptr<void> file_directory;
+        std::shared_ptr<NativePreviewRendererRegistration> native_renderer;
         std::wstring refinement_text;
         std::wstring notice;
+        glance::contracts::components::PreviewNoticeSeverity notice_severity{
+            glance::contracts::components::PreviewNoticeSeverity::informational };
+        std::uint32_t notice_duration_ms{};
     };
 
     struct FileDirectoryValue
@@ -199,6 +205,12 @@ namespace glance::app
     };
 
     struct PagedDocumentRendererRegistration
+    {
+        std::wstring host_path;
+        std::shared_ptr<void> lease;
+    };
+
+    struct NativePreviewRendererRegistration
     {
         std::wstring host_path;
         std::shared_ptr<void> lease;

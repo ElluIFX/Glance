@@ -622,6 +622,26 @@
                     </StackPanel>
                 </Grid>
 
+                <Grid
+                    x:Name="NativeDocumentPanel"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                    Loaded="NativeDocumentPanel_Loaded"
+                    SizeChanged="NativeDocumentPanel_SizeChanged"
+                    Visibility="Collapsed">
+                    <StackPanel
+                        x:Name="NativeDocumentLoadingOverlay"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12">
+                        <ProgressRing Width="32" Height="32" IsActive="True" />
+                        <TextBlock
+                            x:Name="NativeDocumentLoadingText"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+
                 <Grid x:Name="ArchivePanel" Visibility="Collapsed">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="36" />

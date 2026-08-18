@@ -3,9 +3,7 @@
   "id": "office",
   "architecture": "x64",
   "entry_point": "Glance.OfficeComponent.dll",
-  "dependencies": [
-    "pdf"
-  ],
+  "dependencies": [],
   "payload_files": [
     "Glance.OfficeHost.exe",
     "resources.pri"

@@ -246,15 +246,15 @@ namespace
     BOOL WINAPI query_preview_notice(
         std::uint64_t lease_token,
         const wchar_t* language_tag,
-        ComponentLoadingTextResult* result) noexcept
+        PreviewNoticeResult* result) noexcept
     {
         if (!glance::components::adobe::is_low_resolution_only(lease_token) ||
             result == nullptr ||
-            result->size < sizeof(ComponentLoadingTextResult))
+            result->size < sizeof(PreviewNoticeResult))
         {
             return FALSE;
         }
-        ComponentLoadingTextResult notice;
+        PreviewNoticeResult notice;
         if (!localize(
                 low_resolution_only_key,
                 language_tag,

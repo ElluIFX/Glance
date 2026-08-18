@@ -224,7 +224,7 @@ namespace
         ComponentSettingDescriptor setting;
         wcscpy_s(setting.setting_id, L"render-dimension");
         setting.page = ComponentSettingPage::document_preview;
-        wcscpy_s(setting.group_id, L"rich-document");
+        wcscpy_s(setting.group_id, L"pdf-preview");
         setting.kind = ComponentSettingKind::choice;
         setting.default_value = 4096;
         setting.group_order = 1000;

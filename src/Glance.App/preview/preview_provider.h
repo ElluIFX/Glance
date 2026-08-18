@@ -24,6 +24,7 @@ namespace glance::app
         image,
         media,
         document,
+        native_document,
         archive,
         component,
     };

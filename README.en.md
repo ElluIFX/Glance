@@ -59,8 +59,8 @@ Download and install Glance from [Releases](https://github.com/ElluIFX/Glance/re
 
 Support for complex formats is provided by isolated components kept separate from the Glance core. The installer selects all components by default but allows them to be omitted, while the portable package includes every component and source.
 
-- **PDF preview** — Previews multi-page PDF documents and provides document rendering for the Office component
-- **Microsoft Office preview** — Previews Word, PowerPoint, and Excel files; depends on the PDF preview component and the corresponding locally installed Office applications
+- **PDF preview** — Previews multi-page PDF documents
+- **Microsoft Office preview** — Uses locally installed Office preview handlers for Word, PowerPoint, and Excel files
 - **Archive preview** — Directly previews common compressed and archive formats such as ZIP, 7z, RAR, tar, and ISO
 - **Adobe document preview** — Previews Photoshop PSD/PSB files and Illustrator AI files with PDF-compatible data without requiring Adobe applications
 - **3D model preview** — Previews common 3D files such as STEP, STL, and OBJ

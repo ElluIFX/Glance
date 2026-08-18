@@ -4,9 +4,9 @@
 
 namespace glance::app
 {
-    inline constexpr std::uint32_t default_rich_document_render_dimension = 4096;
+    inline constexpr std::uint32_t default_pdf_preview_render_dimension = 4096;
 
-    [[nodiscard]] constexpr std::uint32_t normalize_rich_document_render_dimension(
+    [[nodiscard]] constexpr std::uint32_t normalize_pdf_preview_render_dimension(
         std::uint32_t value) noexcept
     {
         switch (value)
@@ -17,7 +17,7 @@ namespace glance::app
         case 8192:
             return value;
         default:
-            return default_rich_document_render_dimension;
+            return default_pdf_preview_render_dimension;
         }
     }
 

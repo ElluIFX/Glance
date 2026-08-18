@@ -7,6 +7,7 @@
 #include "footer_preferences.h"
 #include "fullscreen_interaction.h"
 #include "media_preview_preferences.h"
+#include "office_preview_benchmark.h"
 #include "pan_interaction.h"
 #include "paged_document_render_client.h"
 #include "text_font_fallback.h"
@@ -67,6 +68,13 @@ namespace
                     glance::contracts::components::paged_document_renderer_api_id) &&
                 interface_version ==
                     glance::contracts::components::paged_document_renderer_api_version) ||
+            (kind == glance::contracts::components::PreviewContentKind::document &&
+             format == glance::contracts::components::PreviewContentFormat::native_surface &&
+             IsEqualGUID(
+                 *interface_id,
+                 glance::contracts::components::native_preview_renderer_api_id) &&
+             interface_version ==
+                 glance::contracts::components::native_preview_renderer_api_version) ||
             (kind == glance::contracts::components::PreviewContentKind::directory &&
              format ==
                  glance::contracts::components::PreviewContentFormat::file_directory &&
@@ -792,8 +800,16 @@ namespace
     }
 }
 
-int main()
+int wmain(int argument_count, wchar_t* arguments[])
 {
+    if (argument_count > 1 &&
+        std::wstring_view(arguments[1]) == L"--office-benchmark")
+    {
+        return glance::tests::run_office_preview_benchmark(
+            argument_count,
+            arguments);
+    }
+
     using glance::core::should_capture_key;
 
     expect(should_capture_key(VK_SPACE, true, false, true, false, false), "eligible Space");
@@ -1075,15 +1091,15 @@ int main()
         "font fallback keeps primary default");
 
     expect(
-        glance::app::normalize_rich_document_render_dimension(1024) == 1024 &&
-            glance::app::normalize_rich_document_render_dimension(2048) == 2048 &&
-            glance::app::normalize_rich_document_render_dimension(4096) == 4096 &&
-            glance::app::normalize_rich_document_render_dimension(8192) == 8192,
-        "rich document render dimensions");
+        glance::app::normalize_pdf_preview_render_dimension(1024) == 1024 &&
+            glance::app::normalize_pdf_preview_render_dimension(2048) == 2048 &&
+            glance::app::normalize_pdf_preview_render_dimension(4096) == 4096 &&
+            glance::app::normalize_pdf_preview_render_dimension(8192) == 8192,
+        "PDF preview render dimensions");
     expect(
-        glance::app::normalize_rich_document_render_dimension(0) == 4096 &&
-            glance::app::normalize_rich_document_render_dimension(16384) == 4096,
-        "rich document render dimension fallback");
+        glance::app::normalize_pdf_preview_render_dimension(0) == 4096 &&
+            glance::app::normalize_pdf_preview_render_dimension(16384) == 4096,
+        "PDF preview render dimension fallback");
     const glance::app::MediaPreviewPreferences default_media_preferences;
     expect(
         default_media_preferences.middle_click_gallery_mode &&
@@ -1230,8 +1246,9 @@ int main()
         "Office descriptor resource payload");
     expect(
         descriptor.find("\"schema_version\": 3") != std::string::npos &&
-            descriptor.find("\"pdf\"") != std::string::npos,
-        "Office descriptor PDF dependency");
+            descriptor.find("\"dependencies\": []") != std::string::npos &&
+            descriptor.find("\"pdf\"") == std::string::npos,
+        "Office descriptor has no PDF dependency");
 
     const HMODULE component = LoadLibraryExW(
         component_path.c_str(),
@@ -1280,9 +1297,13 @@ int main()
                     "Office component target app version");
                 expect(
                     registration.preferred_kind == PreviewContentKind::document &&
-                        registration.preferred_format == PreviewContentFormat::pdf,
+                        registration.preferred_format ==
+                            PreviewContentFormat::native_surface,
                     "Office component preferred output");
                 expect(extensions.size() == 6, "Office component extension count");
+                expect(
+                    api.can_preview(L"C:\\GlanceComponentTest\\sample.rtf") == FALSE,
+                    "Office component rejects unregistered formats");
             }
             if (api.query_status != nullptr)
             {
@@ -1298,8 +1319,8 @@ int main()
                     english_status.severity == HealthSeverity::healthy
                     ? L"Supports previewing Word, PowerPoint, and Excel files"
                     : english_status.capability_mask == 0
-                        ? L"Office COM automation unavailable"
-                        : L"Some Office COM applications are unavailable";
+                        ? L"Office preview handlers are unavailable"
+                        : L"Some Office preview handlers are unavailable";
                 expect(
                     std::wstring_view(english_status.detail) ==
                         expected_english_detail,
@@ -1317,8 +1338,8 @@ int main()
                     chinese_status.severity == HealthSeverity::healthy
                     ? L"支持预览 Word、PowerPoint 与 Excel 文件"
                     : chinese_status.capability_mask == 0
-                        ? L"未检测到可用的 Office COM 自动化"
-                        : L"部分 Office COM 自动化不可用";
+                        ? L"Office 预览处理器不可用"
+                        : L"部分 Office 预览处理器不可用";
                 expect(
                     std::wstring_view(chinese_status.detail) ==
                         expected_chinese_detail,
@@ -1350,7 +1371,7 @@ int main()
                         "Office component loading text query");
                     expect(
                         std::wstring_view(loading_text.text) ==
-                            L"Preparing this file preview in the background, you can return later...",
+                            L"Loading Office document...",
                         "Office component English loading text");
                 }
 
@@ -1363,7 +1384,7 @@ int main()
                     "Office component Chinese loading text query");
                 expect(
                     std::wstring_view(chinese_loading_text.text) ==
-                        L"正在后台准备该文件的预览，可稍后返回...",
+                        L"正在加载 Office 文档...",
                     "Office component Chinese loading text");
 
                 ComponentLoadingTextResult alias_loading_text;
@@ -1375,7 +1396,7 @@ int main()
                     "Office component language alias query");
                 expect(
                     std::wstring_view(alias_loading_text.text) ==
-                        L"正在后台准备该文件的预览，可稍后返回...",
+                        L"正在加载 Office 文档...",
                     "Office component language alias");
 
                 ComponentLoadingTextResult fallback_loading_text;
@@ -1387,7 +1408,7 @@ int main()
                     "Office component default language query");
                 expect(
                     std::wstring_view(fallback_loading_text.text) ==
-                        L"Preparing this file preview in the background, you can return later...",
+                        L"Loading Office document...",
                     "Office component default language fallback");
                 expect(
                     api.query_loading_text(
@@ -1398,6 +1419,93 @@ int main()
             }
             if (api.query_interface != nullptr)
             {
+                void* renderer_pointer{};
+                expect(
+                    api.query_interface(
+                        &native_preview_renderer_api_id,
+                        native_preview_renderer_api_version,
+                        &renderer_pointer) != FALSE && renderer_pointer != nullptr,
+                    "Office component native renderer interface");
+                if (renderer_pointer != nullptr)
+                {
+                    NativePreviewHostDescriptor host_descriptor;
+                    const auto renderer = static_cast<const NativePreviewRendererApi*>(
+                        renderer_pointer);
+                    expect(
+                        renderer->query_host(&host_descriptor) != FALSE &&
+                            std::wstring_view(host_descriptor.host_executable) ==
+                                L"Glance.OfficeHost.exe",
+                        "Office component native host descriptor");
+                }
+                void* notice_pointer{};
+                expect(
+                    api.query_interface(
+                        &preview_notice_api_id,
+                        preview_notice_api_version,
+                        &notice_pointer) != FALSE && notice_pointer != nullptr,
+                    "Office component preview notice interface");
+                if (notice_pointer != nullptr)
+                {
+                    const auto test_directory =
+                        std::filesystem::temp_directory_path() /
+                        (L"GlanceOfficeTests-" +
+                         std::to_wstring(GetCurrentProcessId()));
+                    std::error_code cleanup_error;
+                    std::filesystem::remove_all(test_directory, cleanup_error);
+                    std::filesystem::create_directories(test_directory, cleanup_error);
+                    const auto protected_path = test_directory / L"protected.pptx";
+                    const auto zone_path = std::filesystem::path(
+                        protected_path.wstring() + L":Zone.Identifier");
+                    const std::vector<unsigned char> zone_data{
+                        '[', 'Z', 'o', 'n', 'e', 'T', 'r', 'a', 'n', 's', 'f', 'e', 'r', ']',
+                        '\r', '\n', 'Z', 'o', 'n', 'e', 'I', 'd', '=', '3', '\r', '\n' };
+                    expect(
+                        !cleanup_error &&
+                            write_bytes(protected_path, { 'P', 'P', 'T', 'X' }) &&
+                            write_bytes(zone_path, zone_data),
+                        "Office protected preview fixture");
+                    if (api.can_preview(protected_path.c_str()) != FALSE)
+                    {
+                        PreparedPreview protected_preview;
+                        expect(
+                            api.prepare_preview(
+                                protected_path.c_str(),
+                                L"en-US",
+                                &protected_preview) == PrepareStatus::success &&
+                                protected_preview.lease_token != 0 &&
+                                std::filesystem::path(protected_preview.path) !=
+                                    protected_path &&
+                                std::filesystem::is_regular_file(
+                                    protected_preview.path) &&
+                                GetPrivateProfileIntW(
+                                    L"ZoneTransfer",
+                                    L"ZoneId",
+                                    0,
+                                    (std::wstring(protected_preview.path) +
+                                     L":Zone.Identifier").c_str()) == 0,
+                            "Office protected preview uses an unblocked copy");
+                        PreviewNoticeResult notice;
+                        const auto notice_api = static_cast<const PreviewNoticeApi*>(
+                            notice_pointer);
+                        expect(
+                            notice_api->query_preview_notice(
+                                protected_preview.lease_token,
+                                L"zh-CN",
+                                &notice) != FALSE &&
+                                notice.severity == PreviewNoticeSeverity::warning &&
+                                notice.duration_ms == 1000 &&
+                                std::wstring_view(notice.text) ==
+                                    L"正在预览被阻止的网络文件",
+                            "Office protected preview warning notice");
+                        const std::filesystem::path copied_path(
+                            protected_preview.path);
+                        api.release_preview(protected_preview.lease_token);
+                        expect(
+                            !std::filesystem::exists(copied_path),
+                            "Office protected preview lease cleanup");
+                    }
+                    std::filesystem::remove_all(test_directory, cleanup_error);
+                }
                 void* interface_pointer = reinterpret_cast<void*>(1);
                 const GUID unknown_interface{};
                 expect(
@@ -1658,13 +1766,15 @@ int main()
                     psb_preview.lease_token != 0 &&
                     progressive->can_refine(psb_preview.lease_token) == FALSE,
                 "Adobe component limits PSB to embedded preview");
-            ComponentLoadingTextResult psb_notice;
+            PreviewNoticeResult psb_notice;
             expect(
                 preview_notice != nullptr &&
                     preview_notice->query_preview_notice(
                         psb_preview.lease_token,
                         L"zh-CN",
                         &psb_notice) != FALSE &&
+                    psb_notice.severity == PreviewNoticeSeverity::informational &&
+                    psb_notice.duration_ms == 0 &&
                     std::wstring_view(psb_notice.text) ==
                         L"大型文件只支持低清预览",
                 "Adobe component PSB low-resolution notice");
@@ -1809,6 +1919,9 @@ int main()
                                 L"zh-CN", &setting, 1, &setting_count) != FALSE &&
                                 std::wstring_view(setting.setting_id) ==
                                     L"render-dimension" &&
+                                std::wstring_view(setting.group_id) == L"pdf-preview" &&
+                                std::wstring_view(setting.group_title) == L"PDF 预览" &&
+                                std::wstring_view(setting.label) == L"PDF 预览分辨率" &&
                                 setting.option_count == 4 &&
                                 setting.default_value == 4096,
                             "PDF component render setting");

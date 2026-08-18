@@ -879,7 +879,10 @@ namespace winrt::Glance::App::implementation
             update_prompt_active_ = false;
             if (host != nullptr)
             {
-                get_self<implementation::MainWindow>(host)->HidePreview();
+                const auto preview_window =
+                    get_self<implementation::MainWindow>(host);
+                preview_window->HidePreview();
+                preview_window->SetXamlModalOverlayActive(false);
             }
         };
 
@@ -891,6 +894,8 @@ namespace winrt::Glance::App::implementation
                 co_return;
             }
 
+            get_self<implementation::MainWindow>(host)
+                ->SetXamlModalOverlayActive(true);
             const auto result = co_await implementation::SettingsWindow::ShowUpdateResultDialog(
                 get_self<implementation::MainWindow>(host)->RootGrid().XamlRoot(),
                 update,

@@ -55,6 +55,43 @@ using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
+    glance::contracts::native_preview::PreviewVisuals native_preview_visuals(
+        ElementTheme theme) noexcept
+    {
+        const bool dark = theme == ElementTheme::Dark;
+        return {
+            .background_color = dark ? RGB(32, 32, 32) : RGB(243, 243, 243),
+            .text_color = dark ? RGB(255, 255, 255) : RGB(0, 0, 0),
+            .color_scheme = dark ? 1U : 0U };
+    }
+
+    std::wstring_view native_preview_status_name(
+        glance::contracts::native_preview::Status status) noexcept
+    {
+        using glance::contracts::native_preview::Status;
+        switch (status)
+        {
+        case Status::invalid_request:
+            return L"invalid request";
+        case Status::open_failed:
+            return L"host communication";
+        case Status::handler_missing:
+            return L"handler lookup";
+        case Status::cancelled:
+            return L"cancellation";
+        case Status::handler_creation_failed:
+            return L"handler creation";
+        case Status::initialization_failed:
+            return L"file initialization";
+        case Status::window_binding_failed:
+            return L"window binding";
+        case Status::preview_failed:
+            return L"preview rendering";
+        default:
+            return L"unknown stage";
+        }
+    }
+
     winrt::hstring formatted_zoom_factor(double zoom)
     {
         std::wostringstream output;
@@ -1620,6 +1657,12 @@ namespace winrt::Glance::App::implementation
         {
             render_markdown();
         }
+        if (native_preview_surface_ != nullptr && native_preview_ready_)
+        {
+            update_native_preview_visuals_async(
+                native_preview_surface_,
+                native_preview_visuals(RootGrid().ActualTheme()));
+        }
     }
 
     void MainWindow::apply_background_surfaces(bool acrylic_enabled)
@@ -1908,6 +1951,33 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void MainWindow::SetXamlModalOverlayActive(bool active) noexcept
+    {
+        if (xaml_modal_overlay_active_ == active)
+        {
+            return;
+        }
+        xaml_modal_overlay_active_ = active;
+        update_text_editor_visibility();
+        try
+        {
+            if (web_preview_ != nullptr)
+            {
+                web_preview_.Visibility(
+                    active ? Visibility::Collapsed : Visibility::Visible);
+            }
+        }
+        catch (...)
+        {
+        }
+        if (native_preview_surface_ != nullptr)
+        {
+            native_preview_surface_->set_visible(
+                visible_ && !active &&
+                current_kind_ == glance::app::PreviewKind::native_document);
+        }
+    }
+
     void MainWindow::configure_window()
     {
         glance::contracts::log_event(L"Resolving the native window handle.");
@@ -2040,11 +2110,12 @@ namespace winrt::Glance::App::implementation
         }
 
         update_fullscreen_button();
-        queue_text_editor_occlusion_update();
+        queue_native_surface_occlusion_update();
         static_cast<void>(DispatcherQueue().TryEnqueue([weak = get_weak()] {
             if (const auto self = weak.get())
             {
                 self->update_text_editor_bounds();
+                self->update_native_preview_bounds();
             }
         }));
     }
@@ -2098,7 +2169,8 @@ namespace winrt::Glance::App::implementation
         PreviewTitleBar().IsHitTestVisible(title_visible);
         PreviewFooterBar().Opacity(footer_visible ? 1.0 : 0.0);
         PreviewFooterBar().IsHitTestVisible(footer_visible);
-        queue_text_editor_occlusion_update();
+        queue_native_surface_occlusion_update();
+        update_native_preview_occlusions();
     }
 
     void MainWindow::update_fullscreen_chrome() noexcept
@@ -2266,6 +2338,7 @@ namespace winrt::Glance::App::implementation
         if (message == WM_WINDOWPOSCHANGED && self != nullptr)
         {
             self->update_text_editor_bounds();
+            self->update_native_preview_bounds();
         }
         if (message == WM_DESTROY && self != nullptr)
         {
@@ -2275,6 +2348,7 @@ namespace winrt::Glance::App::implementation
         {
             glance::contracts::log_event(L"MainWindow received WM_NCDESTROY.");
             self->text_editor_.reset();
+            self->release_native_preview_surface();
             self->release_web_view_control();
             RemoveWindowSubclass(window, window_subclass, 1);
             self->stop_detached_focus_monitor();
@@ -2504,6 +2578,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::clear_preview_content()
     {
         leave_gallery(false);
+        release_native_preview_surface();
         if (shell_file_cancellation_)
         {
             shell_file_cancellation_->store(true, std::memory_order_release);
@@ -2609,6 +2684,7 @@ namespace winrt::Glance::App::implementation
         ImagePanel().Visibility(Visibility::Collapsed);
         MediaPanel().Visibility(Visibility::Collapsed);
         PdfPanel().Visibility(Visibility::Collapsed);
+        NativeDocumentPanel().Visibility(Visibility::Collapsed);
         ArchivePanel().Visibility(Visibility::Collapsed);
         TextStatusControls().Visibility(Visibility::Collapsed);
         ImageStatusControls().Visibility(Visibility::Collapsed);
@@ -3029,6 +3105,200 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void MainWindow::release_native_preview_surface() noexcept
+    {
+        ++native_preview_resize_request_;
+        const bool loading = !native_preview_ready_;
+        native_preview_ready_ = false;
+        auto surface = std::exchange(native_preview_surface_, nullptr);
+        if (surface == nullptr)
+        {
+            return;
+        }
+        if (loading)
+        {
+            surface->cancel();
+        }
+        surface->set_visible(false);
+        surface->destroy_surface();
+        shutdown_native_preview_surface_async(std::move(surface));
+    }
+
+    fire_and_forget MainWindow::shutdown_native_preview_surface_async(
+        std::shared_ptr<glance::app::NativePreviewSurface> surface)
+    {
+        co_await resume_background();
+        surface->shutdown();
+    }
+
+    fire_and_forget MainWindow::load_native_preview_async(
+        std::shared_ptr<glance::app::NativePreviewSurface> surface,
+        std::wstring path,
+        std::uint64_t generation)
+    {
+        const auto weak = get_weak();
+        const auto dispatcher = DispatcherQueue();
+        const auto visuals = native_preview_visuals(RootGrid().ActualTheme());
+        const auto dpi = GetDpiForWindow(window_);
+        co_await resume_background();
+        const auto status = surface->open(path, visuals, dpi);
+        static_cast<void>(dispatcher.TryEnqueue([
+            weak,
+            surface = std::move(surface),
+            status,
+            generation]() mutable {
+            const auto lifetime = weak.get();
+            if (lifetime == nullptr ||
+                generation != lifetime->content_generation_ ||
+                surface != lifetime->native_preview_surface_ ||
+                lifetime->current_kind_ != glance::app::PreviewKind::native_document)
+            {
+                return;
+            }
+            if (status != glance::contracts::native_preview::Status::success)
+            {
+                glance::contracts::log_event(
+                    L"Native preview host failed during " +
+                    std::wstring(native_preview_status_name(status)) + L" (status " +
+                    std::to_wstring(static_cast<std::uint32_t>(status)) + L").");
+                lifetime->release_native_preview_surface();
+                if (lifetime->current_index_ < lifetime->files_.size())
+                {
+                    lifetime->present_generic(lifetime->files_[lifetime->current_index_]);
+                }
+                return;
+            }
+            lifetime->native_preview_ready_ = true;
+            lifetime->NativeDocumentLoadingOverlay().Visibility(Visibility::Collapsed);
+            lifetime->update_native_preview_bounds();
+            surface->set_visible(
+                lifetime->visible_ && !lifetime->xaml_modal_overlay_active_);
+        }));
+    }
+
+    fire_and_forget MainWindow::resize_native_preview_async(
+        std::shared_ptr<glance::app::NativePreviewSurface> surface,
+        std::uint32_t width,
+        std::uint32_t height,
+        std::uint32_t dpi,
+        std::uint64_t request)
+    {
+        const auto lifetime = get_strong();
+        co_await resume_background();
+        if (request != native_preview_resize_request_.load(std::memory_order_acquire))
+        {
+            co_return;
+        }
+        surface->resize(width, height, dpi);
+    }
+
+    fire_and_forget MainWindow::update_native_preview_visuals_async(
+        std::shared_ptr<glance::app::NativePreviewSurface> surface,
+        glance::contracts::native_preview::PreviewVisuals visuals)
+    {
+        co_await resume_background();
+        surface->set_visuals(visuals);
+    }
+
+    void MainWindow::update_native_preview_bounds() noexcept
+    {
+        if (native_preview_surface_ == nullptr)
+        {
+            return;
+        }
+        try
+        {
+            const auto xaml_root = NativeDocumentPanel().XamlRoot();
+            if (xaml_root == nullptr)
+            {
+                return;
+            }
+            const auto origin = NativeDocumentPanel()
+                .TransformToVisual(nullptr)
+                .TransformPoint({ 0.0F, 0.0F });
+            const double scale = xaml_root.RasterizationScale();
+            const auto width = static_cast<std::uint32_t>(std::max(
+                0.0,
+                std::round(NativeDocumentPanel().ActualWidth() * scale)));
+            const auto height = static_cast<std::uint32_t>(std::max(
+                0.0,
+                std::round(NativeDocumentPanel().ActualHeight() * scale)));
+            native_preview_surface_->set_bounds(
+                static_cast<int>(std::lround(origin.X * scale)),
+                static_cast<int>(std::lround(origin.Y * scale)),
+                static_cast<int>(width),
+                static_cast<int>(height));
+            update_native_preview_occlusions();
+            if (native_preview_ready_ && width != 0 && height != 0)
+            {
+                const auto request = native_preview_resize_request_.fetch_add(
+                    1,
+                    std::memory_order_acq_rel) + 1;
+                resize_native_preview_async(
+                    native_preview_surface_,
+                    width,
+                    height,
+                    GetDpiForWindow(window_),
+                    request);
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
+    void MainWindow::update_native_preview_occlusions() noexcept
+    {
+        if (native_preview_surface_ == nullptr)
+        {
+            return;
+        }
+        try
+        {
+            const auto xaml_root = NativeDocumentPanel().XamlRoot();
+            if (xaml_root == nullptr)
+            {
+                return;
+            }
+            const double scale = xaml_root.RasterizationScale();
+            std::vector<RECT> rectangles;
+            const auto append = [&](FrameworkElement const& element) {
+                if (element.Visibility() != Visibility::Visible ||
+                    element.Opacity() <= 0.0 ||
+                    element.ActualWidth() <= 0.0 || element.ActualHeight() <= 0.0)
+                {
+                    return;
+                }
+                const auto origin = element
+                    .TransformToVisual(NativeDocumentPanel())
+                    .TransformPoint({ 0.0F, 0.0F });
+                rectangles.push_back({
+                    static_cast<LONG>(std::floor(origin.X * scale)),
+                    static_cast<LONG>(std::floor(origin.Y * scale)),
+                    static_cast<LONG>(std::ceil(
+                        (origin.X + static_cast<float>(element.ActualWidth())) * scale)),
+                    static_cast<LONG>(std::ceil(
+                        (origin.Y + static_cast<float>(element.ActualHeight())) * scale)) });
+            };
+            if (PreviewErrorInfoBar().IsOpen())
+            {
+                append(PreviewErrorInfoBar());
+            }
+            if (fullscreen_ && fullscreen_title_visible_)
+            {
+                append(PreviewTitleBar());
+            }
+            if (fullscreen_ && fullscreen_footer_visible_)
+            {
+                append(PreviewFooterBar());
+            }
+            native_preview_surface_->set_occlusions(rectangles);
+        }
+        catch (...)
+        {
+        }
+    }
+
     void MainWindow::present_file(
         std::uint32_t index,
         std::optional<glance::app::PreviewKind> known_kind)
@@ -3037,6 +3307,7 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        release_native_preview_surface();
         if (shell_file_cancellation_)
         {
             shell_file_cancellation_->store(true, std::memory_order_release);
@@ -4217,11 +4488,11 @@ namespace winrt::Glance::App::implementation
         }
         PdfLoadingOverlay().Visibility(Visibility::Visible);
         const auto render_dimension =
-            glance::app::normalize_rich_document_render_dimension(
+            glance::app::normalize_pdf_preview_render_dimension(
                 static_cast<std::uint32_t>(glance::app::component_setting_value(
                     L"pdf",
                     L"render-dimension",
-                    glance::app::default_rich_document_render_dimension)));
+                    glance::app::default_pdf_preview_render_dimension)));
         AtomicCounterGuard foreground_render(pdf_foreground_render_requests_);
         co_await resume_background();
         if (request != pdf_render_request_.load(std::memory_order_relaxed))
@@ -5005,12 +5276,7 @@ namespace winrt::Glance::App::implementation
             RootGrid().ActualTheme() == ElementTheme::Dark
             ? glance::contracts::components::PreviewColorScheme::dark
             : glance::contracts::components::PreviewColorScheme::light;
-        glance::contracts::components::PreviewPreparationOptions options{
-            .maximum_dimension = glance::app::normalize_rich_document_render_dimension(
-                static_cast<std::uint32_t>(glance::app::component_setting_value(
-                    L"pdf",
-                    L"render-dimension",
-                    glance::app::default_rich_document_render_dimension))) };
+        glance::contracts::components::PreviewPreparationOptions options;
         co_await resume_background();
 
         auto result = glance::app::prepare_component_preview(
@@ -5225,6 +5491,11 @@ namespace winrt::Glance::App::implementation
         {
             kind = glance::app::PreviewKind::document;
         }
+        else if (result.kind == PreviewContentKind::document &&
+                 result.format == PreviewContentFormat::native_surface)
+        {
+            kind = glance::app::PreviewKind::native_document;
+        }
         else if (result.kind == PreviewContentKind::web &&
                  result.format == PreviewContentFormat::html)
         {
@@ -5248,6 +5519,66 @@ namespace winrt::Glance::App::implementation
             !glance::app::paged_document_renderer().has_value())
         {
             present_generic(files_[current_index_]);
+            return;
+        }
+        const auto show_component_notice = [&] {
+            if (result.notice.empty())
+            {
+                return;
+            }
+            show_preview_message(
+                std::move(result.notice),
+                result.notice_severity == glance::contracts::components::
+                        PreviewNoticeSeverity::warning
+                    ? InfoBarSeverity::Warning
+                    : InfoBarSeverity::Informational,
+                true,
+                result.notice_duration_ms == 0
+                    ? 2880
+                    : result.notice_duration_ms);
+        };
+        if (kind == glance::app::PreviewKind::native_document)
+        {
+            if (result.native_renderer == nullptr)
+            {
+                present_generic(files_[current_index_]);
+                return;
+            }
+            active_component_preview_ = std::move(result.lease);
+            content_preview_kind_ = kind;
+            current_kind_ = kind;
+            update_preview_mode_button();
+            show_content_panel(kind);
+            NativeDocumentLoadingText().Text(
+                ComponentLoadingText().Text().empty()
+                    ? winrt::hstring(glance::app::localize(L"Loading"))
+                    : ComponentLoadingText().Text());
+            NativeDocumentLoadingOverlay().Visibility(Visibility::Visible);
+            ComponentLoadingText().Visibility(Visibility::Collapsed);
+            native_preview_ready_ = false;
+            auto surface = std::make_shared<glance::app::NativePreviewSurface>(
+                window_,
+                result.native_renderer->host_path,
+                result.lease,
+                [weak = get_weak()] {
+                    if (const auto self = weak.get())
+                    {
+                        static_cast<void>(self->handle_preview_content_double_click());
+                    }
+                });
+            if (!surface->available())
+            {
+                present_generic(files_[current_index_]);
+                return;
+            }
+            native_preview_surface_ = surface;
+            surface->set_double_click_enabled(double_click_fullscreen_enabled_);
+            update_native_preview_bounds();
+            load_native_preview_async(
+                std::move(surface),
+                result.output_path,
+                generation);
+            show_component_notice();
             return;
         }
 
@@ -5275,6 +5606,7 @@ namespace winrt::Glance::App::implementation
                 active_component_file_directory_,
                 {},
                 generation);
+            show_component_notice();
             return;
         }
 
@@ -5286,7 +5618,6 @@ namespace winrt::Glance::App::implementation
             : nullptr;
         component_refinement_text_ = std::move(result.refinement_text);
         component_refinement_started_ = false;
-        auto component_notice = std::move(result.notice);
         ComponentLoadingText().Visibility(Visibility::Collapsed);
         auto prepared_file = files_[current_index_];
         prepared_file.path = std::move(result.output_path);
@@ -5301,13 +5632,7 @@ namespace winrt::Glance::App::implementation
         {
             position_initial_window();
         }
-        if (!component_notice.empty())
-        {
-            show_preview_message(
-                std::move(component_notice),
-                InfoBarSeverity::Informational,
-                true);
-        }
+        show_component_notice();
     }
 
     void MainWindow::begin_component_refinement(std::uint64_t generation)
@@ -5799,6 +6124,10 @@ namespace winrt::Glance::App::implementation
             web_preview_.HorizontalAlignment(HorizontalAlignment::Stretch);
             web_preview_.VerticalAlignment(VerticalAlignment::Stretch);
             web_preview_.Opacity(0.0);
+            web_preview_.Visibility(
+                xaml_modal_overlay_active_
+                    ? Visibility::Collapsed
+                    : Visibility::Visible);
             WebPreviewHost().Children().Append(web_preview_);
         }
         const bool dark_theme = RootGrid().ActualTheme() == ElementTheme::Dark;
@@ -6132,7 +6461,7 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void MainWindow::queue_text_editor_occlusion_update()
+    void MainWindow::queue_native_surface_occlusion_update()
     {
         const auto weak = get_weak();
         static_cast<void>(DispatcherQueue().TryEnqueue(
@@ -6141,6 +6470,7 @@ namespace winrt::Glance::App::implementation
                 if (const auto self = weak.get())
                 {
                     self->update_text_editor_occlusions();
+                    self->update_native_preview_occlusions();
                 }
             }));
     }
@@ -6153,6 +6483,7 @@ namespace winrt::Glance::App::implementation
         }
         const bool code_visible =
             visible_ &&
+            !xaml_modal_overlay_active_ &&
             !text_loading_ &&
             !markdown_preview_ &&
             TextPanel().Visibility() == Visibility::Visible;
@@ -6239,6 +6570,10 @@ namespace winrt::Glance::App::implementation
         ImagePanel().Visibility(kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
         MediaPanel().Visibility(kind == glance::app::PreviewKind::media ? Visibility::Visible : Visibility::Collapsed);
         PdfPanel().Visibility(kind == glance::app::PreviewKind::document ? Visibility::Visible : Visibility::Collapsed);
+        NativeDocumentPanel().Visibility(
+            kind == glance::app::PreviewKind::native_document
+                ? Visibility::Visible
+                : Visibility::Collapsed);
         ArchivePanel().Visibility(kind == glance::app::PreviewKind::archive ? Visibility::Visible : Visibility::Collapsed);
         ImageStatusControls().Visibility(
             kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
@@ -6278,6 +6613,11 @@ namespace winrt::Glance::App::implementation
             cancel_pdf_render();
             PdfPageImage().Source(nullptr);
             hide_password_prompt();
+        }
+        if (kind != glance::app::PreviewKind::native_document &&
+            native_preview_surface_ != nullptr)
+        {
+            release_native_preview_surface();
         }
         if (!text)
         {
@@ -6348,6 +6688,10 @@ namespace winrt::Glance::App::implementation
         case glance::app::PreviewKind::document:
             kind = PreviewContentKind::document;
             format = PreviewContentFormat::pdf;
+            break;
+        case glance::app::PreviewKind::native_document:
+            kind = PreviewContentKind::document;
+            format = PreviewContentFormat::native_surface;
             break;
         case glance::app::PreviewKind::web:
             kind = PreviewContentKind::web;
@@ -6580,8 +6924,11 @@ namespace winrt::Glance::App::implementation
             dialog.PrimaryButtonText(action.confirmation_button);
             dialog.CloseButtonText(glance::app::localize(L"Cancel"));
             dialog.DefaultButton(Controls::ContentDialogButton::Primary);
-            if (co_await dialog.ShowAsync() != Controls::ContentDialogResult::Primary)
+            lifetime->SetXamlModalOverlayActive(true);
+            const auto result = co_await dialog.ShowAsync();
+            if (result != Controls::ContentDialogResult::Primary)
             {
+                lifetime->SetXamlModalOverlayActive(false);
                 co_return;
             }
             if (lifetime->detached_)
@@ -6594,6 +6941,7 @@ namespace winrt::Glance::App::implementation
             {
                 lifetime->HidePreview();
             }
+            lifetime->SetXamlModalOverlayActive(false);
             if (lifetime->component_action_callback_)
             {
                 lifetime->component_action_callback_(
@@ -6603,6 +6951,7 @@ namespace winrt::Glance::App::implementation
         }
         catch (...)
         {
+            lifetime->SetXamlModalOverlayActive(false);
         }
     }
 
@@ -6624,7 +6973,7 @@ namespace winrt::Glance::App::implementation
         visual.StopAnimation(L"Opacity");
         visual.Opacity(1.0F);
         PreviewErrorInfoBar().IsOpen(false);
-        queue_text_editor_occlusion_update();
+        queue_native_surface_occlusion_update();
     }
 
     void MainWindow::show_preview_notice(std::wstring resource_key)
@@ -6640,7 +6989,8 @@ namespace winrt::Glance::App::implementation
     void MainWindow::show_preview_message(
         std::wstring message,
         InfoBarSeverity severity,
-        bool auto_hide)
+        bool auto_hide,
+        std::uint32_t auto_hide_delay_ms)
     {
         dismiss_preview_info_bar();
         preview_notice_active_ = true;
@@ -6649,7 +6999,7 @@ namespace winrt::Glance::App::implementation
         PreviewErrorInfoBar().Severity(severity);
         PreviewErrorInfoBar().IsClosable(false);
         PreviewErrorInfoBar().IsOpen(true);
-        queue_text_editor_occlusion_update();
+        queue_native_surface_occlusion_update();
         animate_preview_info_bar(true);
         if (!auto_hide)
         {
@@ -6691,7 +7041,7 @@ namespace winrt::Glance::App::implementation
                     self->preview_notice_hiding_ = false;
                     self->preview_notice_resource_key_.clear();
                     self->PreviewErrorInfoBar().IsOpen(false);
-                    self->queue_text_editor_occlusion_update();
+                    self->queue_native_surface_occlusion_update();
                     const auto visual =
                         Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
                             self->PreviewErrorInfoBar());
@@ -6700,6 +7050,8 @@ namespace winrt::Glance::App::implementation
                 }
             });
         }
+        preview_notice_timer_.Interval(std::chrono::milliseconds(
+            std::max<std::uint32_t>(1, auto_hide_delay_ms)));
         preview_notice_timer_.Start();
     }
 
@@ -6735,7 +7087,7 @@ namespace winrt::Glance::App::implementation
         PreviewErrorInfoBar().Severity(InfoBarSeverity::Error);
         PreviewErrorInfoBar().IsClosable(true);
         PreviewErrorInfoBar().IsOpen(true);
-        queue_text_editor_occlusion_update();
+        queue_native_surface_occlusion_update();
         animate_preview_info_bar(true);
     }
 
@@ -7311,7 +7663,7 @@ namespace winrt::Glance::App::implementation
             L"FontSizeOverlayFormat",
             { std::to_wstring(static_cast<int>(text_preferences_.font_size)) }));
         TextFontSizeOverlay().Visibility(Visibility::Visible);
-        queue_text_editor_occlusion_update();
+        queue_native_surface_occlusion_update();
 
         if (font_size_overlay_timer_ == nullptr)
         {
@@ -7323,7 +7675,7 @@ namespace winrt::Glance::App::implementation
                 {
                     self->font_size_overlay_timer_.Stop();
                     self->TextFontSizeOverlay().Visibility(Visibility::Collapsed);
-                    self->queue_text_editor_occlusion_update();
+                    self->queue_native_surface_occlusion_update();
                 }
             });
         }
@@ -7340,6 +7692,20 @@ namespace winrt::Glance::App::implementation
     void MainWindow::PdfPanel_SizeChanged(IInspectable const&, SizeChangedEventArgs const&)
     {
         update_pdf_fit_surface();
+    }
+
+    void MainWindow::NativeDocumentPanel_Loaded(
+        IInspectable const&,
+        RoutedEventArgs const&)
+    {
+        update_native_preview_bounds();
+    }
+
+    void MainWindow::NativeDocumentPanel_SizeChanged(
+        IInspectable const&,
+        SizeChangedEventArgs const&)
+    {
+        update_native_preview_bounds();
     }
 
     void MainWindow::update_image_metadata_visibility()
@@ -7989,7 +8355,7 @@ namespace winrt::Glance::App::implementation
         InfoBar const&,
         InfoBarClosedEventArgs const&)
     {
-        queue_text_editor_occlusion_update();
+        queue_native_surface_occlusion_update();
     }
 
     void MainWindow::show_pdf_navigation(bool thumbnails)

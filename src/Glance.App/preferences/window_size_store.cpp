@@ -25,6 +25,8 @@ namespace
             return media_is_audio ? L"Audio" : L"Video";
         case PreviewKind::document:
             return L"Pdf";
+        case PreviewKind::native_document:
+            return L"Document";
         case PreviewKind::archive:
             return L"Archive";
         case PreviewKind::component:

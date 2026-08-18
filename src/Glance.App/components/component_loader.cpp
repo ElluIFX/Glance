@@ -39,9 +39,12 @@ namespace
     using glance::contracts::components::PreparedPreview;
     using glance::contracts::components::PagedDocumentHostDescriptor;
     using glance::contracts::components::PagedDocumentRendererApi;
+    using glance::contracts::components::NativePreviewHostDescriptor;
+    using glance::contracts::components::NativePreviewRendererApi;
     using glance::contracts::components::PreviewContentFormat;
     using glance::contracts::components::PreviewContentKind;
     using glance::contracts::components::PreviewNoticeApi;
+    using glance::contracts::components::PreviewNoticeResult;
     using glance::contracts::components::ProgressivePreviewApi;
     using glance::contracts::components::SettingsContributionApi;
     using glance::contracts::components::StatusBarShortcutApi;
@@ -93,6 +96,8 @@ namespace
         std::optional<WebPreviewApi> web_preview;
         std::optional<PagedDocumentRendererApi> paged_document_renderer;
         std::optional<std::filesystem::path> paged_document_host;
+        std::optional<NativePreviewRendererApi> native_preview_renderer;
+        std::optional<std::filesystem::path> native_preview_host;
         std::optional<SettingsContributionApi> settings_contribution;
         std::optional<FileDirectoryPreviewApi> file_directory_preview;
         std::optional<GalleryMediaApi> gallery_media;
@@ -274,7 +279,8 @@ namespace
         case PreviewContentKind::media:
             return format == PreviewContentFormat::media_file;
         case PreviewContentKind::document:
-            return format == PreviewContentFormat::pdf;
+            return format == PreviewContentFormat::pdf ||
+                format == PreviewContentFormat::native_surface;
         case PreviewContentKind::web:
             return format == PreviewContentFormat::html;
         case PreviewContentKind::directory:
@@ -548,6 +554,23 @@ namespace
         }
         interface_pointer = nullptr;
         if (component->api.query_interface(
+                &glance::contracts::components::native_preview_renderer_api_id,
+                glance::contracts::components::native_preview_renderer_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const NativePreviewRendererApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(NativePreviewRendererApi) &&
+                interface_api->version ==
+                    glance::contracts::components::native_preview_renderer_api_version &&
+                interface_api->query_host != nullptr)
+            {
+                component->native_preview_renderer = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
                 &glance::contracts::components::settings_contribution_api_id,
                 glance::contracts::components::settings_contribution_api_version,
                 &interface_pointer) &&
@@ -726,6 +749,14 @@ namespace
                         renderer.interface_version !=
                             glance::contracts::components::file_directory_preview_api_version;
                 }
+                if (IsEqualGUID(
+                        renderer.interface_id,
+                        glance::contracts::components::native_preview_renderer_api_id))
+                {
+                    return !component->native_preview_renderer.has_value() ||
+                        renderer.interface_version !=
+                            glance::contracts::components::native_preview_renderer_api_version;
+                }
                 return true;
             }))
         {
@@ -751,6 +782,29 @@ namespace
             if (component->activation_ready)
             {
                 component->paged_document_host = directory / relative;
+            }
+        }
+        if (component->native_preview_renderer.has_value())
+        {
+            NativePreviewHostDescriptor descriptor;
+            const bool described =
+                component->native_preview_renderer->query_host(&descriptor) != FALSE &&
+                descriptor.size >= sizeof(NativePreviewHostDescriptor);
+            const auto executable = described
+                ? bounded_string(descriptor.host_executable)
+                : std::nullopt;
+            const std::filesystem::path relative = executable.has_value()
+                ? std::filesystem::path(*executable)
+                : std::filesystem::path{};
+            std::error_code error;
+            component->activation_ready = component->activation_ready &&
+                executable.has_value() && !relative.empty() &&
+                relative == relative.filename() &&
+                _wcsicmp(relative.extension().c_str(), L".exe") == 0 &&
+                std::filesystem::is_regular_file(directory / relative, error);
+            if (component->activation_ready)
+            {
+                component->native_preview_host = directory / relative;
             }
         }
         std::ranges::sort(component->extensions);
@@ -1057,6 +1111,21 @@ namespace
         result.lease = std::make_shared<PreviewLease>(
             component,
             preview.lease_token);
+        if (preview.kind == PreviewContentKind::document &&
+            preview.format == PreviewContentFormat::native_surface)
+        {
+            if (!component->native_preview_host.has_value())
+            {
+                result.lease.reset();
+                result.status = glance::contracts::components::PrepareStatus::failed;
+                return result;
+            }
+            result.native_renderer =
+                std::make_shared<glance::app::NativePreviewRendererRegistration>(
+                    glance::app::NativePreviewRendererRegistration{
+                        .host_path = component->native_preview_host->wstring(),
+                        .lease = std::static_pointer_cast<void>(component) });
+        }
         return result;
     }
 
@@ -1603,7 +1672,7 @@ namespace glance::app
                 if (preview.lease_token != 0 &&
                     component->preview_notice.has_value())
                 {
-                    ComponentLoadingTextResult notice;
+                    PreviewNoticeResult notice;
                     if (component->preview_notice->query_preview_notice(
                             preview.lease_token,
                             language.c_str(),
@@ -1614,6 +1683,8 @@ namespace glance::app
                         if (length != std::size(notice.text))
                         {
                             result.notice.assign(notice.text, length);
+                            result.notice_severity = notice.severity;
+                            result.notice_duration_ms = notice.duration_ms;
                         }
                     }
                 }
@@ -2537,7 +2608,7 @@ namespace glance::app
                     DWORD size = sizeof(value);
                     const auto status = RegQueryValueExW(
                         legacy_key,
-                        L"RichDocumentRenderDimension",
+                        L"PdfPreviewRenderDimension",
                         nullptr,
                         &type,
                         reinterpret_cast<BYTE*>(&value),

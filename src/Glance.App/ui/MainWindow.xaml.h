@@ -8,6 +8,7 @@
 #include "folder_preview_preferences.h"
 #include "generic_preview_preferences.h"
 #include "media_preview_preferences.h"
+#include "native_preview_surface.h"
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
@@ -70,6 +71,7 @@ namespace winrt::Glance::App::implementation
         void ApplyFooterPreferences();
         void ApplyWindowPreferences();
         void RefreshComponentContributions();
+        void SetXamlModalOverlayActive(bool active) noexcept;
         void HandleGalleryResponse(std::string_view payload);
         void HandleGalleryDisconnect();
         [[nodiscard]] std::uint64_t InstanceId() const noexcept { return instance_id_; }
@@ -101,6 +103,12 @@ namespace winrt::Glance::App::implementation
             Microsoft::UI::Xaml::SizeChangedEventArgs const&);
         void ImagePanel_SizeChanged(IInspectable const&, Microsoft::UI::Xaml::SizeChangedEventArgs const&);
         void PdfPanel_SizeChanged(IInspectable const&, Microsoft::UI::Xaml::SizeChangedEventArgs const&);
+        void NativeDocumentPanel_Loaded(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void NativeDocumentPanel_SizeChanged(
+            IInspectable const&,
+            Microsoft::UI::Xaml::SizeChangedEventArgs const&);
         void PdfScroller_PointerWheelChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
@@ -270,6 +278,24 @@ namespace winrt::Glance::App::implementation
         void update_preview_navigation_ui();
         [[nodiscard]] const glance::app::ArchiveEntry* selected_folder_entry() noexcept;
         void cancel_pdf_render() noexcept;
+        void release_native_preview_surface() noexcept;
+        winrt::fire_and_forget shutdown_native_preview_surface_async(
+            std::shared_ptr<glance::app::NativePreviewSurface> surface);
+        winrt::fire_and_forget load_native_preview_async(
+            std::shared_ptr<glance::app::NativePreviewSurface> surface,
+            std::wstring path,
+            std::uint64_t generation);
+        winrt::fire_and_forget resize_native_preview_async(
+            std::shared_ptr<glance::app::NativePreviewSurface> surface,
+            std::uint32_t width,
+            std::uint32_t height,
+            std::uint32_t dpi,
+            std::uint64_t request);
+        winrt::fire_and_forget update_native_preview_visuals_async(
+            std::shared_ptr<glance::app::NativePreviewSurface> surface,
+            glance::contracts::native_preview::PreviewVisuals visuals);
+        void update_native_preview_bounds() noexcept;
+        void update_native_preview_occlusions() noexcept;
         void reset_hidden_window_size() noexcept;
         void present_file(
             std::uint32_t index,
@@ -450,7 +476,7 @@ namespace winrt::Glance::App::implementation
         bool ensure_text_editor();
         void update_text_editor_bounds() noexcept;
         void update_text_editor_occlusions() noexcept;
-        void queue_text_editor_occlusion_update();
+        void queue_native_surface_occlusion_update();
         void update_text_editor_visibility() noexcept;
         void ensure_text_viewport_filled();
         void apply_text_preferences();
@@ -503,7 +529,8 @@ namespace winrt::Glance::App::implementation
         void show_preview_message(
             std::wstring message,
             Microsoft::UI::Xaml::Controls::InfoBarSeverity severity,
-            bool auto_hide);
+            bool auto_hide,
+            std::uint32_t auto_hide_delay_ms = 2880);
         void animate_preview_info_bar(bool opening);
         void show_text_preview_error(std::wstring message);
         void show_provider_error(std::wstring message, std::uint64_t generation);
@@ -673,6 +700,10 @@ namespace winrt::Glance::App::implementation
         std::wstring component_hover_cache_component_id_;
         std::wstring component_hover_cache_info_id_;
         std::shared_ptr<glance::app::PagedDocumentRenderClient> pdf_render_client_;
+        std::shared_ptr<glance::app::NativePreviewSurface> native_preview_surface_;
+        std::atomic_uint64_t native_preview_resize_request_{};
+        bool native_preview_ready_{};
+        bool xaml_modal_overlay_active_{};
         std::shared_ptr<void> active_component_preview_;
         std::shared_ptr<void> active_component_file_directory_;
         glance::app::FileDirectoryDescriptor active_file_directory_descriptor_;

@@ -67,6 +67,7 @@
     <ClInclude Include="preview\image_metadata_provider.h" />
     <ClInclude Include="application\localization.h" />
     <ClInclude Include="preview\markdown_renderer.h" />
+    <ClInclude Include="preview\native_preview_surface.h" />
     <ClInclude Include="preferences\media_preview_preferences.h" />
     <ClInclude Include="preview\pan_interaction.h" />
     <ClInclude Include="preferences\path_copy_preferences.h" />
@@ -118,6 +119,7 @@
     <ClCompile Include="preview\image_metadata_provider.cpp" />
     <ClCompile Include="application\localization.cpp" />
     <ClCompile Include="preview\markdown_renderer.cpp" />
+    <ClCompile Include="preview\native_preview_surface.cpp" />
     <ClCompile Include="preferences\media_preview_preferences.cpp" />
     <ClCompile Include="preferences\path_copy_preferences.cpp" />
     <ClCompile Include="preview\paged_document_render_client.cpp" />
