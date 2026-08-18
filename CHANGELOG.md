@@ -4,6 +4,18 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.19] - 2026-08-19
+
+### Changed
+
+- Office previews now use locally installed Preview Handlers for direct Word, PowerPoint, and Excel rendering without the PDF component dependency.
+- Renamed the rich-document resolution setting to PDF preview resolution and scoped it to PDF rendering.
+
+### Fixed
+
+- Automatically previews blocked network Office files through temporary local copies and shows a brief warning.
+- Keeps preview notices and update dialogs visible above native Office, text, and web preview surfaces.
+
 ## [2026.08.18] - 2026-08-18
 
 ### Added
