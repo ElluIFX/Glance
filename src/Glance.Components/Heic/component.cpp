@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #include "heic_preview_service.h"
-#include "../Common/component_localization.h"
+#include "../Common/component_text.h"
 #include "../../version.h"
 #include "glance/contracts/component_api.h"
 
@@ -19,17 +19,6 @@ namespace
     constexpr wchar_t failed_key[] = L"Preview.Failed";
     constexpr std::uint32_t preview_dimension = 8192;
 
-    glance::components::ComponentResourceStore component_resources;
-
-    template <std::size_t Size>
-    bool localize(
-        const wchar_t* key,
-        const wchar_t* language_tag,
-        wchar_t (&destination)[Size]) noexcept
-    {
-        return component_resources.copy(key, language_tag, destination, Size);
-    }
-
     BOOL WINAPI initialize(
         const ComponentRegistrar* registrar,
         ComponentRegistration* registration) noexcept
@@ -38,8 +27,7 @@ namespace
             registrar->size < sizeof(ComponentRegistrar) ||
             registrar->register_extension == nullptr ||
             registration == nullptr ||
-            registration->size < sizeof(ComponentRegistration) ||
-            !component_resources.initialize())
+            registration->size < sizeof(ComponentRegistration))
         {
             return FALSE;
         }
@@ -56,15 +44,14 @@ namespace
         ComponentRegistration result;
         wcscpy_s(result.component_id, L"heic");
         wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
+        wcscpy_s(result.resource_path, L"resources.pri");
         result.preferred_kind = PreviewContentKind::image;
         result.preferred_format = PreviewContentFormat::image_file;
         *registration = result;
         return TRUE;
     }
 
-    BOOL WINAPI query_status(
-        const wchar_t* language_tag,
-        ComponentStatusResult* result) noexcept
+    BOOL WINAPI query_status(ComponentStatusResult* result) noexcept
     {
         if (result == nullptr || result->size < sizeof(ComponentStatusResult))
         {
@@ -73,8 +60,10 @@ namespace
 
         ComponentStatusResult status;
         status.severity = HealthSeverity::healthy;
-        if (!localize(display_name_key, language_tag, status.display_name) ||
-            !localize(status_key, language_tag, status.detail))
+        if (!glance::components::copy_resource_key(
+                display_name_key,
+                status.display_name_key) ||
+            !glance::components::copy_resource_key(status_key, status.detail_key))
         {
             return FALSE;
         }
@@ -84,7 +73,6 @@ namespace
 
     BOOL WINAPI query_loading_text(
         const wchar_t* path,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept
     {
         if (path == nullptr ||
@@ -94,7 +82,7 @@ namespace
             return FALSE;
         }
         ComponentLoadingTextResult loading;
-        if (!localize(loading_key, language_tag, loading.text))
+        if (!glance::components::copy_resource_key(loading_key, loading.key))
         {
             return FALSE;
         }
@@ -110,24 +98,22 @@ namespace
 
     PrepareStatus copy_preview_result(
         const glance::components::heic::PreviewResult& result,
-        const wchar_t* language_tag,
         PreparedPreview* preview) noexcept
     {
         if (result.status != PrepareStatus::success)
         {
-            localize(
+            glance::components::copy_resource_key(
                 result.status == PrepareStatus::unavailable
                     ? unavailable_key
                     : failed_key,
-                language_tag,
-                preview->error_detail);
+                preview->error_key);
             return result.status;
         }
         const auto output_path = result.path.wstring();
         if (output_path.size() + 1 > preview_path_capacity)
         {
             glance::components::heic::release_preview(result.lease_token);
-            localize(failed_key, language_tag, preview->error_detail);
+            glance::components::copy_resource_key(failed_key, preview->error_key);
             return PrepareStatus::failed;
         }
 
@@ -142,7 +128,6 @@ namespace
 
     PrepareStatus WINAPI prepare_preview(
         const wchar_t* path,
-        const wchar_t* language_tag,
         PreparedPreview* preview) noexcept
     {
         if (path == nullptr ||
@@ -153,7 +138,6 @@ namespace
         }
         return copy_preview_result(
             glance::components::heic::prepare_preview(path, preview_dimension),
-            language_tag,
             preview);
     }
 
@@ -217,7 +201,6 @@ namespace
     void WINAPI shutdown() noexcept
     {
         glance::components::heic::shutdown();
-        component_resources.shutdown();
     }
 }
 

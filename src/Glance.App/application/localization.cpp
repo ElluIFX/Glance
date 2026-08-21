@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <cwctype>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <optional>
+#include <unordered_map>
 
 namespace
 {
@@ -38,25 +40,78 @@ namespace
         return std::nullopt;
     }
 
+    class ResourceSource
+    {
+    public:
+        explicit ResourceSource(const std::filesystem::path& path)
+            : manager_(path.wstring()),
+              resources_(manager_.MainResourceMap().GetSubtree(L"Resources")),
+              context_(manager_.CreateResourceContext()),
+              fallback_context_(manager_.CreateResourceContext())
+        {
+            fallback_context_.QualifierValues().Insert(
+                winrt::Microsoft::Windows::ApplicationModel::Resources::
+                    KnownResourceQualifierName::Language(),
+                L"en-US");
+        }
+
+        void set_language(std::wstring_view language)
+        {
+            context_.QualifierValues().Insert(
+                winrt::Microsoft::Windows::ApplicationModel::Resources::
+                    KnownResourceQualifierName::Language(),
+                winrt::hstring(language));
+            cache_.clear();
+        }
+
+        std::wstring get(std::wstring_view key)
+        {
+            if (const auto cached = cache_.find(std::wstring(key)); cached != cache_.end())
+            {
+                return cached->second;
+            }
+            std::wstring resource_id(key);
+            std::ranges::replace(resource_id, L'.', L'/');
+            auto candidate = resources_.TryGetValue(resource_id, context_);
+            if (candidate == nullptr)
+            {
+                candidate = resources_.TryGetValue(resource_id, fallback_context_);
+            }
+            const auto resolved = candidate == nullptr || candidate.ValueAsString().empty()
+                ? std::wstring(key)
+                : std::wstring(candidate.ValueAsString());
+            cache_.emplace(std::wstring(key), resolved);
+            return resolved;
+        }
+
+    private:
+        winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceManager manager_;
+        winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceMap resources_;
+        winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceContext context_;
+        winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceContext
+            fallback_context_;
+        std::unordered_map<std::wstring, std::wstring> cache_;
+    };
+
     class ResourceStore
     {
     public:
         ResourceStore()
-            : manager_(resource_file_path().wstring()),
-              resources_(manager_.MainResourceMap().GetSubtree(L"Resources")),
-              context_(manager_.CreateResourceContext()),
-              language_(L"en-US")
+            : application_(resource_file_path()), language_(L"en-US")
         {
+            application_.set_language(language_);
         }
 
         void set_language(std::wstring_view language)
         {
             std::scoped_lock lock(mutex_);
-            context_.QualifierValues().Insert(
-                winrt::Microsoft::Windows::ApplicationModel::Resources::
-                    KnownResourceQualifierName::Language(),
-                winrt::hstring(language));
             language_ = language;
+            application_.set_language(language_);
+            for (const auto& [id, resources] : components_)
+            {
+                static_cast<void>(id);
+                resources->set_language(language_);
+            }
         }
 
         std::wstring language()
@@ -67,23 +122,46 @@ namespace
 
         std::wstring get(std::wstring_view key)
         {
-            std::wstring resource_id(key);
-            std::ranges::replace(resource_id, L'.', L'/');
             std::scoped_lock lock(mutex_);
-            const auto candidate = resources_.TryGetValue(resource_id, context_);
-            if (candidate == nullptr)
+            return application_.get(key);
+        }
+
+        bool add_component(
+            std::wstring_view component_id,
+            const std::filesystem::path& path)
+        {
+            auto resources = std::make_unique<ResourceSource>(path);
+            std::scoped_lock lock(mutex_);
+            if (components_.contains(std::wstring(component_id)))
             {
-                return std::wstring(key);
+                return false;
             }
-            const auto value = candidate.ValueAsString();
-            return value.empty() ? std::wstring(key) : std::wstring(value);
+            resources->set_language(language_);
+            components_.emplace(std::wstring(component_id), std::move(resources));
+            return true;
+        }
+
+        void remove_component(std::wstring_view component_id)
+        {
+            std::scoped_lock lock(mutex_);
+            components_.erase(std::wstring(component_id));
+        }
+
+        std::wstring get_component(
+            std::wstring_view component_id,
+            std::wstring_view key)
+        {
+            std::scoped_lock lock(mutex_);
+            const auto match = components_.find(std::wstring(component_id));
+            return match == components_.end()
+                ? std::wstring(key)
+                : match->second->get(key);
         }
 
     private:
         std::mutex mutex_;
-        winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceManager manager_;
-        winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceMap resources_;
-        winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceContext context_;
+        ResourceSource application_;
+        std::unordered_map<std::wstring, std::unique_ptr<ResourceSource>> components_;
         std::wstring language_;
     };
 
@@ -166,4 +244,45 @@ namespace glance::app
         }
         return result;
     }
+
+    bool register_component_resources(
+        std::wstring_view component_id,
+        const std::filesystem::path& resource_path) noexcept
+    {
+        try
+        {
+            return !component_id.empty() && resource_path.is_absolute() &&
+                resource_store().add_component(component_id, resource_path);
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+
+    void unregister_component_resources(std::wstring_view component_id) noexcept
+    {
+        try
+        {
+            resource_store().remove_component(component_id);
+        }
+        catch (...)
+        {
+        }
+    }
+
+    std::wstring localize_component(
+        std::wstring_view component_id,
+        std::wstring_view key)
+    {
+        try
+        {
+            return resource_store().get_component(component_id, key);
+        }
+        catch (...)
+        {
+            return std::wstring(key);
+        }
+    }
+
 }

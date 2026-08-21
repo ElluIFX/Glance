@@ -2,7 +2,7 @@
 
 #include "glance/contracts/component_api.h"
 #include "office_availability.h"
-#include "../Common/component_localization.h"
+#include "../Common/component_text.h"
 #include "../../version.h"
 
 #include <algorithm>
@@ -28,19 +28,9 @@ namespace
     constexpr wchar_t protected_source_notice_key[] =
         L"Preview.ProtectedSourceNotice";
 
-    glance::components::ComponentResourceStore component_resources;
     std::mutex preview_lease_mutex;
     std::unordered_map<std::uint64_t, std::filesystem::path> preview_leases;
     std::atomic_uint64_t next_preview_lease{ 1 };
-
-    template <std::size_t Size>
-    bool localize(
-        const wchar_t* key,
-        const wchar_t* language_tag,
-        wchar_t (&destination)[Size]) noexcept
-    {
-        return component_resources.copy(key, language_tag, destination, Size);
-    }
 
     std::filesystem::path component_directory() noexcept
     {
@@ -150,8 +140,7 @@ namespace
             registrar->register_extension == nullptr ||
             registrar->register_renderer == nullptr ||
             registration == nullptr ||
-            registration->size < sizeof(ComponentRegistration) ||
-            !component_resources.initialize())
+            registration->size < sizeof(ComponentRegistration))
         {
             return FALSE;
         }
@@ -177,15 +166,14 @@ namespace
         ComponentRegistration result;
         wcscpy_s(result.component_id, L"office");
         wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
+        wcscpy_s(result.resource_path, L"resources.pri");
         result.preferred_kind = PreviewContentKind::document;
         result.preferred_format = PreviewContentFormat::native_surface;
         *registration = result;
         return TRUE;
     }
 
-    BOOL WINAPI query_status(
-        const wchar_t* language_tag,
-        ComponentStatusResult* result) noexcept
+    BOOL WINAPI query_status(ComponentStatusResult* result) noexcept
     {
         if (result == nullptr || result->size < sizeof(ComponentStatusResult))
         {
@@ -198,14 +186,16 @@ namespace
             ? HealthSeverity::healthy
             : HealthSeverity::warning;
         status.capability_mask = mask;
-        if (!localize(display_name_key, language_tag, status.display_name))
+        if (!glance::components::copy_resource_key(
+                display_name_key,
+                status.display_name_key))
         {
             return FALSE;
         }
         const wchar_t* detail_key = mask == glance::app::office_all_components
             ? status_available_key
             : mask == 0 ? status_unavailable_key : status_partial_key;
-        if (!localize(detail_key, language_tag, status.detail))
+        if (!glance::components::copy_resource_key(detail_key, status.detail_key))
         {
             return FALSE;
         }
@@ -215,7 +205,6 @@ namespace
 
     BOOL WINAPI query_loading_text(
         const wchar_t* path,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept
     {
         if (path == nullptr || result == nullptr ||
@@ -224,7 +213,7 @@ namespace
             return FALSE;
         }
         ComponentLoadingTextResult loading;
-        if (!localize(loading_key, language_tag, loading.text))
+        if (!glance::components::copy_resource_key(loading_key, loading.key))
         {
             return FALSE;
         }
@@ -239,7 +228,6 @@ namespace
 
     PrepareStatus prepare_preview_impl(
         const wchar_t* path,
-        const wchar_t*,
         PreparedPreview* preview) noexcept
     {
         if (path == nullptr || preview == nullptr ||
@@ -307,15 +295,13 @@ namespace
 
     PrepareStatus WINAPI prepare_preview(
         const wchar_t* path,
-        const wchar_t* language_tag,
         PreparedPreview* preview) noexcept
     {
-        return prepare_preview_impl(path, language_tag, preview);
+        return prepare_preview_impl(path, preview);
     }
 
     BOOL WINAPI query_preview_notice(
         std::uint64_t lease_token,
-        const wchar_t* language_tag,
         PreviewNoticeResult* result) noexcept
     {
         if (lease_token == 0 || result == nullptr ||
@@ -333,10 +319,9 @@ namespace
         PreviewNoticeResult notice;
         notice.severity = PreviewNoticeSeverity::warning;
         notice.duration_ms = 1000;
-        if (!localize(
+        if (!glance::components::copy_resource_key(
                 protected_source_notice_key,
-                language_tag,
-                notice.text))
+                notice.text_key))
         {
             return FALSE;
         }
@@ -410,7 +395,6 @@ namespace
             std::error_code error;
             std::filesystem::remove_all(directory, error);
         }
-        component_resources.shutdown();
     }
 }
 

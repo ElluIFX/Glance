@@ -38,12 +38,11 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\Common\component_localization.h" />
+    <ClInclude Include="..\Common\component_text.h" />
     <ClInclude Include="archive_protocol.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Common\component_localization.cpp" />
     <ClCompile Include="component.cpp" />
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
   </ItemGroup>

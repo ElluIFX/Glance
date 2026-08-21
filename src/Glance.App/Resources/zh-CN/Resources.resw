@@ -123,7 +123,8 @@
   <data name="GeneralPageTitle.Text" xml:space="preserve"><value>常规</value></data>
   <data name="GeneralPageDescription.Text" xml:space="preserve"><value>外观、启动和更新</value></data>
   <data name="LaunchTitle.Text" xml:space="preserve"><value>登录时启动</value></data>
-  <data name="LaunchDescription.Text" xml:space="preserve"><value>登录 Windows 时自动启动 Glance</value></data>
+  <data name="LaunchEnabledDescription.Text" xml:space="preserve"><value>登录 Windows 时自动启动 Glance</value></data>
+  <data name="LaunchDisabledDescription.Text" xml:space="preserve"><value>登录 Windows 后手动启动 Glance</value></data>
   <data name="FooterPageTitle.Text" xml:space="preserve"><value>底栏</value></data>
   <data name="FooterPageDescription.Text" xml:space="preserve"><value>预览元数据和路径复制</value></data>
   <data name="FooterFieldsLabel.Text" xml:space="preserve"><value>显示字段</value></data>
@@ -136,55 +137,69 @@
   <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>上移</value></data>
   <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>下移</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>保存诊断信息</value></data>
-  <data name="DiagnosticsDescription.Text" xml:space="preserve"><value>保存诊断日志和崩溃转储</value></data>
+  <data name="DiagnosticsEnabledDescription.Text" xml:space="preserve"><value>保存诊断日志和崩溃转储</value></data>
+  <data name="DiagnosticsDisabledDescription.Text" xml:space="preserve"><value>停止记录新的诊断日志和崩溃转储</value></data>
   <data name="WindowPageTitle.Text" xml:space="preserve"><value>窗口</value></data>
   <data name="WindowPageDescription.Text" xml:space="preserve"><value>预览窗口的尺寸、位置和外观</value></data>
   <data name="WindowBehaviorSectionTitle.Text" xml:space="preserve"><value>窗口行为</value></data>
   <data name="DefaultWindowSizeLabel.Text" xml:space="preserve"><value>默认窗口尺寸</value></data>
   <data name="DefaultWindowSizeDescription.Text" xml:space="preserve"><value>没有可用记忆尺寸时使用的宽度和高度</value></data>
   <data name="RememberWindowSizeLabel.Text" xml:space="preserve"><value>记忆窗口尺寸</value></data>
-  <data name="RememberWindowSizeDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口尺寸</value></data>
+  <data name="RememberWindowSizeEnabledDescription.Text" xml:space="preserve"><value>按预览类型分别保存上一次窗口尺寸</value></data>
+  <data name="RememberWindowSizeDisabledDescription.Text" xml:space="preserve"><value>窗口尺寸由默认尺寸与自适应选项决定</value></data>
   <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>媒体自适应</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
-  <data name="AutoFitWindowSizeDescription.Text" xml:space="preserve"><value>根据媒体固有尺寸调整窗口</value></data>
-  <data name="ShowAfterAutoFitLabel.Text" xml:space="preserve"><value>适应后再显示</value></data>
-  <data name="ShowAfterAutoFitDescription.Text" xml:space="preserve"><value>牺牲响应速度避免窗口尺寸闪烁</value></data>
+  <data name="AutoFitWindowSizeEnabledDescription.Text" xml:space="preserve"><value>根据预览媒体尺寸调整窗口大小</value></data>
+  <data name="AutoFitWindowSizeDisabledDescription.Text" xml:space="preserve"><value>媒体窗口尺寸受窗口行为选项控制</value></data>
+  <data name="ShowAfterAutoFitLabel.Text" xml:space="preserve"><value>避免窗口尺寸闪烁</value></data>
+  <data name="ShowAfterAutoFitEnabledDescription.Text" xml:space="preserve"><value>获取媒体尺寸后显示预览窗口</value></data>
+  <data name="ShowAfterAutoFitDisabledDescription.Text" xml:space="preserve"><value>将立即显示预览窗口</value></data>
   <data name="DynamicAutoFitLabel.Text" xml:space="preserve"><value>动态适应页面</value></data>
-  <data name="DynamicAutoFitDescription.Text" xml:space="preserve"><value>页面尺寸变化时同步调整窗口尺寸</value></data>
+  <data name="DynamicAutoFitEnabledDescription.Text" xml:space="preserve"><value>页面尺寸变化时同步调整窗口尺寸</value></data>
+  <data name="DynamicAutoFitDisabledDescription.Text" xml:space="preserve"><value>页面尺寸变化时保持当前窗口尺寸</value></data>
   <data name="AdaptiveSizeRangeLabel.Text" xml:space="preserve"><value>自适应尺寸范围</value></data>
   <data name="AdaptiveSizeRangeDescription.Text" xml:space="preserve"><value>窗口占显示器工作区的最小和最大比例</value></data>
   <data name="AutoFitIgnoredExtensionsLabel.Text" xml:space="preserve"><value>忽略后缀</value></data>
   <data name="AutoFitIgnoredExtensionsDescription.Text" xml:space="preserve"><value>使用分号分隔，后缀开头的点可省略</value></data>
   <data name="AutoFitIgnoredExtensionsTextBox.PlaceholderText" xml:space="preserve"><value>.gif; webp; mp4</value></data>
   <data name="RememberWindowPositionLabel.Text" xml:space="preserve"><value>记忆窗口位置</value></data>
-  <data name="RememberWindowPositionDescription.Text" xml:space="preserve"><value>按预览类型保存窗口中心相对屏幕中心的偏移</value></data>
+  <data name="RememberWindowPositionEnabledDescription.Text" xml:space="preserve"><value>按预览类型保存窗口中心相对屏幕中心的偏移</value></data>
+  <data name="RememberWindowPositionDisabledDescription.Text" xml:space="preserve"><value>预览窗口使用默认位置</value></data>
   <data name="DoubleClickFullscreenLabel.Text" xml:space="preserve"><value>双击全屏</value></data>
-  <data name="DoubleClickFullscreenDescription.Text" xml:space="preserve"><value>双击预览内容以切换全屏模式</value></data>
+  <data name="DoubleClickFullscreenEnabledDescription.Text" xml:space="preserve"><value>双击预览区域切换全屏模式</value></data>
+  <data name="DoubleClickFullscreenDisabledDescription.Text" xml:space="preserve"><value>启用后可双击预览切换全屏</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>重置</value></data>
   <data name="AcrylicOpacityLabel.Text" xml:space="preserve"><value>亚克力不透明度</value></data>
   <data name="MediaPreviewPageTitle.Text" xml:space="preserve"><value>媒体预览</value></data>
   <data name="MediaPreviewPageDescription.Text" xml:space="preserve"><value>图片与音视频预览器的外观与行为</value></data>
   <data name="MediaGeneralGroupTitle.Text" xml:space="preserve"><value>画廊</value></data>
   <data name="MiddleClickGalleryModeLabel.Text" xml:space="preserve"><value>鼠标中键切换画廊模式</value></data>
-  <data name="MiddleClickGalleryModeDescription.Text" xml:space="preserve"><value>使用鼠标中键切换画廊模式</value></data>
+  <data name="MiddleClickGalleryModeEnabledDescription.Text" xml:space="preserve"><value>使用鼠标中键切换画廊模式</value></data>
+  <data name="MiddleClickGalleryModeDisabledDescription.Text" xml:space="preserve"><value>启用后可用鼠标中键切换画廊模式</value></data>
   <data name="LoopGalleryScrollingLabel.Text" xml:space="preserve"><value>画廊模式无限滚动</value></data>
-  <data name="LoopGalleryScrollingDescription.Text" xml:space="preserve"><value>到达首尾后从另一端继续滚动</value></data>
+  <data name="LoopGalleryScrollingEnabledDescription.Text" xml:space="preserve"><value>到达首尾后从另一端继续滚动</value></data>
+  <data name="LoopGalleryScrollingDisabledDescription.Text" xml:space="preserve"><value>到达首项或末项时停止画廊滚动</value></data>
   <data name="GallerySameExtensionOnlyLabel.Text" xml:space="preserve"><value>仅浏览相同扩展名</value></data>
-  <data name="GallerySameExtensionOnlyDescription.Text" xml:space="preserve"><value>画廊仅在与当前文件扩展名相同的文件中滚动</value></data>
+  <data name="GallerySameExtensionOnlyEnabledDescription.Text" xml:space="preserve"><value>画廊仅在与当前文件扩展名相同的文件中滚动</value></data>
+  <data name="GallerySameExtensionOnlyDisabledDescription.Text" xml:space="preserve"><value>画廊在所有支持的媒体文件中滚动</value></data>
   <data name="ImagePreviewGroupTitle.Text" xml:space="preserve"><value>图片预览</value></data>
   <data name="ImageZoomMapLabel.Text" xml:space="preserve"><value>缩放缩略图</value></data>
-  <data name="ImageZoomMapDescription.Text" xml:space="preserve"><value>图片缩放时显示当前预览区域</value></data>
+  <data name="ImageZoomMapEnabledDescription.Text" xml:space="preserve"><value>图片缩放时显示当前预览区域</value></data>
+  <data name="ImageZoomMapDisabledDescription.Text" xml:space="preserve"><value>启用后可在图片缩放时显示预览区域地图</value></data>
   <data name="AudioVideoPreviewGroupTitle.Text" xml:space="preserve"><value>音视频预览</value></data>
   <data name="DefaultAudioVolumeLabel.Text" xml:space="preserve"><value>默认音频音量</value></data>
   <data name="DefaultAudioVolumeDescription.Text" xml:space="preserve"><value>音频预览的初始音量</value></data>
   <data name="DefaultVideoVolumeLabel.Text" xml:space="preserve"><value>默认视频音量</value></data>
   <data name="DefaultVideoVolumeDescription.Text" xml:space="preserve"><value>视频预览的初始音量</value></data>
   <data name="AutoplayAudioLabel.Text" xml:space="preserve"><value>自动播放音频</value></data>
-  <data name="AutoplayAudioDescription.Text" xml:space="preserve"><value>打开音频预览时自动开始播放</value></data>
+  <data name="AutoplayAudioEnabledDescription.Text" xml:space="preserve"><value>打开音频预览时自动开始播放</value></data>
+  <data name="AutoplayAudioDisabledDescription.Text" xml:space="preserve"><value>打开音频预览后等待播放操作</value></data>
   <data name="AutoplayVideoLabel.Text" xml:space="preserve"><value>自动播放视频</value></data>
-  <data name="AutoplayVideoDescription.Text" xml:space="preserve"><value>打开视频预览时自动开始播放</value></data>
+  <data name="AutoplayVideoEnabledDescription.Text" xml:space="preserve"><value>打开视频预览时自动开始播放</value></data>
+  <data name="AutoplayVideoDisabledDescription.Text" xml:space="preserve"><value>打开视频预览后等待播放操作</value></data>
   <data name="ReverseSeekWheelLabel.Text" xml:space="preserve"><value>反转进度滚轮方向</value></data>
-  <data name="ReverseSeekWheelDescription.Text" xml:space="preserve"><value>反转鼠标滚轮调整播放进度的方向</value></data>
+  <data name="ReverseSeekWheelEnabledDescription.Text" xml:space="preserve"><value>反转鼠标滚轮调整播放进度的方向</value></data>
+  <data name="ReverseSeekWheelDisabledDescription.Text" xml:space="preserve"><value>使用标准鼠标滚轮方向调整播放进度</value></data>
   <data name="TextPreviewPageTitle.Text" xml:space="preserve"><value>文档预览</value></data>
   <data name="TextPreviewPageDescription.Text" xml:space="preserve"><value>文档预览器的外观与行为</value></data>
   <data name="PlainTextPreviewSectionTitle.Text" xml:space="preserve"><value>纯文本预览</value></data>
@@ -193,7 +208,8 @@
   <data name="FontSizeLabel.Text" xml:space="preserve"><value>字号</value></data>
   <data name="FontSizeDescription.Text" xml:space="preserve"><value>文本的默认像素字号</value></data>
   <data name="SyntaxHighlightingLabel.Text" xml:space="preserve"><value>语法高亮</value></data>
-  <data name="SyntaxHighlightingDescription.Text" xml:space="preserve"><value>为识别出的代码元素着色</value></data>
+  <data name="SyntaxHighlightingEnabledDescription.Text" xml:space="preserve"><value>为识别出的代码元素着色</value></data>
+  <data name="SyntaxHighlightingDisabledDescription.Text" xml:space="preserve"><value>文本使用统一前景色显示</value></data>
   <data name="SyntaxThemeLabel.Text" xml:space="preserve"><value>高亮风格</value></data>
   <data name="SyntaxThemeDescription.Text" xml:space="preserve"><value>语法高亮使用的颜色方案</value></data>
   <data name="SyntaxThemeGlance" xml:space="preserve"><value>Glance</value></data>
@@ -215,14 +231,18 @@
   <data name="SyntaxThemePaperColor" xml:space="preserve"><value>PaperColor</value></data>
   <data name="SyntaxThemeMaterial" xml:space="preserve"><value>Material</value></data>
   <data name="LineNumbersLabel.Text" xml:space="preserve"><value>行号</value></data>
-  <data name="LineNumbersDescription.Text" xml:space="preserve"><value>在预览左侧显示行号</value></data>
+  <data name="LineNumbersEnabledDescription.Text" xml:space="preserve"><value>在预览左侧显示行号</value></data>
+  <data name="LineNumbersDisabledDescription.Text" xml:space="preserve"><value>完整预览宽度用于显示文本</value></data>
   <data name="WordWrapLabel.Text" xml:space="preserve"><value>自动换行</value></data>
-  <data name="WordWrapDescription.Text" xml:space="preserve"><value>按可用视口宽度换行</value></data>
+  <data name="WordWrapEnabledDescription.Text" xml:space="preserve"><value>按可用视口宽度换行</value></data>
+  <data name="WordWrapDisabledDescription.Text" xml:space="preserve"><value>每行保持单行显示并允许水平滚动</value></data>
   <data name="PathCopyGroupLabel.Text" xml:space="preserve"><value>路径复制</value></data>
   <data name="QuoteCopiedPathLabel.Text" xml:space="preserve"><value>为复制的路径添加引号</value></data>
-  <data name="QuoteCopiedPathDescription.Text" xml:space="preserve"><value>使用双引号包裹复制的路径</value></data>
+  <data name="QuoteCopiedPathEnabledDescription.Text" xml:space="preserve"><value>使用双引号包裹复制的路径</value></data>
+  <data name="QuoteCopiedPathDisabledDescription.Text" xml:space="preserve"><value>复制路径时省略两侧引号</value></data>
   <data name="UnixPathSeparatorsLabel.Text" xml:space="preserve"><value>Unix 路径分隔符</value></data>
-  <data name="UnixPathSeparatorsDescription.Text" xml:space="preserve"><value>将反斜杠替换为正斜杠</value></data>
+  <data name="UnixPathSeparatorsEnabledDescription.Text" xml:space="preserve"><value>将反斜杠替换为正斜杠</value></data>
+  <data name="UnixPathSeparatorsDisabledDescription.Text" xml:space="preserve"><value>复制路径保留 Windows 反斜杠</value></data>
   <data name="MaintenancePageTitle.Text" xml:space="preserve"><value>维护</value></data>
   <data name="MaintenancePageDescription.Text" xml:space="preserve"><value>运行状态、诊断和已保存的应用状态</value></data>
   <data name="RuntimeStatusGroupTitle.Text" xml:space="preserve"><value>运行状态</value></data>
@@ -344,7 +364,8 @@
   <data name="StartupGroupTitle.Text" xml:space="preserve"><value>启动</value></data>
   <data name="UpdateGroupTitle.Text" xml:space="preserve"><value>更新</value></data>
   <data name="AutomaticUpdateCheckLabel.Text" xml:space="preserve"><value>定期检查更新</value></data>
-  <data name="AutomaticUpdateCheckDescription.Text" xml:space="preserve"><value>启动预览时在后台检查更新</value></data>
+  <data name="AutomaticUpdateCheckEnabledDescription.Text" xml:space="preserve"><value>按所选频率在后台检查更新</value></data>
+  <data name="AutomaticUpdateCheckDisabledDescription.Text" xml:space="preserve"><value>从关于页面手动检查更新</value></data>
   <data name="UpdateCheckFrequencyLabel.Text" xml:space="preserve"><value>检查频率</value></data>
   <data name="UpdateFrequencyHourlyItem.Content" xml:space="preserve"><value>每小时</value></data>
   <data name="UpdateFrequencyDailyItem.Content" xml:space="preserve"><value>每天</value></data>

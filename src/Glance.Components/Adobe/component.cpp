@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #include "adobe_preview_service.h"
-#include "../Common/component_localization.h"
+#include "../Common/component_text.h"
 #include "../../version.h"
 #include "glance/contracts/component_api.h"
 
@@ -21,17 +21,6 @@ namespace
     constexpr wchar_t unavailable_key[] = L"Preview.Unavailable";
     constexpr wchar_t failed_key[] = L"Preview.Failed";
 
-    glance::components::ComponentResourceStore component_resources;
-
-    template <std::size_t Size>
-    bool localize(
-        const wchar_t* key,
-        const wchar_t* language_tag,
-        wchar_t (&destination)[Size]) noexcept
-    {
-        return component_resources.copy(key, language_tag, destination, Size);
-    }
-
     BOOL WINAPI initialize(
         const ComponentRegistrar* registrar,
         ComponentRegistration* registration) noexcept
@@ -40,8 +29,7 @@ namespace
             registrar->size < sizeof(ComponentRegistrar) ||
             registrar->register_extension == nullptr ||
             registration == nullptr ||
-            registration->size < sizeof(ComponentRegistration) ||
-            !component_resources.initialize())
+            registration->size < sizeof(ComponentRegistration))
         {
             return FALSE;
         }
@@ -58,15 +46,14 @@ namespace
         ComponentRegistration result;
         wcscpy_s(result.component_id, L"adobe");
         wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
+        wcscpy_s(result.resource_path, L"resources.pri");
         result.preferred_kind = PreviewContentKind::image;
         result.preferred_format = PreviewContentFormat::image_file;
         *registration = result;
         return TRUE;
     }
 
-    BOOL WINAPI query_status(
-        const wchar_t* language_tag,
-        ComponentStatusResult* result) noexcept
+    BOOL WINAPI query_status(ComponentStatusResult* result) noexcept
     {
         if (result == nullptr || result->size < sizeof(ComponentStatusResult))
         {
@@ -75,8 +62,10 @@ namespace
 
         ComponentStatusResult status;
         status.severity = HealthSeverity::healthy;
-        if (!localize(display_name_key, language_tag, status.display_name) ||
-            !localize(status_key, language_tag, status.detail))
+        if (!glance::components::copy_resource_key(
+                display_name_key,
+                status.display_name_key) ||
+            !glance::components::copy_resource_key(status_key, status.detail_key))
         {
             return FALSE;
         }
@@ -86,7 +75,6 @@ namespace
 
     BOOL WINAPI query_loading_text(
         const wchar_t* path,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept
     {
         if (path == nullptr ||
@@ -96,7 +84,7 @@ namespace
             return FALSE;
         }
         ComponentLoadingTextResult loading;
-        if (!localize(loading_key, language_tag, loading.text))
+        if (!glance::components::copy_resource_key(loading_key, loading.key))
         {
             return FALSE;
         }
@@ -112,24 +100,22 @@ namespace
 
     PrepareStatus copy_preview_result(
         const glance::components::adobe::PreviewResult& result,
-        const wchar_t* language_tag,
         PreparedPreview* preview) noexcept
     {
         if (result.status != PrepareStatus::success)
         {
-            localize(
+            glance::components::copy_resource_key(
                 result.status == PrepareStatus::unavailable
                     ? unavailable_key
                     : failed_key,
-                language_tag,
-                preview->error_detail);
+                preview->error_key);
             return result.status;
         }
         const auto output_path = result.path.wstring();
         if (output_path.size() + 1 > preview_path_capacity)
         {
             glance::components::adobe::release_preview(result.lease_token);
-            localize(failed_key, language_tag, preview->error_detail);
+            glance::components::copy_resource_key(failed_key, preview->error_key);
             return PrepareStatus::failed;
         }
 
@@ -144,7 +130,6 @@ namespace
 
     PrepareStatus WINAPI prepare_preview_with_options(
         const wchar_t* path,
-        const wchar_t* language_tag,
         const PreviewPreparationOptions* options,
         PreparedPreview* preview) noexcept
     {
@@ -160,19 +145,16 @@ namespace
             glance::components::adobe::prepare_preview(
                 path,
                 options->maximum_dimension),
-            language_tag,
             preview);
     }
 
     PrepareStatus WINAPI prepare_preview(
         const wchar_t* path,
-        const wchar_t* language_tag,
         PreparedPreview* preview) noexcept
     {
         PreviewPreparationOptions options;
         return prepare_preview_with_options(
             path,
-            language_tag,
             &options,
             preview);
     }
@@ -184,7 +166,6 @@ namespace
 
     BOOL WINAPI query_refinement_text(
         std::uint64_t lease_token,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept
     {
         if (!glance::components::adobe::can_refine(lease_token) ||
@@ -194,7 +175,7 @@ namespace
             return FALSE;
         }
         ComponentLoadingTextResult text;
-        if (!localize(refining_key, language_tag, text.text))
+        if (!glance::components::copy_resource_key(refining_key, text.key))
         {
             return FALSE;
         }
@@ -204,7 +185,6 @@ namespace
 
     PrepareStatus WINAPI prepare_refined_preview(
         std::uint64_t lease_token,
-        const wchar_t* language_tag,
         const PreviewPreparationOptions* options,
         PreparedPreview* preview) noexcept
     {
@@ -220,13 +200,12 @@ namespace
                 lease_token,
                 options->maximum_dimension);
         const auto status =
-            copy_preview_result(result, language_tag, preview);
+            copy_preview_result(result, preview);
         if (status != PrepareStatus::success)
         {
-            localize(
+            glance::components::copy_resource_key(
                 refinement_failed_key,
-                language_tag,
-                preview->error_detail);
+                preview->error_key);
         }
         return status;
     }
@@ -245,7 +224,6 @@ namespace
 
     BOOL WINAPI query_preview_notice(
         std::uint64_t lease_token,
-        const wchar_t* language_tag,
         PreviewNoticeResult* result) noexcept
     {
         if (!glance::components::adobe::is_low_resolution_only(lease_token) ||
@@ -255,10 +233,9 @@ namespace
             return FALSE;
         }
         PreviewNoticeResult notice;
-        if (!localize(
+        if (!glance::components::copy_resource_key(
                 low_resolution_only_key,
-                language_tag,
-                notice.text))
+                notice.text_key))
         {
             return FALSE;
         }
@@ -292,27 +269,31 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
-        if (interface_id == nullptr || minimum_version > 1)
+        if (interface_id == nullptr)
         {
             return FALSE;
         }
         if (IsEqualGUID(*interface_id, configurable_preview_api_id))
         {
+            if (minimum_version > configurable_preview_api_version) return FALSE;
             *interface_pointer = &configurable_preview_api;
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, progressive_preview_api_id))
         {
+            if (minimum_version > progressive_preview_api_version) return FALSE;
             *interface_pointer = &progressive_preview_api;
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, preview_notice_api_id))
         {
+            if (minimum_version > preview_notice_api_version) return FALSE;
             *interface_pointer = &preview_notice_api;
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, gallery_media_api_id))
         {
+            if (minimum_version > gallery_media_api_version) return FALSE;
             *interface_pointer = &gallery_media_api;
             return TRUE;
         }
@@ -322,7 +303,6 @@ namespace
     void WINAPI shutdown() noexcept
     {
         glance::components::adobe::shutdown();
-        component_resources.shutdown();
     }
 }
 

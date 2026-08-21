@@ -232,6 +232,8 @@ namespace glance::app
         std::wstring group_title;
         std::wstring label;
         std::wstring description;
+        std::wstring enabled_description;
+        std::wstring disabled_description;
         glance::contracts::components::ComponentSettingKind kind{
             glance::contracts::components::ComponentSettingKind::choice };
         std::int64_t default_value{};

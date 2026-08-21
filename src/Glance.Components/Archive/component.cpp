@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../Common/component_localization.h"
+#include "../Common/component_text.h"
 #include "../../version.h"
 #include "archive_protocol.h"
 #include "glance/contracts/component_api.h"
@@ -120,8 +120,6 @@ namespace
         std::vector<ArchiveNode> nodes;
         std::unordered_map<std::uint64_t, std::vector<std::size_t>> children;
         std::vector<ColumnKind> columns;
-        std::wstring folder_type;
-        std::wstring file_type;
     };
 
     struct PreviewLease
@@ -132,26 +130,10 @@ namespace
         std::shared_ptr<ArchiveIndex> index;
     };
 
-    glance::components::ComponentResourceStore component_resources;
     std::mutex lease_mutex;
     std::unordered_map<std::uint64_t, std::shared_ptr<PreviewLease>> leases;
     std::atomic_uint64_t next_lease_token{ 1 };
     std::atomic_bool shutting_down{};
-
-    template <std::size_t Size>
-    bool localize(
-        const wchar_t* key,
-        const wchar_t* language_tag,
-        wchar_t (&destination)[Size]) noexcept
-    {
-        return component_resources.copy(key, language_tag, destination, Size);
-    }
-
-    std::wstring localized_string(const wchar_t* key, const wchar_t* language_tag)
-    {
-        wchar_t value[file_directory_text_capacity]{};
-        return localize(key, language_tag, value) ? std::wstring(value) : std::wstring{};
-    }
 
     std::filesystem::path component_directory() noexcept
     {
@@ -582,11 +564,11 @@ namespace
         FileDirectoryDescriptor& descriptor,
         const wchar_t* id,
         const wchar_t* label_key,
-        const wchar_t* language_tag,
         FileDirectoryValueKind kind,
         std::uint64_t unsigned_value = 0,
         double ratio_value = 0.0,
-        std::wstring_view text = {})
+        std::wstring_view text = {},
+        ComponentTextKind text_kind = ComponentTextKind::literal)
     {
         if (descriptor.info_field_count >= maximum_file_directory_info_fields)
         {
@@ -594,7 +576,7 @@ namespace
         }
         auto& field = descriptor.info_fields[descriptor.info_field_count];
         if (wcscpy_s(field.id, id) != 0 ||
-            !localize(label_key, language_tag, field.label) ||
+            !glance::components::copy_resource_key(label_key, field.label_key) ||
             !copy_text(text, field.text, std::size(field.text)))
         {
             return false;
@@ -602,6 +584,7 @@ namespace
         field.kind = kind;
         field.unsigned_value = unsigned_value;
         field.ratio_value = ratio_value;
+        field.text_kind = text_kind;
         ++descriptor.info_field_count;
         return true;
     }
@@ -612,7 +595,6 @@ namespace
         ColumnKind kind,
         const wchar_t* id,
         const wchar_t* title_key,
-        const wchar_t* language_tag,
         FileDirectoryValueKind value_kind,
         FileDirectoryAlignment alignment,
         std::uint32_t width)
@@ -623,7 +605,7 @@ namespace
         }
         auto& column = descriptor.columns[descriptor.column_count];
         if (wcscpy_s(column.id, id) != 0 ||
-            !localize(title_key, language_tag, column.title))
+            !glance::components::copy_resource_key(title_key, column.title_key))
         {
             return false;
         }
@@ -635,10 +617,7 @@ namespace
         return true;
     }
 
-    bool fill_descriptor(
-        ArchiveIndex& index,
-        const wchar_t* language_tag,
-        FileDirectoryDescriptor& descriptor)
+    bool fill_descriptor(ArchiveIndex& index, FileDirectoryDescriptor& descriptor)
     {
         FileDirectoryDescriptor result;
         result.presentation = FileDirectoryPresentation::tree;
@@ -648,14 +627,12 @@ namespace
                 result,
                 L"file-count",
                 L"Info.FileCount",
-                language_tag,
                 FileDirectoryValueKind::unsigned_integer,
                 index.file_count) ||
             !add_info_field(
                 result,
                 L"format",
                 L"Info.Format",
-                language_tag,
                 FileDirectoryValueKind::text,
                 0,
                 0.0,
@@ -664,7 +641,6 @@ namespace
                 result,
                 L"packed-size",
                 L"Info.ArchiveSize",
-                language_tag,
                 FileDirectoryValueKind::bytes,
                 index.packed_size))
         {
@@ -675,7 +651,6 @@ namespace
                  result,
                  L"original-size",
                  L"Info.OriginalSize",
-                 language_tag,
                  FileDirectoryValueKind::bytes,
                  index.original_size) ||
              (index.original_size != 0 &&
@@ -683,7 +658,6 @@ namespace
                   result,
                   L"ratio",
                   L"Info.Ratio",
-                  language_tag,
                   FileDirectoryValueKind::ratio,
                   0,
                   static_cast<double>(index.packed_size) /
@@ -696,11 +670,11 @@ namespace
                 result,
                 L"encrypted",
                 L"Info.Encrypted",
-                language_tag,
                 FileDirectoryValueKind::text,
                 0,
                 0.0,
-                localized_string(L"Value.Yes", language_tag)))
+                L"Value.Yes",
+                ComponentTextKind::resource_key))
         {
             return false;
         }
@@ -712,7 +686,6 @@ namespace
                 ColumnKind::name,
                 L"name",
                 L"Column.Name",
-                language_tag,
                 FileDirectoryValueKind::text,
                 FileDirectoryAlignment::left,
                 0) ||
@@ -722,7 +695,6 @@ namespace
                 ColumnKind::type,
                 L"type",
                 L"Column.Type",
-                language_tag,
                 FileDirectoryValueKind::text,
                 FileDirectoryAlignment::left,
                 100))
@@ -737,7 +709,6 @@ namespace
                     ColumnKind::packed_size,
                     L"packed-size",
                     L"Column.PackedSize",
-                    language_tag,
                     FileDirectoryValueKind::bytes,
                     FileDirectoryAlignment::right,
                     110))
@@ -752,7 +723,6 @@ namespace
                      ColumnKind::modified,
                      L"modified",
                      L"Column.Modified",
-                     language_tag,
                      FileDirectoryValueKind::timestamp,
                      FileDirectoryAlignment::left,
                      150))
@@ -766,16 +736,9 @@ namespace
                 ColumnKind::original_size,
                 L"size",
                 L"Column.Size",
-                language_tag,
                 FileDirectoryValueKind::bytes,
                 FileDirectoryAlignment::right,
                 110))
-        {
-            return false;
-        }
-        index.folder_type = localized_string(L"Value.Folder", language_tag);
-        index.file_type = localized_string(L"Value.File", language_tag);
-        if (index.folder_type.empty() || index.file_type.empty())
         {
             return false;
         }
@@ -792,8 +755,7 @@ namespace
             registrar->register_extension == nullptr ||
             registrar->register_renderer == nullptr ||
             registration == nullptr ||
-            registration->size < sizeof(ComponentRegistration) ||
-            !component_resources.initialize())
+            registration->size < sizeof(ComponentRegistration))
         {
             return FALSE;
         }
@@ -816,15 +778,14 @@ namespace
         ComponentRegistration result;
         wcscpy_s(result.component_id, L"archive");
         wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
+        wcscpy_s(result.resource_path, L"resources.pri");
         result.preferred_kind = PreviewContentKind::directory;
         result.preferred_format = PreviewContentFormat::file_directory;
         *registration = result;
         return TRUE;
     }
 
-    BOOL WINAPI query_status(
-        const wchar_t* language_tag,
-        ComponentStatusResult* result) noexcept
+    BOOL WINAPI query_status(ComponentStatusResult* result) noexcept
     {
         if (result == nullptr || result->size < sizeof(ComponentStatusResult))
         {
@@ -838,11 +799,12 @@ namespace
             std::filesystem::is_regular_file(directory / L"7z.dll", error);
         ComponentStatusResult status;
         status.severity = available ? HealthSeverity::healthy : HealthSeverity::error;
-        if (!localize(display_name_key, language_tag, status.display_name) ||
-            !localize(
+        if (!glance::components::copy_resource_key(
+                display_name_key,
+                status.display_name_key) ||
+            !glance::components::copy_resource_key(
                 available ? status_available_key : status_unavailable_key,
-                language_tag,
-                status.detail))
+                status.detail_key))
         {
             return FALSE;
         }
@@ -852,7 +814,6 @@ namespace
 
     BOOL WINAPI query_loading_text(
         const wchar_t* path,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept
     {
         if (path == nullptr || result == nullptr ||
@@ -861,7 +822,7 @@ namespace
             return FALSE;
         }
         ComponentLoadingTextResult text;
-        if (!localize(loading_key, language_tag, text.text))
+        if (!glance::components::copy_resource_key(loading_key, text.key))
         {
             return FALSE;
         }
@@ -876,7 +837,6 @@ namespace
 
     PrepareStatus WINAPI prepare_preview(
         const wchar_t* path,
-        const wchar_t*,
         PreparedPreview* preview) noexcept
     {
         if (path == nullptr || preview == nullptr ||
@@ -922,7 +882,6 @@ namespace
 
     FileDirectoryOpenStatus WINAPI open_directory(
         std::uint64_t token,
-        const wchar_t* language_tag,
         const wchar_t* password,
         FileDirectoryDescriptor* descriptor) noexcept
     {
@@ -961,7 +920,7 @@ namespace
             default:
                 return FileDirectoryOpenStatus::failed;
             }
-            return fill_descriptor(*lease->index, language_tag, *descriptor)
+            return fill_descriptor(*lease->index, *descriptor)
                 ? FileDirectoryOpenStatus::ready
                 : FileDirectoryOpenStatus::failed;
         }
@@ -1030,12 +989,13 @@ namespace
                         break;
                     case ColumnKind::type:
                         value.kind = FileDirectoryValueKind::text;
-                        texts.push_back(
-                            (node.flags & entry_is_folder) != 0
-                                ? lease->index->folder_type
-                                : node.type.empty()
-                                    ? lease->index->file_type
-                                    : node.type + L" " + lease->index->file_type);
+                        value.text_kind =
+                            (node.flags & entry_is_folder) != 0 || node.type.empty()
+                            ? ComponentTextKind::resource_key
+                            : ComponentTextKind::literal;
+                        texts.push_back((node.flags & entry_is_folder) != 0
+                                ? L"Value.Folder"
+                                : node.type.empty() ? L"Value.File" : node.type);
                         value.text = texts.back().c_str();
                         break;
                     case ColumnKind::modified:
@@ -1115,7 +1075,6 @@ namespace
             std::scoped_lock lock(lease_mutex);
             leases.clear();
         }
-        component_resources.shutdown();
     }
 }
 

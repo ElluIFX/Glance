@@ -193,7 +193,7 @@ namespace
         PreparedPreview preview;
         const auto total_start = steady_clock::now();
         const auto prepare_start = steady_clock::now();
-        result.prepare_status = api.prepare_preview(source.c_str(), L"en-US", &preview);
+        result.prepare_status = api.prepare_preview(source.c_str(), &preview);
         result.component_prepare_ms = duration_cast<milliseconds>(
             steady_clock::now() - prepare_start).count();
         result.native_output_valid = result.prepare_status == PrepareStatus::success &&

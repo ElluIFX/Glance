@@ -35,7 +35,11 @@
   <data name="MediaInfo.Duration" xml:space="preserve"><value>Duration</value></data>
   <data name="MediaInfo.OverallBitrate" xml:space="preserve"><value>Overall bitrate</value></data>
   <data name="MediaInfo.Chapters" xml:space="preserve"><value>Chapters</value></data>
-  <data name="MediaInfo.StreamHeading" xml:space="preserve"><value>{0} stream {1}</value></data>
+  <data name="MediaInfo.VideoStream" xml:space="preserve"><value>Video stream {0}</value></data>
+  <data name="MediaInfo.AudioStream" xml:space="preserve"><value>Audio stream {0}</value></data>
+  <data name="MediaInfo.SubtitleStream" xml:space="preserve"><value>Subtitle stream {0}</value></data>
+  <data name="MediaInfo.AttachmentStream" xml:space="preserve"><value>Attachment stream {0}</value></data>
+  <data name="MediaInfo.DataStream" xml:space="preserve"><value>Data stream {0}</value></data>
   <data name="MediaInfo.Codec" xml:space="preserve"><value>Codec</value></data>
   <data name="MediaInfo.Resolution" xml:space="preserve"><value>Resolution</value></data>
   <data name="MediaInfo.FrameRate" xml:space="preserve"><value>Frame rate</value></data>
@@ -53,6 +57,7 @@
   <data name="MediaInfo.Title" xml:space="preserve"><value>Title</value></data>
   <data name="MediaInfo.Default" xml:space="preserve"><value>Default</value></data>
   <data name="MediaInfo.Forced" xml:space="preserve"><value>Forced</value></data>
+  <data name="MediaInfo.DefaultForced" xml:space="preserve"><value>Default, forced</value></data>
   <data name="MediaInfo.Disposition" xml:space="preserve"><value>Disposition</value></data>
   <data name="MediaInfo.Metadata" xml:space="preserve"><value>Metadata</value></data>
   <data name="MediaType.Video" xml:space="preserve"><value>Video</value></data>

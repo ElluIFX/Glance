@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #include "glance/contracts/component_api.h"
-#include "../Common/component_localization.h"
+#include "../Common/component_text.h"
 #include "../../version.h"
 
 #include <algorithm>
@@ -28,17 +28,6 @@ namespace
         L"Settings.RenderResolution.8192" };
     constexpr std::array<std::int64_t, 4> setting_option_values{
         1024, 2048, 4096, 8192 };
-
-    glance::components::ComponentResourceStore component_resources;
-
-    template <std::size_t Size>
-    bool localize(
-        const wchar_t* key,
-        const wchar_t* language_tag,
-        wchar_t (&destination)[Size]) noexcept
-    {
-        return component_resources.copy(key, language_tag, destination, Size);
-    }
 
     std::filesystem::path component_directory() noexcept
     {
@@ -74,7 +63,6 @@ namespace
             registrar->register_renderer == nullptr ||
             registration == nullptr ||
             registration->size < sizeof(ComponentRegistration) ||
-            !component_resources.initialize() ||
             !registrar->register_extension(registrar->context, L".pdf") ||
             !registrar->register_renderer(
                 registrar->context,
@@ -89,15 +77,14 @@ namespace
         ComponentRegistration result;
         wcscpy_s(result.component_id, L"pdf");
         wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
+        wcscpy_s(result.resource_path, L"resources.pri");
         result.preferred_kind = PreviewContentKind::document;
         result.preferred_format = PreviewContentFormat::pdf;
         *registration = result;
         return TRUE;
     }
 
-    BOOL WINAPI query_status(
-        const wchar_t* language_tag,
-        ComponentStatusResult* result) noexcept
+    BOOL WINAPI query_status(ComponentStatusResult* result) noexcept
     {
         if (result == nullptr || result->size < sizeof(ComponentStatusResult))
         {
@@ -110,11 +97,12 @@ namespace
             std::filesystem::is_regular_file(directory / L"pdfium.dll", error);
         ComponentStatusResult status;
         status.severity = available ? HealthSeverity::healthy : HealthSeverity::error;
-        if (!localize(display_name_key, language_tag, status.display_name) ||
-            !localize(
+        if (!glance::components::copy_resource_key(
+                display_name_key,
+                status.display_name_key) ||
+            !glance::components::copy_resource_key(
                 available ? status_available_key : status_unavailable_key,
-                language_tag,
-                status.detail))
+                status.detail_key))
         {
             return FALSE;
         }
@@ -124,7 +112,6 @@ namespace
 
     BOOL WINAPI query_loading_text(
         const wchar_t* path,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept
     {
         if (path == nullptr || result == nullptr ||
@@ -133,7 +120,7 @@ namespace
             return FALSE;
         }
         ComponentLoadingTextResult text;
-        if (!localize(loading_key, language_tag, text.text))
+        if (!glance::components::copy_resource_key(loading_key, text.key))
         {
             return FALSE;
         }
@@ -149,7 +136,6 @@ namespace
 
     PrepareStatus WINAPI prepare_preview(
         const wchar_t* path,
-        const wchar_t*,
         PreparedPreview* preview) noexcept
     {
         if (path == nullptr || preview == nullptr ||
@@ -206,7 +192,6 @@ namespace
     }
 
     BOOL WINAPI enumerate_settings(
-        const wchar_t* language_tag,
         ComponentSettingDescriptor* descriptors,
         std::uint32_t capacity,
         std::uint32_t* count) noexcept
@@ -230,19 +215,24 @@ namespace
         setting.group_order = 1000;
         setting.setting_order = 0;
         setting.option_count = static_cast<std::uint32_t>(setting_option_values.size());
-        if (!localize(settings_group_key, language_tag, setting.group_title) ||
-            !localize(settings_label_key, language_tag, setting.label) ||
-            !localize(settings_description_key, language_tag, setting.description))
+        if (!glance::components::copy_resource_key(
+                settings_group_key,
+                setting.group_title_key) ||
+            !glance::components::copy_resource_key(
+                settings_label_key,
+                setting.label_key) ||
+            !glance::components::copy_resource_key(
+                settings_description_key,
+                setting.description_key))
         {
             return FALSE;
         }
         for (std::size_t index = 0; index < setting_option_values.size(); ++index)
         {
             setting.options[index].value = setting_option_values[index];
-            if (!localize(
+            if (!glance::components::copy_resource_key(
                     setting_option_keys[index],
-                    language_tag,
-                    setting.options[index].text))
+                    setting.options[index].text_key))
             {
                 return FALSE;
             }
@@ -281,10 +271,7 @@ namespace
         return FALSE;
     }
 
-    void WINAPI shutdown() noexcept
-    {
-        component_resources.shutdown();
-    }
+    void WINAPI shutdown() noexcept {}
 }
 
 extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(

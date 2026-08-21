@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../Common/component_localization.h"
+#include "../Common/component_text.h"
 #include "../../version.h"
 #include "glance/contracts/component_api.h"
 
@@ -53,10 +53,8 @@ namespace
     struct PreviewLease
     {
         std::filesystem::path source_path;
-        std::wstring language_tag;
     };
 
-    glance::components::ComponentResourceStore component_resources;
     std::mutex lease_mutex;
     std::unordered_map<std::uint64_t, PreviewLease> leases;
     std::atomic_uint64_t next_lease_token{ 1 };
@@ -81,23 +79,6 @@ namespace
         }
         path.resize(length);
         return std::filesystem::path(path).parent_path();
-    }
-
-    template <std::size_t Size>
-    bool localize(
-        const wchar_t* key,
-        const wchar_t* language_tag,
-        wchar_t (&destination)[Size]) noexcept
-    {
-        return component_resources.copy(key, language_tag, destination, Size);
-    }
-
-    std::wstring localized_string(
-        const wchar_t* key,
-        const wchar_t* language_tag)
-    {
-        wchar_t text[loading_text_capacity]{};
-        return localize(key, language_tag, text) ? std::wstring(text) : std::wstring{};
     }
 
     std::wstring lower_extension(const std::filesystem::path& path)
@@ -220,8 +201,7 @@ namespace
             registrar->size < sizeof(ComponentRegistrar) ||
             registrar->register_extension == nullptr ||
             registration == nullptr ||
-            registration->size < sizeof(ComponentRegistration) ||
-            !component_resources.initialize())
+            registration->size < sizeof(ComponentRegistration))
         {
             return FALSE;
         }
@@ -236,15 +216,14 @@ namespace
         ComponentRegistration result;
         wcscpy_s(result.component_id, L"model3d");
         wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
+        wcscpy_s(result.resource_path, L"resources.pri");
         result.preferred_kind = PreviewContentKind::web;
         result.preferred_format = PreviewContentFormat::html;
         *registration = result;
         return TRUE;
     }
 
-    BOOL WINAPI query_status(
-        const wchar_t* language_tag,
-        ComponentStatusResult* result) noexcept
+    BOOL WINAPI query_status(ComponentStatusResult* result) noexcept
     {
         if (result == nullptr || result->size < sizeof(ComponentStatusResult))
         {
@@ -252,8 +231,10 @@ namespace
         }
         ComponentStatusResult status;
         status.severity = HealthSeverity::healthy;
-        if (!localize(display_name_key, language_tag, status.display_name) ||
-            !localize(status_key, language_tag, status.detail))
+        if (!glance::components::copy_resource_key(
+                display_name_key,
+                status.display_name_key) ||
+            !glance::components::copy_resource_key(status_key, status.detail_key))
         {
             return FALSE;
         }
@@ -263,7 +244,6 @@ namespace
 
     BOOL WINAPI query_loading_text(
         const wchar_t* path,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept
     {
         if (path == nullptr ||
@@ -278,7 +258,7 @@ namespace
             const auto key = cad_extension(lower_extension(path))
                 ? cad_loading_key
                 : loading_key;
-            if (!localize(key, language_tag, loading.text))
+            if (!glance::components::copy_resource_key(key, loading.key))
             {
                 return FALSE;
             }
@@ -312,7 +292,6 @@ namespace
 
     PrepareStatus WINAPI prepare_preview(
         const wchar_t* path,
-        const wchar_t* language_tag,
         PreparedPreview* preview) noexcept
     {
         if (path == nullptr ||
@@ -333,7 +312,7 @@ namespace
             std::error_code error;
             if (!std::filesystem::is_regular_file(viewer_path, error))
             {
-                localize(failed_key, language_tag, preview->error_detail);
+                glance::components::copy_resource_key(failed_key, preview->error_key);
                 return PrepareStatus::failed;
             }
 
@@ -349,9 +328,7 @@ namespace
                 leases.insert_or_assign(
                     lease_token,
                     PreviewLease{
-                        .source_path = std::filesystem::absolute(source),
-                        .language_tag =
-                            language_tag != nullptr ? language_tag : L"" });
+                        .source_path = std::filesystem::absolute(source) });
             }
 
             const auto output_path = viewer_path.wstring();
@@ -359,7 +336,7 @@ namespace
             {
                 std::scoped_lock lock(lease_mutex);
                 leases.erase(lease_token);
-                localize(failed_key, language_tag, preview->error_detail);
+                glance::components::copy_resource_key(failed_key, preview->error_key);
                 return PrepareStatus::failed;
             }
 
@@ -373,7 +350,7 @@ namespace
         }
         catch (...)
         {
-            localize(failed_key, language_tag, preview->error_detail);
+            glance::components::copy_resource_key(failed_key, preview->error_key);
             return PrepareStatus::failed;
         }
     }
@@ -423,31 +400,6 @@ namespace
             }
 
             const auto extension = lower_extension(lease.source_path);
-            const auto loading = localized_string(
-                cad_extension(extension)
-                    ? viewer_cad_loading_key
-                    : viewer_loading_key,
-                lease.language_tag.c_str());
-            const auto failed =
-                localized_string(viewer_failed_key, lease.language_tag.c_str());
-            const auto empty =
-                localized_string(viewer_empty_key, lease.language_tag.c_str());
-            const auto fit =
-                localized_string(fit_key, lease.language_tag.c_str());
-            const auto grid =
-                localized_string(grid_key, lease.language_tag.c_str());
-            const auto wireframe =
-                localized_string(wireframe_key, lease.language_tag.c_str());
-            if (loading.empty() ||
-                failed.empty() ||
-                empty.empty() ||
-                fit.empty() ||
-                grid.empty() ||
-                wireframe.empty())
-            {
-                return FALSE;
-            }
-
             const std::wstring model_uri =
                 std::wstring(L"https://") + model_host + L"/" +
                 url_encode(lease.source_path.filename().wstring());
@@ -469,12 +421,6 @@ namespace
                 options->color_scheme == PreviewColorScheme::dark
                     ? L"dark"
                     : L"light");
-            append_parameter(navigation, L"loading", loading);
-            append_parameter(navigation, L"failed", failed);
-            append_parameter(navigation, L"empty", empty);
-            append_parameter(navigation, L"fit", fit);
-            append_parameter(navigation, L"grid", grid);
-            append_parameter(navigation, L"wireframe", wireframe);
             if (navigation.size() + 1 > preview_path_capacity)
             {
                 return FALSE;
@@ -493,6 +439,28 @@ namespace
                 result->mappings[1].folder_path,
                 source_root.wstring().c_str());
             result->mappings[1].access_kind = WebResourceAccessKind::allow;
+            constexpr std::array parameter_names{
+                L"loading", L"failed", L"empty", L"fit", L"grid", L"wireframe" };
+            const std::array parameter_keys{
+                cad_extension(extension)
+                    ? viewer_cad_loading_key
+                    : viewer_loading_key,
+                viewer_failed_key,
+                viewer_empty_key,
+                fit_key,
+                grid_key,
+                wireframe_key };
+            result->localized_parameter_count =
+                static_cast<std::uint32_t>(parameter_names.size());
+            for (std::size_t index = 0; index < parameter_names.size(); ++index)
+            {
+                wcscpy_s(
+                    result->localized_parameters[index].name,
+                    parameter_names[index]);
+                wcscpy_s(
+                    result->localized_parameters[index].resource_key,
+                    parameter_keys[index]);
+            }
             *descriptor = *result;
             return TRUE;
         }
@@ -531,7 +499,6 @@ namespace
             std::scoped_lock lock(lease_mutex);
             leases.clear();
         }
-        component_resources.shutdown();
     }
 }
 

@@ -113,9 +113,14 @@ namespace
         DependencyFailure dependency_failure{ DependencyFailure::none };
         bool activation_ready{ true };
         bool active{};
+        bool resources_registered{};
 
         ~LoadedComponent()
         {
+            if (resources_registered)
+            {
+                glance::app::unregister_component_resources(id);
+            }
             if (api.shutdown != nullptr)
             {
                 api.shutdown();
@@ -219,6 +224,28 @@ namespace
                     (character >= L'0' && character <= L'9') ||
                     character == L'-';
             });
+    }
+
+    bool valid_resource_key(std::wstring_view key) noexcept
+    {
+        return !key.empty() &&
+            key.size() < glance::contracts::components::resource_key_capacity &&
+            std::ranges::all_of(key, [](wchar_t character) {
+                return (character >= L'a' && character <= L'z') ||
+                    (character >= L'A' && character <= L'Z') ||
+                    (character >= L'0' && character <= L'9') ||
+                    character == L'.' || character == L'-' ||
+                    character == L'_' || character == L'/';
+            });
+    }
+
+    std::wstring localize_component_key(
+        const LoadedComponent& component,
+        std::wstring_view key)
+    {
+        return valid_resource_key(key)
+            ? glance::app::localize_component(component.id, key)
+            : std::wstring{};
     }
 
     void log_component_failure(
@@ -455,14 +482,42 @@ namespace
             .register_extension = register_extension,
             .register_renderer = register_renderer };
         if (!component->api.initialize(&registrar, &component->registration) ||
-            component->registration.size < sizeof(ComponentRegistration) ||
-            manifest.id != component->registration.component_id ||
-            std::wstring_view(component->registration.target_app_version) !=
-                GLANCE_VERSION_WSTRING)
+            component->registration.size < sizeof(ComponentRegistration))
+        {
+            return {};
+        }
+        const auto registered_id = bounded_string(component->registration.component_id);
+        const auto target_version =
+            bounded_string(component->registration.target_app_version);
+        const auto resource_path = bounded_string(component->registration.resource_path);
+        if (!registered_id.has_value() || manifest.id != *registered_id ||
+            !target_version.has_value() || *target_version != GLANCE_VERSION_WSTRING ||
+            !resource_path.has_value() || resource_path->empty())
+        {
+            return {};
+        }
+        const std::filesystem::path relative_resources(*resource_path);
+        if (relative_resources.is_absolute() || relative_resources.has_root_path() ||
+            std::ranges::any_of(relative_resources, [](const auto& part) {
+                return part == L"..";
+            }))
+        {
+            return {};
+        }
+        const auto absolute_resources = directory / relative_resources;
+        std::error_code resource_error;
+        if (!std::filesystem::is_regular_file(absolute_resources, resource_error))
         {
             return {};
         }
         component->id = manifest.id;
+        if (!glance::app::register_component_resources(
+                component->id,
+                std::filesystem::absolute(absolute_resources)))
+        {
+            return {};
+        }
+        component->resources_registered = true;
         component->extensions = std::move(collector.extensions);
         component->renderers = std::move(collector.renderers);
         void* interface_pointer{};
@@ -1013,8 +1068,7 @@ namespace
 
     std::wstring query_loading_text(
         const LoadedComponent& component,
-        const std::wstring& path,
-        const std::wstring& language_tag)
+        const std::wstring& path)
     {
         if (component.api.query_loading_text == nullptr)
         {
@@ -1024,33 +1078,30 @@ namespace
         ComponentLoadingTextResult result;
         if (!component.api.query_loading_text(
                 path.c_str(),
-                language_tag.c_str(),
                 &result))
         {
             return {};
         }
-        const auto length = wcsnlen_s(result.text, std::size(result.text));
-        return length == std::size(result.text)
-            ? std::wstring{}
-            : std::wstring(result.text, length);
+        const auto key = bounded_string(result.key);
+        return key.has_value()
+            ? localize_component_key(component, *key)
+            : std::wstring{};
     }
 
     std::wstring query_refinement_text(
-        const RefinementSession& session,
-        const std::wstring& language_tag)
+        const RefinementSession& session)
     {
         ComponentLoadingTextResult result;
         if (!session.api.query_refinement_text(
                 session.token,
-                language_tag.c_str(),
                 &result))
         {
             return {};
         }
-        const auto length = wcsnlen_s(result.text, std::size(result.text));
-        return length == std::size(result.text)
-            ? std::wstring{}
-            : std::wstring(result.text, length);
+        const auto key = bounded_string(result.key);
+        return key.has_value()
+            ? localize_component_key(*session.component, *key)
+            : std::wstring{};
     }
 
     glance::app::ComponentPreviewResult materialize_preview(
@@ -1165,7 +1216,9 @@ namespace
             descriptor->size < sizeof(WebPreviewDescriptor) ||
             descriptor->mapping_count == 0 ||
             descriptor->mapping_count >
-                glance::contracts::components::maximum_web_resource_mappings)
+                glance::contracts::components::maximum_web_resource_mappings ||
+            descriptor->localized_parameter_count >
+                glance::contracts::components::maximum_web_localized_parameters)
         {
             return {};
         }
@@ -1182,6 +1235,37 @@ namespace
         result->navigation_uri.assign(
             descriptor->navigation_uri,
             navigation_length);
+        std::unordered_set<std::wstring> parameter_names;
+        for (std::uint32_t index = 0;
+             index < descriptor->localized_parameter_count;
+             ++index)
+        {
+            const auto name = bounded_string(
+                descriptor->localized_parameters[index].name);
+            const auto key = bounded_string(
+                descriptor->localized_parameters[index].resource_key);
+            if (!name.has_value() || !valid_setting_id(*name) ||
+                !parameter_names.insert(*name).second ||
+                !key.has_value() || !valid_resource_key(*key))
+            {
+                return {};
+            }
+            const auto localized = localize_component_key(component, *key);
+            result->navigation_uri.append(
+                result->navigation_uri.find(L'?') != std::wstring::npos
+                    ? L"&"
+                    : L"?");
+            result->navigation_uri.append(*name);
+            result->navigation_uri.push_back(L'=');
+            const auto encoded =
+                winrt::Windows::Foundation::Uri::EscapeComponent(localized);
+            result->navigation_uri.append(encoded.c_str());
+            if (result->navigation_uri.size() >=
+                glance::contracts::components::preview_path_capacity)
+            {
+                return {};
+            }
+        }
         std::unordered_set<std::wstring> hosts;
         for (std::uint32_t index = 0; index < descriptor->mapping_count; ++index)
         {
@@ -1224,6 +1308,7 @@ namespace
 
     struct FileDirectoryEntryCollector
     {
+        const LoadedComponent* component{};
         std::vector<glance::app::FileDirectoryEntry>* entries{};
         bool valid{ true };
     };
@@ -1257,11 +1342,23 @@ namespace
                     collector.valid = false;
                     return FALSE;
                 }
+                std::wstring text = value.text == nullptr ? L"" : value.text;
+                if (value.text_kind ==
+                    glance::contracts::components::ComponentTextKind::resource_key)
+                {
+                    text = localize_component_key(*collector.component, text);
+                }
+                else if (value.text_kind !=
+                         glance::contracts::components::ComponentTextKind::literal)
+                {
+                    collector.valid = false;
+                    return FALSE;
+                }
                 copied.values.push_back(glance::app::FileDirectoryValue{
                     .kind = value.kind,
                     .unsigned_value = value.unsigned_value,
                     .ratio_value = value.ratio_value,
-                    .text = value.text == nullptr ? L"" : value.text });
+                    .text = std::move(text) });
             }
             collector.entries->push_back(std::move(copied));
             return TRUE;
@@ -1283,10 +1380,10 @@ namespace
             return actions;
         }
 
-        const std::wstring language(language_tag);
+        static_cast<void>(language_tag);
         std::uint32_t count{};
         if (!component->component_management_action->enumerate_actions(
-                language.c_str(), nullptr, 0, &count) ||
+                nullptr, 0, &count) ||
             count == 0 ||
             count > glance::contracts::components::maximum_component_management_actions)
         {
@@ -1297,7 +1394,7 @@ namespace
             descriptors(count);
         std::uint32_t written = count;
         if (!component->component_management_action->enumerate_actions(
-                language.c_str(), descriptors.data(), count, &written) ||
+                descriptors.data(), count, &written) ||
             written != count)
         {
             return actions;
@@ -1306,19 +1403,20 @@ namespace
         for (const auto& descriptor : descriptors)
         {
             const auto action_id = bounded_string(descriptor.action_id);
-            const auto button_text = bounded_string(descriptor.button_text);
-            const auto confirmation_title = bounded_string(descriptor.confirmation_title);
-            const auto confirmation_message = bounded_string(descriptor.confirmation_message);
-            const auto confirmation_button = bounded_string(descriptor.confirmation_button);
-            const auto download_title = bounded_string(descriptor.download_title);
-            const auto download_message = bounded_string(descriptor.download_message);
-            const auto preparing_title = bounded_string(descriptor.preparing_title);
-            const auto preparing_message = bounded_string(descriptor.preparing_message);
-            const auto completed_title = bounded_string(descriptor.completed_title);
-            const auto completed_message = bounded_string(descriptor.completed_message);
+            const auto button_text = bounded_string(descriptor.button_text_key);
+            const auto confirmation_title = bounded_string(descriptor.confirmation_title_key);
+            const auto confirmation_message = bounded_string(descriptor.confirmation_message_key);
+            const auto confirmation_button = bounded_string(descriptor.confirmation_button_key);
+            const auto download_title = bounded_string(descriptor.download_title_key);
+            const auto download_message = bounded_string(descriptor.download_message_key);
+            const auto preparing_title = bounded_string(descriptor.preparing_title_key);
+            const auto preparing_message = bounded_string(descriptor.preparing_message_key);
+            const auto completed_title = bounded_string(descriptor.completed_title_key);
+            const auto completed_message = bounded_string(descriptor.completed_message_key);
             if (descriptor.size < sizeof(descriptor) ||
                 !action_id.has_value() || !valid_setting_id(*action_id) ||
                 !button_text.has_value() || button_text->empty() ||
+                !valid_resource_key(*button_text) ||
                 !confirmation_title.has_value() || !confirmation_message.has_value() ||
                 !confirmation_button.has_value() ||
                 (((!confirmation_title->empty() || !confirmation_message->empty() ||
@@ -1326,10 +1424,13 @@ namespace
                   (confirmation_title->empty() || confirmation_message->empty() ||
                    confirmation_button->empty()))) ||
                 !download_title.has_value() || download_title->empty() ||
+                !valid_resource_key(*download_title) ||
                 !download_message.has_value() ||
                 !preparing_title.has_value() || preparing_title->empty() ||
+                !valid_resource_key(*preparing_title) ||
                 !preparing_message.has_value() ||
                 !completed_title.has_value() || completed_title->empty() ||
+                !valid_resource_key(*completed_title) ||
                 !completed_message.has_value())
             {
                 continue;
@@ -1338,16 +1439,22 @@ namespace
                 .component_id = component->id,
                 .action_id = std::move(*action_id),
                 .order = descriptor.order,
-                .button_text = std::move(*button_text),
-                .confirmation_title = std::move(*confirmation_title),
-                .confirmation_message = std::move(*confirmation_message),
-                .confirmation_button = std::move(*confirmation_button),
-                .download_title = std::move(*download_title),
-                .download_message = std::move(*download_message),
-                .preparing_title = std::move(*preparing_title),
-                .preparing_message = std::move(*preparing_message),
-                .completed_title = std::move(*completed_title),
-                .completed_message = std::move(*completed_message),
+                .button_text = localize_component_key(*component, *button_text),
+                .confirmation_title = confirmation_title->empty()
+                    ? L"" : localize_component_key(*component, *confirmation_title),
+                .confirmation_message = confirmation_message->empty()
+                    ? L"" : localize_component_key(*component, *confirmation_message),
+                .confirmation_button = confirmation_button->empty()
+                    ? L"" : localize_component_key(*component, *confirmation_button),
+                .download_title = localize_component_key(*component, *download_title),
+                .download_message = download_message->empty()
+                    ? L"" : localize_component_key(*component, *download_message),
+                .preparing_title = localize_component_key(*component, *preparing_title),
+                .preparing_message = preparing_message->empty()
+                    ? L"" : localize_component_key(*component, *preparing_message),
+                .completed_title = localize_component_key(*component, *completed_title),
+                .completed_message = completed_message->empty()
+                    ? L"" : localize_component_key(*component, *completed_message),
                 .lease = std::static_pointer_cast<void>(component) });
         }
         std::ranges::sort(actions, [](const auto& left, const auto& right) {
@@ -1401,6 +1508,140 @@ namespace
     {
         return context != nullptr &&
             static_cast<HoverInfoCollector*>(context)->cancelled->load(
+                std::memory_order_acquire);
+    }
+
+    struct InformationPanelCollector
+    {
+        const LoadedComponent* component{};
+        std::wstring text;
+        const std::atomic_bool* cancelled{};
+        bool valid{ true };
+    };
+
+    std::optional<std::wstring> resolve_information_panel_text(
+        const InformationPanelCollector& collector,
+        const glance::contracts::components::InformationPanelText& text)
+    {
+        const auto value = bounded_string(text.value);
+        if (!value.has_value() ||
+            text.argument_count >
+                glance::contracts::components::maximum_information_panel_arguments)
+        {
+            return std::nullopt;
+        }
+        std::wstring result;
+        if (text.kind == glance::contracts::components::ComponentTextKind::resource_key)
+        {
+            if (!valid_resource_key(*value))
+            {
+                return std::nullopt;
+            }
+            result = localize_component_key(*collector.component, *value);
+        }
+        else if (text.kind == glance::contracts::components::ComponentTextKind::literal)
+        {
+            result = *value;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+        for (std::uint32_t index = 0; index < text.argument_count; ++index)
+        {
+            const auto argument = bounded_string(text.arguments[index]);
+            if (!argument.has_value())
+            {
+                return std::nullopt;
+            }
+            const std::wstring token = L"{" + std::to_wstring(index) + L"}";
+            std::size_t position{};
+            while ((position = result.find(token, position)) != std::wstring::npos)
+            {
+                result.replace(position, token.size(), *argument);
+                position += argument->size();
+            }
+        }
+        return result;
+    }
+
+    BOOL WINAPI append_information_panel_entry(
+        void* context,
+        const glance::contracts::components::InformationPanelEntry* entry) noexcept
+    {
+        if (context == nullptr || entry == nullptr ||
+            entry->size < sizeof(*entry))
+        {
+            return FALSE;
+        }
+        auto& collector = *static_cast<InformationPanelCollector*>(context);
+        try
+        {
+            if (collector.cancelled->load(std::memory_order_acquire))
+            {
+                collector.valid = false;
+                return FALSE;
+            }
+            auto label = resolve_information_panel_text(collector, entry->label);
+            auto value = resolve_information_panel_text(collector, entry->value);
+            if (!label.has_value() || label->empty() || !value.has_value())
+            {
+                collector.valid = false;
+                return FALSE;
+            }
+            if (entry->kind ==
+                glance::contracts::components::InformationPanelEntryKind::section)
+            {
+                if (!value->empty())
+                {
+                    collector.valid = false;
+                    return FALSE;
+                }
+                if (!collector.text.empty())
+                {
+                    collector.text.append(L"\n\n");
+                }
+                collector.text.append(*label);
+            }
+            else if (entry->kind ==
+                     glance::contracts::components::InformationPanelEntryKind::field)
+            {
+                if (value->empty())
+                {
+                    collector.valid = false;
+                    return FALSE;
+                }
+                if (!collector.text.empty())
+                {
+                    collector.text.push_back(L'\n');
+                }
+                collector.text.append(*label);
+                collector.text.append(L": ");
+                collector.text.append(*value);
+            }
+            else
+            {
+                collector.valid = false;
+                return FALSE;
+            }
+            if (collector.text.size() > 256 * 1024)
+            {
+                collector.valid = false;
+                return FALSE;
+            }
+            return TRUE;
+        }
+        catch (...)
+        {
+            collector.valid = false;
+            return FALSE;
+        }
+    }
+
+    BOOL WINAPI information_panel_cancelled(void* context) noexcept
+    {
+        return context != nullptr &&
+            static_cast<InformationPanelCollector*>(context)->cancelled->load(
                 std::memory_order_acquire);
     }
 
@@ -1578,14 +1819,14 @@ namespace glance::app
         try
         {
             initialize_components();
-            const std::wstring language(language_tag);
+            static_cast<void>(language_tag);
             for (const auto& component : candidates_for_path(path))
             {
                 if (component->api.can_preview(path.c_str()))
                 {
                     return ComponentLoadingMessage{
                         .component_found = true,
-                        .text = query_loading_text(*component, path, language) };
+                        .text = query_loading_text(*component, path) };
                 }
             }
         }
@@ -1606,7 +1847,7 @@ namespace glance::app
         try
         {
             initialize_components();
-            const std::wstring language(language_tag);
+            static_cast<void>(language_tag);
             for (const auto& component : candidates_for_path(path))
             {
                 if (!component->api.can_preview(path.c_str()))
@@ -1617,7 +1858,7 @@ namespace glance::app
                 {
                     try
                     {
-                        loading_callback(query_loading_text(*component, path, language));
+                        loading_callback(query_loading_text(*component, path));
                     }
                     catch (...)
                     {
@@ -1629,14 +1870,17 @@ namespace glance::app
                 result.status = component->configurable_preview.has_value()
                     ? component->configurable_preview->prepare_preview(
                         path.c_str(),
-                        language.c_str(),
                         &options,
                         &preview)
                     : component->api.prepare_preview(
                         path.c_str(),
-                        language.c_str(),
                         &preview);
-                result.error_detail = preview.error_detail;
+                if (const auto error_key = bounded_string(preview.error_key);
+                    error_key.has_value() && !error_key->empty())
+                {
+                    result.error_detail =
+                        localize_component_key(*component, *error_key);
+                }
                 if (result.status !=
                     glance::contracts::components::PrepareStatus::success)
                 {
@@ -1675,14 +1919,13 @@ namespace glance::app
                     PreviewNoticeResult notice;
                     if (component->preview_notice->query_preview_notice(
                             preview.lease_token,
-                            language.c_str(),
                             &notice))
                     {
-                        const auto length =
-                            wcsnlen_s(notice.text, std::size(notice.text));
-                        if (length != std::size(notice.text))
+                        const auto notice_key = bounded_string(notice.text_key);
+                        if (notice_key.has_value() && !notice_key->empty())
                         {
-                            result.notice.assign(notice.text, length);
+                            result.notice =
+                                localize_component_key(*component, *notice_key);
                             result.notice_severity = notice.severity;
                             result.notice_duration_ms = notice.duration_ms;
                         }
@@ -1702,7 +1945,7 @@ namespace glance::app
                     session->format = preview.format;
                     session->token = preview.lease_token;
                     result.refinement_text =
-                        query_refinement_text(*session, language);
+                        query_refinement_text(*session);
                     result.refinement = std::move(session);
                 }
                 return result;
@@ -1730,13 +1973,17 @@ namespace glance::app
             const auto session =
                 std::static_pointer_cast<RefinementSession>(refinement);
             PreparedPreview preview;
-            const std::wstring language(language_tag);
+            static_cast<void>(language_tag);
             result.status = session->api.prepare_refined_preview(
                 session->token,
-                language.c_str(),
                 &session->options,
                 &preview);
-            result.error_detail = preview.error_detail;
+            if (const auto error_key = bounded_string(preview.error_key);
+                error_key.has_value() && !error_key->empty())
+            {
+                result.error_detail =
+                    localize_component_key(*session->component, *error_key);
+            }
             if (result.status !=
                 glance::contracts::components::PrepareStatus::success)
             {
@@ -1775,11 +2022,10 @@ namespace glance::app
         {
             const auto session = std::static_pointer_cast<FileDirectorySession>(session_value);
             glance::contracts::components::FileDirectoryDescriptor native;
-            const std::wstring language(language_tag);
+            static_cast<void>(language_tag);
             const std::wstring password_value(password);
             const auto status = session->api.open(
                 session->token,
-                language.c_str(),
                 password_value.c_str(),
                 &native);
             if (status != FileDirectoryOpenStatus::ready)
@@ -1805,23 +2051,36 @@ namespace glance::app
             {
                 const auto& field = native.info_fields[index];
                 const auto id = bounded_string(field.id);
-                const auto label = bounded_string(field.label);
+                const auto label_key = bounded_string(field.label_key);
                 const auto value = bounded_string(field.text);
                 if (!id.has_value() || !valid_setting_id(*id) ||
                     !info_ids.insert(*id).second ||
-                    !label.has_value() || label->empty() || !value.has_value() ||
+                    !label_key.has_value() || !valid_resource_key(*label_key) ||
+                    !value.has_value() ||
                     !valid_file_directory_value_kind(field.kind))
                 {
                     return FileDirectoryOpenStatus::failed;
                 }
                 descriptor.info_fields.push_back(FileDirectoryInfoField{
                     .id = *id,
-                    .label = *label,
+                    .label = localize_component_key(
+                        *session->component,
+                        *label_key),
                     .value = FileDirectoryValue{
                         .kind = field.kind,
                         .unsigned_value = field.unsigned_value,
                         .ratio_value = field.ratio_value,
-                        .text = *value } });
+                        .text = field.text_kind ==
+                                glance::contracts::components::ComponentTextKind::resource_key
+                            ? localize_component_key(*session->component, *value)
+                            : *value } });
+                if (field.text_kind !=
+                        glance::contracts::components::ComponentTextKind::literal &&
+                    field.text_kind !=
+                        glance::contracts::components::ComponentTextKind::resource_key)
+                {
+                    return FileDirectoryOpenStatus::failed;
+                }
             }
             descriptor.columns.reserve(native.column_count);
             std::unordered_set<std::wstring> column_ids;
@@ -1829,10 +2088,10 @@ namespace glance::app
             {
                 const auto& column = native.columns[index];
                 const auto id = bounded_string(column.id);
-                const auto title = bounded_string(column.title);
+                const auto title_key = bounded_string(column.title_key);
                 if (!id.has_value() || !valid_setting_id(*id) ||
                     !column_ids.insert(*id).second ||
-                    !title.has_value() || title->empty() ||
+                    !title_key.has_value() || !valid_resource_key(*title_key) ||
                     !valid_file_directory_value_kind(column.kind) ||
                     column.kind == FileDirectoryValueKind::none ||
                     (column.alignment != FileDirectoryAlignment::left &&
@@ -1843,7 +2102,9 @@ namespace glance::app
                 }
                 descriptor.columns.push_back(FileDirectoryColumn{
                     .id = *id,
-                    .title = *title,
+                    .title = localize_component_key(
+                        *session->component,
+                        *title_key),
                     .kind = column.kind,
                     .alignment = column.alignment,
                     .width = column.width,
@@ -1880,7 +2141,9 @@ namespace glance::app
         {
             const auto session = std::static_pointer_cast<FileDirectorySession>(session_value);
             result.entries.reserve(limit);
-            FileDirectoryEntryCollector collector{ .entries = &result.entries };
+            FileDirectoryEntryCollector collector{
+                .component = session->component.get(),
+                .entries = &result.entries };
             glance::contracts::components::FileDirectoryEntrySink sink{
                 .context = &collector,
                 .append = append_file_directory_entry };
@@ -1921,15 +2184,24 @@ namespace glance::app
         }
 
         std::vector<ComponentStatus> statuses;
+        static_cast<void>(language_tag);
         for (const auto& component : components)
         {
             try
             {
                 glance::contracts::components::ComponentStatusResult status;
                 if (!component->api.query_status(
-                        std::wstring(language_tag).c_str(),
                         &status) ||
-                    status.display_name[0] == L'\0')
+                    status.display_name_key[0] == L'\0')
+                {
+                    continue;
+                }
+                const auto display_name_key = bounded_string(status.display_name_key);
+                const auto detail_key = bounded_string(status.detail_key);
+                if (!display_name_key.has_value() ||
+                    !valid_resource_key(*display_name_key) ||
+                    !detail_key.has_value() ||
+                    (!detail_key->empty() && !valid_resource_key(*detail_key)))
                 {
                     continue;
                 }
@@ -1942,7 +2214,9 @@ namespace glance::app
                 {
                     state = ComponentState::warning;
                 }
-                std::wstring detail = status.detail;
+                std::wstring detail = detail_key->empty()
+                    ? L""
+                    : localize_component_key(*component, *detail_key);
                 if (!component->active &&
                     component->dependency_failure != DependencyFailure::none)
                 {
@@ -1968,7 +2242,8 @@ namespace glance::app
                 }
                 statuses.push_back(ComponentStatus{
                     .id = component->id,
-                    .display_name = status.display_name,
+                    .display_name =
+                        localize_component_key(*component, *display_name_key),
                     .detail = std::move(detail),
                     .state = state,
                     .actions = enumerate_management_actions(component, language_tag) });
@@ -2006,7 +2281,7 @@ namespace glance::app
 
         std::vector<ComponentStatusBarShortcut> shortcuts;
         const std::wstring source(path);
-        const std::wstring language(language_tag);
+        static_cast<void>(language_tag);
         for (const auto& component : components)
         {
             if (!component->active || !component->status_bar_shortcut.has_value())
@@ -2017,7 +2292,7 @@ namespace glance::app
             {
                 std::uint32_t count{};
                 if (!component->status_bar_shortcut->enumerate_shortcuts(
-                        language.c_str(), nullptr, 0, &count) ||
+                        nullptr, 0, &count) ||
                     count == 0 ||
                     count > glance::contracts::components::maximum_status_bar_shortcuts)
                 {
@@ -2027,7 +2302,7 @@ namespace glance::app
                     descriptors(count);
                 std::uint32_t written = count;
                 if (!component->status_bar_shortcut->enumerate_shortcuts(
-                        language.c_str(), descriptors.data(), count, &written) ||
+                        descriptors.data(), count, &written) ||
                     written != count)
                 {
                     continue;
@@ -2035,10 +2310,11 @@ namespace glance::app
                 for (const auto& descriptor : descriptors)
                 {
                     const auto shortcut_id = bounded_string(descriptor.shortcut_id);
-                    const auto tooltip = bounded_string(descriptor.tooltip);
+                    const auto tooltip_key = bounded_string(descriptor.tooltip_key);
                     if (descriptor.size < sizeof(descriptor) ||
                         !shortcut_id.has_value() || !valid_setting_id(*shortcut_id) ||
-                        !tooltip.has_value() || tooltip->empty() ||
+                        !tooltip_key.has_value() ||
+                        !valid_resource_key(*tooltip_key) ||
                         descriptor.target_kind != kind ||
                         (descriptor.target_format != PreviewContentFormat::none &&
                          descriptor.target_format != format) ||
@@ -2061,7 +2337,9 @@ namespace glance::app
                     shortcuts.push_back(ComponentStatusBarShortcut{
                         .component_id = component->id,
                         .shortcut_id = std::move(*shortcut_id),
-                        .tooltip = std::move(*tooltip),
+                        .tooltip = localize_component_key(
+                            *component,
+                            *tooltip_key),
                         .order = descriptor.order,
                         .fluent_icon_glyph = descriptor.fluent_icon_glyph,
                         .state = state == glance::contracts::components::StatusBarShortcutState::ready
@@ -2103,11 +2381,10 @@ namespace glance::app
             }
             glance::contracts::components::StatusBarShortcutActivationResult result;
             const std::wstring source(path);
-            const std::wstring language(language_tag);
+            static_cast<void>(language_tag);
             if (!component->status_bar_shortcut->activate(
                     shortcut.shortcut_id.c_str(),
                     source.c_str(),
-                    language.c_str(),
                     requested_checked ? TRUE : FALSE,
                     &result) ||
                 result.size < sizeof(result))
@@ -2116,9 +2393,9 @@ namespace glance::app
             }
             const auto hover_info_id = bounded_string(result.hover_info_id);
             const auto component_action_id = bounded_string(result.component_action_id);
-            const auto loading_text = bounded_string(result.loading_text);
+            const auto loading_text_key = bounded_string(result.loading_text_key);
             if (!hover_info_id.has_value() || !component_action_id.has_value() ||
-                !loading_text.has_value())
+                !loading_text_key.has_value())
             {
                 return activation;
             }
@@ -2130,7 +2407,9 @@ namespace glance::app
                 activation.kind = ComponentStatusBarActivationKind::toggle_hover_info;
                 activation.checked = true;
                 activation.hover_info_id = std::move(*hover_info_id);
-                activation.loading_text = std::move(*loading_text);
+                activation.loading_text = loading_text_key->empty()
+                    ? L""
+                    : localize_component_key(*component, *loading_text_key);
             }
             else if (result.activation ==
                          glance::contracts::components::StatusBarShortcutActivation::toggle_hover_info &&
@@ -2173,17 +2452,18 @@ namespace glance::app
             {
                 return {};
             }
-            HoverInfoCollector collector{ .cancelled = &cancelled };
-            glance::contracts::components::HoverInfoTextSink sink{
+            static_cast<void>(language_tag);
+            InformationPanelCollector collector{
+                .component = component.get(),
+                .cancelled = &cancelled };
+            glance::contracts::components::InformationPanelSink sink{
                 .context = &collector,
-                .append = append_hover_info,
-                .is_cancelled = hover_info_cancelled };
+                .append = append_information_panel_entry,
+                .is_cancelled = information_panel_cancelled };
             const std::wstring source(path);
-            const std::wstring language(language_tag);
             const auto status = component->hover_info_layer->query_info(
                 activation.hover_info_id.c_str(),
                 source.c_str(),
-                language.c_str(),
                 &sink);
             return status == glance::contracts::components::PrepareStatus::success &&
                     collector.valid && !cancelled.load(std::memory_order_acquire)
@@ -2283,9 +2563,9 @@ namespace glance::app
                 return request;
             }
             glance::contracts::components::ComponentDownloadRequest raw;
-            const std::wstring language(language_tag);
+            static_cast<void>(language_tag);
             if (!component->component_management_action->prepare_action(
-                    action.action_id.c_str(), language.c_str(), &raw) ||
+                    action.action_id.c_str(), &raw) ||
                 raw.size < sizeof(raw))
             {
                 return request;
@@ -2351,24 +2631,26 @@ namespace glance::app
                 return completion;
             }
             glance::contracts::components::ComponentManagementActionResult raw;
-            const std::wstring language(language_tag);
+            static_cast<void>(language_tag);
             if (!component->component_management_action->complete_action(
                     action.action_id.c_str(),
                     downloaded_path.c_str(),
                     storage.c_str(),
-                    language.c_str(),
                     &raw) ||
                 raw.size < sizeof(raw))
             {
                 return completion;
             }
-            const auto detail = bounded_string(raw.detail);
-            if (!detail.has_value())
+            const auto detail_key = bounded_string(raw.detail_key);
+            if (!detail_key.has_value() ||
+                (!detail_key->empty() && !valid_resource_key(*detail_key)))
             {
                 return completion;
             }
             completion.succeeded = raw.succeeded != FALSE;
-            completion.detail = std::move(*detail);
+            completion.detail = detail_key->empty()
+                ? L""
+                : localize_component_key(*component, *detail_key);
         }
         catch (...)
         {
@@ -2452,7 +2734,7 @@ namespace glance::app
         }
 
         std::vector<ComponentSetting> settings;
-        const std::wstring language(language_tag);
+        static_cast<void>(language_tag);
         for (const auto& component : components)
         {
             if (!component->active || !component->settings_contribution.has_value())
@@ -2463,7 +2745,7 @@ namespace glance::app
             {
                 std::uint32_t count{};
                 if (!component->settings_contribution->enumerate_settings(
-                        language.c_str(), nullptr, 0, &count) ||
+                        nullptr, 0, &count) ||
                     count == 0 || count > 64)
                 {
                     continue;
@@ -2472,7 +2754,7 @@ namespace glance::app
                     descriptors(count);
                 std::uint32_t written = count;
                 if (!component->settings_contribution->enumerate_settings(
-                        language.c_str(), descriptors.data(), count, &written) ||
+                        descriptors.data(), count, &written) ||
                     written != count)
                 {
                     continue;
@@ -2481,15 +2763,25 @@ namespace glance::app
                 {
                     const auto setting_id = bounded_string(descriptor.setting_id);
                     const auto group_id = bounded_string(descriptor.group_id);
-                    const auto group_title = bounded_string(descriptor.group_title);
-                    const auto label = bounded_string(descriptor.label);
-                    const auto description = bounded_string(descriptor.description);
+                    const auto group_title_key =
+                        bounded_string(descriptor.group_title_key);
+                    const auto label_key = bounded_string(descriptor.label_key);
+                    const auto description_key =
+                        bounded_string(descriptor.description_key);
+                    const auto enabled_description_key =
+                        bounded_string(descriptor.enabled_description_key);
+                    const auto disabled_description_key =
+                        bounded_string(descriptor.disabled_description_key);
                     if (descriptor.size < sizeof(descriptor) ||
                         !setting_id.has_value() || !valid_setting_id(*setting_id) ||
                         !group_id.has_value() || !valid_setting_id(*group_id) ||
-                        !group_title.has_value() || group_title->empty() ||
-                        !label.has_value() || label->empty() ||
-                        !description.has_value() ||
+                        !group_title_key.has_value() ||
+                        !valid_resource_key(*group_title_key) ||
+                        !label_key.has_value() ||
+                        !valid_resource_key(*label_key) ||
+                        !description_key.has_value() ||
+                        !enabled_description_key.has_value() ||
+                        !disabled_description_key.has_value() ||
                         (descriptor.kind !=
                              glance::contracts::components::ComponentSettingKind::toggle &&
                          descriptor.kind !=
@@ -2498,7 +2790,12 @@ namespace glance::app
                             glance::contracts::components::maximum_setting_options ||
                         (descriptor.kind ==
                              glance::contracts::components::ComponentSettingKind::choice &&
-                         descriptor.option_count == 0))
+                         (descriptor.option_count == 0 ||
+                          !valid_resource_key(*description_key))) ||
+                        (descriptor.kind ==
+                             glance::contracts::components::ComponentSettingKind::toggle &&
+                         (!valid_resource_key(*enabled_description_key) ||
+                          !valid_resource_key(*disabled_description_key))))
                     {
                         continue;
                     }
@@ -2507,9 +2804,26 @@ namespace glance::app
                         .setting_id = std::move(*setting_id),
                         .page = descriptor.page,
                         .group_id = std::move(*group_id),
-                        .group_title = std::move(*group_title),
-                        .label = std::move(*label),
-                        .description = std::move(*description),
+                        .group_title = localize_component_key(
+                            *component,
+                            *group_title_key),
+                        .label = localize_component_key(*component, *label_key),
+                        .description = descriptor.kind ==
+                                glance::contracts::components::ComponentSettingKind::choice
+                            ? localize_component_key(*component, *description_key)
+                            : L"",
+                        .enabled_description = descriptor.kind ==
+                                glance::contracts::components::ComponentSettingKind::toggle
+                            ? localize_component_key(
+                                *component,
+                                *enabled_description_key)
+                            : L"",
+                        .disabled_description = descriptor.kind ==
+                                glance::contracts::components::ComponentSettingKind::toggle
+                            ? localize_component_key(
+                                *component,
+                                *disabled_description_key)
+                            : L"",
                         .kind = descriptor.kind,
                         .default_value = descriptor.default_value,
                         .group_order = descriptor.group_order,
@@ -2518,15 +2832,19 @@ namespace glance::app
                          index < descriptor.option_count;
                          ++index)
                     {
-                        const auto text = bounded_string(descriptor.options[index].text);
-                        if (!text.has_value() || text->empty())
+                        const auto text_key =
+                            bounded_string(descriptor.options[index].text_key);
+                        if (!text_key.has_value() ||
+                            !valid_resource_key(*text_key))
                         {
                             setting.options.clear();
                             break;
                         }
                         setting.options.push_back(ComponentSettingOption{
                             .value = descriptor.options[index].value,
-                            .text = std::move(*text) });
+                            .text = localize_component_key(
+                                *component,
+                                *text_key) });
                     }
                     if (descriptor.kind ==
                             glance::contracts::components::ComponentSettingKind::toggle ||

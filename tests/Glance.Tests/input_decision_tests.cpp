@@ -92,7 +92,7 @@ namespace
         const wchar_t* host_file;
         std::vector<std::wstring> extensions;
         const wchar_t* loading_extension;
-        const wchar_t* loading_text;
+        const wchar_t* loading_key;
         std::vector<std::wstring> payload_files;
     };
 
@@ -178,6 +178,7 @@ namespace
             std::wstring_view(registration.component_id) == id &&
                 std::wstring_view(registration.target_app_version) ==
                     GLANCE_VERSION_WSTRING &&
+                std::wstring_view(registration.resource_path) == L"resources.pri" &&
                 registration.preferred_kind == PreviewContentKind::image &&
                 registration.preferred_format == PreviewContentFormat::image_file &&
                 extensions == test_case.extensions,
@@ -186,21 +187,21 @@ namespace
         ComponentStatusResult status;
         check(
             api.query_status != nullptr &&
-                api.query_status(L"zh-CN", &status) != FALSE &&
+                api.query_status(&status) != FALSE &&
                 status.severity == HealthSeverity::healthy &&
-                status.display_name[0] != L'\0' && status.detail[0] != L'\0',
-            "localized status");
+                std::wstring_view(status.display_name_key) ==
+                    L"Component.DisplayName" &&
+                status.detail_key[0] != L'\0',
+            "status resource keys");
 
         ComponentLoadingTextResult loading;
         const auto preview_path = std::wstring{ L"C:\\GlanceComponentTest\\sample" } +
             test_case.loading_extension;
         check(
             api.query_loading_text != nullptr &&
-                api.query_loading_text(
-                    preview_path.c_str(), L"zh-CN", &loading) != FALSE &&
-                std::wstring_view(loading.text) == test_case.loading_text &&
-                std::wstring_view(loading.text).ends_with(L"..."),
-            "localized loading text");
+                api.query_loading_text(preview_path.c_str(), &loading) != FALSE &&
+                std::wstring_view(loading.key) == test_case.loading_key,
+            "loading text resource key");
         check(
             api.can_preview != nullptr &&
                 api.can_preview(preview_path.c_str()) != FALSE,
@@ -479,6 +480,7 @@ namespace
         expect(
             std::wstring_view(registration.component_id) == L"model3d" &&
                 std::wstring_view(registration.target_app_version) == GLANCE_VERSION_WSTRING &&
+                std::wstring_view(registration.resource_path) == L"resources.pri" &&
                 registration.preferred_kind == PreviewContentKind::web &&
                 registration.preferred_format == PreviewContentFormat::html &&
                 extensions == expected_extensions,
@@ -487,18 +489,20 @@ namespace
         ComponentStatusResult status;
         expect(
             api.query_status != nullptr &&
-                api.query_status(L"zh-CN", &status) != FALSE &&
+                api.query_status(&status) != FALSE &&
                 status.severity == HealthSeverity::healthy &&
-                status.display_name[0] != L'\0' && status.detail[0] != L'\0',
-            "Model3D component localized status");
+                std::wstring_view(status.display_name_key) ==
+                    L"Component.DisplayName" &&
+                std::wstring_view(status.detail_key) == L"Status.Available",
+            "Model3D component status resource keys");
         ComponentLoadingTextResult loading;
         expect(
             api.query_loading_text != nullptr &&
-                api.query_loading_text(L"C:\\sample.STL", L"zh-CN", &loading) != FALSE &&
-                std::wstring_view(loading.text) == L"正在加载 3D 模型..." &&
-                api.query_loading_text(L"C:\\sample.STEP", L"zh-CN", &loading) != FALSE &&
-                std::wstring_view(loading.text) == L"正在加载 CAD 模型...",
-            "Model3D component localized loading text");
+                api.query_loading_text(L"C:\\sample.STL", &loading) != FALSE &&
+                std::wstring_view(loading.key) == L"Preview.Loading" &&
+                api.query_loading_text(L"C:\\sample.STEP", &loading) != FALSE &&
+                std::wstring_view(loading.key) == L"Preview.LoadingCad",
+            "Model3D component loading text resource keys");
 
         void* interface_pointer{};
         expect(
@@ -532,7 +536,7 @@ namespace
             auto preview = std::make_unique<PreparedPreview>();
             expect(
                 api.can_preview(model_path.c_str()) != FALSE &&
-                    api.prepare_preview(model_path.c_str(), L"en-US", preview.get()) ==
+                    api.prepare_preview(model_path.c_str(), preview.get()) ==
                         PrepareStatus::success &&
                     preview->kind == PreviewContentKind::web &&
                     preview->format == PreviewContentFormat::html &&
@@ -547,6 +551,7 @@ namespace
             expect(
                 web_api->query_preview(preview->lease_token, &options, descriptor.get()) != FALSE &&
                     descriptor->mapping_count == 2 &&
+                    descriptor->localized_parameter_count == 6 &&
                     std::wstring_view(descriptor->navigation_uri).starts_with(
                         L"https://glance-model-viewer.invalid/index.html?") &&
                     std::wstring_view(descriptor->navigation_uri).find(L"sample%2520model.STL") !=
@@ -620,6 +625,7 @@ namespace
         expect(
             std::wstring_view(registration.component_id) == L"media-info" &&
                 std::wstring_view(registration.target_app_version) == GLANCE_VERSION_WSTRING &&
+                std::wstring_view(registration.resource_path) == L"resources.pri" &&
                 registration.preferred_kind == PreviewContentKind::none &&
                 registration.preferred_format == PreviewContentFormat::none &&
                 extensions.empty() && api.can_preview == nullptr &&
@@ -628,9 +634,11 @@ namespace
 
         ComponentStatusResult status;
         expect(
-            api.query_status != nullptr && api.query_status(L"zh-CN", &status) != FALSE &&
-                status.display_name[0] != L'\0' && status.detail[0] != L'\0',
-            "MediaInfo component localized status");
+            api.query_status != nullptr && api.query_status(&status) != FALSE &&
+                std::wstring_view(status.display_name_key) ==
+                    L"Component.DisplayName" &&
+                status.detail_key[0] != L'\0',
+            "MediaInfo component status resource keys");
         const bool ffprobe_available = status.capability_mask == 1;
         expect(
             status.capability_mask <= 1 &&
@@ -677,17 +685,17 @@ namespace
         {
             std::uint32_t count{};
             expect(
-                shortcuts->enumerate_shortcuts(L"zh-CN", nullptr, 0, &count) != FALSE &&
+                shortcuts->enumerate_shortcuts(nullptr, 0, &count) != FALSE &&
                     count == 1,
                 "MediaInfo component shortcut count");
             StatusBarShortcutDescriptor shortcut;
             expect(
-                shortcuts->enumerate_shortcuts(L"zh-CN", &shortcut, 1, &count) != FALSE &&
+                shortcuts->enumerate_shortcuts(&shortcut, 1, &count) != FALSE &&
                     std::wstring_view(shortcut.shortcut_id) == L"advanced-media-info" &&
                     shortcut.target_kind == PreviewContentKind::media &&
                     shortcut.target_format == PreviewContentFormat::media_file &&
                     shortcut.order == 500 && shortcut.fluent_icon_glyph == 0xe946 &&
-                    std::wstring_view(shortcut.tooltip).find(L'\n') != std::wstring_view::npos,
+                    std::wstring_view(shortcut.tooltip_key) == L"Shortcut.Tooltip",
                 "MediaInfo component shortcut descriptor");
             expect(
                 shortcuts->query_state(
@@ -710,7 +718,6 @@ namespace
                 shortcuts->activate(
                     L"advanced-media-info",
                     L"C:\\sample.mp4",
-                    L"zh-CN",
                     TRUE,
                     &activation) != FALSE &&
                     activation.activation == (ffprobe_available
@@ -719,7 +726,8 @@ namespace
                     (ffprobe_available
                         ? std::wstring_view(activation.hover_info_id) ==
                               L"advanced-media-info" && activation.checked != FALSE &&
-                              std::wstring_view(activation.loading_text).ends_with(L"...")
+                              std::wstring_view(activation.loading_text_key) ==
+                                  L"Preview.Loading"
                         : std::wstring_view(activation.component_action_id) ==
                               L"prepare-ffprobe"),
                 "MediaInfo component shortcut activation");
@@ -729,21 +737,22 @@ namespace
         {
             std::uint32_t count{};
             expect(
-                actions->enumerate_actions(L"zh-CN", nullptr, 0, &count) != FALSE &&
+                actions->enumerate_actions(nullptr, 0, &count) != FALSE &&
                     count == (ffprobe_available ? 0U : 1U),
                 "MediaInfo component management action count");
             if (!ffprobe_available)
             {
                 ComponentManagementActionDescriptor action;
                 expect(
-                    actions->enumerate_actions(L"zh-CN", &action, 1, &count) != FALSE &&
+                    actions->enumerate_actions(&action, 1, &count) != FALSE &&
                         std::wstring_view(action.action_id) == L"prepare-ffprobe" &&
-                        action.button_text[0] != L'\0' &&
-                        action.confirmation_message[0] != L'\0',
+                        std::wstring_view(action.button_text_key) == L"Action.Button" &&
+                        std::wstring_view(action.confirmation_message_key) ==
+                            L"Action.ConfirmationMessage",
                     "MediaInfo component management action descriptor");
                 ComponentDownloadRequest download;
                 expect(
-                    actions->prepare_action(L"prepare-ffprobe", L"zh-CN", &download) != FALSE &&
+                    actions->prepare_action(L"prepare-ffprobe", &download) != FALSE &&
                         std::wstring_view(download.url) ==
                             L"https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.7z" &&
                         std::wstring_view(download.file_name) ==
@@ -1131,7 +1140,7 @@ int wmain(int argument_count, wchar_t* arguments[])
             .host_file = L"Glance.HeicHost.exe",
             .extensions = { L".heic", L".heif", L".hif" },
             .loading_extension = L".heic",
-            .loading_text = L"正在加载 HEIC 图片...",
+            .loading_key = L"Preview.Loading",
             .payload_files = {
                 L"resources.pri",
                 L"heif.dll",
@@ -1146,7 +1155,7 @@ int wmain(int argument_count, wchar_t* arguments[])
             .host_file = L"Glance.AvifHost.exe",
             .extensions = { L".avif" },
             .loading_extension = L".avif",
-            .loading_text = L"正在加载 AVIF 图片...",
+            .loading_key = L"Preview.Loading",
             .payload_files = {
                 L"resources.pri",
                 L"libavif-LICENSE.txt",
@@ -1163,7 +1172,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                 L".srw", L".x3f", L".erf", L".3fr", L".fff", L".mef",
                 L".mos", L".raw" },
             .loading_extension = L".dng",
-            .loading_text = L"正在加载相机 RAW 文件...",
+            .loading_key = L"Preview.Loading",
             .payload_files = {
                 L"resources.pri",
                 L"libraw.dll",
@@ -1293,8 +1302,10 @@ int wmain(int argument_count, wchar_t* arguments[])
                     "Office component API id");
                 expect(
                     std::wstring_view(registration.target_app_version) ==
-                        GLANCE_VERSION_WSTRING,
-                    "Office component target app version");
+                        GLANCE_VERSION_WSTRING &&
+                        std::wstring_view(registration.resource_path) ==
+                            L"resources.pri",
+                    "Office component target app version and resources");
                 expect(
                     registration.preferred_kind == PreviewContentKind::document &&
                         registration.preferred_format ==
@@ -1307,52 +1318,18 @@ int wmain(int argument_count, wchar_t* arguments[])
             }
             if (api.query_status != nullptr)
             {
-                ComponentStatusResult english_status;
+                ComponentStatusResult status;
                 expect(
-                    api.query_status(L"en-US", &english_status) != FALSE,
-                    "Office component English status query");
-                expect(
-                    std::wstring_view(english_status.display_name) ==
-                        L"Microsoft Office preview",
-                    "Office component English display name");
-                const std::wstring_view expected_english_detail =
-                    english_status.severity == HealthSeverity::healthy
-                    ? L"Supports previewing Word, PowerPoint, and Excel files"
-                    : english_status.capability_mask == 0
-                        ? L"Office preview handlers are unavailable"
-                        : L"Some Office preview handlers are unavailable";
-                expect(
-                    std::wstring_view(english_status.detail) ==
-                        expected_english_detail,
-                    "Office component English status detail");
-
-                ComponentStatusResult chinese_status;
-                expect(
-                    api.query_status(L"zh-CN", &chinese_status) != FALSE,
-                    "Office component Chinese status query");
-                expect(
-                    std::wstring_view(chinese_status.display_name) ==
-                        L"Microsoft Office 预览",
-                    "Office component Chinese display name");
-                const std::wstring_view expected_chinese_detail =
-                    chinese_status.severity == HealthSeverity::healthy
-                    ? L"支持预览 Word、PowerPoint 与 Excel 文件"
-                    : chinese_status.capability_mask == 0
-                        ? L"Office 预览处理器不可用"
-                        : L"部分 Office 预览处理器不可用";
-                expect(
-                    std::wstring_view(chinese_status.detail) ==
-                        expected_chinese_detail,
-                    "Office component Chinese status detail");
-
-                ComponentStatusResult fallback_status;
-                expect(
-                    api.query_status(L"not_a_locale", &fallback_status) != FALSE,
-                    "Office component fallback status query");
-                expect(
-                    std::wstring_view(fallback_status.display_name) ==
-                        L"Microsoft Office preview",
-                    "Office component invalid language fallback");
+                    api.query_status(&status) != FALSE &&
+                        std::wstring_view(status.display_name_key) ==
+                            L"Component.DisplayName" &&
+                        std::wstring_view(status.detail_key) ==
+                            (status.severity == HealthSeverity::healthy
+                                ? L"Status.Available"
+                                : status.capability_mask == 0
+                                    ? L"Status.Unavailable"
+                                    : L"Status.Partial"),
+                    "Office component status resource keys");
             }
             if (api.query_loading_text != nullptr)
             {
@@ -1364,57 +1341,15 @@ int wmain(int argument_count, wchar_t* arguments[])
                     const auto path = L"C:\\GlanceComponentTest\\sample" +
                         std::wstring(extension);
                     expect(
-                        api.query_loading_text(
-                            path.c_str(),
-                            L"en-US",
-                            &loading_text) != FALSE,
+                        api.query_loading_text(path.c_str(), &loading_text) != FALSE,
                         "Office component loading text query");
                     expect(
-                        std::wstring_view(loading_text.text) ==
-                            L"Loading Office document...",
-                        "Office component English loading text");
+                        std::wstring_view(loading_text.key) == L"Preview.Loading",
+                        "Office component loading text resource key");
                 }
-
-                ComponentLoadingTextResult chinese_loading_text;
+                ComponentLoadingTextResult loading_text;
                 expect(
-                    api.query_loading_text(
-                        L"C:\\GlanceComponentTest\\sample.docx",
-                        L"zh-CN",
-                        &chinese_loading_text) != FALSE,
-                    "Office component Chinese loading text query");
-                expect(
-                    std::wstring_view(chinese_loading_text.text) ==
-                        L"正在加载 Office 文档...",
-                    "Office component Chinese loading text");
-
-                ComponentLoadingTextResult alias_loading_text;
-                expect(
-                    api.query_loading_text(
-                        L"C:\\GlanceComponentTest\\sample.docx",
-                        L"zh",
-                        &alias_loading_text) != FALSE,
-                    "Office component language alias query");
-                expect(
-                    std::wstring_view(alias_loading_text.text) ==
-                        L"正在加载 Office 文档...",
-                    "Office component language alias");
-
-                ComponentLoadingTextResult fallback_loading_text;
-                expect(
-                    api.query_loading_text(
-                        L"C:\\GlanceComponentTest\\sample.docx",
-                        nullptr,
-                        &fallback_loading_text) != FALSE,
-                    "Office component default language query");
-                expect(
-                    std::wstring_view(fallback_loading_text.text) ==
-                        L"Loading Office document...",
-                    "Office component default language fallback");
-                expect(
-                    api.query_loading_text(
-                        nullptr,
-                        L"en-US",
-                        &chinese_loading_text) == FALSE,
+                    api.query_loading_text(nullptr, &loading_text) == FALSE,
                     "Office component loading text rejects null path");
             }
             if (api.query_interface != nullptr)
@@ -1470,7 +1405,6 @@ int wmain(int argument_count, wchar_t* arguments[])
                         expect(
                             api.prepare_preview(
                                 protected_path.c_str(),
-                                L"en-US",
                                 &protected_preview) == PrepareStatus::success &&
                                 protected_preview.lease_token != 0 &&
                                 std::filesystem::path(protected_preview.path) !=
@@ -1490,12 +1424,11 @@ int wmain(int argument_count, wchar_t* arguments[])
                         expect(
                             notice_api->query_preview_notice(
                                 protected_preview.lease_token,
-                                L"zh-CN",
                                 &notice) != FALSE &&
                                 notice.severity == PreviewNoticeSeverity::warning &&
                                 notice.duration_ms == 1000 &&
-                                std::wstring_view(notice.text) ==
-                                    L"正在预览被阻止的网络文件",
+                                std::wstring_view(notice.text_key) ==
+                                    L"Preview.ProtectedSourceNotice",
                             "Office protected preview warning notice");
                         const std::filesystem::path copied_path(
                             protected_preview.path);
@@ -1609,20 +1542,19 @@ int wmain(int argument_count, wchar_t* arguments[])
 
             ComponentStatusResult status;
             expect(
-                api.query_status(L"zh-CN", &status) != FALSE &&
-                    std::wstring_view(status.display_name) == L"Adobe 文档预览" &&
-                    status.detail[0] != L'\0',
-                "Adobe component localized status");
+                api.query_status(&status) != FALSE &&
+                    std::wstring_view(status.display_name_key) ==
+                        L"Component.DisplayName" &&
+                    status.detail_key[0] != L'\0',
+                "Adobe component status resource keys");
 
             ComponentLoadingTextResult loading;
             expect(
                 api.query_loading_text(
                     L"C:\\GlanceComponentTest\\sample.psd",
-                    L"zh-CN",
                     &loading) != FALSE &&
-                    std::wstring_view(loading.text) ==
-                        L"正在加载 Adobe 文档...",
-                "Adobe component localized loading text");
+                    std::wstring_view(loading.key) == L"Preview.Loading",
+                "Adobe component loading text resource key");
 
             void* configurable_pointer{};
             expect(
@@ -1684,7 +1616,6 @@ int wmain(int argument_count, wchar_t* arguments[])
                 configurable != nullptr &&
                     configurable->prepare_preview(
                     psd_path.c_str(),
-                    L"en-US",
                     &preview_options,
                     &psd_preview) == PrepareStatus::success &&
                     psd_preview.kind == PreviewContentKind::image &&
@@ -1700,17 +1631,15 @@ int wmain(int argument_count, wchar_t* arguments[])
                     progressive->can_refine(psd_preview.lease_token) != FALSE &&
                     progressive->query_refinement_text(
                         psd_preview.lease_token,
-                        L"zh-CN",
                         &refinement_text) != FALSE &&
-                    std::wstring_view(refinement_text.text) ==
-                        L"正在加载高清预览...",
+                    std::wstring_view(refinement_text.key) ==
+                        L"Preview.Refining",
                 "Adobe component refinement availability");
             PreparedPreview refined_preview;
             expect(
                 progressive != nullptr &&
                     progressive->prepare_refined_preview(
                         psd_preview.lease_token,
-                        L"en-US",
                         &preview_options,
                         &refined_preview) == PrepareStatus::success &&
                     refined_preview.kind == PreviewContentKind::image &&
@@ -1742,7 +1671,6 @@ int wmain(int argument_count, wchar_t* arguments[])
                 configurable != nullptr &&
                     configurable->prepare_preview(
                         psd_path.c_str(),
-                        L"en-US",
                         &preview_options,
                         &cached_preview) == PrepareStatus::success &&
                     cached_preview.lease_token == 0 &&
@@ -1761,7 +1689,6 @@ int wmain(int argument_count, wchar_t* arguments[])
             expect(
                 api.prepare_preview(
                     psb_path.c_str(),
-                    L"zh-CN",
                     &psb_preview) == PrepareStatus::success &&
                     psb_preview.lease_token != 0 &&
                     progressive->can_refine(psb_preview.lease_token) == FALSE,
@@ -1771,12 +1698,11 @@ int wmain(int argument_count, wchar_t* arguments[])
                 preview_notice != nullptr &&
                     preview_notice->query_preview_notice(
                         psb_preview.lease_token,
-                        L"zh-CN",
                         &psb_notice) != FALSE &&
                     psb_notice.severity == PreviewNoticeSeverity::informational &&
                     psb_notice.duration_ms == 0 &&
-                    std::wstring_view(psb_notice.text) ==
-                        L"大型文件只支持低清预览",
+                    std::wstring_view(psb_notice.text_key) ==
+                        L"Preview.LowResolutionOnly",
                 "Adobe component PSB low-resolution notice");
             api.release_preview(psb_preview.lease_token);
 
@@ -1791,7 +1717,6 @@ int wmain(int argument_count, wchar_t* arguments[])
             expect(
                 api.prepare_preview(
                     ai_path.c_str(),
-                    L"en-US",
                     &ai_preview) == PrepareStatus::success &&
                     ai_preview.kind == PreviewContentKind::document &&
                     ai_preview.format == PreviewContentFormat::pdf &&
@@ -1910,18 +1835,20 @@ int wmain(int argument_count, wchar_t* arguments[])
                         std::uint32_t setting_count{};
                         expect(
                             settings->enumerate_settings(
-                                L"zh-CN", nullptr, 0, &setting_count) != FALSE &&
+                                nullptr, 0, &setting_count) != FALSE &&
                                 setting_count == 1,
                             "PDF component setting count");
                         ComponentSettingDescriptor setting;
                         expect(
                             settings->enumerate_settings(
-                                L"zh-CN", &setting, 1, &setting_count) != FALSE &&
+                                &setting, 1, &setting_count) != FALSE &&
                                 std::wstring_view(setting.setting_id) ==
                                     L"render-dimension" &&
                                 std::wstring_view(setting.group_id) == L"pdf-preview" &&
-                                std::wstring_view(setting.group_title) == L"PDF 预览" &&
-                                std::wstring_view(setting.label) == L"PDF 预览分辨率" &&
+                                std::wstring_view(setting.group_title_key) ==
+                                    L"Settings.GroupTitle" &&
+                                std::wstring_view(setting.label_key) ==
+                                    L"Settings.RenderResolution.Label" &&
                                 setting.option_count == 4 &&
                                 setting.default_value == 4096,
                             "PDF component render setting");
@@ -1931,7 +1858,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                     expect(
                         api.can_preview(pdf_path.c_str()) != FALSE &&
                             api.prepare_preview(
-                                pdf_path.c_str(), L"en-US", &preview) ==
+                                pdf_path.c_str(), &preview) ==
                                 PrepareStatus::success &&
                             preview.kind == PreviewContentKind::document &&
                             preview.format == PreviewContentFormat::pdf &&
@@ -2044,7 +1971,6 @@ int wmain(int argument_count, wchar_t* arguments[])
                         api.can_preview(archive_path.c_str()) != FALSE &&
                             api.prepare_preview(
                                 archive_path.c_str(),
-                                L"en-US",
                                 &preview) == PrepareStatus::success &&
                             preview.kind == PreviewContentKind::directory &&
                             preview.format == PreviewContentFormat::file_directory &&
@@ -2055,7 +1981,6 @@ int wmain(int argument_count, wchar_t* arguments[])
                     FileDirectoryDescriptor archive_descriptor;
                     const auto opened = directory_api->open(
                         preview.lease_token,
-                        L"en-US",
                         L"",
                         &archive_descriptor);
                     expect(

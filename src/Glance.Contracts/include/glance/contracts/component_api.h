@@ -7,7 +7,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 8;
+    inline constexpr std::uint32_t abi_version = 9;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -16,22 +16,25 @@ namespace glance::contracts::components
     inline constexpr std::size_t loading_text_capacity = 256;
     inline constexpr std::size_t preview_path_capacity = 32768;
     inline constexpr std::size_t preview_error_capacity = 256;
-    inline constexpr std::uint32_t configurable_preview_api_version = 1;
-    inline constexpr std::uint32_t progressive_preview_api_version = 1;
-    inline constexpr std::uint32_t preview_notice_api_version = 1;
-    inline constexpr std::uint32_t web_preview_api_version = 1;
+    inline constexpr std::uint32_t configurable_preview_api_version = 2;
+    inline constexpr std::uint32_t progressive_preview_api_version = 2;
+    inline constexpr std::uint32_t preview_notice_api_version = 2;
+    inline constexpr std::uint32_t web_preview_api_version = 2;
     inline constexpr std::uint32_t paged_document_renderer_api_version = 1;
     inline constexpr std::uint32_t native_preview_renderer_api_version = 1;
-    inline constexpr std::uint32_t settings_contribution_api_version = 1;
-    inline constexpr std::uint32_t file_directory_preview_api_version = 1;
+    inline constexpr std::uint32_t settings_contribution_api_version = 2;
+    inline constexpr std::uint32_t file_directory_preview_api_version = 2;
     inline constexpr std::uint32_t gallery_media_api_version = 1;
     inline constexpr std::uint32_t image_metadata_api_version = 1;
-    inline constexpr std::uint32_t hover_info_layer_api_version = 1;
-    inline constexpr std::uint32_t status_bar_shortcut_api_version = 1;
+    inline constexpr std::uint32_t hover_info_layer_api_version = 2;
+    inline constexpr std::uint32_t status_bar_shortcut_api_version = 2;
     inline constexpr std::uint32_t status_bar_shortcut_data_api_version = 1;
-    inline constexpr std::uint32_t component_management_action_api_version = 1;
+    inline constexpr std::uint32_t component_management_action_api_version = 2;
+    inline constexpr std::size_t component_resource_path_capacity = 260;
+    inline constexpr std::size_t resource_key_capacity = 256;
     inline constexpr std::size_t web_resource_host_capacity = 64;
     inline constexpr std::size_t maximum_web_resource_mappings = 4;
+    inline constexpr std::size_t maximum_web_localized_parameters = 8;
     inline constexpr std::size_t renderer_host_capacity = 260;
     inline constexpr std::size_t setting_id_capacity = 64;
     inline constexpr std::size_t setting_group_id_capacity = 64;
@@ -51,6 +54,8 @@ namespace glance::contracts::components
     inline constexpr std::size_t sha256_capacity = 65;
     inline constexpr std::size_t image_metadata_property_capacity = 128;
     inline constexpr std::size_t image_metadata_text_capacity = 512;
+    inline constexpr std::size_t information_panel_value_capacity = 1024;
+    inline constexpr std::size_t maximum_information_panel_arguments = 2;
     inline constexpr GUID configurable_preview_api_id{
         0x950742e7,
         0x0af2,
@@ -222,6 +227,18 @@ namespace glance::contracts::components
         ratio = 5,
     };
 
+    enum class ComponentTextKind : std::uint32_t
+    {
+        literal = 0,
+        resource_key = 1,
+    };
+
+    enum class InformationPanelEntryKind : std::uint32_t
+    {
+        section = 0,
+        field = 1,
+    };
+
     enum class FileDirectoryAlignment : std::uint32_t
     {
         left = 0,
@@ -274,6 +291,7 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(ComponentRegistration) };
         wchar_t component_id[component_id_capacity]{};
         wchar_t target_app_version[target_app_version_capacity]{};
+        wchar_t resource_path[component_resource_path_capacity]{};
         PreviewContentKind preferred_kind{ PreviewContentKind::none };
         PreviewContentFormat preferred_format{ PreviewContentFormat::none };
     };
@@ -284,14 +302,14 @@ namespace glance::contracts::components
         HealthSeverity severity{ HealthSeverity::error };
         std::uint32_t code{};
         std::uint64_t capability_mask{};
-        wchar_t display_name[display_name_capacity]{};
-        wchar_t detail[status_detail_capacity]{};
+        wchar_t display_name_key[display_name_capacity]{};
+        wchar_t detail_key[status_detail_capacity]{};
     };
 
     struct ComponentLoadingTextResult
     {
         std::uint32_t size{ sizeof(ComponentLoadingTextResult) };
-        wchar_t text[loading_text_capacity]{};
+        wchar_t key[loading_text_capacity]{};
     };
 
     struct PreviewNoticeResult
@@ -299,7 +317,7 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(PreviewNoticeResult) };
         PreviewNoticeSeverity severity{ PreviewNoticeSeverity::informational };
         std::uint32_t duration_ms{};
-        wchar_t text[loading_text_capacity]{};
+        wchar_t text_key[loading_text_capacity]{};
     };
 
     struct PreparedPreview
@@ -309,7 +327,7 @@ namespace glance::contracts::components
         PreviewContentFormat format{ PreviewContentFormat::none };
         std::uint64_t lease_token{};
         wchar_t path[preview_path_capacity]{};
-        wchar_t error_detail[preview_error_capacity]{};
+        wchar_t error_key[preview_error_capacity]{};
     };
 
     struct PreviewPreparationOptions
@@ -331,12 +349,20 @@ namespace glance::contracts::components
         WebResourceAccessKind access_kind{ WebResourceAccessKind::deny_cors };
     };
 
+    struct WebLocalizedParameter
+    {
+        wchar_t name[web_resource_host_capacity]{};
+        wchar_t resource_key[resource_key_capacity]{};
+    };
+
     struct WebPreviewDescriptor
     {
         std::uint32_t size{ sizeof(WebPreviewDescriptor) };
         wchar_t navigation_uri[preview_path_capacity]{};
         std::uint32_t mapping_count{};
         WebResourceMapping mappings[maximum_web_resource_mappings]{};
+        std::uint32_t localized_parameter_count{};
+        WebLocalizedParameter localized_parameters[maximum_web_localized_parameters]{};
     };
 
     struct PagedDocumentHostDescriptor
@@ -354,7 +380,7 @@ namespace glance::contracts::components
     struct ComponentSettingOption
     {
         std::int64_t value{};
-        wchar_t text[setting_option_text_capacity]{};
+        wchar_t text_key[setting_option_text_capacity]{};
     };
 
     struct ComponentSettingDescriptor
@@ -363,9 +389,11 @@ namespace glance::contracts::components
         wchar_t setting_id[setting_id_capacity]{};
         ComponentSettingPage page{ ComponentSettingPage::document_preview };
         wchar_t group_id[setting_group_id_capacity]{};
-        wchar_t group_title[setting_text_capacity]{};
-        wchar_t label[setting_text_capacity]{};
-        wchar_t description[setting_text_capacity]{};
+        wchar_t group_title_key[setting_text_capacity]{};
+        wchar_t label_key[setting_text_capacity]{};
+        wchar_t description_key[setting_text_capacity]{};
+        wchar_t enabled_description_key[setting_text_capacity]{};
+        wchar_t disabled_description_key[setting_text_capacity]{};
         ComponentSettingKind kind{ ComponentSettingKind::choice };
         std::int64_t default_value{};
         std::uint32_t group_order{};
@@ -379,23 +407,25 @@ namespace glance::contracts::components
         FileDirectoryValueKind kind{ FileDirectoryValueKind::none };
         std::uint64_t unsigned_value{};
         double ratio_value{};
+        ComponentTextKind text_kind{ ComponentTextKind::literal };
         const wchar_t* text{};
     };
 
     struct FileDirectoryInfoField
     {
         wchar_t id[file_directory_id_capacity]{};
-        wchar_t label[file_directory_text_capacity]{};
+        wchar_t label_key[file_directory_text_capacity]{};
         FileDirectoryValueKind kind{ FileDirectoryValueKind::none };
         std::uint64_t unsigned_value{};
         double ratio_value{};
+        ComponentTextKind text_kind{ ComponentTextKind::literal };
         wchar_t text[file_directory_text_capacity]{};
     };
 
     struct FileDirectoryColumnDescriptor
     {
         wchar_t id[file_directory_id_capacity]{};
-        wchar_t title[file_directory_text_capacity]{};
+        wchar_t title_key[file_directory_text_capacity]{};
         FileDirectoryValueKind kind{ FileDirectoryValueKind::text };
         FileDirectoryAlignment alignment{ FileDirectoryAlignment::left };
         std::uint32_t width{};
@@ -436,6 +466,33 @@ namespace glance::contracts::components
         BOOL(WINAPI* is_cancelled)(void* context) noexcept{};
     };
 
+    struct InformationPanelText
+    {
+        ComponentTextKind kind{ ComponentTextKind::resource_key };
+        wchar_t value[information_panel_value_capacity]{};
+        std::uint32_t argument_count{};
+        wchar_t arguments[maximum_information_panel_arguments]
+            [contribution_text_capacity]{};
+    };
+
+    struct InformationPanelEntry
+    {
+        std::uint32_t size{ sizeof(InformationPanelEntry) };
+        InformationPanelEntryKind kind{ InformationPanelEntryKind::field };
+        InformationPanelText label;
+        InformationPanelText value;
+    };
+
+    struct InformationPanelSink
+    {
+        std::uint32_t size{ sizeof(InformationPanelSink) };
+        void* context{};
+        BOOL(WINAPI* append)(
+            void* context,
+            const InformationPanelEntry* entry) noexcept{};
+        BOOL(WINAPI* is_cancelled)(void* context) noexcept{};
+    };
+
     struct ImageMetadataEntry
     {
         std::uint32_t size{ sizeof(ImageMetadataEntry) };
@@ -465,7 +522,7 @@ namespace glance::contracts::components
         PreviewContentFormat target_format{ PreviewContentFormat::none };
         std::uint32_t order{};
         std::uint32_t fluent_icon_glyph{};
-        wchar_t tooltip[contribution_text_capacity]{};
+        wchar_t tooltip_key[contribution_text_capacity]{};
     };
 
     struct StatusBarShortcutActivationResult
@@ -475,7 +532,7 @@ namespace glance::contracts::components
         BOOL checked{};
         wchar_t hover_info_id[contribution_id_capacity]{};
         wchar_t component_action_id[contribution_id_capacity]{};
-        wchar_t loading_text[contribution_text_capacity]{};
+        wchar_t loading_text_key[contribution_text_capacity]{};
     };
 
     struct ComponentManagementActionDescriptor
@@ -483,16 +540,16 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(ComponentManagementActionDescriptor) };
         wchar_t action_id[contribution_id_capacity]{};
         std::uint32_t order{};
-        wchar_t button_text[contribution_text_capacity]{};
-        wchar_t confirmation_title[contribution_text_capacity]{};
-        wchar_t confirmation_message[contribution_text_capacity]{};
-        wchar_t confirmation_button[contribution_text_capacity]{};
-        wchar_t download_title[contribution_text_capacity]{};
-        wchar_t download_message[contribution_text_capacity]{};
-        wchar_t preparing_title[contribution_text_capacity]{};
-        wchar_t preparing_message[contribution_text_capacity]{};
-        wchar_t completed_title[contribution_text_capacity]{};
-        wchar_t completed_message[contribution_text_capacity]{};
+        wchar_t button_text_key[contribution_text_capacity]{};
+        wchar_t confirmation_title_key[contribution_text_capacity]{};
+        wchar_t confirmation_message_key[contribution_text_capacity]{};
+        wchar_t confirmation_button_key[contribution_text_capacity]{};
+        wchar_t download_title_key[contribution_text_capacity]{};
+        wchar_t download_message_key[contribution_text_capacity]{};
+        wchar_t preparing_title_key[contribution_text_capacity]{};
+        wchar_t preparing_message_key[contribution_text_capacity]{};
+        wchar_t completed_title_key[contribution_text_capacity]{};
+        wchar_t completed_message_key[contribution_text_capacity]{};
     };
 
     struct ComponentDownloadRequest
@@ -508,7 +565,7 @@ namespace glance::contracts::components
     {
         std::uint32_t size{ sizeof(ComponentManagementActionResult) };
         BOOL succeeded{};
-        wchar_t detail[contribution_text_capacity]{};
+        wchar_t detail_key[contribution_text_capacity]{};
     };
 
     using AppendFileDirectoryEntryFunction = BOOL(WINAPI*)(
@@ -525,38 +582,30 @@ namespace glance::contracts::components
     using InitializeFunction = BOOL(WINAPI*)(
         const ComponentRegistrar* registrar,
         ComponentRegistration* registration) noexcept;
-    using QueryStatusFunction = BOOL(WINAPI*)(
-        const wchar_t* language_tag,
-        ComponentStatusResult* result) noexcept;
+    using QueryStatusFunction = BOOL(WINAPI*)(ComponentStatusResult* result) noexcept;
     using QueryLoadingTextFunction = BOOL(WINAPI*)(
         const wchar_t* path,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept;
     using CanPreviewFunction = BOOL(WINAPI*)(const wchar_t* path) noexcept;
     using PreparePreviewFunction = PrepareStatus(WINAPI*)(
         const wchar_t* path,
-        const wchar_t* language_tag,
         PreparedPreview* preview) noexcept;
     using ReleasePreviewFunction = void(WINAPI*)(std::uint64_t lease_token) noexcept;
     using PreparePreviewWithOptionsFunction = PrepareStatus(WINAPI*)(
         const wchar_t* path,
-        const wchar_t* language_tag,
         const PreviewPreparationOptions* options,
         PreparedPreview* preview) noexcept;
     using CanRefinePreviewFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token) noexcept;
     using QueryRefinementTextFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token,
-        const wchar_t* language_tag,
         ComponentLoadingTextResult* result) noexcept;
     using PrepareRefinedPreviewFunction = PrepareStatus(WINAPI*)(
         std::uint64_t lease_token,
-        const wchar_t* language_tag,
         const PreviewPreparationOptions* options,
         PreparedPreview* preview) noexcept;
     using QueryPreviewNoticeFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token,
-        const wchar_t* language_tag,
         PreviewNoticeResult* result) noexcept;
     using QueryWebPreviewFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token,
@@ -567,13 +616,11 @@ namespace glance::contracts::components
     using QueryNativePreviewHostFunction = BOOL(WINAPI*)(
         NativePreviewHostDescriptor* descriptor) noexcept;
     using EnumerateComponentSettingsFunction = BOOL(WINAPI*)(
-        const wchar_t* language_tag,
         ComponentSettingDescriptor* descriptors,
         std::uint32_t capacity,
         std::uint32_t* count) noexcept;
     using OpenFileDirectoryFunction = FileDirectoryOpenStatus(WINAPI*)(
         std::uint64_t lease_token,
-        const wchar_t* language_tag,
         const wchar_t* password,
         FileDirectoryDescriptor* descriptor) noexcept;
     using EnumerateFileDirectoryChildrenFunction = BOOL(WINAPI*)(
@@ -592,10 +639,8 @@ namespace glance::contracts::components
     using QueryHoverInfoFunction = PrepareStatus(WINAPI*)(
         const wchar_t* hover_info_id,
         const wchar_t* path,
-        const wchar_t* language_tag,
-        const HoverInfoTextSink* sink) noexcept;
+        const InformationPanelSink* sink) noexcept;
     using EnumerateStatusBarShortcutsFunction = BOOL(WINAPI*)(
-        const wchar_t* language_tag,
         StatusBarShortcutDescriptor* descriptors,
         std::uint32_t capacity,
         std::uint32_t* count) noexcept;
@@ -607,7 +652,6 @@ namespace glance::contracts::components
     using ActivateStatusBarShortcutFunction = BOOL(WINAPI*)(
         const wchar_t* shortcut_id,
         const wchar_t* path,
-        const wchar_t* language_tag,
         BOOL requested_checked,
         StatusBarShortcutActivationResult* result) noexcept;
     using QueryStatusBarShortcutDataFunction = PrepareStatus(WINAPI*)(
@@ -615,19 +659,16 @@ namespace glance::contracts::components
         const wchar_t* path,
         const HoverInfoTextSink* sink) noexcept;
     using EnumerateComponentManagementActionsFunction = BOOL(WINAPI*)(
-        const wchar_t* language_tag,
         ComponentManagementActionDescriptor* descriptors,
         std::uint32_t capacity,
         std::uint32_t* count) noexcept;
     using PrepareComponentManagementActionFunction = BOOL(WINAPI*)(
         const wchar_t* action_id,
-        const wchar_t* language_tag,
         ComponentDownloadRequest* request) noexcept;
     using CompleteComponentManagementActionFunction = BOOL(WINAPI*)(
         const wchar_t* action_id,
         const wchar_t* downloaded_path,
         const wchar_t* component_storage_path,
-        const wchar_t* language_tag,
         ComponentManagementActionResult* result) noexcept;
     using QueryInterfaceFunction = BOOL(WINAPI*)(
         const GUID* interface_id,

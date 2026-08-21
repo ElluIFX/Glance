@@ -8,16 +8,12 @@
 
 namespace glance::components::media_info
 {
-    [[nodiscard]] std::wstring localize_text(
-        std::wstring_view key,
-        const wchar_t* language_tag) noexcept;
     [[nodiscard]] std::filesystem::path find_ffprobe() noexcept;
     [[nodiscard]] bool validate_ffprobe(const std::filesystem::path& path) noexcept;
-    [[nodiscard]] std::wstring query_media_info(
+    [[nodiscard]] glance::contracts::components::PrepareStatus query_media_info(
         const std::filesystem::path& ffprobe,
         std::wstring_view path,
-        const wchar_t* language_tag,
-        const glance::contracts::components::HoverInfoTextSink& sink) noexcept;
+        const glance::contracts::components::InformationPanelSink& sink) noexcept;
     [[nodiscard]] std::wstring query_media_json(
         const std::filesystem::path& ffprobe,
         std::wstring_view path,

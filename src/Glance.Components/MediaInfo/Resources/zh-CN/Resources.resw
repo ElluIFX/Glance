@@ -35,7 +35,11 @@
   <data name="MediaInfo.Duration" xml:space="preserve"><value>时长</value></data>
   <data name="MediaInfo.OverallBitrate" xml:space="preserve"><value>总体码率</value></data>
   <data name="MediaInfo.Chapters" xml:space="preserve"><value>章节</value></data>
-  <data name="MediaInfo.StreamHeading" xml:space="preserve"><value>{0}流 {1}</value></data>
+  <data name="MediaInfo.VideoStream" xml:space="preserve"><value>视频流 {0}</value></data>
+  <data name="MediaInfo.AudioStream" xml:space="preserve"><value>音频流 {0}</value></data>
+  <data name="MediaInfo.SubtitleStream" xml:space="preserve"><value>字幕流 {0}</value></data>
+  <data name="MediaInfo.AttachmentStream" xml:space="preserve"><value>附件流 {0}</value></data>
+  <data name="MediaInfo.DataStream" xml:space="preserve"><value>数据流 {0}</value></data>
   <data name="MediaInfo.Codec" xml:space="preserve"><value>编码</value></data>
   <data name="MediaInfo.Resolution" xml:space="preserve"><value>分辨率</value></data>
   <data name="MediaInfo.FrameRate" xml:space="preserve"><value>帧率</value></data>
@@ -53,6 +57,7 @@
   <data name="MediaInfo.Title" xml:space="preserve"><value>标题</value></data>
   <data name="MediaInfo.Default" xml:space="preserve"><value>默认</value></data>
   <data name="MediaInfo.Forced" xml:space="preserve"><value>强制</value></data>
+  <data name="MediaInfo.DefaultForced" xml:space="preserve"><value>默认，强制</value></data>
   <data name="MediaInfo.Disposition" xml:space="preserve"><value>标记</value></data>
   <data name="MediaInfo.Metadata" xml:space="preserve"><value>元数据</value></data>
   <data name="MediaType.Video" xml:space="preserve"><value>视频</value></data>

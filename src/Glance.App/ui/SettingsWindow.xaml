@@ -347,7 +347,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="LaunchTitle" x:Uid="LaunchTitle" Text="Launch at sign-in" />
-                                    <TextBlock x:Name="LaunchDescription" x:Uid="LaunchDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start Glance automatically when you sign in to Windows" />
+                                    <TextBlock x:Name="LaunchDescription" x:Uid="LaunchDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start Glance manually after signing in to Windows" />
                                 </StackPanel>
                                 <ToggleSwitch
                                     x:Name="LaunchAtSignInToggle"
@@ -377,7 +377,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Spacing="3">
                                         <TextBlock x:Name="AutomaticUpdateCheckLabel" x:Uid="AutomaticUpdateCheckLabel" Text="Check for updates periodically" />
-                                        <TextBlock x:Name="AutomaticUpdateCheckDescription" x:Uid="AutomaticUpdateCheckDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Check in the background when opening a preview" />
+                                        <TextBlock x:Name="AutomaticUpdateCheckDescription" x:Uid="AutomaticUpdateCheckDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Check for updates manually from About" />
                                     </StackPanel>
                                     <ToggleSwitch
                                         x:Name="AutomaticUpdateCheckToggle"
@@ -456,7 +456,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="RememberWindowSizeLabel" x:Uid="RememberWindowSizeLabel" Text="Remember window size" />
-                                    <TextBlock x:Name="RememberWindowSizeDescription" x:Uid="RememberWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Store the last size separately for each preview type" />
+                                    <TextBlock x:Name="RememberWindowSizeDescription" x:Uid="RememberWindowSizeDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Window size follows the default size and auto fit settings" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="12">
                                     <Button x:Name="ResetWindowSizesButton" x:Uid="ResetWindowSizesButton" Click="ResetWindowSizesButton_Click" Content="Reset" />
@@ -471,7 +471,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="RememberWindowPositionLabel" x:Uid="RememberWindowPositionLabel" Text="Remember window position" />
-                                    <TextBlock x:Name="RememberWindowPositionDescription" x:Uid="RememberWindowPositionDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Remember the window center offset for each preview type" />
+                                    <TextBlock x:Name="RememberWindowPositionDescription" x:Uid="RememberWindowPositionDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Place preview windows at the default position" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="12">
                                     <Button x:Name="ResetWindowPositionsButton" x:Uid="ResetWindowPositionsButton" Click="ResetWindowPositionsButton_Click" Content="Reset" />
@@ -486,7 +486,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="DoubleClickFullscreenLabel" x:Uid="DoubleClickFullscreenLabel" Text="Double-click full screen" />
-                                    <TextBlock x:Name="DoubleClickFullscreenDescription" x:Uid="DoubleClickFullscreenDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Double-click preview content to toggle full screen" />
+                                    <TextBlock x:Name="DoubleClickFullscreenDescription" x:Uid="DoubleClickFullscreenDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Enable to toggle full screen by double-clicking the preview" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="DoubleClickFullscreenToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
                             </Grid>
@@ -509,7 +509,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="AutoFitWindowSizeLabel" x:Uid="AutoFitWindowSizeLabel" Text="Auto fit window size" />
-                                    <TextBlock x:Name="AutoFitWindowSizeDescription" x:Uid="AutoFitWindowSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Fit the window to the media dimensions" />
+                                    <TextBlock x:Name="AutoFitWindowSizeDescription" x:Uid="AutoFitWindowSizeDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Media window sizes follow the window behavior settings" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="AutoFitWindowSizeToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
                             </Grid>
@@ -524,8 +524,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock x:Name="ShowAfterAutoFitLabel" x:Uid="ShowAfterAutoFitLabel" Text="Show after auto fit" />
-                                    <TextBlock x:Name="ShowAfterAutoFitDescription" x:Uid="ShowAfterAutoFitDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Trade response speed to prevent window size flicker" />
+                                    <TextBlock x:Name="ShowAfterAutoFitLabel" x:Uid="ShowAfterAutoFitLabel" Text="Avoid window size flicker" />
+                                    <TextBlock x:Name="ShowAfterAutoFitDescription" x:Uid="ShowAfterAutoFitDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Show the preview window immediately" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="ShowAfterAutoFitToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
                             </Grid>
@@ -537,7 +537,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="DynamicAutoFitLabel" x:Uid="DynamicAutoFitLabel" Text="Adapt between pages" />
-                                    <TextBlock x:Name="DynamicAutoFitDescription" x:Uid="DynamicAutoFitDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Resize the window when the page dimensions change" />
+                                    <TextBlock x:Name="DynamicAutoFitDescription" x:Uid="DynamicAutoFitDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Keep the current window size when the page dimensions change" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="DynamicAutoFitToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
                             </Grid>
@@ -680,7 +680,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="QuoteCopiedPathLabel" x:Uid="QuoteCopiedPathLabel" Text="Quote copied paths" />
-                                    <TextBlock x:Name="QuoteCopiedPathDescription" x:Uid="QuoteCopiedPathDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Wrap copied paths in double quotes" />
+                                    <TextBlock x:Name="QuoteCopiedPathDescription" x:Uid="QuoteCopiedPathDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Copy paths without surrounding quotes" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="QuoteCopiedPathToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
                             </Grid>
@@ -692,7 +692,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="UnixPathSeparatorsLabel" x:Uid="UnixPathSeparatorsLabel" Text="Unix separators" />
-                                    <TextBlock x:Name="UnixPathSeparatorsDescription" x:Uid="UnixPathSeparatorsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Replace backslashes with forward slashes" />
+                                    <TextBlock x:Name="UnixPathSeparatorsDescription" x:Uid="UnixPathSeparatorsDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Keep Windows backslashes in copied paths" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="UnixPathSeparatorsToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="PathCopyPreferenceToggle_Toggled" />
                             </Grid>
@@ -762,7 +762,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="SyntaxHighlightingLabel" x:Uid="SyntaxHighlightingLabel" Text="Syntax highlighting" />
-                                    <TextBlock x:Name="SyntaxHighlightingDescription" x:Uid="SyntaxHighlightingDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Color recognized code elements" />
+                                    <TextBlock x:Name="SyntaxHighlightingDescription" x:Uid="SyntaxHighlightingDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Display text with a single foreground color" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="SyntaxHighlightingToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
@@ -791,7 +791,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="LineNumbersLabel" x:Uid="LineNumbersLabel" Text="Line numbers" />
-                                    <TextBlock x:Name="LineNumbersDescription" x:Uid="LineNumbersDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Show line numbers on the left side of the preview" />
+                                    <TextBlock x:Name="LineNumbersDescription" x:Uid="LineNumbersDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use the full preview width for text" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="LineNumbersToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
@@ -803,7 +803,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="WordWrapLabel" x:Uid="WordWrapLabel" Text="Wrap long lines" />
-                                    <TextBlock x:Name="WordWrapDescription" x:Uid="WordWrapDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Wrap text to the available viewport width" />
+                                    <TextBlock x:Name="WordWrapDescription" x:Uid="WordWrapDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Keep each line on one row and allow horizontal scrolling" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="WordWrapToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
@@ -881,7 +881,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="AutoplayAudioLabel" x:Uid="AutoplayAudioLabel" Text="Autoplay audio" />
-                                    <TextBlock x:Name="AutoplayAudioDescription" x:Uid="AutoplayAudioDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start audio playback when a preview opens" />
+                                    <TextBlock x:Name="AutoplayAudioDescription" x:Uid="AutoplayAudioDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Wait for a playback command when an audio preview opens" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="AutoplayAudioToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                             </Grid>
@@ -893,7 +893,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="AutoplayVideoLabel" x:Uid="AutoplayVideoLabel" Text="Autoplay video" />
-                                    <TextBlock x:Name="AutoplayVideoDescription" x:Uid="AutoplayVideoDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Start video playback when a preview opens" />
+                                    <TextBlock x:Name="AutoplayVideoDescription" x:Uid="AutoplayVideoDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Wait for a playback command when a video preview opens" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="AutoplayVideoToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                             </Grid>
@@ -905,7 +905,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="ReverseSeekWheelLabel" x:Uid="ReverseSeekWheelLabel" Text="Reverse seek wheel direction" />
-                                    <TextBlock x:Name="ReverseSeekWheelDescription" x:Uid="ReverseSeekWheelDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Reverse the mouse wheel direction used to seek media" />
+                                    <TextBlock x:Name="ReverseSeekWheelDescription" x:Uid="ReverseSeekWheelDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use the standard mouse wheel direction to seek media" />
                                 </StackPanel>
                                 <ToggleSwitch
                                     x:Name="ReverseSeekWheelToggle"
@@ -928,7 +928,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="ImageZoomMapLabel" x:Uid="ImageZoomMapLabel" Text="Zoom thumbnail" />
-                                    <TextBlock x:Name="ImageZoomMapDescription" x:Uid="ImageZoomMapDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Show the current viewport while an image is zoomed" />
+                                    <TextBlock x:Name="ImageZoomMapDescription" x:Uid="ImageZoomMapDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Enable to show a viewport map while an image is zoomed" />
                                 </StackPanel>
                                 <ToggleSwitch
                                     x:Name="ImageZoomMapToggle"
@@ -951,7 +951,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Spacing="3">
                                         <TextBlock x:Name="MiddleClickGalleryModeLabel" x:Uid="MiddleClickGalleryModeLabel" Text="Middle-click gallery mode" />
-                                        <TextBlock x:Name="MiddleClickGalleryModeDescription" x:Uid="MiddleClickGalleryModeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use the middle mouse button to switch gallery mode" />
+                                        <TextBlock x:Name="MiddleClickGalleryModeDescription" x:Uid="MiddleClickGalleryModeDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Enable to switch gallery mode with the middle mouse button" />
                                     </StackPanel>
                                     <ToggleSwitch x:Name="MiddleClickGalleryModeToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                                 </Grid>
@@ -963,7 +963,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Spacing="3">
                                         <TextBlock x:Name="LoopGalleryScrollingLabel" x:Uid="LoopGalleryScrollingLabel" Text="Loop gallery scrolling" />
-                                        <TextBlock x:Name="LoopGalleryScrollingDescription" x:Uid="LoopGalleryScrollingDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Continue from the opposite end after the first or last item" />
+                                        <TextBlock x:Name="LoopGalleryScrollingDescription" x:Uid="LoopGalleryScrollingDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Stop gallery scrolling at the first or last item" />
                                     </StackPanel>
                                     <ToggleSwitch x:Name="LoopGalleryScrollingToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                                 </Grid>
@@ -975,7 +975,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Spacing="3">
                                         <TextBlock x:Name="GallerySameExtensionOnlyLabel" x:Uid="GallerySameExtensionOnlyLabel" Text="Same extension only" />
-                                        <TextBlock x:Name="GallerySameExtensionOnlyDescription" x:Uid="GallerySameExtensionOnlyDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Only scroll through files with the same extension as the current file" />
+                                        <TextBlock x:Name="GallerySameExtensionOnlyDescription" x:Uid="GallerySameExtensionOnlyDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Scroll through all supported media files in the gallery" />
                                     </StackPanel>
                                     <ToggleSwitch x:Name="GallerySameExtensionOnlyToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                                 </Grid>
@@ -1174,7 +1174,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="DiagnosticsTitle" x:Uid="DiagnosticsTitle" Text="Save diagnostic information" />
-                                    <TextBlock x:Name="DiagnosticsDescription" x:Uid="DiagnosticsDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Save diagnostic logs and crash dumps" />
+                                    <TextBlock x:Name="DiagnosticsDescription" x:Uid="DiagnosticsDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Stop recording new diagnostic logs and crash dumps" />
                                 </StackPanel>
                                 <ToggleSwitch
                                     x:Name="DiagnosticsToggle"

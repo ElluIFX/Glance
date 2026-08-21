@@ -19,6 +19,8 @@
 
 namespace
 {
+    using namespace glance::contracts::components;
+
     constexpr std::size_t maximum_probe_output_bytes = 2 * 1024 * 1024;
     constexpr std::size_t maximum_tag_value_characters = 512;
     constexpr std::uint32_t maximum_stream_count = 64;
@@ -131,8 +133,13 @@ namespace
         return result;
     }
 
-    bool sink_cancelled(
-        const glance::contracts::components::HoverInfoTextSink* sink) noexcept
+    struct CancellationProbe
+    {
+        void* context{};
+        BOOL(WINAPI* is_cancelled)(void* context) noexcept{};
+    };
+
+    bool sink_cancelled(const CancellationProbe* sink) noexcept
     {
         return sink != nullptr && sink->is_cancelled != nullptr &&
             sink->is_cancelled(sink->context) != FALSE;
@@ -149,7 +156,7 @@ namespace
         const std::filesystem::path& executable,
         std::wstring arguments,
         DWORD timeout_ms,
-        const glance::contracts::components::HoverInfoTextSink* sink)
+        const CancellationProbe* sink)
     {
         SECURITY_ATTRIBUTES security{ sizeof(security), nullptr, TRUE };
         HANDLE raw_read{};
@@ -439,50 +446,6 @@ namespace
         return result;
     }
 
-    std::wstring format_pattern(
-        std::wstring pattern,
-        std::initializer_list<std::wstring_view> values)
-    {
-        std::size_t index{};
-        for (const auto value : values)
-        {
-            const std::wstring token = L"{" + std::to_wstring(index++) + L"}";
-            if (const auto position = pattern.find(token); position != std::wstring::npos)
-            {
-                pattern.replace(position, token.size(), value);
-            }
-        }
-        return pattern;
-    }
-
-    void append_line(
-        std::wstring& output,
-        std::wstring_view label,
-        std::wstring_view value)
-    {
-        if (value.empty())
-        {
-            return;
-        }
-        if (!output.empty())
-        {
-            output.push_back(L'\n');
-        }
-        output.append(label).append(L": ").append(value);
-    }
-
-    std::wstring stream_type_label(
-        std::wstring_view type,
-        const wchar_t* language_tag)
-    {
-        const wchar_t* key = L"MediaType.Data";
-        if (type == L"video") key = L"MediaType.Video";
-        else if (type == L"audio") key = L"MediaType.Audio";
-        else if (type == L"subtitle") key = L"MediaType.Subtitle";
-        else if (type == L"attachment") key = L"MediaType.Attachment";
-        return glance::components::media_info::localize_text(key, language_tag);
-    }
-
     std::wstring compact_tag_value(std::wstring value)
     {
         for (auto& character : value)
@@ -565,47 +528,118 @@ namespace
         std::ranges::sort(destination, {}, &std::pair<std::wstring, std::wstring>::first);
     }
 
-    std::wstring format_probe_json(
+    bool copy_panel_text(
+        InformationPanelText& destination,
+        ComponentTextKind kind,
+        std::wstring_view value,
+        std::initializer_list<std::wstring_view> arguments = {})
+    {
+        if (value.size() >= std::size(destination.value) ||
+            arguments.size() > maximum_information_panel_arguments)
+        {
+            return false;
+        }
+        destination.kind = kind;
+        std::copy(value.begin(), value.end(), destination.value);
+        destination.value[value.size()] = L'\0';
+        destination.argument_count = static_cast<std::uint32_t>(arguments.size());
+        std::size_t index{};
+        for (const auto argument : arguments)
+        {
+            if (argument.size() >= std::size(destination.arguments[index]))
+            {
+                return false;
+            }
+            std::copy(
+                argument.begin(),
+                argument.end(),
+                destination.arguments[index]);
+            destination.arguments[index][argument.size()] = L'\0';
+            ++index;
+        }
+        return true;
+    }
+
+    bool append_panel_entry(
+        const InformationPanelSink& sink,
+        InformationPanelEntryKind kind,
+        ComponentTextKind label_kind,
+        std::wstring_view label,
+        std::wstring_view value = {},
+        ComponentTextKind value_kind = ComponentTextKind::literal,
+        std::initializer_list<std::wstring_view> label_arguments = {})
+    {
+        InformationPanelEntry entry;
+        entry.kind = kind;
+        return copy_panel_text(entry.label, label_kind, label, label_arguments) &&
+            copy_panel_text(entry.value, value_kind, value) &&
+            sink.append(sink.context, &entry);
+    }
+
+    const wchar_t* stream_heading_key(std::wstring_view type) noexcept
+    {
+        if (type == L"video") return L"MediaInfo.VideoStream";
+        if (type == L"audio") return L"MediaInfo.AudioStream";
+        if (type == L"subtitle") return L"MediaInfo.SubtitleStream";
+        if (type == L"attachment") return L"MediaInfo.AttachmentStream";
+        return L"MediaInfo.DataStream";
+    }
+
+    bool format_probe_json(
         std::string_view json,
-        const wchar_t* language_tag)
+        const InformationPanelSink& sink)
     {
         using winrt::Windows::Data::Json::JsonObject;
-        const auto localize = [language_tag](std::wstring_view key) {
-            return glance::components::media_info::localize_text(key, language_tag);
-        };
         const auto root = JsonObject::Parse(winrt::to_hstring(json));
-        std::wstring result;
+        bool emitted{};
+        const auto append_field = [&](std::wstring_view label, std::wstring value) {
+            if (value.empty())
+            {
+                return true;
+            }
+            emitted = true;
+            return append_panel_entry(
+                sink,
+                InformationPanelEntryKind::field,
+                ComponentTextKind::resource_key,
+                label,
+                value);
+        };
+
         const auto format = root.GetNamedObject(L"format", nullptr);
         std::vector<std::pair<std::wstring, std::wstring>> tags;
         if (format != nullptr)
         {
+            if (!append_panel_entry(
+                    sink,
+                    InformationPanelEntryKind::section,
+                    ComponentTextKind::resource_key,
+                    L"MediaInfo.General"))
+            {
+                return false;
+            }
             auto container = json_string(format, L"format_long_name");
             if (container.empty())
             {
                 container = json_string(format, L"format_name");
             }
-            append_line(result, localize(L"MediaInfo.Container"), container);
-            append_line(
-                result,
-                localize(L"MediaInfo.Duration"),
-                format_duration(json_string(format, L"duration")));
-            append_line(
-                result,
-                localize(L"MediaInfo.OverallBitrate"),
-                format_rate(unsigned_value(json_string(format, L"bit_rate"))));
+            if (!append_field(L"MediaInfo.Container", std::move(container)) ||
+                !append_field(
+                    L"MediaInfo.Duration",
+                    format_duration(json_string(format, L"duration"))) ||
+                !append_field(
+                    L"MediaInfo.OverallBitrate",
+                    format_rate(unsigned_value(json_string(format, L"bit_rate")))))
+            {
+                return false;
+            }
             append_tags(format, tags);
         }
         if (const auto chapters = root.GetNamedArray(L"chapters", nullptr);
-            chapters != nullptr && chapters.Size() != 0)
+            chapters != nullptr && chapters.Size() != 0 &&
+            !append_field(L"MediaInfo.Chapters", std::to_wstring(chapters.Size())))
         {
-            append_line(
-                result,
-                localize(L"MediaInfo.Chapters"),
-                std::to_wstring(chapters.Size()));
-        }
-        if (!result.empty())
-        {
-            result.insert(0, localize(L"MediaInfo.General") + L"\n");
+            return false;
         }
 
         const auto streams = root.GetNamedArray(L"streams", nullptr);
@@ -615,14 +649,20 @@ namespace
             for (std::uint32_t index = 0; index < count; ++index)
             {
                 const auto stream = streams.GetObjectAt(index);
-                if (!result.empty())
-                {
-                    result.append(L"\n\n");
-                }
                 const auto type = json_string(stream, L"codec_type");
-                result.append(format_pattern(
-                    localize(L"MediaInfo.StreamHeading"),
-                    { stream_type_label(type, language_tag), std::to_wstring(index + 1) }));
+                const auto stream_number = std::to_wstring(index + 1);
+                if (!append_panel_entry(
+                        sink,
+                        InformationPanelEntryKind::section,
+                        ComponentTextKind::resource_key,
+                        stream_heading_key(type),
+                        {},
+                        ComponentTextKind::literal,
+                        { stream_number }))
+                {
+                    return false;
+                }
+                emitted = true;
 
                 auto codec = friendly_codec(json_string(stream, L"codec_name"));
                 const auto profile = json_string(stream, L"profile");
@@ -635,47 +675,46 @@ namespace
                 {
                     codec += codec.empty() ? description : L" (" + description + L")";
                 }
-                append_line(result, localize(L"MediaInfo.Codec"), codec);
+                if (!append_field(L"MediaInfo.Codec", std::move(codec)))
+                {
+                    return false;
+                }
 
                 const auto width = json_string(stream, L"width");
                 const auto height = json_string(stream, L"height");
-                if (!width.empty() && !height.empty())
+                if (!width.empty() && !height.empty() &&
+                    !append_field(L"MediaInfo.Resolution", width + L"x" + height))
                 {
-                    append_line(
-                        result,
-                        localize(L"MediaInfo.Resolution"),
-                        width + L"x" + height);
+                    return false;
                 }
                 auto frame_rate = format_frame_rate(json_string(stream, L"avg_frame_rate"));
                 if (frame_rate.empty())
                 {
                     frame_rate = format_frame_rate(json_string(stream, L"r_frame_rate"));
                 }
-                append_line(result, localize(L"MediaInfo.FrameRate"), frame_rate);
-                append_line(
-                    result,
-                    localize(L"MediaInfo.PixelFormat"),
-                    json_string(stream, L"pix_fmt"));
                 auto bit_depth = json_string(stream, L"bits_per_raw_sample");
                 if (bit_depth.empty() || bit_depth == L"0")
                 {
                     bit_depth = json_string(stream, L"bits_per_sample");
                 }
-                append_line(result, localize(L"MediaInfo.BitDepth"), bit_depth);
-                append_line(
-                    result,
-                    localize(L"MediaInfo.Color"),
-                    join_values({
-                        json_string(stream, L"color_primaries"),
-                        json_string(stream, L"color_transfer"),
-                        json_string(stream, L"color_space"),
-                        json_string(stream, L"color_range") }));
-                append_line(
-                    result,
-                    localize(L"MediaInfo.AspectRatio"),
-                    join_values({
-                        json_string(stream, L"sample_aspect_ratio"),
-                        json_string(stream, L"display_aspect_ratio") }));
+                if (!append_field(L"MediaInfo.FrameRate", std::move(frame_rate)) ||
+                    !append_field(L"MediaInfo.PixelFormat", json_string(stream, L"pix_fmt")) ||
+                    !append_field(L"MediaInfo.BitDepth", std::move(bit_depth)) ||
+                    !append_field(
+                        L"MediaInfo.Color",
+                        join_values({
+                            json_string(stream, L"color_primaries"),
+                            json_string(stream, L"color_transfer"),
+                            json_string(stream, L"color_space"),
+                            json_string(stream, L"color_range") })) ||
+                    !append_field(
+                        L"MediaInfo.AspectRatio",
+                        join_values({
+                            json_string(stream, L"sample_aspect_ratio"),
+                            json_string(stream, L"display_aspect_ratio") })))
+                {
+                    return false;
+                }
                 if (const auto side_data = stream.GetNamedArray(L"side_data_list", nullptr))
                 {
                     for (const auto& value : side_data)
@@ -683,10 +722,10 @@ namespace
                         const auto rotation = json_string(value.GetObjectW(), L"rotation");
                         if (!rotation.empty())
                         {
-                            append_line(
-                                result,
-                                localize(L"MediaInfo.Rotation"),
-                                rotation + L"\u00b0");
+                            if (!append_field(L"MediaInfo.Rotation", rotation + L"\u00b0"))
+                            {
+                                return false;
+                            }
                             break;
                         }
                     }
@@ -696,78 +735,98 @@ namespace
                 if (!sample_rate.empty())
                 {
                     const auto numeric_rate = unsigned_value(sample_rate);
-                    append_line(
-                        result,
-                        localize(L"MediaInfo.SampleRate"),
-                        numeric_rate == 0 ? sample_rate : std::to_wstring(numeric_rate) + L"Hz");
+                    if (!append_field(
+                            L"MediaInfo.SampleRate",
+                            numeric_rate == 0
+                                ? sample_rate
+                                : std::to_wstring(numeric_rate) + L"Hz"))
+                    {
+                        return false;
+                    }
                 }
-                append_line(
-                    result,
-                    localize(L"MediaInfo.SampleFormat"),
-                    json_string(stream, L"sample_fmt"));
-                append_line(
-                    result,
-                    localize(L"MediaInfo.Channels"),
-                    join_values({
-                        json_string(stream, L"channels"),
-                        json_string(stream, L"channel_layout") }));
-                append_line(
-                    result,
-                    localize(L"MediaInfo.Bitrate"),
-                    format_rate(unsigned_value(json_string(stream, L"bit_rate"))));
-                append_line(
-                    result,
-                    localize(L"MediaInfo.Duration"),
-                    format_duration(json_string(stream, L"duration")));
-                append_line(
-                    result,
-                    localize(L"MediaInfo.Frames"),
-                    json_string(stream, L"nb_frames"));
+                if (!append_field(L"MediaInfo.SampleFormat", json_string(stream, L"sample_fmt")) ||
+                    !append_field(
+                        L"MediaInfo.Channels",
+                        join_values({
+                            json_string(stream, L"channels"),
+                            json_string(stream, L"channel_layout") })) ||
+                    !append_field(
+                        L"MediaInfo.Bitrate",
+                        format_rate(unsigned_value(json_string(stream, L"bit_rate")))) ||
+                    !append_field(
+                        L"MediaInfo.Duration",
+                        format_duration(json_string(stream, L"duration"))) ||
+                    !append_field(L"MediaInfo.Frames", json_string(stream, L"nb_frames")))
+                {
+                    return false;
+                }
 
                 if (const auto stream_tags = stream.GetNamedObject(L"tags", nullptr))
                 {
-                    append_line(
-                        result,
-                        localize(L"MediaInfo.Language"),
-                        json_string(stream_tags, L"language"));
-                    append_line(
-                        result,
-                        localize(L"MediaInfo.Title"),
-                        json_string(stream_tags, L"title"));
+                    if (!append_field(
+                            L"MediaInfo.Language",
+                            json_string(stream_tags, L"language")) ||
+                        !append_field(
+                            L"MediaInfo.Title",
+                            json_string(stream_tags, L"title")))
+                    {
+                        return false;
+                    }
                 }
                 if (const auto disposition = stream.GetNamedObject(L"disposition", nullptr))
                 {
-                    std::wstring disposition_text;
-                    if (disposition.GetNamedNumber(L"default", 0) != 0)
+                    const bool is_default =
+                        disposition.GetNamedNumber(L"default", 0) != 0;
+                    const bool is_forced =
+                        disposition.GetNamedNumber(L"forced", 0) != 0;
+                    const wchar_t* value_key = is_default && is_forced
+                        ? L"MediaInfo.DefaultForced"
+                        : is_default
+                            ? L"MediaInfo.Default"
+                            : is_forced ? L"MediaInfo.Forced" : nullptr;
+                    if (value_key != nullptr)
                     {
-                        disposition_text = localize(L"MediaInfo.Default");
+                        emitted = true;
+                        if (!append_panel_entry(
+                                sink,
+                                InformationPanelEntryKind::field,
+                                ComponentTextKind::resource_key,
+                                L"MediaInfo.Disposition",
+                                value_key,
+                                ComponentTextKind::resource_key))
+                        {
+                            return false;
+                        }
                     }
-                    if (disposition.GetNamedNumber(L"forced", 0) != 0)
-                    {
-                        if (!disposition_text.empty()) disposition_text.append(L", ");
-                        disposition_text.append(localize(L"MediaInfo.Forced"));
-                    }
-                    append_line(
-                        result,
-                        localize(L"MediaInfo.Disposition"),
-                        disposition_text);
                 }
             }
         }
 
         if (!tags.empty())
         {
-            if (!result.empty())
+            if (!append_panel_entry(
+                    sink,
+                    InformationPanelEntryKind::section,
+                    ComponentTextKind::resource_key,
+                    L"MediaInfo.Metadata"))
             {
-                result.append(L"\n\n");
+                return false;
             }
-            result.append(localize(L"MediaInfo.Metadata"));
+            emitted = true;
             for (const auto& [name, value] : tags)
             {
-                append_line(result, name, value);
+                if (!append_panel_entry(
+                        sink,
+                        InformationPanelEntryKind::field,
+                        ComponentTextKind::literal,
+                        name,
+                        value))
+                {
+                    return false;
+                }
             }
         }
-        return result;
+        return emitted;
     }
 
     std::optional<std::wstring> sha256_file(const std::filesystem::path& path)
@@ -891,7 +950,7 @@ namespace
     ProcessOutput run_media_probe(
         const std::filesystem::path& ffprobe,
         std::wstring_view path,
-        const glance::contracts::components::HoverInfoTextSink& sink)
+        const CancellationProbe* sink)
     {
         constexpr std::wstring_view entries =
             L"format=format_name,format_long_name,duration,bit_rate:"
@@ -909,9 +968,9 @@ namespace
         return run_process_capture(
             ffprobe,
             L"-v error -show_entries " + std::wstring(entries) +
-                L" -of json " + quote_argument(path),
+            L" -of json " + quote_argument(path),
             10000,
-            &sink);
+            sink);
     }
 }
 
@@ -949,31 +1008,34 @@ namespace glance::components::media_info
         }
     }
 
-    std::wstring query_media_info(
+    PrepareStatus query_media_info(
         const std::filesystem::path& ffprobe,
         std::wstring_view path,
-        const wchar_t* language_tag,
-        const glance::contracts::components::HoverInfoTextSink& sink) noexcept
+        const InformationPanelSink& sink) noexcept
     {
         try
         {
-            const auto output = run_media_probe(ffprobe, path, sink);
+            const CancellationProbe cancellation{
+                .context = sink.context,
+                .is_cancelled = sink.is_cancelled };
+            const auto output = run_media_probe(ffprobe, path, &cancellation);
             if (output.cancelled)
             {
-                return {};
+                return PrepareStatus::cancelled;
             }
             if (!output.succeeded || output.text.empty())
             {
-                return localize_text(L"Preview.Failed", language_tag);
+                return PrepareStatus::failed;
             }
-            auto result = format_probe_json(output.text, language_tag);
-            return result.empty()
-                ? localize_text(L"Preview.Failed", language_tag)
-                : result;
+            return format_probe_json(output.text, sink)
+                ? PrepareStatus::success
+                : sink.is_cancelled != nullptr && sink.is_cancelled(sink.context)
+                    ? PrepareStatus::cancelled
+                    : PrepareStatus::failed;
         }
         catch (...)
         {
-            return localize_text(L"Preview.Failed", language_tag);
+            return PrepareStatus::failed;
         }
     }
 
@@ -984,7 +1046,10 @@ namespace glance::components::media_info
     {
         try
         {
-            const auto output = run_media_probe(ffprobe, path, sink);
+            const CancellationProbe cancellation{
+                .context = sink.context,
+                .is_cancelled = sink.is_cancelled };
+            const auto output = run_media_probe(ffprobe, path, &cancellation);
             if (output.cancelled || !output.succeeded || output.text.empty())
             {
                 return {};

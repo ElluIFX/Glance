@@ -462,6 +462,7 @@ namespace winrt::Glance::App::implementation
         auto_fit_options_region_.initialize(
             AutoFitOptionsRegion(),
             window_preferences_.auto_fit_media);
+        refresh_toggle_descriptions();
         initializing_ = false;
         refresh_diagnostic_bundle_status();
         Activated([this](IInspectable const&, WindowActivatedEventArgs const& args) {
@@ -706,12 +707,12 @@ namespace winrt::Glance::App::implementation
         set_text(AccentPinkText(), L"AccentPinkText.Text");
         set_text(AccentPurpleText(), L"AccentPurpleText.Text");
         set_text(LaunchTitle(), L"LaunchTitle.Text");
-        set_text(LaunchDescription(), L"LaunchDescription.Text");
+        set_text(LaunchDescription(), L"LaunchDisabledDescription.Text");
         set_text(UpdateGroupTitle(), L"UpdateGroupTitle.Text");
         set_text(AutomaticUpdateCheckLabel(), L"AutomaticUpdateCheckLabel.Text");
         set_text(
             AutomaticUpdateCheckDescription(),
-            L"AutomaticUpdateCheckDescription.Text");
+            L"AutomaticUpdateCheckDisabledDescription.Text");
         set_text(UpdateCheckFrequencyLabel(), L"UpdateCheckFrequencyLabel.Text");
         set_content(UpdateFrequencyHourlyItem(), L"UpdateFrequencyHourlyItem.Content");
         set_content(UpdateFrequencyDailyItem(), L"UpdateFrequencyDailyItem.Content");
@@ -733,21 +734,29 @@ namespace winrt::Glance::App::implementation
             set_tooltip(controls.move_down, L"FooterFieldMoveDownToolTip");
         }
         set_text(DiagnosticsTitle(), L"DiagnosticsTitle.Text");
-        set_text(DiagnosticsDescription(), L"DiagnosticsDescription.Text");
+        set_text(DiagnosticsDescription(), L"DiagnosticsDisabledDescription.Text");
         set_text(WindowPageTitle(), L"WindowPageTitle.Text");
         set_text(WindowPageDescription(), L"WindowPageDescription.Text");
         set_text(WindowBehaviorSectionTitle(), L"WindowBehaviorSectionTitle.Text");
         set_text(DefaultWindowSizeLabel(), L"DefaultWindowSizeLabel.Text");
         set_text(DefaultWindowSizeDescription(), L"DefaultWindowSizeDescription.Text");
         set_text(RememberWindowSizeLabel(), L"RememberWindowSizeLabel.Text");
-        set_text(RememberWindowSizeDescription(), L"RememberWindowSizeDescription.Text");
+        set_text(
+            RememberWindowSizeDescription(),
+            L"RememberWindowSizeDisabledDescription.Text");
         set_text(AutoFitWindowSizeLabel(), L"AutoFitWindowSizeLabel.Text");
-        set_text(AutoFitWindowSizeDescription(), L"AutoFitWindowSizeDescription.Text");
+        set_text(
+            AutoFitWindowSizeDescription(),
+            L"AutoFitWindowSizeDisabledDescription.Text");
         set_text(ShowAfterAutoFitLabel(), L"ShowAfterAutoFitLabel.Text");
-        set_text(ShowAfterAutoFitDescription(), L"ShowAfterAutoFitDescription.Text");
+        set_text(
+            ShowAfterAutoFitDescription(),
+            L"ShowAfterAutoFitDisabledDescription.Text");
         set_text(AdaptiveMediaSizeSectionTitle(), L"AdaptiveMediaSizeSectionTitle.Text");
         set_text(DynamicAutoFitLabel(), L"DynamicAutoFitLabel.Text");
-        set_text(DynamicAutoFitDescription(), L"DynamicAutoFitDescription.Text");
+        set_text(
+            DynamicAutoFitDescription(),
+            L"DynamicAutoFitDisabledDescription.Text");
         set_text(AdaptiveSizeRangeLabel(), L"AdaptiveSizeRangeLabel.Text");
         set_text(AdaptiveSizeRangeDescription(), L"AdaptiveSizeRangeDescription.Text");
         set_text(AutoFitIgnoredExtensionsLabel(), L"AutoFitIgnoredExtensionsLabel.Text");
@@ -756,12 +765,14 @@ namespace winrt::Glance::App::implementation
             glance::app::localize(L"AutoFitIgnoredExtensionsTextBox.PlaceholderText"));
         set_content(ResetWindowSizesButton(), L"ResetWindowSizesButton.Content");
         set_text(RememberWindowPositionLabel(), L"RememberWindowPositionLabel.Text");
-        set_text(RememberWindowPositionDescription(), L"RememberWindowPositionDescription.Text");
+        set_text(
+            RememberWindowPositionDescription(),
+            L"RememberWindowPositionDisabledDescription.Text");
         set_content(ResetWindowPositionsButton(), L"ResetWindowPositionsButton.Content");
         set_text(DoubleClickFullscreenLabel(), L"DoubleClickFullscreenLabel.Text");
         set_text(
             DoubleClickFullscreenDescription(),
-            L"DoubleClickFullscreenDescription.Text");
+            L"DoubleClickFullscreenDisabledDescription.Text");
         set_text(AcrylicOpacityLabel(), L"AcrylicOpacityLabel.Text");
         set_text(MediaPreviewPageTitle(), L"MediaPreviewPageTitle.Text");
         set_text(MediaPreviewPageDescription(), L"MediaPreviewPageDescription.Text");
@@ -769,29 +780,31 @@ namespace winrt::Glance::App::implementation
         set_text(MiddleClickGalleryModeLabel(), L"MiddleClickGalleryModeLabel.Text");
         set_text(
             MiddleClickGalleryModeDescription(),
-            L"MiddleClickGalleryModeDescription.Text");
+            L"MiddleClickGalleryModeDisabledDescription.Text");
         set_text(LoopGalleryScrollingLabel(), L"LoopGalleryScrollingLabel.Text");
         set_text(
             LoopGalleryScrollingDescription(),
-            L"LoopGalleryScrollingDescription.Text");
+            L"LoopGalleryScrollingDisabledDescription.Text");
         set_text(GallerySameExtensionOnlyLabel(), L"GallerySameExtensionOnlyLabel.Text");
         set_text(
             GallerySameExtensionOnlyDescription(),
-            L"GallerySameExtensionOnlyDescription.Text");
+            L"GallerySameExtensionOnlyDisabledDescription.Text");
         set_text(ImagePreviewGroupTitle(), L"ImagePreviewGroupTitle.Text");
         set_text(ImageZoomMapLabel(), L"ImageZoomMapLabel.Text");
-        set_text(ImageZoomMapDescription(), L"ImageZoomMapDescription.Text");
+        set_text(ImageZoomMapDescription(), L"ImageZoomMapDisabledDescription.Text");
         set_text(AudioVideoPreviewGroupTitle(), L"AudioVideoPreviewGroupTitle.Text");
         set_text(DefaultAudioVolumeLabel(), L"DefaultAudioVolumeLabel.Text");
         set_text(DefaultAudioVolumeDescription(), L"DefaultAudioVolumeDescription.Text");
         set_text(DefaultVideoVolumeLabel(), L"DefaultVideoVolumeLabel.Text");
         set_text(DefaultVideoVolumeDescription(), L"DefaultVideoVolumeDescription.Text");
         set_text(AutoplayAudioLabel(), L"AutoplayAudioLabel.Text");
-        set_text(AutoplayAudioDescription(), L"AutoplayAudioDescription.Text");
+        set_text(AutoplayAudioDescription(), L"AutoplayAudioDisabledDescription.Text");
         set_text(AutoplayVideoLabel(), L"AutoplayVideoLabel.Text");
-        set_text(AutoplayVideoDescription(), L"AutoplayVideoDescription.Text");
+        set_text(AutoplayVideoDescription(), L"AutoplayVideoDisabledDescription.Text");
         set_text(ReverseSeekWheelLabel(), L"ReverseSeekWheelLabel.Text");
-        set_text(ReverseSeekWheelDescription(), L"ReverseSeekWheelDescription.Text");
+        set_text(
+            ReverseSeekWheelDescription(),
+            L"ReverseSeekWheelDisabledDescription.Text");
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
         set_text(PlainTextPreviewSectionTitle(), L"PlainTextPreviewSectionTitle.Text");
@@ -800,7 +813,9 @@ namespace winrt::Glance::App::implementation
         set_text(FontSizeLabel(), L"FontSizeLabel.Text");
         set_text(FontSizeDescription(), L"FontSizeDescription.Text");
         set_text(SyntaxHighlightingLabel(), L"SyntaxHighlightingLabel.Text");
-        set_text(SyntaxHighlightingDescription(), L"SyntaxHighlightingDescription.Text");
+        set_text(
+            SyntaxHighlightingDescription(),
+            L"SyntaxHighlightingDisabledDescription.Text");
         set_text(SyntaxThemeLabel(), L"SyntaxThemeLabel.Text");
         set_text(SyntaxThemeDescription(), L"SyntaxThemeDescription.Text");
         const int selected_syntax_theme = SyntaxThemeComboBox().SelectedIndex();
@@ -839,14 +854,18 @@ namespace winrt::Glance::App::implementation
         }
         initializing_ = was_initializing_syntax_theme;
         set_text(LineNumbersLabel(), L"LineNumbersLabel.Text");
-        set_text(LineNumbersDescription(), L"LineNumbersDescription.Text");
+        set_text(LineNumbersDescription(), L"LineNumbersDisabledDescription.Text");
         set_text(WordWrapLabel(), L"WordWrapLabel.Text");
-        set_text(WordWrapDescription(), L"WordWrapDescription.Text");
+        set_text(WordWrapDescription(), L"WordWrapDisabledDescription.Text");
         set_text(PathCopyGroupLabel(), L"PathCopyGroupLabel.Text");
         set_text(QuoteCopiedPathLabel(), L"QuoteCopiedPathLabel.Text");
-        set_text(QuoteCopiedPathDescription(), L"QuoteCopiedPathDescription.Text");
+        set_text(
+            QuoteCopiedPathDescription(),
+            L"QuoteCopiedPathDisabledDescription.Text");
         set_text(UnixPathSeparatorsLabel(), L"UnixPathSeparatorsLabel.Text");
-        set_text(UnixPathSeparatorsDescription(), L"UnixPathSeparatorsDescription.Text");
+        set_text(
+            UnixPathSeparatorsDescription(),
+            L"UnixPathSeparatorsDisabledDescription.Text");
         set_text(ComponentsPageTitle(), L"ComponentsPageTitle.Text");
         set_text(ComponentsPageDescription(), L"ComponentsPageDescription.Text");
         set_text(AppearanceGroupTitle(), L"AppearanceGroupTitle.Text");
@@ -888,6 +907,7 @@ namespace winrt::Glance::App::implementation
         refresh_component_statuses();
         request_source_statuses();
         rebuild_component_settings();
+        refresh_toggle_descriptions();
     }
 
     bool SettingsWindow::launch_at_sign_in_enabled() const
@@ -1223,22 +1243,29 @@ namespace winrt::Glance::App::implementation
                 Controls::StackPanel content;
                 content.Spacing(3);
                 content.VerticalAlignment(VerticalAlignment::Center);
-                Controls::TextBlock label;
-                label.Text(setting.label);
-                content.Children().Append(label);
-                if (!setting.description.empty())
-                {
-                    Controls::TextBlock description;
-                    description.Style(description_style);
-                    description.Text(setting.description);
-                    content.Children().Append(description);
-                }
-                row.Children().Append(content);
-
                 const auto stored_value = glance::app::component_setting_value(
                     setting.component_id,
                     setting.setting_id,
                     setting.default_value);
+                Controls::TextBlock label;
+                label.Text(setting.label);
+                content.Children().Append(label);
+                const auto description_text =
+                    setting.kind == glance::contracts::components::
+                        ComponentSettingKind::toggle
+                    ? stored_value != 0
+                        ? setting.enabled_description
+                        : setting.disabled_description
+                    : setting.description;
+                Controls::TextBlock description;
+                if (!description_text.empty())
+                {
+                    description.Style(description_style);
+                    description.Text(description_text);
+                    content.Children().Append(description);
+                }
+                row.Children().Append(content);
+
                 if (setting.kind == glance::contracts::components::
                         ComponentSettingKind::toggle)
                 {
@@ -1248,16 +1275,25 @@ namespace winrt::Glance::App::implementation
                     toggle.Toggled([
                         weak,
                         component_id = setting.component_id,
-                        setting_id = setting.setting_id](
+                        setting_id = setting.setting_id,
+                        description,
+                        enabled_description = setting.enabled_description,
+                        disabled_description = setting.disabled_description](
                             IInspectable const& sender,
                             RoutedEventArgs const&) {
                         if (const auto self = weak.get();
                             self != nullptr && !self->initializing_)
                         {
+                            const bool enabled =
+                                sender.as<Controls::ToggleSwitch>().IsOn();
+                            description.Text(
+                                enabled
+                                    ? enabled_description
+                                    : disabled_description);
                             glance::app::save_component_setting_value(
                                 component_id,
                                 setting_id,
-                                sender.as<Controls::ToggleSwitch>().IsOn() ? 1 : 0);
+                                enabled ? 1 : 0);
                         }
                     });
                     row.Children().Append(toggle);
@@ -1345,6 +1381,7 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::LaunchAtSignInToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
     {
+        refresh_toggle_descriptions();
         if (!initializing_)
         {
             set_launch_at_sign_in(LaunchAtSignInToggle().IsOn());
@@ -1355,6 +1392,7 @@ namespace winrt::Glance::App::implementation
         IInspectable const&,
         RoutedEventArgs const&)
     {
+        refresh_toggle_descriptions();
         if (initializing_)
         {
             return;
@@ -1387,6 +1425,7 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::DiagnosticsToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
     {
+        refresh_toggle_descriptions();
         if (!initializing_)
         {
             glance::contracts::set_diagnostics_enabled(DiagnosticsToggle().IsOn());
@@ -1395,6 +1434,7 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::WindowPreferenceToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
     {
+        refresh_toggle_descriptions();
         if (!initializing_)
         {
             window_preferences_.remember_size = RememberWindowSizeToggle().IsOn();
@@ -1500,6 +1540,98 @@ namespace winrt::Glance::App::implementation
             animate && update_animations_enabled_);
     }
 
+    void SettingsWindow::refresh_toggle_descriptions()
+    {
+        const auto set_description = [](
+                                         const Controls::TextBlock& description,
+                                         const Controls::ToggleSwitch& toggle,
+                                         std::wstring_view resource_prefix) {
+            std::wstring key(resource_prefix);
+            key.append(toggle.IsOn()
+                    ? L"EnabledDescription.Text"
+                    : L"DisabledDescription.Text");
+            description.Text(glance::app::localize(key));
+        };
+        set_description(LaunchDescription(), LaunchAtSignInToggle(), L"Launch");
+        set_description(
+            AutomaticUpdateCheckDescription(),
+            AutomaticUpdateCheckToggle(),
+            L"AutomaticUpdateCheck");
+        set_description(
+            DiagnosticsDescription(),
+            DiagnosticsToggle(),
+            L"Diagnostics");
+        set_description(
+            RememberWindowSizeDescription(),
+            RememberWindowSizeToggle(),
+            L"RememberWindowSize");
+        set_description(
+            RememberWindowPositionDescription(),
+            RememberWindowPositionToggle(),
+            L"RememberWindowPosition");
+        set_description(
+            DoubleClickFullscreenDescription(),
+            DoubleClickFullscreenToggle(),
+            L"DoubleClickFullscreen");
+        set_description(
+            AutoFitWindowSizeDescription(),
+            AutoFitWindowSizeToggle(),
+            L"AutoFitWindowSize");
+        set_description(
+            ShowAfterAutoFitDescription(),
+            ShowAfterAutoFitToggle(),
+            L"ShowAfterAutoFit");
+        set_description(
+            DynamicAutoFitDescription(),
+            DynamicAutoFitToggle(),
+            L"DynamicAutoFit");
+        set_description(
+            QuoteCopiedPathDescription(),
+            QuoteCopiedPathToggle(),
+            L"QuoteCopiedPath");
+        set_description(
+            UnixPathSeparatorsDescription(),
+            UnixPathSeparatorsToggle(),
+            L"UnixPathSeparators");
+        set_description(
+            SyntaxHighlightingDescription(),
+            SyntaxHighlightingToggle(),
+            L"SyntaxHighlighting");
+        set_description(
+            LineNumbersDescription(),
+            LineNumbersToggle(),
+            L"LineNumbers");
+        set_description(WordWrapDescription(), WordWrapToggle(), L"WordWrap");
+        set_description(
+            AutoplayAudioDescription(),
+            AutoplayAudioToggle(),
+            L"AutoplayAudio");
+        set_description(
+            AutoplayVideoDescription(),
+            AutoplayVideoToggle(),
+            L"AutoplayVideo");
+        set_description(
+            ReverseSeekWheelDescription(),
+            ReverseSeekWheelToggle(),
+            L"ReverseSeekWheel");
+        set_description(
+            ImageZoomMapDescription(),
+            ImageZoomMapToggle(),
+            L"ImageZoomMap");
+        set_description(
+            MiddleClickGalleryModeDescription(),
+            MiddleClickGalleryModeToggle(),
+            L"MiddleClickGalleryMode");
+        set_description(
+            LoopGalleryScrollingDescription(),
+            LoopGalleryScrollingToggle(),
+            L"LoopGalleryScrolling");
+        set_description(
+            GallerySameExtensionOnlyDescription(),
+            GallerySameExtensionOnlyToggle(),
+            L"GallerySameExtensionOnly");
+    }
+
     void SettingsWindow::set_media_volume(
         Controls::NumberBox const& control,
         double value,
@@ -1552,6 +1684,7 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::MediaPreferenceToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
     {
+        refresh_toggle_descriptions();
         if (initializing_)
         {
             return;
@@ -2393,11 +2526,13 @@ namespace winrt::Glance::App::implementation
 
     void SettingsWindow::TextPreferenceToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
     {
+        refresh_toggle_descriptions();
         save_text_preferences();
     }
 
     void SettingsWindow::PathCopyPreferenceToggle_Toggled(IInspectable const&, RoutedEventArgs const&)
     {
+        refresh_toggle_descriptions();
         if (initializing_)
         {
             return;

@@ -222,6 +222,7 @@ namespace winrt::Glance::App::implementation
         void update_acrylic_dependency(bool animate);
         void update_update_frequency_dependency(bool animate);
         void update_auto_fit_dependency(bool animate);
+        void refresh_toggle_descriptions();
         void save_footer_preferences();
         void rebuild_footer_field_rows();
         void rebuild_component_settings();

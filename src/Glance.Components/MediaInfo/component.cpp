@@ -2,7 +2,7 @@
 
 #include "glance/contracts/component_api.h"
 #include "media_probe.h"
-#include "../Common/component_localization.h"
+#include "../Common/component_text.h"
 #include "../../version.h"
 
 #include <algorithm>
@@ -26,28 +26,8 @@ namespace
         L"e25b682664025d49034c981afb4bae36238a40f29a3cc1c713ad9a8b5b3528f6";
     constexpr std::uint64_t archive_size = 33876939;
 
-    glance::components::ComponentResourceStore component_resources;
     std::mutex state_mutex;
     std::filesystem::path ffprobe_path;
-
-    template <std::size_t Size>
-    bool copy_text(
-        std::wstring_view key,
-        const wchar_t* language_tag,
-        wchar_t (&destination)[Size]) noexcept
-    {
-        if (component_resources.copy(key, language_tag, destination, Size))
-        {
-            return true;
-        }
-        if (key.size() >= Size)
-        {
-            return false;
-        }
-        std::copy(key.begin(), key.end(), destination);
-        destination[key.size()] = L'\0';
-        return true;
-    }
 
     bool available() noexcept
     {
@@ -60,8 +40,7 @@ namespace
         ComponentRegistration* registration) noexcept
     {
         if (registrar == nullptr || registrar->size < sizeof(ComponentRegistrar) ||
-            registration == nullptr || registration->size < sizeof(ComponentRegistration) ||
-            !component_resources.initialize())
+            registration == nullptr || registration->size < sizeof(ComponentRegistration))
         {
             return FALSE;
         }
@@ -73,15 +52,14 @@ namespace
         ComponentRegistration result;
         wcscpy_s(result.component_id, component_id);
         wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
+        wcscpy_s(result.resource_path, L"resources.pri");
         result.preferred_kind = PreviewContentKind::none;
         result.preferred_format = PreviewContentFormat::none;
         *registration = result;
         return TRUE;
     }
 
-    BOOL WINAPI query_status(
-        const wchar_t* language_tag,
-        ComponentStatusResult* result) noexcept
+    BOOL WINAPI query_status(ComponentStatusResult* result) noexcept
     {
         if (result == nullptr || result->size < sizeof(ComponentStatusResult))
         {
@@ -91,11 +69,12 @@ namespace
         const bool is_available = available();
         status.severity = is_available ? HealthSeverity::healthy : HealthSeverity::error;
         status.capability_mask = is_available ? 1 : 0;
-        if (!copy_text(L"Component.DisplayName", language_tag, status.display_name) ||
-            !copy_text(
+        if (!glance::components::copy_resource_key(
+                L"Component.DisplayName",
+                status.display_name_key) ||
+            !glance::components::copy_resource_key(
                 is_available ? L"Status.Available" : L"Status.Unavailable",
-                language_tag,
-                status.detail))
+                status.detail_key))
         {
             return FALSE;
         }
@@ -104,7 +83,6 @@ namespace
     }
 
     BOOL WINAPI enumerate_shortcuts(
-        const wchar_t* language_tag,
         StatusBarShortcutDescriptor* descriptors,
         std::uint32_t capacity,
         std::uint32_t* count) noexcept
@@ -128,7 +106,9 @@ namespace
         descriptor.target_format = PreviewContentFormat::media_file;
         descriptor.order = 500;
         descriptor.fluent_icon_glyph = 0xe946;
-        if (!copy_text(L"Shortcut.Tooltip", language_tag, descriptor.tooltip))
+        if (!glance::components::copy_resource_key(
+                L"Shortcut.Tooltip",
+                descriptor.tooltip_key))
         {
             return FALSE;
         }
@@ -157,7 +137,6 @@ namespace
     BOOL WINAPI activate_shortcut(
         const wchar_t* requested_shortcut_id,
         const wchar_t* path,
-        const wchar_t* language_tag,
         BOOL requested_checked,
         StatusBarShortcutActivationResult* result) noexcept
     {
@@ -173,7 +152,9 @@ namespace
             activation.activation = StatusBarShortcutActivation::toggle_hover_info;
             activation.checked = requested_checked;
             wcscpy_s(activation.hover_info_id, hover_info_id);
-            if (!copy_text(L"Preview.Loading", language_tag, activation.loading_text))
+            if (!glance::components::copy_resource_key(
+                    L"Preview.Loading",
+                    activation.loading_text_key))
             {
                 return FALSE;
             }
@@ -190,11 +171,10 @@ namespace
     PrepareStatus WINAPI query_hover_info(
         const wchar_t* requested_hover_info_id,
         const wchar_t* path,
-        const wchar_t* language_tag,
-        const HoverInfoTextSink* sink) noexcept
+        const InformationPanelSink* sink) noexcept
     {
         if (requested_hover_info_id == nullptr || path == nullptr || sink == nullptr ||
-            sink->size < sizeof(HoverInfoTextSink) || sink->append == nullptr ||
+            sink->size < sizeof(InformationPanelSink) || sink->append == nullptr ||
             wcscmp(requested_hover_info_id, hover_info_id) != 0)
         {
             return PrepareStatus::failed;
@@ -208,26 +188,10 @@ namespace
         {
             return PrepareStatus::unavailable;
         }
-        const auto text = glance::components::media_info::query_media_info(
+        return glance::components::media_info::query_media_info(
             executable,
             path,
-            language_tag,
             *sink);
-        if (text.empty())
-        {
-            return sink->is_cancelled != nullptr && sink->is_cancelled(sink->context)
-                ? PrepareStatus::cancelled
-                : PrepareStatus::failed;
-        }
-        if (text.size() > std::numeric_limits<std::uint32_t>::max() ||
-            !sink->append(
-                sink->context,
-                text.c_str(),
-                static_cast<std::uint32_t>(text.size())))
-        {
-            return PrepareStatus::failed;
-        }
-        return PrepareStatus::success;
     }
 
     PrepareStatus WINAPI query_shortcut_data(
@@ -272,7 +236,6 @@ namespace
     }
 
     BOOL WINAPI enumerate_actions(
-        const wchar_t* language_tag,
         ComponentManagementActionDescriptor* descriptors,
         std::uint32_t capacity,
         std::uint32_t* count) noexcept
@@ -292,19 +255,36 @@ namespace
         }
         ComponentManagementActionDescriptor descriptor;
         wcscpy_s(descriptor.action_id, action_id);
-        if (!copy_text(L"Action.Button", language_tag, descriptor.button_text) ||
-            !copy_text(
-                L"Action.ConfirmationTitle", language_tag, descriptor.confirmation_title) ||
-            !copy_text(
-                L"Action.ConfirmationMessage", language_tag, descriptor.confirmation_message) ||
-            !copy_text(
-                L"Action.ConfirmationButton", language_tag, descriptor.confirmation_button) ||
-            !copy_text(L"Action.DownloadTitle", language_tag, descriptor.download_title) ||
-            !copy_text(L"Action.DownloadMessage", language_tag, descriptor.download_message) ||
-            !copy_text(L"Action.PreparingTitle", language_tag, descriptor.preparing_title) ||
-            !copy_text(L"Action.PreparingMessage", language_tag, descriptor.preparing_message) ||
-            !copy_text(L"Action.CompletedTitle", language_tag, descriptor.completed_title) ||
-            !copy_text(L"Action.CompletedMessage", language_tag, descriptor.completed_message))
+        if (!glance::components::copy_resource_key(
+                L"Action.Button",
+                descriptor.button_text_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.ConfirmationTitle",
+                descriptor.confirmation_title_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.ConfirmationMessage",
+                descriptor.confirmation_message_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.ConfirmationButton",
+                descriptor.confirmation_button_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.DownloadTitle",
+                descriptor.download_title_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.DownloadMessage",
+                descriptor.download_message_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.PreparingTitle",
+                descriptor.preparing_title_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.PreparingMessage",
+                descriptor.preparing_message_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.CompletedTitle",
+                descriptor.completed_title_key) ||
+            !glance::components::copy_resource_key(
+                L"Action.CompletedMessage",
+                descriptor.completed_message_key))
         {
             return FALSE;
         }
@@ -314,7 +294,6 @@ namespace
 
     BOOL WINAPI prepare_action(
         const wchar_t* requested_action_id,
-        const wchar_t*,
         ComponentDownloadRequest* request) noexcept
     {
         if (requested_action_id == nullptr || request == nullptr ||
@@ -336,7 +315,6 @@ namespace
         const wchar_t* requested_action_id,
         const wchar_t* downloaded_path,
         const wchar_t* component_storage_path,
-        const wchar_t* language_tag,
         ComponentManagementActionResult* result) noexcept
     {
         if (requested_action_id == nullptr || downloaded_path == nullptr ||
@@ -367,7 +345,9 @@ namespace
             }
         }
         if (!action_result.succeeded &&
-            !copy_text(error_key, language_tag, action_result.detail))
+            !glance::components::copy_resource_key(
+                error_key,
+                action_result.detail_key))
         {
             return FALSE;
         }
@@ -433,20 +413,6 @@ namespace
             std::scoped_lock lock(state_mutex);
             ffprobe_path.clear();
         }
-        component_resources.shutdown();
-    }
-}
-
-namespace glance::components::media_info
-{
-    std::wstring localize_text(
-        std::wstring_view key,
-        const wchar_t* language_tag) noexcept
-    {
-        wchar_t value[512]{};
-        return copy_text(key, language_tag, value)
-            ? std::wstring(value)
-            : std::wstring(key);
     }
 }
 
