@@ -228,6 +228,145 @@
                         x:Name="WebPreviewHost"
                         Visibility="Collapsed" />
                     <Grid
+                        x:Name="JsonTreeHost"
+                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                        Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid
+                            x:Name="JsonTreeToolbar"
+                            Grid.Row="0"
+                            MinHeight="36"
+                            Padding="8,4"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,0,0,1"
+                            ColumnSpacing="12">
+                            <Grid.Resources>
+                                <Style x:Key="JsonDepthButtonStyle" TargetType="Button">
+                                    <Setter Property="Height" Value="24" />
+                                    <Setter Property="MinWidth" Value="28" />
+                                    <Setter Property="Padding" Value="7,0" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderBrush" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Setter Property="FontSize" Value="11" />
+                                </Style>
+                            </Grid.Resources>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <Button
+                                    x:Name="JsonDepth1Button"
+                                    x:Uid="JsonDepth1Button"
+                                    Style="{StaticResource JsonDepthButtonStyle}"
+                                    Click="JsonDepthButton_Click"
+                                    Content="1"
+                                    Tag="1"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="JsonDepth2Button"
+                                    x:Uid="JsonDepth2Button"
+                                    Style="{StaticResource JsonDepthButtonStyle}"
+                                    Click="JsonDepthButton_Click"
+                                    Content="2"
+                                    Tag="2"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="JsonDepth3Button"
+                                    x:Uid="JsonDepth3Button"
+                                    Style="{StaticResource JsonDepthButtonStyle}"
+                                    Click="JsonDepthButton_Click"
+                                    Content="3"
+                                    Tag="3"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="JsonDepth4Button"
+                                    x:Uid="JsonDepth4Button"
+                                    Style="{StaticResource JsonDepthButtonStyle}"
+                                    Click="JsonDepthButton_Click"
+                                    Content="4"
+                                    Tag="4"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="JsonDepth5Button"
+                                    x:Uid="JsonDepth5Button"
+                                    Style="{StaticResource JsonDepthButtonStyle}"
+                                    Click="JsonDepthButton_Click"
+                                    Content="5"
+                                    Tag="5"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="JsonExpandAllButton"
+                                    x:Uid="JsonExpandAllButton"
+                                    Style="{StaticResource JsonDepthButtonStyle}"
+                                    Click="JsonDepthButton_Click"
+                                    Content="All"
+                                    Tag="all"
+                                    Visibility="Collapsed" />
+                            </StackPanel>
+                            <TextBlock
+                                x:Name="JsonStatisticsText"
+                                Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                FontSize="11"
+                                TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                        <ListView
+                            x:Name="JsonTreeList"
+                            Grid.Row="1"
+                            Padding="8"
+                            Background="Transparent"
+                            ContainerContentChanging="JsonTreeList_ContainerContentChanging"
+                            IsItemClickEnabled="True"
+                            ItemClick="JsonTreeList_ItemClick"
+                            SelectionMode="None">
+                            <ListView.ItemContainerTransitions>
+                                <TransitionCollection />
+                            </ListView.ItemContainerTransitions>
+                            <ListView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <ItemsStackPanel Orientation="Vertical" />
+                                </ItemsPanelTemplate>
+                            </ListView.ItemsPanel>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid
+                                        MinHeight="30"
+                                        Background="Transparent"
+                                        PointerPressed="JsonTreeRow_PointerPressed" />
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="MinHeight" Value="30" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="IsTabStop" Value="False" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                        </ListView>
+                        <StackPanel
+                            x:Name="JsonParsingOverlay"
+                            Grid.RowSpan="2"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            IsHitTestVisible="False"
+                            Spacing="12">
+                            <ProgressRing Width="32" Height="32" IsActive="True" />
+                            <TextBlock
+                                x:Name="JsonParsingText"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid
                         x:Name="TextLoadingOverlay"
                         IsHitTestVisible="False"
                         Visibility="Collapsed">
@@ -891,6 +1030,7 @@
                     Visibility="Collapsed">
                     <ToggleButton
                         x:Name="MarkdownPreviewButton"
+                        x:Uid="MarkdownPreviewButton"
                         Height="24"
                         MinWidth="54"
                         Padding="8,0"
@@ -902,6 +1042,7 @@
                         FontSize="11" />
                     <ToggleButton
                         x:Name="MarkdownCodeButton"
+                        x:Uid="MarkdownCodeButton"
                         Height="24"
                         MinWidth="42"
                         Padding="8,0"
@@ -910,6 +1051,36 @@
                         BorderThickness="0"
                         Click="MarkdownCodeButton_Click"
                         Content="Code"
+                        FontSize="11" />
+                </StackPanel>
+                <StackPanel
+                    x:Name="JsonModeButtons"
+                    Orientation="Horizontal"
+                    Spacing="2"
+                    Visibility="Collapsed">
+                    <ToggleButton
+                        x:Name="JsonTreeButton"
+                        x:Uid="JsonTreeButton"
+                        Height="24"
+                        MinWidth="42"
+                        Padding="8,0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Click="JsonTreeButton_Click"
+                        Content="Tree"
+                        FontSize="11" />
+                    <ToggleButton
+                        x:Name="JsonRawButton"
+                        x:Uid="JsonRawButton"
+                        Height="24"
+                        MinWidth="42"
+                        Padding="8,0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Click="JsonRawButton_Click"
+                        Content="Raw"
                         FontSize="11" />
                 </StackPanel>
             </StackPanel>

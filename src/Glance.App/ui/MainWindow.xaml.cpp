@@ -6,6 +6,7 @@
 #include "generic_file_info.h"
 #include "gallery_navigation.h"
 #include "image_metadata_provider.h"
+#include "json_preview.h"
 #include "localization.h"
 #include "markdown_renderer.h"
 #include "media_preview_preferences.h"
@@ -14,6 +15,7 @@
 #include "path_copy_preferences.h"
 #include "resource.h"
 #include "shell_icon_provider.h"
+#include "syntax_theme.h"
 #include "webview_availability.h"
 #include "window_size_store.h"
 #include "window_preferences.h"
@@ -144,6 +146,215 @@ namespace
     constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
     constexpr std::size_t retained_preview_buffer_limit_bytes = 8U * 1024U * 1024U;
     constexpr std::uint32_t folder_icon_pixel_size = 20;
+    constexpr std::uint64_t json_sentinel_mask = 1ULL << 63U;
+    constexpr std::size_t json_child_batch_size = 128;
+    constexpr std::size_t json_preloaded_child_count = json_child_batch_size * 2;
+    constexpr std::size_t json_depth_command_batch_size = 128;
+    constexpr std::uint32_t json_all_depth = std::numeric_limits<std::uint32_t>::max();
+    constexpr auto json_row_animation_duration = std::chrono::milliseconds(250);
+    constexpr std::size_t maximum_json_display_characters = 512;
+
+    bool json_preview_path(std::wstring_view path)
+    {
+        auto extension = std::filesystem::path(path).extension().wstring();
+        std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+            return static_cast<wchar_t>(std::towlower(value));
+        });
+        return extension == L".json" ||
+            extension == L".jsonl" ||
+            extension == L".ndjson";
+    }
+
+    bool json_lines_path(std::wstring_view path)
+    {
+        auto extension = std::filesystem::path(path).extension().wstring();
+        std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+            return static_cast<wchar_t>(std::towlower(value));
+        });
+        return extension == L".jsonl" || extension == L".ndjson";
+    }
+
+    bool json_container(glance::app::JsonNodeKind kind) noexcept
+    {
+        return kind == glance::app::JsonNodeKind::object ||
+            kind == glance::app::JsonNodeKind::array;
+    }
+
+    Windows::UI::Color json_color(std::uint32_t value) noexcept
+    {
+        return {
+            255,
+            static_cast<std::uint8_t>((value >> 16U) & 0xFFU),
+            static_cast<std::uint8_t>((value >> 8U) & 0xFFU),
+            static_cast<std::uint8_t>(value & 0xFFU) };
+    }
+
+    std::wstring json_preview_text(std::wstring_view text)
+    {
+        if (text.size() <= maximum_json_display_characters)
+        {
+            return std::wstring(text);
+        }
+
+        auto length = maximum_json_display_characters;
+        if (length > 0 && length < text.size() &&
+            text[length - 1] >= 0xD800 && text[length - 1] <= 0xDBFF &&
+            text[length] >= 0xDC00 && text[length] <= 0xDFFF)
+        {
+            --length;
+        }
+        std::wstring result(text.substr(0, length));
+        result += L"...";
+        return result;
+    }
+
+    void append_json_string(std::wstring& output, std::wstring_view value)
+    {
+        constexpr wchar_t hexadecimal[] = L"0123456789abcdef";
+        output.push_back(L'\"');
+        for (const auto character : value)
+        {
+            switch (character)
+            {
+            case L'\b':
+                output += L"\\b";
+                break;
+            case L'\f':
+                output += L"\\f";
+                break;
+            case L'\r':
+                output += L"\\r";
+                break;
+            case L'\n':
+                output += L"\\n";
+                break;
+            case L'\t':
+                output += L"\\t";
+                break;
+            case L'\"':
+                output += L"\\\"";
+                break;
+            case L'\\':
+                output += L"\\\\";
+                break;
+            default:
+                if (character < 0x20)
+                {
+                    output += L"\\u00";
+                    output.push_back(hexadecimal[(character >> 4) & 0x0F]);
+                    output.push_back(hexadecimal[character & 0x0F]);
+                }
+                else
+                {
+                    output.push_back(character);
+                }
+                break;
+            }
+        }
+        output.push_back(L'\"');
+    }
+
+    std::wstring json_scalar_text(const glance::app::JsonNode& node)
+    {
+        const auto display_value = json_preview_text(node.value);
+        if (node.kind != glance::app::JsonNodeKind::string)
+        {
+            return display_value;
+        }
+        std::wstring value;
+        value.reserve(display_value.size() + 2);
+        append_json_string(value, display_value);
+        return value;
+    }
+
+    void append_json_indent(std::wstring& output, std::uint32_t level)
+    {
+        output.append(static_cast<std::size_t>(level) * 2, L' ');
+    }
+
+    bool append_serialized_json_node(
+        std::wstring& output,
+        const std::vector<glance::app::JsonNode>& nodes,
+        const std::unordered_map<std::size_t, std::vector<std::size_t>>& children,
+        std::size_t node_id,
+        std::uint32_t indentation,
+        bool allow_incomplete_root)
+    {
+        if (node_id >= nodes.size())
+        {
+            return false;
+        }
+        const auto& node = nodes[node_id];
+        if (!node.complete && !(allow_incomplete_root && node.parent_id == glance::app::json_no_parent))
+        {
+            return false;
+        }
+
+        switch (node.kind)
+        {
+        case glance::app::JsonNodeKind::object:
+        case glance::app::JsonNodeKind::array:
+        {
+            const auto iterator = children.find(node_id);
+            const std::size_t child_count = iterator == children.end()
+                ? 0
+                : iterator->second.size();
+            if (node.child_count != child_count)
+            {
+                return false;
+            }
+
+            const bool object = node.kind == glance::app::JsonNodeKind::object;
+            output.push_back(object ? L'{' : L'[');
+            if (child_count != 0)
+            {
+                output.push_back(L'\n');
+                for (std::size_t index = 0; index < child_count; ++index)
+                {
+                    const auto child_id = iterator->second[index];
+                    if (child_id >= nodes.size())
+                    {
+                        return false;
+                    }
+                    append_json_indent(output, indentation + 1);
+                    if (object)
+                    {
+                        append_json_string(output, nodes[child_id].key);
+                        output += L": ";
+                    }
+                    if (!append_serialized_json_node(
+                            output,
+                            nodes,
+                            children,
+                            child_id,
+                            indentation + 1,
+                            false))
+                    {
+                        return false;
+                    }
+                    if (index + 1 < child_count)
+                    {
+                        output.push_back(L',');
+                    }
+                    output.push_back(L'\n');
+                }
+                append_json_indent(output, indentation);
+            }
+            output.push_back(object ? L'}' : L']');
+            return true;
+        }
+        case glance::app::JsonNodeKind::string:
+            append_json_string(output, node.value);
+            return true;
+        case glance::app::JsonNodeKind::number:
+        case glance::app::JsonNodeKind::boolean:
+        case glance::app::JsonNodeKind::null_value:
+            output += node.value;
+            return true;
+        default:
+            return false;
+        }
+    }
 
     std::wstring compact_file_list_name(std::wstring_view name)
     {
@@ -1653,6 +1864,7 @@ namespace winrt::Glance::App::implementation
                 syntax_highlighting_,
                 RootGrid().ActualTheme() == ElementTheme::Dark);
         }
+        refresh_realized_json_rows();
         if (current_text_markdown_ && !current_text_has_more_ && !current_text_.empty())
         {
             render_markdown();
@@ -1723,6 +1935,34 @@ namespace winrt::Glance::App::implementation
             L"GenericAdvancedInfoButton.ToolTipService.ToolTip");
         LoadCloudFileText().Text(glance::app::localize(L"LoadCloudFileText.Text"));
         PreviewAsTextText().Text(glance::app::localize(L"PreviewAsTextText.Text"));
+        MarkdownPreviewButton().Content(box_value(
+            glance::app::localize(L"MarkdownPreviewButton.Content")));
+        MarkdownCodeButton().Content(box_value(
+            glance::app::localize(L"MarkdownCodeButton.Content")));
+        JsonTreeButton().Content(box_value(
+            glance::app::localize(L"JsonTreeButton.Content")));
+        JsonRawButton().Content(box_value(
+            glance::app::localize(L"JsonRawButton.Content")));
+        JsonExpandAllButton().Content(box_value(
+            glance::app::localize(L"JsonExpandAllButton.Content")));
+        const std::array depth_buttons{
+            JsonDepth1Button(),
+            JsonDepth2Button(),
+            JsonDepth3Button(),
+            JsonDepth4Button(),
+            JsonDepth5Button(),
+        };
+        for (std::size_t index = 0; index < depth_buttons.size(); ++index)
+        {
+            ToolTipService::SetToolTip(
+                depth_buttons[index],
+                box_value(glance::app::localize_format(
+                    L"JsonDepthButtonTooltipFormat",
+                    { std::to_wstring(index + 1) })));
+        }
+        set_tooltip(JsonExpandAllButton(), L"JsonExpandAllButtonTooltip");
+        JsonParsingText().Text(glance::app::localize(L"JsonParsingText"));
+        update_json_statistics();
         if (TextLoadingOverlay().Visibility() == Visibility::Visible)
         {
             TextLoadingText().Text(glance::app::localize(L"Loading"));
@@ -1779,6 +2019,7 @@ namespace winrt::Glance::App::implementation
         update_line_number_visibility();
         update_generic_file_metadata();
         update_footer_metadata();
+        refresh_realized_json_rows();
         rebuild_component_contributions();
     }
 
@@ -1791,6 +2032,7 @@ namespace winrt::Glance::App::implementation
         {
             update_text_layout();
         }
+        refresh_realized_json_rows();
         update_preview_as_text_button();
     }
 
@@ -2599,6 +2841,7 @@ namespace winrt::Glance::App::implementation
         cancel_pdf_render();
         cancel_archive_icon_load();
         glance::app::cancel_text_preview_read(current_text_reader_);
+        reset_json_preview();
         clear_web_view_content();
         active_component_web_preview_.reset();
         active_component_file_directory_.reset();
@@ -3775,6 +4018,7 @@ namespace winrt::Glance::App::implementation
     {
         clear_web_view_content();
         glance::app::cancel_text_preview_read(current_text_reader_);
+        reset_json_preview();
         if (!ensure_text_editor())
         {
             set_text_loading(false);
@@ -3795,6 +4039,10 @@ namespace winrt::Glance::App::implementation
         current_text_path_ = file.path;
         current_text_markdown_ = markdown;
         current_text_web_ = web;
+        current_text_json_ = !markdown && !web && json_preview_path(file.path);
+        current_text_json_lines_ = current_text_json_ && json_lines_path(file.path);
+        json_tree_available_ = current_text_json_;
+        json_tree_mode_ = current_text_json_;
         web_preview_available_ =
             (markdown || web) && glance::app::webview_runtime_available();
         if (web_preview_ != nullptr)
@@ -3827,9 +4075,15 @@ namespace winrt::Glance::App::implementation
             web_preview_available_ && !component_web
                 ? Visibility::Visible
                 : Visibility::Collapsed);
+        JsonModeButtons().Visibility(
+            current_text_json_ ? Visibility::Visible : Visibility::Collapsed);
         MarkdownPreviewButton().IsEnabled(web_preview_available_);
         MarkdownCodeButton().IsEnabled(true);
         set_markdown_preview_mode(web_preview_available_);
+        if (current_text_json_)
+        {
+            set_json_tree_mode(true);
+        }
         if (web_preview_available_)
         {
             if (web_preview_ != nullptr)
@@ -3861,6 +4115,13 @@ namespace winrt::Glance::App::implementation
         {
             set_text_loading(false);
             return;
+        }
+        if (current_text_json_)
+        {
+            start_json_preview(
+                file.path,
+                content_generation_,
+                current_text_encoding_);
         }
         load_text_async(file.path, markdown, web, content_generation_, current_text_encoding_);
     }
@@ -5930,6 +6191,525 @@ namespace winrt::Glance::App::implementation
             }));
     }
 
+    void MainWindow::start_json_preview(
+        const std::wstring& path,
+        std::uint64_t generation,
+        glance::app::TextEncoding encoding)
+    {
+        if (json_parser_ != nullptr)
+        {
+            json_parser_->cancel();
+        }
+        cancel_json_depth_command();
+        json_nodes_.clear();
+        json_children_.clear();
+        json_visible_rows_.clear();
+        json_expanded_nodes_.clear();
+        json_visible_child_counts_.clear();
+        json_pending_child_batches_.clear();
+        json_animating_rows_.clear();
+        if (json_row_animation_timer_ != nullptr)
+        {
+            json_row_animation_timer_.Stop();
+        }
+        json_statistics_ = {};
+        JsonTreeList().Items().Clear();
+        json_parse_complete_ = false;
+        json_index_truncated_ = false;
+        json_tree_available_ = true;
+        JsonTreeButton().IsEnabled(true);
+        JsonParsingText().Text(glance::app::localize(L"JsonParsingText"));
+        update_json_statistics();
+        JsonParsingOverlay().Visibility(Visibility::Visible);
+        JsonTreeHost().Visibility(
+            json_tree_mode_ ? Visibility::Visible : Visibility::Collapsed);
+        auto parser = std::make_shared<glance::app::JsonPreviewParser>(
+            path,
+            encoding,
+            current_text_json_lines_);
+        json_parser_ = parser;
+        parse_json_batch_async(std::move(parser), generation);
+    }
+
+    fire_and_forget MainWindow::parse_json_batch_async(
+        std::shared_ptr<glance::app::JsonPreviewParser> parser,
+        std::uint64_t generation)
+    {
+        const auto lifetime = get_strong();
+        const auto dispatcher = DispatcherQueue();
+        glance::app::JsonParseBatch batch;
+        try
+        {
+            co_await resume_background();
+            batch = parser->parse_next_batch();
+        }
+        catch (...)
+        {
+            batch.fatal_error = true;
+        }
+        static_cast<void>(dispatcher.TryEnqueue([
+            lifetime,
+            parser = std::move(parser),
+            batch = std::move(batch),
+            generation]() mutable {
+            lifetime->apply_json_parse_batch(
+                std::move(parser),
+                std::move(batch),
+                generation);
+        }));
+    }
+
+    void MainWindow::apply_json_parse_batch(
+        std::shared_ptr<glance::app::JsonPreviewParser> parser,
+        glance::app::JsonParseBatch batch,
+        std::uint64_t generation)
+    {
+        if (generation != content_generation_ || parser != json_parser_)
+        {
+            parser->cancel();
+            return;
+        }
+        if (batch.cancelled)
+        {
+            return;
+        }
+
+        for (auto& node : batch.added_nodes)
+        {
+            if (node.id >= json_nodes_.size())
+            {
+                json_nodes_.resize(node.id + 1);
+            }
+            json_nodes_[node.id] = node;
+            if (node.parent_id != glance::app::json_no_parent)
+            {
+                json_children_[node.parent_id].push_back(node.id);
+            }
+            else if (json_container(node.kind))
+            {
+                json_expanded_nodes_.insert(node.id);
+                json_visible_child_counts_[node.id] = json_preloaded_child_count;
+            }
+            if (json_depth_command_limit_.has_value() &&
+                json_container(node.kind) &&
+                node.depth < *json_depth_command_limit_)
+            {
+                json_expanded_nodes_.insert(node.id);
+                json_visible_child_counts_[node.id] = json_preloaded_child_count;
+            }
+        }
+        for (auto& update : batch.updated_nodes)
+        {
+            if (update.id < json_nodes_.size())
+            {
+                auto& node = json_nodes_[update.id];
+                node.child_count = update.child_count;
+                node.complete = update.complete;
+                if (update.replace_kind_and_value)
+                {
+                    node.kind = update.kind;
+                    node.value = std::move(update.value);
+                }
+                if (json_depth_command_limit_.has_value() &&
+                    json_container(node.kind) &&
+                    node.depth < *json_depth_command_limit_)
+                {
+                    json_expanded_nodes_.insert(node.id);
+                    json_visible_child_counts_[node.id] = std::max(
+                        json_visible_child_counts_[node.id],
+                        json_preloaded_child_count);
+                }
+            }
+        }
+
+        for (auto iterator = json_pending_child_batches_.begin();
+             iterator != json_pending_child_batches_.end();)
+        {
+            const auto parent_id = *iterator;
+            const auto available = json_children_[parent_id].size();
+            auto& shown = json_visible_child_counts_[parent_id];
+            if (available > shown)
+            {
+                shown = std::min(available, shown + json_preloaded_child_count);
+                iterator = json_pending_child_batches_.erase(iterator);
+            }
+            else if (batch.complete)
+            {
+                iterator = json_pending_child_batches_.erase(iterator);
+            }
+            else
+            {
+                ++iterator;
+            }
+        }
+        json_statistics_ = batch.statistics;
+        update_json_statistics();
+
+        if (!json_nodes_.empty())
+        {
+            JsonParsingOverlay().Visibility(Visibility::Collapsed);
+        }
+        json_parse_complete_ = batch.complete;
+        sync_json_projection(json_depth_command_limit_.has_value());
+
+        if (batch.fatal_error)
+        {
+            json_tree_available_ = false;
+            JsonTreeButton().IsEnabled(false);
+            JsonParsingOverlay().Visibility(Visibility::Collapsed);
+            set_json_tree_mode(false);
+            show_preview_message(
+                glance::app::localize_format(
+                    L"JsonParseErrorFormat",
+                    {
+                        std::to_wstring(batch.error_line),
+                        std::to_wstring(batch.error_column),
+                    }),
+                InfoBarSeverity::Warning,
+                true,
+                5000);
+            return;
+        }
+        if (batch.index_truncated && !json_index_truncated_)
+        {
+            json_index_truncated_ = true;
+            show_preview_message(
+                glance::app::localize(L"JsonTreeTruncated"),
+                InfoBarSeverity::Warning,
+                true,
+                5000);
+        }
+        if (batch.complete)
+        {
+            if (json_depth_command_queue_.empty())
+            {
+                json_depth_command_limit_.reset();
+            }
+            JsonParsingOverlay().Visibility(Visibility::Collapsed);
+            return;
+        }
+        parse_json_batch_async(std::move(parser), generation);
+    }
+
+    void MainWindow::reset_json_preview() noexcept
+    {
+        if (json_parser_ != nullptr)
+        {
+            json_parser_->cancel();
+            json_parser_.reset();
+        }
+        cancel_json_depth_command();
+        json_nodes_.clear();
+        json_children_.clear();
+        json_visible_rows_.clear();
+        json_expanded_nodes_.clear();
+        json_visible_child_counts_.clear();
+        json_pending_child_batches_.clear();
+        json_animating_rows_.clear();
+        if (json_row_animation_timer_ != nullptr)
+        {
+            json_row_animation_timer_.Stop();
+        }
+        json_statistics_ = {};
+        current_text_json_ = false;
+        current_text_json_lines_ = false;
+        json_tree_mode_ = false;
+        json_tree_available_ = false;
+        json_parse_complete_ = false;
+        json_index_truncated_ = false;
+        try
+        {
+            JsonTreeList().Items().Clear();
+            update_json_statistics();
+            JsonTreeHost().Visibility(Visibility::Collapsed);
+            JsonParsingOverlay().Visibility(Visibility::Collapsed);
+            JsonModeButtons().Visibility(Visibility::Collapsed);
+        }
+        catch (...)
+        {
+        }
+    }
+
+    void MainWindow::append_json_projection(
+        std::size_t node_id,
+        std::vector<std::uint64_t>& projection) const
+    {
+        if (node_id >= json_nodes_.size())
+        {
+            return;
+        }
+        const auto& node = json_nodes_[node_id];
+        projection.push_back(static_cast<std::uint64_t>(node_id));
+        if (!json_container(node.kind) ||
+            !json_expanded_nodes_.contains(node_id))
+        {
+            return;
+        }
+
+        const auto children = json_children_.find(node_id);
+        const auto available = children == json_children_.end()
+            ? 0
+            : children->second.size();
+        const auto requested = json_visible_child_counts_.contains(node_id)
+            ? json_visible_child_counts_.at(node_id)
+            : json_child_batch_size;
+        const auto visible = std::min(available, requested);
+        for (std::size_t index = 0; index < visible; ++index)
+        {
+            append_json_projection(children->second[index], projection);
+        }
+        if (visible < available || (!node.complete && !json_parse_complete_))
+        {
+            projection.push_back(
+                json_sentinel_mask | static_cast<std::uint64_t>(node_id));
+        }
+    }
+
+    void MainWindow::sync_json_projection(bool animate_insertions)
+    {
+        std::vector<std::uint64_t> projection;
+        if (!json_nodes_.empty())
+        {
+            append_json_projection(0, projection);
+        }
+        if (projection == json_visible_rows_)
+        {
+            refresh_realized_json_rows();
+            return;
+        }
+
+        auto items = JsonTreeList().Items();
+        const std::unordered_set<std::uint64_t> projected_rows(
+            projection.begin(),
+            projection.end());
+        std::vector<std::uint64_t> retained_rows;
+        retained_rows.reserve(std::min(
+            json_visible_rows_.size(),
+            projection.size()));
+        std::uint32_t retained_index{};
+        for (const auto row_id : json_visible_rows_)
+        {
+            if (projected_rows.contains(row_id))
+            {
+                retained_rows.push_back(row_id);
+                ++retained_index;
+            }
+            else
+            {
+                items.RemoveAt(retained_index);
+            }
+        }
+
+        if (animate_insertions)
+        {
+            json_animating_rows_.clear();
+        }
+        std::size_t next_retained{};
+        for (std::size_t index = 0; index < projection.size(); ++index)
+        {
+            if (next_retained < retained_rows.size() &&
+                projection[index] == retained_rows[next_retained])
+            {
+                ++next_retained;
+                continue;
+            }
+            items.InsertAt(
+                static_cast<std::uint32_t>(index),
+                box_value(projection[index]));
+            if (animate_insertions &&
+                (projection[index] & json_sentinel_mask) == 0)
+            {
+                json_animating_rows_.insert(projection[index]);
+            }
+        }
+        if (animate_insertions && !json_animating_rows_.empty())
+        {
+            if (json_row_animation_timer_ == nullptr)
+            {
+                json_row_animation_timer_ = DispatcherTimer();
+                json_row_animation_timer_.Interval(std::chrono::milliseconds(280));
+                const auto weak = get_weak();
+                json_row_animation_timer_.Tick([
+                    weak](IInspectable const&, IInspectable const&) {
+                    if (const auto self = weak.get())
+                    {
+                        self->json_row_animation_timer_.Stop();
+                        self->json_animating_rows_.clear();
+                    }
+                });
+            }
+            json_row_animation_timer_.Stop();
+            json_row_animation_timer_.Start();
+        }
+        json_visible_rows_ = std::move(projection);
+        refresh_realized_json_rows();
+    }
+
+    void MainWindow::apply_json_depth_command(std::uint32_t maximum_depth)
+    {
+        cancel_json_depth_command();
+        json_depth_command_limit_ = maximum_depth;
+
+        if (maximum_depth != json_all_depth)
+        {
+            std::erase_if(json_expanded_nodes_, [this, maximum_depth](std::size_t node_id) {
+                return node_id < json_nodes_.size() &&
+                    node_id != 0 &&
+                    json_nodes_[node_id].depth >= maximum_depth;
+            });
+        }
+        if (json_nodes_.empty() || !json_container(json_nodes_.front().kind))
+        {
+            json_depth_command_limit_.reset();
+            sync_json_projection();
+            return;
+        }
+
+        json_depth_command_queue_.push_back(0);
+        json_depth_queued_nodes_.insert(0);
+        process_json_depth_command(json_depth_command_generation_);
+    }
+
+    void MainWindow::process_json_depth_command(std::uint64_t command_generation)
+    {
+        if (command_generation != json_depth_command_generation_ ||
+            !json_depth_command_limit_.has_value())
+        {
+            return;
+        }
+
+        const auto maximum_depth = *json_depth_command_limit_;
+        std::size_t processed{};
+        while (!json_depth_command_queue_.empty() &&
+               processed < json_depth_command_batch_size)
+        {
+            const auto node_id = json_depth_command_queue_.front();
+            json_depth_command_queue_.pop_front();
+            ++processed;
+            if (node_id >= json_nodes_.size())
+            {
+                continue;
+            }
+
+            const auto& node = json_nodes_[node_id];
+            if (!json_container(node.kind) || node.depth >= maximum_depth)
+            {
+                continue;
+            }
+            json_expanded_nodes_.insert(node_id);
+            json_visible_child_counts_[node_id] = std::max(
+                json_visible_child_counts_[node_id],
+                json_preloaded_child_count);
+
+            const auto children = json_children_.find(node_id);
+            if (children == json_children_.end())
+            {
+                continue;
+            }
+            for (const auto child_id : children->second)
+            {
+                if (child_id < json_nodes_.size() &&
+                    json_container(json_nodes_[child_id].kind) &&
+                    json_nodes_[child_id].depth < maximum_depth &&
+                    json_depth_queued_nodes_.insert(child_id).second)
+                {
+                    json_depth_command_queue_.push_back(child_id);
+                }
+            }
+        }
+
+        sync_json_projection(true);
+        if (!json_depth_command_queue_.empty())
+        {
+            const auto weak = get_weak();
+            static_cast<void>(DispatcherQueue().TryEnqueue([
+                weak,
+                command_generation] {
+                if (const auto self = weak.get())
+                {
+                    self->process_json_depth_command(command_generation);
+                }
+            }));
+            return;
+        }
+
+        json_depth_queued_nodes_.clear();
+        if (json_parse_complete_)
+        {
+            json_depth_command_limit_.reset();
+        }
+    }
+
+    void MainWindow::cancel_json_depth_command() noexcept
+    {
+        ++json_depth_command_generation_;
+        json_depth_command_limit_.reset();
+        json_depth_command_queue_.clear();
+        json_depth_queued_nodes_.clear();
+    }
+
+    void MainWindow::update_json_statistics()
+    {
+        JsonStatisticsText().Text(glance::app::localize_format(
+            L"JsonStatisticsFormat",
+            {
+                std::to_wstring(json_statistics_.object_count),
+                std::to_wstring(json_statistics_.array_count),
+                std::to_wstring(json_statistics_.value_count),
+                std::to_wstring(json_statistics_.maximum_depth),
+            }));
+
+        const std::array depth_buttons{
+            JsonDepth1Button(),
+            JsonDepth2Button(),
+            JsonDepth3Button(),
+            JsonDepth4Button(),
+            JsonDepth5Button(),
+        };
+        for (std::size_t index = 0; index < depth_buttons.size(); ++index)
+        {
+            depth_buttons[index].Visibility(
+                json_statistics_.maximum_depth > index
+                    ? Visibility::Visible
+                    : Visibility::Collapsed);
+        }
+        JsonExpandAllButton().Visibility(
+            json_statistics_.maximum_depth > 0
+                ? Visibility::Visible
+                : Visibility::Collapsed);
+    }
+
+    void MainWindow::request_more_json_children(std::size_t parent_id)
+    {
+        if (!json_pending_child_batches_.insert(parent_id).second)
+        {
+            return;
+        }
+        const auto weak = get_weak();
+        static_cast<void>(DispatcherQueue().TryEnqueue(
+            Microsoft::UI::Dispatching::DispatcherQueuePriority::Normal,
+            [weak, parent_id] {
+                const auto self = weak.get();
+                if (!self || !self->json_pending_child_batches_.contains(parent_id))
+                {
+                    return;
+                }
+                const auto available = self->json_children_[parent_id].size();
+                auto& shown = self->json_visible_child_counts_[parent_id];
+                if (available > shown)
+                {
+                    shown = std::min(available, shown + json_preloaded_child_count);
+                    self->json_pending_child_batches_.erase(parent_id);
+                    self->sync_json_projection();
+                }
+                else if (self->json_parse_complete_)
+                {
+                    self->json_pending_child_batches_.erase(parent_id);
+                    self->sync_json_projection();
+                }
+            }));
+    }
+
     fire_and_forget MainWindow::render_markdown()
     {
         if (!web_preview_available_ || !web_view_ready_)
@@ -6336,7 +7116,10 @@ namespace winrt::Glance::App::implementation
     {
         text_loading_ = loading;
         TextLoadingText().Text(loading ? glance::app::localize(L"Loading") : L"");
-        TextLoadingOverlay().Visibility(loading ? Visibility::Visible : Visibility::Collapsed);
+        TextLoadingOverlay().Visibility(
+            loading && !json_tree_mode_
+                ? Visibility::Visible
+                : Visibility::Collapsed);
         update_text_editor_visibility();
     }
 
@@ -6486,6 +7269,7 @@ namespace winrt::Glance::App::implementation
             !xaml_modal_overlay_active_ &&
             !text_loading_ &&
             !markdown_preview_ &&
+            !json_tree_mode_ &&
             TextPanel().Visibility() == Visibility::Visible;
         text_editor_->set_visible(code_visible);
     }
@@ -6586,11 +7370,17 @@ namespace winrt::Glance::App::implementation
         TextStatusControls().Visibility(
             text && !component_web ? Visibility::Visible : Visibility::Collapsed);
         LineNumbersButton().Visibility(
-            text && !component_web ? Visibility::Visible : Visibility::Collapsed);
+            text && !component_web && (!current_text_json_ || !json_tree_mode_)
+                ? Visibility::Visible
+                : Visibility::Collapsed);
         SyntaxHighlightButton().Visibility(
-            text && !component_web ? Visibility::Visible : Visibility::Collapsed);
+            text && !component_web && (!current_text_json_ || !json_tree_mode_)
+                ? Visibility::Visible
+                : Visibility::Collapsed);
         WordWrapButton().Visibility(
-            text && !component_web ? Visibility::Visible : Visibility::Collapsed);
+            text && !component_web && (!current_text_json_ || !json_tree_mode_)
+                ? Visibility::Visible
+                : Visibility::Collapsed);
         if (kind != glance::app::PreviewKind::generic)
         {
             GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
@@ -6621,6 +7411,7 @@ namespace winrt::Glance::App::implementation
         }
         if (!text)
         {
+            reset_json_preview();
             clear_web_view_content();
         }
         update_text_editor_visibility();
@@ -7453,6 +8244,474 @@ namespace winrt::Glance::App::implementation
         set_markdown_preview_mode(false);
     }
 
+    void MainWindow::set_json_tree_mode(bool tree)
+    {
+        json_tree_mode_ = current_text_json_ && json_tree_available_ && tree;
+        JsonTreeButton().IsChecked(json_tree_mode_);
+        JsonRawButton().IsChecked(current_text_json_ && !json_tree_mode_);
+        JsonTreeButton().FontWeight(
+            json_tree_mode_
+                ? Windows::UI::Text::FontWeights::SemiBold()
+                : Windows::UI::Text::FontWeights::Normal());
+        JsonRawButton().FontWeight(
+            json_tree_mode_
+                ? Windows::UI::Text::FontWeights::Normal()
+                : Windows::UI::Text::FontWeights::SemiBold());
+        JsonTreeHost().Visibility(
+            json_tree_mode_ ? Visibility::Visible : Visibility::Collapsed);
+        TextLoadingOverlay().Visibility(
+            text_loading_ && !json_tree_mode_
+                ? Visibility::Visible
+                : Visibility::Collapsed);
+        update_text_mode_controls();
+        update_text_editor_visibility();
+    }
+
+    void MainWindow::JsonTreeButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        set_json_tree_mode(true);
+    }
+
+    void MainWindow::JsonRawButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        set_json_tree_mode(false);
+    }
+
+    void MainWindow::JsonDepthButton_Click(
+        IInspectable const& sender,
+        RoutedEventArgs const&)
+    {
+        const auto button = sender.try_as<Button>();
+        if (!button)
+        {
+            return;
+        }
+        const auto tag = unbox_value_or<hstring>(button.Tag(), {});
+        if (tag == L"all")
+        {
+            apply_json_depth_command(json_all_depth);
+            return;
+        }
+        const auto depth = parse_u64(tag);
+        if (depth.has_value() && *depth >= 1 && *depth <= 5)
+        {
+            apply_json_depth_command(static_cast<std::uint32_t>(*depth));
+        }
+    }
+
+    void MainWindow::JsonTreeList_ItemClick(
+        IInspectable const&,
+        ItemClickEventArgs const& args)
+    {
+        const auto row_id = unbox_value_or<std::uint64_t>(
+            args.ClickedItem(),
+            std::numeric_limits<std::uint64_t>::max());
+        if ((row_id & json_sentinel_mask) != 0)
+        {
+            request_more_json_children(
+                static_cast<std::size_t>(row_id & ~json_sentinel_mask));
+            return;
+        }
+        const auto node_id = static_cast<std::size_t>(row_id);
+        if (node_id >= json_nodes_.size() ||
+            !json_container(json_nodes_[node_id].kind))
+        {
+            return;
+        }
+        if (node_id == 0)
+        {
+            return;
+        }
+        cancel_json_depth_command();
+        if (json_expanded_nodes_.contains(node_id))
+        {
+            json_expanded_nodes_.erase(node_id);
+        }
+        else
+        {
+            json_expanded_nodes_.insert(node_id);
+            json_visible_child_counts_[node_id] = json_preloaded_child_count;
+        }
+        sync_json_projection(true);
+    }
+
+    void MainWindow::JsonTreeList_ContainerContentChanging(
+        ListViewBase const&,
+        ContainerContentChangingEventArgs const& args)
+    {
+        const auto container = args.ItemContainer().try_as<ListViewItem>();
+        if (!container)
+        {
+            return;
+        }
+        if (args.InRecycleQueue())
+        {
+            Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::SetIsTranslationEnabled(
+                container,
+                true);
+            const auto visual = Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
+                container);
+            visual.StopAnimation(L"Opacity");
+            visual.StopAnimation(L"Translation.Y");
+            visual.Opacity(1.0F);
+            visual.Properties().InsertVector3(
+                L"Translation",
+                Windows::Foundation::Numerics::float3{});
+            if (const auto row = container.ContentTemplateRoot().try_as<Grid>())
+            {
+                row.Tag(nullptr);
+                row.Children().Clear();
+                row.ColumnDefinitions().Clear();
+            }
+            return;
+        }
+        const auto row_id = unbox_value_or<std::uint64_t>(
+            args.Item(),
+            std::numeric_limits<std::uint64_t>::max());
+        render_json_row(container, row_id);
+        args.Handled(true);
+        if ((row_id & json_sentinel_mask) != 0)
+        {
+            request_more_json_children(
+                static_cast<std::size_t>(row_id & ~json_sentinel_mask));
+        }
+    }
+
+    void MainWindow::JsonTreeRow_PointerPressed(
+        IInspectable const& sender,
+        PointerRoutedEventArgs const& args)
+    {
+        const auto row = sender.try_as<FrameworkElement>();
+        if (row == nullptr ||
+            !args.GetCurrentPoint(row).Properties().IsRightButtonPressed())
+        {
+            return;
+        }
+
+        const auto row_id = unbox_value_or<std::uint64_t>(
+            row.Tag(),
+            std::numeric_limits<std::uint64_t>::max());
+        if ((row_id & json_sentinel_mask) != 0 || row_id >= json_nodes_.size())
+        {
+            return;
+        }
+        args.Handled(true);
+        glance::contracts::log_event(
+            L"JSON node copy requested: node=" + std::to_wstring(row_id));
+        copy_json_node(static_cast<std::size_t>(row_id));
+    }
+
+    void MainWindow::copy_json_node(std::size_t node_id)
+    {
+        try
+        {
+            if (node_id >= json_nodes_.size())
+            {
+                return;
+            }
+
+            std::wstring json;
+            const auto& node = json_nodes_[node_id];
+            const bool object_property =
+                node.parent_id < json_nodes_.size() &&
+                json_nodes_[node.parent_id].kind == glance::app::JsonNodeKind::object;
+            bool complete{};
+            if (object_property)
+            {
+                json = L"{\n  ";
+                append_json_string(json, node.key);
+                json += L": ";
+                complete = append_serialized_json_node(
+                    json,
+                    json_nodes_,
+                    json_children_,
+                    node_id,
+                    1,
+                    false);
+                if (complete)
+                {
+                    json += L"\n}";
+                }
+            }
+            else
+            {
+                complete = append_serialized_json_node(
+                    json,
+                    json_nodes_,
+                    json_children_,
+                    node_id,
+                    0,
+                    current_text_json_lines_ && json_parse_complete_ && node_id == 0);
+            }
+
+            if (!complete)
+            {
+                show_preview_message(
+                    glance::app::localize(L"JsonNodeCopyUnavailable"),
+                    InfoBarSeverity::Warning,
+                    true,
+                    2200);
+                return;
+            }
+
+            Windows::ApplicationModel::DataTransfer::DataPackage package;
+            package.SetText(json);
+            Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
+            Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
+            glance::contracts::log_event(
+                L"JSON node copied: node=" + std::to_wstring(node_id) +
+                L", characters=" + std::to_wstring(json.size()));
+            show_preview_message(
+                glance::app::localize(L"JsonNodeCopied"),
+                InfoBarSeverity::Informational,
+                true,
+                1600);
+        }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(
+                L"Copy JSON node failed: " + std::wstring(error.message()));
+            show_preview_message(
+                glance::app::localize(L"JsonNodeCopyFailed"),
+                InfoBarSeverity::Error,
+                true,
+                2200);
+        }
+        catch (...)
+        {
+            glance::contracts::log_event(L"Copy JSON node failed");
+            show_preview_message(
+                glance::app::localize(L"JsonNodeCopyFailed"),
+                InfoBarSeverity::Error,
+                true,
+                2200);
+        }
+    }
+
+    void MainWindow::render_json_row(
+        const ListViewItem& container,
+        std::uint64_t row_id)
+    {
+        const auto row = container.ContentTemplateRoot().try_as<Grid>();
+        if (!row)
+        {
+            return;
+        }
+        row.Tag(box_value(row_id));
+        row.Children().Clear();
+        row.ColumnDefinitions().Clear();
+        row.MinHeight(30.0);
+        row.ColumnSpacing(6.0);
+        ColumnDefinition icon_column;
+        icon_column.Width(GridLength{ 18.0, GridUnitType::Pixel });
+        row.ColumnDefinitions().Append(icon_column);
+        ColumnDefinition key_column;
+        key_column.Width(GridLengthHelper::Auto());
+        row.ColumnDefinitions().Append(key_column);
+        ColumnDefinition value_column;
+        value_column.Width(GridLength{ 1.0, GridUnitType::Star });
+        row.ColumnDefinitions().Append(value_column);
+
+        if ((row_id & json_sentinel_mask) != 0)
+        {
+            const auto parent_id = static_cast<std::size_t>(
+                row_id & ~json_sentinel_mask);
+            const auto depth = parent_id < json_nodes_.size()
+                ? json_nodes_[parent_id].depth + 1
+                : 0;
+            row.Margin(Thickness{ 10.0 + depth * 18.0, 0.0, 8.0, 0.0 });
+            ProgressRing progress;
+            progress.Width(14.0);
+            progress.Height(14.0);
+            progress.IsActive(true);
+            progress.VerticalAlignment(VerticalAlignment::Center);
+            Grid::SetColumn(progress, 0);
+            row.Children().Append(progress);
+            TextBlock loading;
+            loading.Text(glance::app::localize(L"JsonParsingText"));
+            loading.Foreground(
+                Application::Current().Resources().Lookup(
+                    box_value(L"TextFillColorSecondaryBrush"))
+                    .as<Media::Brush>());
+            loading.FontSize(std::max(10.0, text_preferences_.font_size));
+            loading.VerticalAlignment(VerticalAlignment::Center);
+            Grid::SetColumn(loading, 1);
+            Grid::SetColumnSpan(loading, 2);
+            row.Children().Append(loading);
+            return;
+        }
+
+        const auto node_id = static_cast<std::size_t>(row_id);
+        if (node_id >= json_nodes_.size())
+        {
+            return;
+        }
+        const auto& node = json_nodes_[node_id];
+        row.Margin(Thickness{ 10.0 + node.depth * 18.0, 0.0, 8.0, 0.0 });
+        const bool container_node = json_container(node.kind);
+        FontIcon chevron;
+        chevron.FontFamily(Media::FontFamily(L"Segoe Fluent Icons"));
+        chevron.FontSize(10.0);
+        chevron.Glyph(
+            json_expanded_nodes_.contains(node_id)
+                ? L"\xE70D"
+                : L"\xE76C");
+        chevron.Opacity(container_node ? 0.82 : 0.0);
+        chevron.VerticalAlignment(VerticalAlignment::Center);
+        Grid::SetColumn(chevron, 0);
+        row.Children().Append(chevron);
+
+        const bool array_child = node.parent_id < json_nodes_.size() &&
+            json_nodes_[node.parent_id].kind == glance::app::JsonNodeKind::array;
+        std::wstring key_text;
+        if (!node.key.empty())
+        {
+            const auto display_key = json_preview_text(node.key);
+            key_text = array_child
+                ? L"[" + display_key + L"]"
+                : display_key + L":";
+        }
+        TextBlock key;
+        key.Text(key_text);
+        key.MaxWidth(280.0);
+        key.FontFamily(Media::FontFamily(text_preferences_.font_family));
+        key.FontSize(std::max(10.0, text_preferences_.font_size));
+        key.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
+        key.TextTrimming(TextTrimming::CharacterEllipsis);
+        key.VerticalAlignment(VerticalAlignment::Center);
+
+        const bool dark = RootGrid().ActualTheme() == ElementTheme::Dark;
+        const auto& palette = glance::app::syntax_theme_palette(
+            text_preferences_.syntax_theme,
+            dark);
+        key.Foreground(Media::SolidColorBrush(json_color(palette.attribute)));
+        Grid::SetColumn(key, 1);
+        row.Children().Append(key);
+
+        std::wstring value_text;
+        std::uint32_t value_color = palette.foreground;
+        switch (node.kind)
+        {
+        case glance::app::JsonNodeKind::object:
+            value_text = glance::app::localize_format(
+                L"JsonObjectSummaryFormat",
+                { std::to_wstring(node.child_count) });
+            break;
+        case glance::app::JsonNodeKind::array:
+            value_text = glance::app::localize_format(
+                L"JsonArraySummaryFormat",
+                { std::to_wstring(node.child_count) });
+            break;
+        case glance::app::JsonNodeKind::string:
+            value_text = json_scalar_text(node);
+            value_color = palette.string;
+            break;
+        case glance::app::JsonNodeKind::number:
+            value_text = json_preview_text(node.value);
+            value_color = palette.number;
+            break;
+        case glance::app::JsonNodeKind::boolean:
+        case glance::app::JsonNodeKind::null_value:
+            value_text = node.value;
+            value_color = palette.keyword;
+            break;
+        case glance::app::JsonNodeKind::error:
+            value_text = glance::app::localize_format(
+                L"JsonInvalidRecordFormat",
+                { node.value });
+            value_color = palette.error;
+            break;
+        default:
+            value_text = glance::app::localize(L"JsonPendingValue");
+            value_color = palette.comment;
+            break;
+        }
+        TextBlock value;
+        value.Text(value_text);
+        value.FontFamily(Media::FontFamily(text_preferences_.font_family));
+        value.FontSize(std::max(10.0, text_preferences_.font_size));
+        value.Foreground(Media::SolidColorBrush(json_color(value_color)));
+        value.TextTrimming(TextTrimming::CharacterEllipsis);
+        value.TextWrapping(TextWrapping::NoWrap);
+        value.VerticalAlignment(VerticalAlignment::Center);
+        Grid::SetColumn(value, 2);
+        row.Children().Append(value);
+        animate_json_row(container, row_id);
+    }
+
+    void MainWindow::animate_json_row(
+        const ListViewItem& container,
+        std::uint64_t row_id)
+    {
+        if (json_animating_rows_.erase(row_id) == 0)
+        {
+            return;
+        }
+
+        Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::SetIsTranslationEnabled(
+            container,
+            true);
+        const auto visual = Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
+            container);
+        const auto compositor = visual.Compositor();
+        visual.StopAnimation(L"Opacity");
+        visual.StopAnimation(L"Translation.Y");
+        visual.Opacity(0.0F);
+        visual.Properties().InsertVector3(
+            L"Translation",
+            Windows::Foundation::Numerics::float3{ 0.0F, 4.0F, 0.0F });
+
+        const auto easing = compositor.CreateCubicBezierEasingFunction(
+            Windows::Foundation::Numerics::float2{ 0.16F, 1.0F },
+            Windows::Foundation::Numerics::float2{ 0.30F, 1.0F });
+        const auto opacity = compositor.CreateScalarKeyFrameAnimation();
+        opacity.Duration(json_row_animation_duration);
+        opacity.InsertKeyFrame(0.0F, 0.0F);
+        opacity.InsertKeyFrame(1.0F, 1.0F, easing);
+        visual.StartAnimation(L"Opacity", opacity);
+
+        const auto translation = compositor.CreateScalarKeyFrameAnimation();
+        translation.Duration(json_row_animation_duration);
+        translation.InsertKeyFrame(0.0F, 4.0F);
+        translation.InsertKeyFrame(1.0F, 0.0F, easing);
+        visual.StartAnimation(L"Translation.Y", translation);
+    }
+
+    void MainWindow::refresh_realized_json_rows()
+    {
+        for (std::size_t index = 0;
+             index < json_visible_rows_.size();
+             ++index)
+        {
+            const auto container = JsonTreeList()
+                .ContainerFromIndex(static_cast<int>(index))
+                .try_as<ListViewItem>();
+            if (container)
+            {
+                render_json_row(container, json_visible_rows_[index]);
+            }
+        }
+    }
+
+    void MainWindow::update_text_mode_controls()
+    {
+        const bool text = current_kind_ == glance::app::PreviewKind::text ||
+            current_kind_ == glance::app::PreviewKind::markdown ||
+            current_kind_ == glance::app::PreviewKind::web;
+        const bool component_web =
+            current_kind_ == glance::app::PreviewKind::web &&
+            active_component_web_preview_ != nullptr;
+        const auto raw_visibility =
+            text && !component_web && (!current_text_json_ || !json_tree_mode_)
+                ? Visibility::Visible
+                : Visibility::Collapsed;
+        LineNumbersButton().Visibility(raw_visibility);
+        SyntaxHighlightButton().Visibility(raw_visibility);
+        WordWrapButton().Visibility(raw_visibility);
+        JsonModeButtons().Visibility(
+            current_text_json_ ? Visibility::Visible : Visibility::Collapsed);
+    }
+
     void MainWindow::update_line_number_visibility()
     {
         if (text_editor_ != nullptr)
@@ -7637,6 +8896,13 @@ namespace winrt::Glance::App::implementation
         }
         set_text_loading(true);
         const auto generation = ++content_generation_;
+        if (current_text_json_)
+        {
+            start_json_preview(
+                current_text_path_,
+                generation,
+                current_text_encoding_);
+        }
         load_text_async(
             current_text_path_,
             current_text_markdown_,

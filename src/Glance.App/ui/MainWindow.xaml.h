@@ -7,6 +7,7 @@
 #include "footer_preferences.h"
 #include "folder_preview_preferences.h"
 #include "generic_preview_preferences.h"
+#include "json_preview.h"
 #include "media_preview_preferences.h"
 #include "native_preview_surface.h"
 #include "preview_file.h"
@@ -33,6 +34,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace winrt::Glance::App::implementation
@@ -84,6 +86,18 @@ namespace winrt::Glance::App::implementation
         void PinButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MarkdownPreviewButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void MarkdownCodeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void JsonTreeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void JsonRawButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void JsonDepthButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void JsonTreeList_ItemClick(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Controls::ItemClickEventArgs const&);
+        void JsonTreeList_ContainerContentChanging(
+            Microsoft::UI::Xaml::Controls::ListViewBase const&,
+            Microsoft::UI::Xaml::Controls::ContainerContentChangingEventArgs const&);
+        void JsonTreeRow_PointerPressed(
+            IInspectable const&,
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
         void LineNumbersButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void SyntaxHighlightButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void WordWrapButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -328,6 +342,37 @@ namespace winrt::Glance::App::implementation
             glance::app::TextEncoding encoding,
             bool preview_as_text_attempt = false);
         winrt::fire_and_forget load_next_text_chunk_async(std::uint64_t generation);
+        void start_json_preview(
+            const std::wstring& path,
+            std::uint64_t generation,
+            glance::app::TextEncoding encoding);
+        winrt::fire_and_forget parse_json_batch_async(
+            std::shared_ptr<glance::app::JsonPreviewParser> parser,
+            std::uint64_t generation);
+        void apply_json_parse_batch(
+            std::shared_ptr<glance::app::JsonPreviewParser> parser,
+            glance::app::JsonParseBatch batch,
+            std::uint64_t generation);
+        void set_json_tree_mode(bool tree);
+        void reset_json_preview() noexcept;
+        void sync_json_projection(bool animate_insertions = false);
+        void append_json_projection(
+            std::size_t node_id,
+            std::vector<std::uint64_t>& projection) const;
+        void apply_json_depth_command(std::uint32_t maximum_depth);
+        void process_json_depth_command(std::uint64_t command_generation);
+        void cancel_json_depth_command() noexcept;
+        void update_json_statistics();
+        void animate_json_row(
+            const Microsoft::UI::Xaml::Controls::ListViewItem& container,
+            std::uint64_t row_id);
+        void render_json_row(
+            const Microsoft::UI::Xaml::Controls::ListViewItem& container,
+            std::uint64_t row_id);
+        void refresh_realized_json_rows();
+        void copy_json_node(std::size_t node_id);
+        void request_more_json_children(std::size_t parent_id);
+        void update_text_mode_controls();
         void set_text_loading(bool loading);
         Windows::Foundation::IAsyncAction load_image_async(
             std::wstring path,
@@ -606,6 +651,12 @@ namespace winrt::Glance::App::implementation
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};
         bool markdown_preview_{};
+        bool current_text_json_{};
+        bool current_text_json_lines_{};
+        bool json_tree_mode_{};
+        bool json_tree_available_{};
+        bool json_parse_complete_{};
+        bool json_index_truncated_{};
         bool web_preview_available_{};
         bool web_view_initializing_{};
         bool web_view_ready_{};
@@ -660,6 +711,19 @@ namespace winrt::Glance::App::implementation
         bool current_text_markdown_{};
         bool current_text_web_{};
         std::shared_ptr<glance::app::IncrementalTextReader> current_text_reader_;
+        std::shared_ptr<glance::app::JsonPreviewParser> json_parser_;
+        std::vector<glance::app::JsonNode> json_nodes_;
+        std::unordered_map<std::size_t, std::vector<std::size_t>> json_children_;
+        std::vector<std::uint64_t> json_visible_rows_;
+        std::unordered_set<std::size_t> json_expanded_nodes_;
+        std::unordered_map<std::size_t, std::size_t> json_visible_child_counts_;
+        std::unordered_set<std::size_t> json_pending_child_batches_;
+        std::deque<std::size_t> json_depth_command_queue_;
+        std::unordered_set<std::size_t> json_depth_queued_nodes_;
+        std::unordered_set<std::uint64_t> json_animating_rows_;
+        glance::app::JsonStatistics json_statistics_;
+        std::optional<std::uint32_t> json_depth_command_limit_;
+        std::uint64_t json_depth_command_generation_{};
         std::unique_ptr<glance::app::ScintillaTextView> text_editor_;
         std::unique_ptr<glance::app::WindowAcrylicBackdrop> acrylic_backdrop_;
         bool acrylic_enabled_{};
@@ -739,6 +803,7 @@ namespace winrt::Glance::App::implementation
         Microsoft::UI::Xaml::DispatcherTimer font_size_overlay_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_hide_timer_{ nullptr };
+        Microsoft::UI::Xaml::DispatcherTimer json_row_animation_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer web_view_idle_timer_{ nullptr };
         Microsoft::UI::Xaml::Controls::WebView2 web_preview_{ nullptr };
         std::vector<std::wstring> web_resource_mapping_hosts_;

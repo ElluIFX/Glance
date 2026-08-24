@@ -23,6 +23,8 @@ namespace
     constexpr wchar_t host_window_class[] = L"Glance.ScintillaHost";
     constexpr UINT_PTR editor_subclass_id = 1;
     constexpr UINT near_end_check_message = WM_APP + 1;
+    constexpr UINT copy_selection_message = WM_APP + 2;
+    constexpr UINT clear_selection_message = WM_APP + 3;
     constexpr WPARAM active_layout_threads = 4;
     constexpr WPARAM idle_layout_threads = 1;
 
@@ -36,6 +38,152 @@ namespace
     HMODULE lexilla_module{};
     Lexilla::CreateLexerFn create_lexer{};
     std::once_flag host_class_once;
+
+    struct CopyShortcutState
+    {
+        HWND host{};
+        HWND editor{};
+        HWND foreground{};
+        HHOOK keyboard_hook{};
+        HHOOK mouse_hook{};
+        bool copy_key_down{};
+    };
+
+    CopyShortcutState copy_shortcut_state;
+
+    void release_copy_shortcut(HWND host) noexcept;
+
+    LRESULT CALLBACK copy_keyboard_hook(
+        int code,
+        WPARAM wparam,
+        LPARAM lparam) noexcept
+    {
+        if (code >= 0)
+        {
+            const auto& key = *reinterpret_cast<const KBDLLHOOKSTRUCT*>(lparam);
+            if (key.vkCode == 'C')
+            {
+                const bool key_down =
+                    wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN;
+                const bool key_up =
+                    wparam == WM_KEYUP || wparam == WM_SYSKEYUP;
+                if (key_up && copy_shortcut_state.copy_key_down)
+                {
+                    copy_shortcut_state.copy_key_down = false;
+                    if (copy_shortcut_state.host == nullptr)
+                    {
+                        release_copy_shortcut(nullptr);
+                    }
+                    return 1;
+                }
+                if (key_down && copy_shortcut_state.copy_key_down)
+                {
+                    return 1;
+                }
+                if (key_down && copy_shortcut_state.host != nullptr &&
+                    GetForegroundWindow() == copy_shortcut_state.foreground)
+                {
+                    const bool control =
+                        (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+                    const bool other_modifier =
+                        (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0 ||
+                        (GetAsyncKeyState(VK_MENU) & 0x8000) != 0 ||
+                        (GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 ||
+                        (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0;
+                    if (control && !other_modifier)
+                    {
+                        if (!copy_shortcut_state.copy_key_down)
+                        {
+                            copy_shortcut_state.copy_key_down = true;
+                            PostMessageW(
+                                copy_shortcut_state.host,
+                                copy_selection_message,
+                                0,
+                                0);
+                        }
+                        return 1;
+                    }
+                }
+            }
+        }
+        return CallNextHookEx(nullptr, code, wparam, lparam);
+    }
+
+    LRESULT CALLBACK copy_mouse_hook(
+        int code,
+        WPARAM wparam,
+        LPARAM lparam) noexcept
+    {
+        if (code >= 0 && copy_shortcut_state.host != nullptr &&
+            (wparam == WM_LBUTTONDOWN || wparam == WM_RBUTTONDOWN ||
+             wparam == WM_MBUTTONDOWN || wparam == WM_XBUTTONDOWN))
+        {
+            const auto& mouse = *reinterpret_cast<const MSLLHOOKSTRUCT*>(lparam);
+            RECT bounds{};
+            if (!GetWindowRect(copy_shortcut_state.editor, &bounds) ||
+                !PtInRect(&bounds, mouse.pt))
+            {
+                PostMessageW(
+                    copy_shortcut_state.host,
+                    clear_selection_message,
+                    0,
+                    0);
+            }
+        }
+        return CallNextHookEx(nullptr, code, wparam, lparam);
+    }
+
+    void release_copy_shortcut(HWND host) noexcept
+    {
+        if (host != nullptr && copy_shortcut_state.host != host)
+        {
+            return;
+        }
+        copy_shortcut_state.host = nullptr;
+        copy_shortcut_state.editor = nullptr;
+        copy_shortcut_state.foreground = nullptr;
+        if (copy_shortcut_state.mouse_hook != nullptr)
+        {
+            UnhookWindowsHookEx(copy_shortcut_state.mouse_hook);
+            copy_shortcut_state.mouse_hook = nullptr;
+        }
+        if (!copy_shortcut_state.copy_key_down &&
+            copy_shortcut_state.keyboard_hook != nullptr)
+        {
+            UnhookWindowsHookEx(copy_shortcut_state.keyboard_hook);
+            copy_shortcut_state.keyboard_hook = nullptr;
+        }
+    }
+
+    void acquire_copy_shortcut(HWND host, HWND editor) noexcept
+    {
+        if (copy_shortcut_state.host == host)
+        {
+            return;
+        }
+        release_copy_shortcut(nullptr);
+        copy_shortcut_state.host = host;
+        copy_shortcut_state.editor = editor;
+        copy_shortcut_state.foreground = GetForegroundWindow();
+        if (copy_shortcut_state.keyboard_hook == nullptr)
+        {
+            copy_shortcut_state.keyboard_hook = SetWindowsHookExW(
+                WH_KEYBOARD_LL,
+                copy_keyboard_hook,
+                nullptr,
+                0);
+        }
+        copy_shortcut_state.mouse_hook = SetWindowsHookExW(
+            WH_MOUSE_LL,
+            copy_mouse_hook,
+            nullptr,
+            0);
+        if (copy_shortcut_state.keyboard_hook == nullptr ||
+            copy_shortcut_state.mouse_hook == nullptr)
+        {
+            release_copy_shortcut(nullptr);
+        }
+    }
 
     std::filesystem::path executable_directory()
     {
@@ -207,7 +355,8 @@ namespace
         {
             return { "rust", { rust_keywords, {}, {} } };
         }
-        if (extension == L".json" || extension == L".jsonc")
+        if (extension == L".json" || extension == L".jsonc" ||
+            extension == L".jsonl" || extension == L".ndjson")
         {
             return { "json", { "false null true", {}, {} } };
         }
@@ -377,6 +526,7 @@ namespace glance::app
 
     ScintillaTextView::~ScintillaTextView()
     {
+        release_copy_shortcut(host_);
         if (editor_ != nullptr && IsWindow(editor_))
         {
             RemoveWindowSubclass(editor_, editor_subclass, editor_subclass_id);
@@ -435,6 +585,16 @@ namespace glance::app
     void ScintillaTextView::set_visible(bool visible) noexcept
     {
         visible_ = visible;
+        if (!visible)
+        {
+            release_copy_shortcut(host_);
+            if (call(SCI_GETSELECTIONEMPTY) == FALSE)
+            {
+                const auto position = call(SCI_GETCURRENTPOS);
+                call(SCI_CLEARSELECTIONS);
+                call(SCI_SETEMPTYSELECTION, position);
+            }
+        }
         call(
             SCI_SETLAYOUTTHREADS,
             visible ? active_layout_threads : idle_layout_threads);
@@ -498,6 +658,7 @@ namespace glance::app
 
     void ScintillaTextView::clear() noexcept
     {
+        release_copy_shortcut(host_);
         if (editor_ == nullptr)
         {
             return;
@@ -646,6 +807,23 @@ namespace glance::app
                 {
                     self->near_end_callback_();
                 }
+                return 0;
+            }
+            if (message == copy_selection_message)
+            {
+                const auto position = self->call(SCI_GETCURRENTPOS);
+                self->call(SCI_COPY);
+                self->call(SCI_CLEARSELECTIONS);
+                self->call(SCI_SETEMPTYSELECTION, position);
+                release_copy_shortcut(self->host_);
+                return 0;
+            }
+            if (message == clear_selection_message)
+            {
+                const auto position = self->call(SCI_GETCURRENTPOS);
+                self->call(SCI_CLEARSELECTIONS);
+                self->call(SCI_SETEMPTYSELECTION, position);
+                release_copy_shortcut(self->host_);
                 return 0;
             }
             if (message == WM_NOTIFY)
@@ -1075,6 +1253,22 @@ namespace glance::app
         if ((notification.updated & SC_UPDATE_V_SCROLL) != 0)
         {
             request_near_end_check();
+        }
+        if ((notification.updated & SC_UPDATE_SELECTION) != 0)
+        {
+            update_copy_shortcut();
+        }
+    }
+
+    void ScintillaTextView::update_copy_shortcut() noexcept
+    {
+        if (visible_ && call(SCI_GETSELECTIONEMPTY) == FALSE)
+        {
+            acquire_copy_shortcut(host_, editor_);
+        }
+        else
+        {
+            release_copy_shortcut(host_);
         }
     }
 }

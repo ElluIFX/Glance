@@ -400,4 +400,27 @@
   <data name="ComponentActionDownloadIntegrityFailedMessage" xml:space="preserve"><value>The downloaded dependency did not match the expected checksum</value></data>
   <data name="ComponentActionFailedTitle" xml:space="preserve"><value>Could not prepare component</value></data>
   <data name="ComponentActionFailedMessage" xml:space="preserve"><value>The downloaded dependency could not be installed</value></data>
+  <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>Preview</value></data>
+  <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>Code</value></data>
+  <data name="JsonTreeButton.Content" xml:space="preserve"><value>Structured</value></data>
+  <data name="JsonRawButton.Content" xml:space="preserve"><value>Raw</value></data>
+  <data name="JsonDepth1Button.Content" xml:space="preserve"><value>1</value></data>
+  <data name="JsonDepth2Button.Content" xml:space="preserve"><value>2</value></data>
+  <data name="JsonDepth3Button.Content" xml:space="preserve"><value>3</value></data>
+  <data name="JsonDepth4Button.Content" xml:space="preserve"><value>4</value></data>
+  <data name="JsonDepth5Button.Content" xml:space="preserve"><value>5</value></data>
+  <data name="JsonExpandAllButton.Content" xml:space="preserve"><value>All</value></data>
+  <data name="JsonDepthButtonTooltipFormat" xml:space="preserve"><value>Show through level {0}</value></data>
+  <data name="JsonExpandAllButtonTooltip" xml:space="preserve"><value>Expand all levels</value></data>
+  <data name="JsonStatisticsFormat" xml:space="preserve"><value>Objects {0}  Arrays {1}  Values {2}  Depth {3}</value></data>
+  <data name="JsonParsingText" xml:space="preserve"><value>Parsing JSON...</value></data>
+  <data name="JsonParseErrorFormat" xml:space="preserve"><value>Invalid JSON at line {0}, column {1}</value></data>
+  <data name="JsonTreeTruncated" xml:space="preserve"><value>The JSON tree reached its memory limit; use Raw to view the complete file</value></data>
+  <data name="JsonObjectSummaryFormat" xml:space="preserve"><value>{0} properties</value></data>
+  <data name="JsonArraySummaryFormat" xml:space="preserve"><value>{0} items</value></data>
+  <data name="JsonInvalidRecordFormat" xml:space="preserve"><value>Invalid JSON record at line {0}</value></data>
+  <data name="JsonPendingValue" xml:space="preserve"><value>Parsing...</value></data>
+  <data name="JsonNodeCopied" xml:space="preserve"><value>JSON node copied</value></data>
+  <data name="JsonNodeCopyUnavailable" xml:space="preserve"><value>The JSON node is not ready to copy</value></data>
+  <data name="JsonNodeCopyFailed" xml:space="preserve"><value>Could not copy JSON node</value></data>
 </root>

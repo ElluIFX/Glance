@@ -706,6 +706,64 @@ finally {
     }
 }
 
+# --- RapidJSON (structured JSON preview) ---
+$rapidJsonCommit = "24b5e7a8b27f42fa16b96fc70aade9106cf7102f"
+$rapidJsonArchiveSha256 = "DF07F5DDFEBBC2940181039F6C939EC2764A7303EF79B17958D9792A364306BB"
+$rapidJsonRoot = Join-Path $repositoryRoot "src\Glance.App\third_party\rapidjson"
+$rapidJsonHeader = Join-Path $rapidJsonRoot "include\rapidjson\reader.h"
+$rapidJsonLicense = Join-Path $rapidJsonRoot "license.txt"
+if ((Test-Path -LiteralPath $rapidJsonHeader -PathType Leaf) -and
+    (Test-Path -LiteralPath $rapidJsonLicense -PathType Leaf)) {
+    Write-Host "RapidJSON structured preview dependency is available."
+}
+else {
+    $rapidJsonTemporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) (
+        "Glance.RapidJSON." + [Guid]::NewGuid().ToString("N"))
+    $rapidJsonArchivePath = Join-Path $rapidJsonTemporaryDirectory "rapidjson.zip"
+    $rapidJsonExpandedDirectory = Join-Path $rapidJsonTemporaryDirectory "expanded"
+    try {
+        New-Item -ItemType Directory -Path $rapidJsonExpandedDirectory -Force | Out-Null
+        Write-Host "Downloading RapidJSON structured preview dependency..."
+        Invoke-DependencyDownload `
+            -Uri "https://github.com/Tencent/rapidjson/archive/$rapidJsonCommit.zip" `
+            -OutFile $rapidJsonArchivePath
+        $rapidJsonArchiveHash =
+            (Get-FileHash -LiteralPath $rapidJsonArchivePath -Algorithm SHA256).Hash
+        if ($rapidJsonArchiveHash -ne $rapidJsonArchiveSha256) {
+            throw "RapidJSON archive SHA-256 mismatch. Expected $rapidJsonArchiveSha256, got $rapidJsonArchiveHash."
+        }
+        Expand-Archive `
+            -LiteralPath $rapidJsonArchivePath `
+            -DestinationPath $rapidJsonExpandedDirectory
+        $rapidJsonSourceRoot = Get-ChildItem `
+            -LiteralPath $rapidJsonExpandedDirectory `
+            -Directory |
+            Select-Object -First 1
+        if ($null -eq $rapidJsonSourceRoot -or
+            -not (Test-Path -LiteralPath (Join-Path $rapidJsonSourceRoot.FullName "include\rapidjson\reader.h")) -or
+            -not (Test-Path -LiteralPath (Join-Path $rapidJsonSourceRoot.FullName "license.txt"))) {
+            throw "RapidJSON archive payload is incomplete."
+        }
+        Remove-Item -LiteralPath $rapidJsonRoot -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path $rapidJsonRoot -Force | Out-Null
+        Copy-Item `
+            -LiteralPath (Join-Path $rapidJsonSourceRoot.FullName "include") `
+            -Destination (Join-Path $rapidJsonRoot "include") `
+            -Recurse `
+            -Force
+        Copy-Item `
+            -LiteralPath (Join-Path $rapidJsonSourceRoot.FullName "license.txt") `
+            -Destination $rapidJsonLicense `
+            -Force
+    }
+    finally {
+        if (Test-Path -LiteralPath $rapidJsonTemporaryDirectory) {
+            Remove-Item -LiteralPath $rapidJsonTemporaryDirectory -Recurse -Force
+        }
+    }
+    Write-Host "RapidJSON structured preview dependency is ready."
+}
+
 if ($allAvailable) {
     Write-Host "Scintilla runtime dependencies are available."
     return

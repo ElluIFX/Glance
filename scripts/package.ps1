@@ -188,6 +188,8 @@ $licenseDirectory = Join-Path $payloadDirectory "licenses"
 New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\Scintilla-Lexilla.txt") `
     -Destination (Join-Path $licenseDirectory "Scintilla-Lexilla.txt") -Force
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "src\Glance.App\third_party\rapidjson\license.txt") `
+    -Destination (Join-Path $licenseDirectory "RapidJSON.txt") -Force
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\Tinted-Theming.txt") `
     -Destination (Join-Path $licenseDirectory "Tinted-Theming.txt") -Force
 

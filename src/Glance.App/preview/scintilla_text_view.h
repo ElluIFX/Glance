@@ -71,6 +71,7 @@ namespace glance::app
         void update_line_number_width() noexcept;
         void request_near_end_check() noexcept;
         void handle_notification(const NMHDR& header) noexcept;
+        void update_copy_shortcut() noexcept;
 
         HWND parent_{};
         HWND host_{};

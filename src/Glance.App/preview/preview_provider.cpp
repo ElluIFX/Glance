@@ -1126,6 +1126,7 @@ namespace glance::app
         static constexpr std::array text_extensions{
             std::wstring_view(L".txt"), std::wstring_view(L".log"), std::wstring_view(L".ini"),
             std::wstring_view(L".cfg"), std::wstring_view(L".conf"), std::wstring_view(L".json"),
+            std::wstring_view(L".jsonl"), std::wstring_view(L".ndjson"),
             std::wstring_view(L".xml"), std::wstring_view(L".yaml"), std::wstring_view(L".yml"),
             std::wstring_view(L".toml"), std::wstring_view(L".csv"), std::wstring_view(L".tsv"),
             std::wstring_view(L".c"), std::wstring_view(L".h"), std::wstring_view(L".cpp"),

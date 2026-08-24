@@ -400,4 +400,27 @@
   <data name="ComponentActionDownloadIntegrityFailedMessage" xml:space="preserve"><value>下载的依赖与预期校验值不一致</value></data>
   <data name="ComponentActionFailedTitle" xml:space="preserve"><value>无法准备组件</value></data>
   <data name="ComponentActionFailedMessage" xml:space="preserve"><value>无法安装下载的依赖</value></data>
+  <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>预览</value></data>
+  <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>代码</value></data>
+  <data name="JsonTreeButton.Content" xml:space="preserve"><value>结构化</value></data>
+  <data name="JsonRawButton.Content" xml:space="preserve"><value>原始</value></data>
+  <data name="JsonDepth1Button.Content" xml:space="preserve"><value>1</value></data>
+  <data name="JsonDepth2Button.Content" xml:space="preserve"><value>2</value></data>
+  <data name="JsonDepth3Button.Content" xml:space="preserve"><value>3</value></data>
+  <data name="JsonDepth4Button.Content" xml:space="preserve"><value>4</value></data>
+  <data name="JsonDepth5Button.Content" xml:space="preserve"><value>5</value></data>
+  <data name="JsonExpandAllButton.Content" xml:space="preserve"><value>全部</value></data>
+  <data name="JsonDepthButtonTooltipFormat" xml:space="preserve"><value>显示到第 {0} 层</value></data>
+  <data name="JsonExpandAllButtonTooltip" xml:space="preserve"><value>展开全部层级</value></data>
+  <data name="JsonStatisticsFormat" xml:space="preserve"><value>对象 {0}  数组 {1}  值 {2}  层级 {3}</value></data>
+  <data name="JsonParsingText" xml:space="preserve"><value>正在解析 JSON...</value></data>
+  <data name="JsonParseErrorFormat" xml:space="preserve"><value>JSON 语法错误，位于第 {0} 行第 {1} 列</value></data>
+  <data name="JsonTreeTruncated" xml:space="preserve"><value>JSON 树已达到内存限制，请切换到原始视图查看完整文件</value></data>
+  <data name="JsonObjectSummaryFormat" xml:space="preserve"><value>{0} 个属性</value></data>
+  <data name="JsonArraySummaryFormat" xml:space="preserve"><value>{0} 个项目</value></data>
+  <data name="JsonInvalidRecordFormat" xml:space="preserve"><value>第 {0} 行不是有效的 JSON 记录</value></data>
+  <data name="JsonPendingValue" xml:space="preserve"><value>正在解析...</value></data>
+  <data name="JsonNodeCopied" xml:space="preserve"><value>已复制 JSON 节点</value></data>
+  <data name="JsonNodeCopyUnavailable" xml:space="preserve"><value>JSON 节点尚未准备好复制</value></data>
+  <data name="JsonNodeCopyFailed" xml:space="preserve"><value>无法复制 JSON 节点</value></data>
 </root>

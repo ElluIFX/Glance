@@ -41,7 +41,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(IntDir)generated;$(ProjectDir)..\Glance.Contracts\include;$(ProjectDir);$(ProjectDir)application;$(ProjectDir)components;$(ProjectDir)preferences;$(ProjectDir)preview;$(ProjectDir)ui;$(ProjectDir)common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IntDir)generated;$(ProjectDir)..\Glance.Contracts\include;$(ProjectDir);$(ProjectDir)application;$(ProjectDir)components;$(ProjectDir)preferences;$(ProjectDir)preview;$(ProjectDir)ui;$(ProjectDir)common;$(ProjectDir)third_party\rapidjson\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -62,6 +62,7 @@
     <ClInclude Include="preferences\footer_preferences.h" />
     <ClInclude Include="preferences\folder_preview_preferences.h" />
     <ClInclude Include="preview\generic_file_info.h" />
+    <ClInclude Include="preview\json_preview.h" />
     <ClInclude Include="preferences\generic_preview_preferences.h" />
     <ClInclude Include="preferences\appearance_preferences.h" />
     <ClInclude Include="preview\image_metadata_provider.h" />
@@ -114,6 +115,7 @@
     <ClCompile Include="preferences\footer_preferences.cpp" />
     <ClCompile Include="preferences\folder_preview_preferences.cpp" />
     <ClCompile Include="preview\generic_file_info.cpp" />
+    <ClCompile Include="preview\json_preview.cpp" />
     <ClCompile Include="preferences\generic_preview_preferences.cpp" />
     <ClCompile Include="preferences\appearance_preferences.cpp" />
     <ClCompile Include="preview\image_metadata_provider.cpp" />

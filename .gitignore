@@ -13,6 +13,7 @@ obj/
 src/Glance.Components/Heic/third_party/*/*/Debug/
 src/Glance.Components/Avif/third_party/*/*/Debug/
 src/Glance.Components/Raw/third_party/libraw/*/Debug/
+src/Glance.App/third_party/rapidjson/
 packages/
 *.user
 *.suo
