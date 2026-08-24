@@ -4,6 +4,17 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.08.25] - 2026-08-25
+
+### Added
+
+- Added progressive structured previews for JSON, JSONL, and NDJSON with depth controls, document statistics, and complete node copying.
+- Added `Ctrl+C` copying for selected text in the text previewer, with the selection cleared after copying.
+
+### Changed
+
+- Unified component-provided setting text with the application localization pipeline.
+
 ## [2026.08.19] - 2026-08-19
 
 ### Changed
