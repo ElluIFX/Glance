@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Component.DisplayName" xml:space="preserve"><value>Panorama video preview</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>DJI and Insta360 panorama videos are supported</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>HEVC decoding or Direct3D 11 is unavailable</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>Loading panorama video...</value></data>
+  <data name="Shortcut.ProjectionTooltip" xml:space="preserve"><value>Switch between 3D and dual 180-degree views</value></data>
+  <data name="Settings.GroupTitle" xml:space="preserve"><value>Panorama preview</value></data>
+  <data name="Settings.InsvRow" xml:space="preserve"><value>INSV preview</value></data>
+  <data name="Settings.OsvRow" xml:space="preserve"><value>OSV preview</value></data>
+  <data name="Settings.ViewAngle" xml:space="preserve"><value>View angle (°)</value></data>
+  <data name="Settings.Overlap" xml:space="preserve"><value>Overlap (°)</value></data>
+</root>

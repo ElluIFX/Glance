@@ -36,6 +36,8 @@ namespace winrt::Glance::App::implementation
         using FooterPreferencesChangedCallback = std::function<void()>;
         using WindowPreferencesChangedCallback = std::function<void()>;
         using ComponentChangedCallback = std::function<void()>;
+        using ComponentSettingChangedCallback =
+            std::function<void(std::wstring)>;
         using SourceStatusRequestCallback = std::function<bool(std::string)>;
         using UpdateCheckCallback =
             std::function<glance::contracts::UpdateCheckResult()>;
@@ -53,6 +55,7 @@ namespace winrt::Glance::App::implementation
             FooterPreferencesChangedCallback footer_preferences_changed_callback,
             WindowPreferencesChangedCallback window_preferences_changed_callback,
             ComponentChangedCallback component_changed_callback,
+            ComponentSettingChangedCallback component_setting_changed_callback,
             SourceStatusRequestCallback source_status_request_callback,
             UpdateCheckCallback update_check_callback,
             NetworkDownloadCallback network_download_callback,
@@ -277,6 +280,7 @@ namespace winrt::Glance::App::implementation
         FooterPreferencesChangedCallback footer_preferences_changed_callback_;
         WindowPreferencesChangedCallback window_preferences_changed_callback_;
         ComponentChangedCallback component_changed_callback_;
+        ComponentSettingChangedCallback component_setting_changed_callback_;
         SourceStatusRequestCallback source_status_request_callback_;
         UpdateCheckCallback update_check_callback_;
         NetworkDownloadCallback network_download_callback_;

@@ -503,9 +503,11 @@
                 <Grid
                     x:Name="MediaPanel"
                     Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                    Loaded="NativeDocumentPanel_Loaded"
                     PointerMoved="MediaPanel_PointerMoved"
                     PointerPressed="MediaPanel_PointerPressed"
                     PointerWheelChanged="MediaPanel_PointerWheelChanged"
+                    SizeChanged="NativeDocumentPanel_SizeChanged"
                     Visibility="Collapsed">
                     <MediaPlayerElement
                         x:Name="MediaPreview"
@@ -560,6 +562,13 @@
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
+                    <StackPanel
+                        x:Name="NativeMediaLoadingOverlay"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed">
+                        <ProgressRing Width="32" Height="32" IsActive="True" />
+                    </StackPanel>
                     <Border
                         x:Name="MediaControlsOverlay"
                         Height="56"

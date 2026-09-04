@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Component.DisplayName" xml:space="preserve"><value>全景视频预览</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>支持预览大疆与影石全景视频</value></data>
+  <data name="Status.Unavailable" xml:space="preserve"><value>HEVC 解码或 Direct3D 11 不可用</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在加载全景视频...</value></data>
+  <data name="Shortcut.ProjectionTooltip" xml:space="preserve"><value>切换 3D 与双路 180 度视图</value></data>
+  <data name="Settings.GroupTitle" xml:space="preserve"><value>全景预览</value></data>
+  <data name="Settings.InsvRow" xml:space="preserve"><value>INSV 预览</value></data>
+  <data name="Settings.OsvRow" xml:space="preserve"><value>OSV 预览</value></data>
+  <data name="Settings.ViewAngle" xml:space="preserve"><value>视角 (°)</value></data>
+  <data name="Settings.Overlap" xml:space="preserve"><value>重叠区 (°)</value></data>
+</root>

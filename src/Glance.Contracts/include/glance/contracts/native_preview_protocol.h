@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 namespace glance::contracts::native_preview
@@ -7,6 +8,7 @@ namespace glance::contracts::native_preview
     inline constexpr std::uint32_t protocol_magic = 0x56504E47U;
     inline constexpr std::uint32_t protocol_version = 1U;
     inline constexpr std::uint32_t maximum_payload_size = 64U * 1024U;
+    inline constexpr std::size_t media_setting_id_capacity = 64;
 
     enum class Command : std::uint32_t
     {
@@ -15,6 +17,14 @@ namespace glance::contracts::native_preview
         set_visuals = 3,
         unload = 4,
         shutdown = 5,
+        media_play = 6,
+        media_pause = 7,
+        media_seek = 8,
+        media_set_volume = 9,
+        media_set_muted = 10,
+        media_query_state = 11,
+        media_set_view_mode = 12,
+        media_set_settings = 13,
     };
 
     enum class Status : std::uint32_t
@@ -28,6 +38,8 @@ namespace glance::contracts::native_preview
         initialization_failed = 6,
         window_binding_failed = 7,
         preview_failed = 8,
+        decoder_unavailable = 9,
+        media_failed = 10,
     };
 
 #pragma pack(push, 1)
@@ -75,6 +87,45 @@ namespace glance::contracts::native_preview
     {
         PreviewBounds bounds{};
         std::uint32_t dpi{ 96 };
+    };
+
+    struct MediaValueRequest
+    {
+        std::int64_t value{};
+    };
+
+    struct MediaSettingsRequest
+    {
+        std::uint64_t generation{};
+        std::uint32_t count{};
+    };
+
+    struct MediaSettingValue
+    {
+        wchar_t setting_id[media_setting_id_capacity]{};
+        std::int64_t value{};
+    };
+
+    enum MediaStateFlags : std::uint32_t
+    {
+        media_state_ready = 1U << 0U,
+        media_state_playing = 1U << 1U,
+        media_state_muted = 1U << 2U,
+        media_state_failed = 1U << 3U,
+        media_state_projected_view = 1U << 4U,
+    };
+
+    struct MediaState
+    {
+        std::int64_t duration_ticks{};
+        std::int64_t position_ticks{};
+        std::uint32_t video_width{};
+        std::uint32_t video_height{};
+        std::uint32_t volume_percent{ 100 };
+        std::uint32_t flags{};
+        std::uint64_t interaction_generation{};
+        std::uint32_t failure_kind{};
+        std::int32_t failure_hresult{};
     };
 #pragma pack(pop)
 }

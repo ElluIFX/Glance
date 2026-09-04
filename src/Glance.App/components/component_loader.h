@@ -9,6 +9,7 @@
 #include <atomic>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace glance::app
@@ -63,6 +64,7 @@ namespace glance::app
         std::uint32_t order{};
         std::uint32_t fluent_icon_glyph{};
         ComponentStatusBarShortcutState state{ ComponentStatusBarShortcutState::ready };
+        bool initially_checked{};
         bool supports_data_copy{};
         std::shared_ptr<void> lease;
     };
@@ -72,6 +74,7 @@ namespace glance::app
         none,
         toggle_hover_info,
         request_component_action,
+        set_native_media_view_mode,
     };
 
     struct ComponentStatusBarActivation
@@ -126,6 +129,7 @@ namespace glance::app
     };
 
     struct NativePreviewRendererRegistration;
+    struct NativeMediaRendererRegistration;
 
     struct ComponentPreviewResult
     {
@@ -142,6 +146,7 @@ namespace glance::app
         std::shared_ptr<ComponentWebPreview> web_preview;
         std::shared_ptr<void> file_directory;
         std::shared_ptr<NativePreviewRendererRegistration> native_renderer;
+        std::shared_ptr<NativeMediaRendererRegistration> native_media_renderer;
         std::wstring refinement_text;
         std::wstring notice;
         glance::contracts::components::PreviewNoticeSeverity notice_severity{
@@ -216,6 +221,13 @@ namespace glance::app
         std::shared_ptr<void> lease;
     };
 
+    struct NativeMediaRendererRegistration
+    {
+        std::wstring component_id;
+        std::wstring host_path;
+        std::shared_ptr<void> lease;
+    };
+
     struct ComponentSettingOption
     {
         std::int64_t value{};
@@ -230,6 +242,8 @@ namespace glance::app
             glance::contracts::components::ComponentSettingPage::document_preview };
         std::wstring group_id;
         std::wstring group_title;
+        std::wstring row_id;
+        std::wstring row_title;
         std::wstring label;
         std::wstring description;
         std::wstring enabled_description;
@@ -237,6 +251,10 @@ namespace glance::app
         glance::contracts::components::ComponentSettingKind kind{
             glance::contracts::components::ComponentSettingKind::choice };
         std::int64_t default_value{};
+        std::int64_t minimum_value{};
+        std::int64_t maximum_value{};
+        std::int64_t small_change{ 1 };
+        std::uint32_t decimal_places{};
         std::uint32_t group_order{};
         std::uint32_t setting_order{};
         std::vector<ComponentSettingOption> options;
@@ -321,5 +339,7 @@ namespace glance::app
         std::wstring_view component_id,
         std::wstring_view setting_id,
         std::int64_t value) noexcept;
+    [[nodiscard]] std::vector<std::pair<std::wstring, std::int64_t>>
+        component_setting_values(std::wstring_view component_id) noexcept;
     void shutdown_components() noexcept;
 }

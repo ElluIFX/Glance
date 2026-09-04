@@ -7,7 +7,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 9;
+    inline constexpr std::uint32_t abi_version = 10;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -22,12 +22,13 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t web_preview_api_version = 2;
     inline constexpr std::uint32_t paged_document_renderer_api_version = 1;
     inline constexpr std::uint32_t native_preview_renderer_api_version = 1;
-    inline constexpr std::uint32_t settings_contribution_api_version = 2;
+    inline constexpr std::uint32_t native_media_renderer_api_version = 1;
+    inline constexpr std::uint32_t settings_contribution_api_version = 3;
     inline constexpr std::uint32_t file_directory_preview_api_version = 2;
     inline constexpr std::uint32_t gallery_media_api_version = 1;
     inline constexpr std::uint32_t image_metadata_api_version = 1;
     inline constexpr std::uint32_t hover_info_layer_api_version = 2;
-    inline constexpr std::uint32_t status_bar_shortcut_api_version = 2;
+    inline constexpr std::uint32_t status_bar_shortcut_api_version = 3;
     inline constexpr std::uint32_t status_bar_shortcut_data_api_version = 1;
     inline constexpr std::uint32_t component_management_action_api_version = 2;
     inline constexpr std::size_t component_resource_path_capacity = 260;
@@ -86,6 +87,11 @@ namespace glance::contracts::components
         0x479f,
         0x4fa5,
         { 0x95, 0x12, 0x70, 0x68, 0xa1, 0x77, 0x63, 0x8b } };
+    inline constexpr GUID native_media_renderer_api_id{
+        0x8ebbf167,
+        0xa97c,
+        0x4349,
+        { 0xab, 0x2c, 0xe6, 0x05, 0x66, 0x52, 0x66, 0xb6 } };
     inline constexpr GUID settings_contribution_api_id{
         0xd1ef7371,
         0x3b06,
@@ -203,12 +209,14 @@ namespace glance::contracts::components
     enum class ComponentSettingPage : std::uint32_t
     {
         document_preview = 1,
+        media_preview = 2,
     };
 
     enum class ComponentSettingKind : std::uint32_t
     {
         toggle = 1,
         choice = 2,
+        number = 3,
     };
 
     enum class FileDirectoryPresentation : std::uint32_t
@@ -266,6 +274,7 @@ namespace glance::contracts::components
         none = 0,
         toggle_hover_info = 1,
         request_component_action = 2,
+        set_native_media_view_mode = 3,
     };
 
     using RegisterExtensionFunction = BOOL(WINAPI*)(
@@ -377,6 +386,12 @@ namespace glance::contracts::components
         wchar_t host_executable[renderer_host_capacity]{};
     };
 
+    struct NativeMediaHostDescriptor
+    {
+        std::uint32_t size{ sizeof(NativeMediaHostDescriptor) };
+        wchar_t host_executable[renderer_host_capacity]{};
+    };
+
     struct ComponentSettingOption
     {
         std::int64_t value{};
@@ -400,6 +415,12 @@ namespace glance::contracts::components
         std::uint32_t setting_order{};
         std::uint32_t option_count{};
         ComponentSettingOption options[maximum_setting_options]{};
+        wchar_t row_id[setting_group_id_capacity]{};
+        wchar_t row_title_key[setting_text_capacity]{};
+        std::int64_t minimum_value{};
+        std::int64_t maximum_value{};
+        std::int64_t small_change{ 1 };
+        std::uint32_t decimal_places{};
     };
 
     struct FileDirectoryValue
@@ -523,6 +544,7 @@ namespace glance::contracts::components
         std::uint32_t order{};
         std::uint32_t fluent_icon_glyph{};
         wchar_t tooltip_key[contribution_text_capacity]{};
+        BOOL initially_checked{};
     };
 
     struct StatusBarShortcutActivationResult
@@ -615,6 +637,8 @@ namespace glance::contracts::components
         PagedDocumentHostDescriptor* descriptor) noexcept;
     using QueryNativePreviewHostFunction = BOOL(WINAPI*)(
         NativePreviewHostDescriptor* descriptor) noexcept;
+    using QueryNativeMediaHostFunction = BOOL(WINAPI*)(
+        NativeMediaHostDescriptor* descriptor) noexcept;
     using EnumerateComponentSettingsFunction = BOOL(WINAPI*)(
         ComponentSettingDescriptor* descriptors,
         std::uint32_t capacity,
@@ -718,6 +742,13 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(NativePreviewRendererApi) };
         std::uint32_t version{ native_preview_renderer_api_version };
         QueryNativePreviewHostFunction query_host{};
+    };
+
+    struct NativeMediaRendererApi
+    {
+        std::uint32_t size{ sizeof(NativeMediaRendererApi) };
+        std::uint32_t version{ native_media_renderer_api_version };
+        QueryNativeMediaHostFunction query_host{};
     };
 
     struct SettingsContributionApi

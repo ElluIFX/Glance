@@ -54,6 +54,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.RawComponent", "src\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.RawHost", "src\Glance.Components\Raw\host\Glance.RawHost.vcxproj", "{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.PanoramaVideoHost", "src\Glance.Components\PanoramaVideo\host\Glance.PanoramaVideoHost.vcxproj", "{33BBA6D3-7618-4E05-B946-BFA2D44B459A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.PanoramaVideoComponent", "src\Glance.Components\PanoramaVideo\Glance.PanoramaVideoComponent.vcxproj", "{7BF2416A-C43E-4E6C-AB43-9C7A91BBD2F0}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Tests", "tests\Glance.Tests\Glance.Tests.vcxproj", "{4D728170-2954-4B84-BA44-626E290A361F}"
 EndProject
 Global
@@ -154,6 +158,14 @@ Global
 		{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}.Debug|x64.Build.0 = Debug|x64
 		{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}.Release|x64.ActiveCfg = Release|x64
 		{3FA0B95E-E6D0-4707-8F0C-FB92D907685B}.Release|x64.Build.0 = Release|x64
+		{33BBA6D3-7618-4E05-B946-BFA2D44B459A}.Debug|x64.ActiveCfg = Debug|x64
+		{33BBA6D3-7618-4E05-B946-BFA2D44B459A}.Debug|x64.Build.0 = Debug|x64
+		{33BBA6D3-7618-4E05-B946-BFA2D44B459A}.Release|x64.ActiveCfg = Release|x64
+		{33BBA6D3-7618-4E05-B946-BFA2D44B459A}.Release|x64.Build.0 = Release|x64
+		{7BF2416A-C43E-4E6C-AB43-9C7A91BBD2F0}.Debug|x64.ActiveCfg = Debug|x64
+		{7BF2416A-C43E-4E6C-AB43-9C7A91BBD2F0}.Debug|x64.Build.0 = Debug|x64
+		{7BF2416A-C43E-4E6C-AB43-9C7A91BBD2F0}.Release|x64.ActiveCfg = Release|x64
+		{7BF2416A-C43E-4E6C-AB43-9C7A91BBD2F0}.Release|x64.Build.0 = Release|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Debug|x64.ActiveCfg = Debug|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Debug|x64.Build.0 = Debug|x64
 		{4D728170-2954-4B84-BA44-626E290A361F}.Release|x64.ActiveCfg = Release|x64

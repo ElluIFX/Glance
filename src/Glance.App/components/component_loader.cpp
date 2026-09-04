@@ -41,6 +41,8 @@ namespace
     using glance::contracts::components::PagedDocumentRendererApi;
     using glance::contracts::components::NativePreviewHostDescriptor;
     using glance::contracts::components::NativePreviewRendererApi;
+    using glance::contracts::components::NativeMediaHostDescriptor;
+    using glance::contracts::components::NativeMediaRendererApi;
     using glance::contracts::components::PreviewContentFormat;
     using glance::contracts::components::PreviewContentKind;
     using glance::contracts::components::PreviewNoticeApi;
@@ -98,6 +100,8 @@ namespace
         std::optional<std::filesystem::path> paged_document_host;
         std::optional<NativePreviewRendererApi> native_preview_renderer;
         std::optional<std::filesystem::path> native_preview_host;
+        std::optional<NativeMediaRendererApi> native_media_renderer;
+        std::optional<std::filesystem::path> native_media_host;
         std::optional<SettingsContributionApi> settings_contribution;
         std::optional<FileDirectoryPreviewApi> file_directory_preview;
         std::optional<GalleryMediaApi> gallery_media;
@@ -626,6 +630,23 @@ namespace
         }
         interface_pointer = nullptr;
         if (component->api.query_interface(
+                &glance::contracts::components::native_media_renderer_api_id,
+                glance::contracts::components::native_media_renderer_api_version,
+                &interface_pointer) &&
+            interface_pointer != nullptr)
+        {
+            const auto* interface_api =
+                static_cast<const NativeMediaRendererApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(NativeMediaRendererApi) &&
+                interface_api->version ==
+                    glance::contracts::components::native_media_renderer_api_version &&
+                interface_api->query_host != nullptr)
+            {
+                component->native_media_renderer = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
                 &glance::contracts::components::settings_contribution_api_id,
                 glance::contracts::components::settings_contribution_api_version,
                 &interface_pointer) &&
@@ -812,6 +833,14 @@ namespace
                         renderer.interface_version !=
                             glance::contracts::components::native_preview_renderer_api_version;
                 }
+                if (IsEqualGUID(
+                        renderer.interface_id,
+                        glance::contracts::components::native_media_renderer_api_id))
+                {
+                    return !component->native_media_renderer.has_value() ||
+                        renderer.interface_version !=
+                            glance::contracts::components::native_media_renderer_api_version;
+                }
                 return true;
             }))
         {
@@ -860,6 +889,29 @@ namespace
             if (component->activation_ready)
             {
                 component->native_preview_host = directory / relative;
+            }
+        }
+        if (component->native_media_renderer.has_value())
+        {
+            NativeMediaHostDescriptor descriptor;
+            const bool described =
+                component->native_media_renderer->query_host(&descriptor) != FALSE &&
+                descriptor.size >= sizeof(NativeMediaHostDescriptor);
+            const auto executable = described
+                ? bounded_string(descriptor.host_executable)
+                : std::nullopt;
+            const std::filesystem::path relative = executable.has_value()
+                ? std::filesystem::path(*executable)
+                : std::filesystem::path{};
+            std::error_code error;
+            component->activation_ready = component->activation_ready &&
+                executable.has_value() && !relative.empty() &&
+                relative == relative.filename() &&
+                _wcsicmp(relative.extension().c_str(), L".exe") == 0 &&
+                std::filesystem::is_regular_file(directory / relative, error);
+            if (component->activation_ready)
+            {
+                component->native_media_host = directory / relative;
             }
         }
         std::ranges::sort(component->extensions);
@@ -1175,6 +1227,23 @@ namespace
                 std::make_shared<glance::app::NativePreviewRendererRegistration>(
                     glance::app::NativePreviewRendererRegistration{
                         .host_path = component->native_preview_host->wstring(),
+                        .lease = std::static_pointer_cast<void>(component) });
+        }
+        if (preview.kind == PreviewContentKind::media &&
+            preview.format == PreviewContentFormat::media_file &&
+            component->native_media_renderer.has_value())
+        {
+            if (!component->native_media_host.has_value())
+            {
+                result.lease.reset();
+                result.status = glance::contracts::components::PrepareStatus::failed;
+                return result;
+            }
+            result.native_media_renderer =
+                std::make_shared<glance::app::NativeMediaRendererRegistration>(
+                    glance::app::NativeMediaRendererRegistration{
+                        .component_id = component->id,
+                        .host_path = component->native_media_host->wstring(),
                         .lease = std::static_pointer_cast<void>(component) });
         }
         return result;
@@ -2345,6 +2414,7 @@ namespace glance::app
                         .state = state == glance::contracts::components::StatusBarShortcutState::ready
                             ? ComponentStatusBarShortcutState::ready
                             : ComponentStatusBarShortcutState::setup_required,
+                        .initially_checked = descriptor.initially_checked != FALSE,
                         .supports_data_copy =
                             state == glance::contracts::components::StatusBarShortcutState::ready &&
                             component->status_bar_shortcut_data.has_value(),
@@ -2424,6 +2494,11 @@ namespace glance::app
             {
                 activation.kind = ComponentStatusBarActivationKind::request_component_action;
                 activation.component_action_id = std::move(*component_action_id);
+            }
+            else if (result.activation == glance::contracts::components::
+                         StatusBarShortcutActivation::set_native_media_view_mode)
+            {
+                activation.kind = ComponentStatusBarActivationKind::set_native_media_view_mode;
             }
             activation.checked = result.checked != FALSE;
             activation.component_id = component->id;
@@ -2765,6 +2840,9 @@ namespace glance::app
                     const auto group_id = bounded_string(descriptor.group_id);
                     const auto group_title_key =
                         bounded_string(descriptor.group_title_key);
+                    const auto row_id = bounded_string(descriptor.row_id);
+                    const auto row_title_key =
+                        bounded_string(descriptor.row_title_key);
                     const auto label_key = bounded_string(descriptor.label_key);
                     const auto description_key =
                         bounded_string(descriptor.description_key);
@@ -2777,6 +2855,8 @@ namespace glance::app
                         !group_id.has_value() || !valid_setting_id(*group_id) ||
                         !group_title_key.has_value() ||
                         !valid_resource_key(*group_title_key) ||
+                        !row_id.has_value() ||
+                        !row_title_key.has_value() ||
                         !label_key.has_value() ||
                         !valid_resource_key(*label_key) ||
                         !description_key.has_value() ||
@@ -2785,7 +2865,13 @@ namespace glance::app
                         (descriptor.kind !=
                              glance::contracts::components::ComponentSettingKind::toggle &&
                          descriptor.kind !=
-                             glance::contracts::components::ComponentSettingKind::choice) ||
+                             glance::contracts::components::ComponentSettingKind::choice &&
+                         descriptor.kind !=
+                             glance::contracts::components::ComponentSettingKind::number) ||
+                        (descriptor.page != glance::contracts::components::
+                                ComponentSettingPage::document_preview &&
+                         descriptor.page != glance::contracts::components::
+                                ComponentSettingPage::media_preview) ||
                         descriptor.option_count >
                             glance::contracts::components::maximum_setting_options ||
                         (descriptor.kind ==
@@ -2795,7 +2881,16 @@ namespace glance::app
                         (descriptor.kind ==
                              glance::contracts::components::ComponentSettingKind::toggle &&
                          (!valid_resource_key(*enabled_description_key) ||
-                          !valid_resource_key(*disabled_description_key))))
+                          !valid_resource_key(*disabled_description_key))) ||
+                        (descriptor.kind ==
+                             glance::contracts::components::ComponentSettingKind::number &&
+                         (row_id->empty() || !valid_setting_id(*row_id) ||
+                          row_title_key->empty() ||
+                          !valid_resource_key(*row_title_key) ||
+                          descriptor.minimum_value > descriptor.default_value ||
+                          descriptor.default_value > descriptor.maximum_value ||
+                          descriptor.small_change <= 0 ||
+                          descriptor.decimal_places > 3)))
                     {
                         continue;
                     }
@@ -2807,6 +2902,11 @@ namespace glance::app
                         .group_title = localize_component_key(
                             *component,
                             *group_title_key),
+                        .row_id = std::move(*row_id),
+                        .row_title = descriptor.kind ==
+                                glance::contracts::components::ComponentSettingKind::number
+                            ? localize_component_key(*component, *row_title_key)
+                            : L"",
                         .label = localize_component_key(*component, *label_key),
                         .description = descriptor.kind ==
                                 glance::contracts::components::ComponentSettingKind::choice
@@ -2826,6 +2926,10 @@ namespace glance::app
                             : L"",
                         .kind = descriptor.kind,
                         .default_value = descriptor.default_value,
+                        .minimum_value = descriptor.minimum_value,
+                        .maximum_value = descriptor.maximum_value,
+                        .small_change = descriptor.small_change,
+                        .decimal_places = descriptor.decimal_places,
                         .group_order = descriptor.group_order,
                         .setting_order = descriptor.setting_order };
                     for (std::uint32_t index = 0;
@@ -2848,6 +2952,8 @@ namespace glance::app
                     }
                     if (descriptor.kind ==
                             glance::contracts::components::ComponentSettingKind::toggle ||
+                        descriptor.kind ==
+                            glance::contracts::components::ComponentSettingKind::number ||
                         !setting.options.empty())
                     {
                         settings.push_back(std::move(setting));
@@ -2986,6 +3092,29 @@ namespace glance::app
         catch (...)
         {
         }
+    }
+
+    std::vector<std::pair<std::wstring, std::int64_t>> component_setting_values(
+        std::wstring_view component_id) noexcept
+    {
+        std::vector<std::pair<std::wstring, std::int64_t>> values;
+        if (!valid_component_id(component_id))
+        {
+            return values;
+        }
+        for (const auto& setting : component_settings({}))
+        {
+            if (setting.component_id == component_id)
+            {
+                values.emplace_back(
+                    setting.setting_id,
+                    component_setting_value(
+                        setting.component_id,
+                        setting.setting_id,
+                        setting.default_value));
+            }
+        }
+        return values;
     }
 
     void shutdown_components() noexcept

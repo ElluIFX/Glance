@@ -33,6 +33,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -73,6 +74,7 @@ namespace winrt::Glance::App::implementation
         void ApplyFooterPreferences();
         void ApplyWindowPreferences();
         void RefreshComponentContributions();
+        void ApplyComponentSettings(std::wstring_view component_id);
         void SetXamlModalOverlayActive(bool active) noexcept;
         void HandleGalleryResponse(std::string_view payload);
         void HandleGalleryDisconnect();
@@ -255,6 +257,16 @@ namespace winrt::Glance::App::implementation
             active,
         };
 
+        enum class NativeMediaControl
+        {
+            play,
+            pause,
+            seek,
+            volume,
+            muted,
+            view_mode,
+        };
+
         void show_copy_feedback(
             const Microsoft::UI::Xaml::Controls::FontIcon& icon);
         void copy_text_to_clipboard(
@@ -299,6 +311,24 @@ namespace winrt::Glance::App::implementation
             std::shared_ptr<glance::app::NativePreviewSurface> surface,
             std::wstring path,
             std::uint64_t generation);
+        winrt::fire_and_forget load_native_media_async(
+            std::shared_ptr<glance::app::NativePreviewSurface> surface,
+            std::wstring path,
+            std::wstring component_id,
+            std::uint64_t settings_generation,
+            std::uint64_t generation,
+            bool autoplay);
+        winrt::fire_and_forget apply_native_media_component_settings_async(
+            std::shared_ptr<glance::app::NativePreviewSurface> surface,
+            std::wstring component_id,
+            std::uint64_t generation);
+        winrt::fire_and_forget query_native_media_state_async(
+            std::shared_ptr<glance::app::NativePreviewSurface> surface,
+            std::uint64_t generation);
+        winrt::fire_and_forget send_native_media_control_async(
+            std::shared_ptr<glance::app::NativePreviewSurface> surface,
+            NativeMediaControl control,
+            std::int64_t value = 0);
         winrt::fire_and_forget resize_native_preview_async(
             std::shared_ptr<glance::app::NativePreviewSurface> surface,
             std::uint32_t width,
@@ -647,6 +677,9 @@ namespace winrt::Glance::App::implementation
         bool syntax_highlighting_{ true };
         bool word_wrap_{ true };
         bool media_is_audio_{};
+        bool native_media_active_{};
+        bool native_media_query_in_flight_{};
+        bool native_media_dimensions_applied_{};
         bool reverse_media_seek_wheel_{};
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};
@@ -757,6 +790,7 @@ namespace winrt::Glance::App::implementation
         std::wstring media_playback_info_;
         Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };
         std::uint64_t media_playback_generation_{};
+        glance::contracts::native_preview::MediaState native_media_state_{};
         std::shared_ptr<std::atomic_bool> component_hover_cancellation_;
         std::shared_ptr<std::atomic_bool> component_data_copy_cancellation_;
         glance::app::ComponentStatusBarActivation active_component_hover_;
@@ -765,6 +799,8 @@ namespace winrt::Glance::App::implementation
         std::wstring component_hover_cache_info_id_;
         std::shared_ptr<glance::app::PagedDocumentRenderClient> pdf_render_client_;
         std::shared_ptr<glance::app::NativePreviewSurface> native_preview_surface_;
+        std::wstring active_native_media_component_id_;
+        std::atomic_uint64_t native_media_settings_generation_{};
         std::atomic_uint64_t native_preview_resize_request_{};
         bool native_preview_ready_{};
         bool xaml_modal_overlay_active_{};

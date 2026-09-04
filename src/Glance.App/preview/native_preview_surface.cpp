@@ -29,7 +29,7 @@ namespace
             std::scoped_lock lock(mouse_hook_mutex);
             for (auto* surface : mouse_hook_surfaces)
             {
-                if (surface != nullptr && surface->handle_mouse_message(wparam, input->pt))
+                if (surface != nullptr && surface->handle_mouse_message(wparam, *input))
                 {
                     return 1;
                 }
@@ -170,12 +170,14 @@ namespace glance::app
         HWND parent,
         std::wstring host_path,
         std::shared_ptr<void> renderer_lease,
-        DoubleClickCallback double_click_callback)
+        DoubleClickCallback double_click_callback,
+        MouseMessageCallback mouse_message_callback)
         : parent_(parent),
           surface_thread_id_(GetCurrentThreadId()),
           host_path_(std::move(host_path)),
           renderer_lease_(std::move(renderer_lease)),
-          double_click_callback_(std::move(double_click_callback))
+          double_click_callback_(std::move(double_click_callback)),
+          mouse_message_callback_(std::move(mouse_message_callback))
     {
         const auto instance = GetModuleHandleW(nullptr);
         std::call_once(host_class_once, register_host_window_class, instance);
@@ -444,6 +446,159 @@ namespace glance::app
         update_mouse_hook_registration();
     }
 
+    bool NativePreviewSurface::media_play() noexcept
+    {
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        return transact_locked(
+                   Command::media_play,
+                   nullptr,
+                   0,
+                   status,
+                   1000) &&
+            status == Status::success;
+    }
+
+    bool NativePreviewSurface::media_pause() noexcept
+    {
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        return transact_locked(
+                   Command::media_pause,
+                   nullptr,
+                   0,
+                   status,
+                   1000) &&
+            status == Status::success;
+    }
+
+    bool NativePreviewSurface::media_seek(std::int64_t position_ticks) noexcept
+    {
+        const MediaValueRequest request{ .value = position_ticks };
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        return transact_locked(
+                   Command::media_seek,
+                   &request,
+                   sizeof(request),
+                   status,
+                   1000) &&
+            status == Status::success;
+    }
+
+    bool NativePreviewSurface::media_set_volume(std::uint32_t percent) noexcept
+    {
+        const MediaValueRequest request{
+            .value = static_cast<std::int64_t>(std::min(percent, 100U)) };
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        return transact_locked(
+                   Command::media_set_volume,
+                   &request,
+                   sizeof(request),
+                   status,
+                   1000) &&
+            status == Status::success;
+    }
+
+    bool NativePreviewSurface::media_set_muted(bool muted) noexcept
+    {
+        const MediaValueRequest request{ .value = muted ? 1 : 0 };
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        return transact_locked(
+                   Command::media_set_muted,
+                   &request,
+                   sizeof(request),
+                   status,
+                   1000) &&
+            status == Status::success;
+    }
+
+    bool NativePreviewSurface::media_set_view_mode(bool projected) noexcept
+    {
+        const MediaValueRequest request{ .value = projected ? 1 : 0 };
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        return transact_locked(
+                   Command::media_set_view_mode,
+                   &request,
+                   sizeof(request),
+                   status,
+                   1000) &&
+            status == Status::success;
+    }
+
+    bool NativePreviewSurface::media_set_settings(
+        std::span<const std::pair<std::wstring, std::int64_t>> settings,
+        std::uint64_t generation) noexcept
+    {
+        if (settings.size() >
+            (maximum_payload_size - sizeof(MediaSettingsRequest)) /
+                sizeof(MediaSettingValue))
+        {
+            return false;
+        }
+        std::vector<std::byte> payload(
+            sizeof(MediaSettingsRequest) + settings.size() * sizeof(MediaSettingValue));
+        auto* request = reinterpret_cast<MediaSettingsRequest*>(payload.data());
+        request->generation = generation;
+        request->count = static_cast<std::uint32_t>(settings.size());
+        auto* values = reinterpret_cast<MediaSettingValue*>(
+            payload.data() + sizeof(MediaSettingsRequest));
+        for (std::size_t index = 0; index < settings.size(); ++index)
+        {
+            if (settings[index].first.empty() ||
+                settings[index].first.size() >= media_setting_id_capacity)
+            {
+                return false;
+            }
+            wcscpy_s(values[index].setting_id, settings[index].first.c_str());
+            values[index].value = settings[index].second;
+        }
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        return transact_locked(
+                   Command::media_set_settings,
+                   payload.data(),
+                   static_cast<std::uint32_t>(payload.size()),
+                   status,
+                   1000) &&
+            status == Status::success;
+    }
+
+    std::optional<MediaState> NativePreviewSurface::media_state() noexcept
+    {
+        std::vector<std::byte> payload;
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        const bool received = transact_locked(
+                Command::media_query_state,
+                nullptr,
+                0,
+                status,
+                1000,
+                &payload);
+        if (!received || status != Status::success ||
+            payload.size() != sizeof(MediaState))
+        {
+            DWORD exit_code{};
+            if (process_ != nullptr &&
+                GetExitCodeProcess(process_, &exit_code) &&
+                exit_code != STILL_ACTIVE)
+            {
+                return MediaState{
+                    .flags = media_state_failed,
+                    .failure_kind = ~0U,
+                    .failure_hresult = static_cast<std::int32_t>(exit_code) };
+            }
+            return std::nullopt;
+        }
+        MediaState state;
+        std::memcpy(&state, payload.data(), sizeof(state));
+        return state;
+    }
+
     void NativePreviewSurface::cancel() noexcept
     {
         if (cancelled_.exchange(true, std::memory_order_acq_rel))
@@ -646,7 +801,8 @@ namespace glance::app
         const void* payload,
         std::uint32_t payload_size,
         Status& status,
-        DWORD timeout_ms) noexcept
+        DWORD timeout_ms,
+        std::vector<std::byte>* response_payload) noexcept
     {
         if (process_ == nullptr || request_pipe_ == nullptr ||
             response_pipe_ == nullptr || payload_size > maximum_payload_size)
@@ -670,7 +826,20 @@ namespace glance::app
         {
             return false;
         }
-        if (response.payload_size != 0)
+        if (response_payload != nullptr)
+        {
+            response_payload->resize(response.payload_size);
+            if (!response_payload->empty() &&
+                !read_exact(
+                    response_pipe_,
+                    response_payload->data(),
+                    response_payload->size()))
+            {
+                response_payload->clear();
+                return false;
+            }
+        }
+        else if (response.payload_size != 0)
         {
             std::vector<std::byte> ignored(response.payload_size);
             if (!read_exact(response_pipe_, ignored.data(), ignored.size()))
@@ -716,14 +885,22 @@ namespace glance::app
 
     bool NativePreviewSurface::handle_mouse_message(
         WPARAM message,
-        const POINT& point) noexcept
+        const MSLLHOOKSTRUCT& input) noexcept
     {
-        if (!visible_ || !double_click_enabled_ || host_ == nullptr)
+        if (!visible_ || host_ == nullptr)
         {
             return false;
         }
         RECT bounds{};
-        if (!GetWindowRect(host_, &bounds) || !PtInRect(&bounds, point))
+        if (!GetWindowRect(host_, &bounds) || !PtInRect(&bounds, input.pt))
+        {
+            return false;
+        }
+        if (mouse_message_callback_ && mouse_message_callback_(message, input))
+        {
+            return true;
+        }
+        if (!double_click_enabled_)
         {
             return false;
         }
@@ -742,10 +919,10 @@ namespace glance::app
         const int maximum_y = std::max(1, GetSystemMetrics(SM_CYDOUBLECLK) / 2);
         const bool double_click = last_left_down_tick_ != 0 &&
             now - last_left_down_tick_ <= GetDoubleClickTime() &&
-            std::abs(point.x - last_left_down_point_.x) <= maximum_x &&
-            std::abs(point.y - last_left_down_point_.y) <= maximum_y;
+            std::abs(input.pt.x - last_left_down_point_.x) <= maximum_x &&
+            std::abs(input.pt.y - last_left_down_point_.y) <= maximum_y;
         last_left_down_tick_ = now;
-        last_left_down_point_ = point;
+        last_left_down_point_ = input.pt;
         if (!double_click)
         {
             return false;
@@ -761,7 +938,8 @@ namespace glance::app
 
     void NativePreviewSurface::update_mouse_hook_registration() noexcept
     {
-        const bool should_register = visible_ && double_click_enabled_ && host_ != nullptr;
+        const bool should_register = visible_ && host_ != nullptr &&
+            (double_click_enabled_ || mouse_message_callback_ != nullptr);
         std::scoped_lock lock(mouse_hook_mutex);
         if (should_register == mouse_hook_registered_)
         {

@@ -485,6 +485,7 @@ namespace winrt::Glance::App::implementation
         FooterPreferencesChangedCallback footer_preferences_changed_callback,
         WindowPreferencesChangedCallback window_preferences_changed_callback,
         ComponentChangedCallback component_changed_callback,
+        ComponentSettingChangedCallback component_setting_changed_callback,
         SourceStatusRequestCallback source_status_request_callback,
         UpdateCheckCallback update_check_callback,
         NetworkDownloadCallback network_download_callback,
@@ -496,6 +497,8 @@ namespace winrt::Glance::App::implementation
         footer_preferences_changed_callback_ = std::move(footer_preferences_changed_callback);
         window_preferences_changed_callback_ = std::move(window_preferences_changed_callback);
         component_changed_callback_ = std::move(component_changed_callback);
+        component_setting_changed_callback_ =
+            std::move(component_setting_changed_callback);
         source_status_request_callback_ = std::move(source_status_request_callback);
         update_check_callback_ = std::move(update_check_callback);
         network_download_callback_ = std::move(network_download_callback);
@@ -1171,20 +1174,8 @@ namespace winrt::Glance::App::implementation
         const bool was_initializing = initializing_;
         initializing_ = true;
 
-        const auto panel = ComponentDocumentSettingsPanel();
-        panel.Children().Clear();
-        auto settings = glance::app::component_settings(
+        const auto all_settings = glance::app::component_settings(
             glance::app::current_ui_language());
-        std::erase_if(settings, [](const auto& setting) {
-            return setting.page != glance::contracts::components::
-                ComponentSettingPage::document_preview;
-        });
-        if (settings.empty())
-        {
-            initializing_ = was_initializing;
-            return;
-        }
-
         const auto title_style = SettingsNavigation().Resources()
             .Lookup(box_value(L"SettingsGroupTitleStyle")).as<Style>();
         const auto group_style = SettingsNavigation().Resources()
@@ -1197,165 +1188,296 @@ namespace winrt::Glance::App::implementation
             box_value(L"DividerStrokeColorDefaultBrush")).try_as<Media::Brush>();
         const auto weak = get_weak();
 
-        std::size_t index{};
-        while (index < settings.size())
-        {
-            const auto group_component = settings[index].component_id;
-            const auto group_id = settings[index].group_id;
-            Controls::StackPanel group;
-            group.Spacing(8);
-            Controls::TextBlock title;
-            title.Style(title_style);
-            title.Text(settings[index].group_title);
-            group.Children().Append(title);
+        const auto rebuild_page = [&](
+            const Controls::StackPanel& panel,
+            glance::contracts::components::ComponentSettingPage page) {
+            panel.Children().Clear();
+            auto settings = all_settings;
+            std::erase_if(settings, [page](const auto& setting) {
+                return setting.page != page;
+            });
 
-            Controls::Border border;
-            border.Style(group_style);
-            Controls::StackPanel rows;
-            bool first_row = true;
-            while (index < settings.size() &&
-                   settings[index].component_id == group_component &&
-                   settings[index].group_id == group_id)
+            std::size_t index{};
+            while (index < settings.size())
             {
-                const auto setting = settings[index++];
-                if (!first_row)
-                {
-                    Shapes::Rectangle divider;
-                    divider.Height(1);
-                    divider.Fill(divider_brush);
-                    rows.Children().Append(divider);
-                }
-                first_row = false;
+                const auto group_component = settings[index].component_id;
+                const auto group_id = settings[index].group_id;
+                Controls::StackPanel group;
+                group.Spacing(8);
+                Controls::TextBlock title;
+                title.Style(title_style);
+                title.Text(settings[index].group_title);
+                group.Children().Append(title);
 
-                Controls::Grid row;
-                row.Style(row_style);
-                Controls::ColumnDefinition content_column;
-                content_column.Width(GridLength{ 1, GridUnitType::Star });
-                row.ColumnDefinitions().Append(content_column);
-                Controls::ColumnDefinition control_column;
-                control_column.Width(
-                    setting.kind == glance::contracts::components::
-                        ComponentSettingKind::choice
-                    ? GridLength{ 220, GridUnitType::Pixel }
-                    : GridLengthHelper::Auto());
-                row.ColumnDefinitions().Append(control_column);
-
-                Controls::StackPanel content;
-                content.Spacing(3);
-                content.VerticalAlignment(VerticalAlignment::Center);
-                const auto stored_value = glance::app::component_setting_value(
-                    setting.component_id,
-                    setting.setting_id,
-                    setting.default_value);
-                Controls::TextBlock label;
-                label.Text(setting.label);
-                content.Children().Append(label);
-                const auto description_text =
-                    setting.kind == glance::contracts::components::
-                        ComponentSettingKind::toggle
-                    ? stored_value != 0
-                        ? setting.enabled_description
-                        : setting.disabled_description
-                    : setting.description;
-                Controls::TextBlock description;
-                if (!description_text.empty())
+                Controls::Border border;
+                border.Style(group_style);
+                Controls::StackPanel rows;
+                bool first_row = true;
+                while (index < settings.size() &&
+                       settings[index].component_id == group_component &&
+                       settings[index].group_id == group_id)
                 {
-                    description.Style(description_style);
-                    description.Text(description_text);
-                    content.Children().Append(description);
-                }
-                row.Children().Append(content);
-
-                if (setting.kind == glance::contracts::components::
-                        ComponentSettingKind::toggle)
-                {
-                    Controls::ToggleSwitch toggle;
-                    toggle.IsOn(stored_value != 0);
-                    Controls::Grid::SetColumn(toggle, 1);
-                    toggle.Toggled([
-                        weak,
-                        component_id = setting.component_id,
-                        setting_id = setting.setting_id,
-                        description,
-                        enabled_description = setting.enabled_description,
-                        disabled_description = setting.disabled_description](
-                            IInspectable const& sender,
-                            RoutedEventArgs const&) {
-                        if (const auto self = weak.get();
-                            self != nullptr && !self->initializing_)
+                    const std::size_t row_begin = index;
+                    const auto row_id = settings[index].row_id;
+                    ++index;
+                    if (!row_id.empty())
+                    {
+                        while (index < settings.size() &&
+                               settings[index].component_id == group_component &&
+                               settings[index].group_id == group_id &&
+                               settings[index].row_id == row_id)
                         {
-                            const bool enabled =
-                                sender.as<Controls::ToggleSwitch>().IsOn();
-                            description.Text(
-                                enabled
-                                    ? enabled_description
-                                    : disabled_description);
+                            ++index;
+                        }
+                    }
+                    const std::size_t row_end = index;
+                    const auto& setting = settings[row_begin];
+
+                    if (!first_row)
+                    {
+                        Shapes::Rectangle divider;
+                        divider.Height(1);
+                        divider.Fill(divider_brush);
+                        rows.Children().Append(divider);
+                    }
+                    first_row = false;
+
+                    Controls::Grid row;
+                    row.Style(row_style);
+                    Controls::ColumnDefinition content_column;
+                    content_column.Width(GridLength{ 1, GridUnitType::Star });
+                    row.ColumnDefinitions().Append(content_column);
+                    Controls::ColumnDefinition control_column;
+                    control_column.Width(
+                        setting.kind == glance::contracts::components::
+                                ComponentSettingKind::choice
+                            ? GridLength{ 220, GridUnitType::Pixel }
+                            : GridLengthHelper::Auto());
+                    row.ColumnDefinitions().Append(control_column);
+
+                    Controls::StackPanel content;
+                    content.Spacing(3);
+                    content.VerticalAlignment(VerticalAlignment::Center);
+                    const auto stored_value = glance::app::component_setting_value(
+                        setting.component_id,
+                        setting.setting_id,
+                        setting.default_value);
+                    Controls::TextBlock label;
+                    label.Text(row_id.empty() ? setting.label : setting.row_title);
+                    content.Children().Append(label);
+                    const auto description_text =
+                        setting.kind == glance::contracts::components::
+                                ComponentSettingKind::toggle
+                            ? stored_value != 0
+                                ? setting.enabled_description
+                                : setting.disabled_description
+                            : setting.description;
+                    Controls::TextBlock description;
+                    if (!description_text.empty())
+                    {
+                        description.Style(description_style);
+                        description.Text(description_text);
+                        content.Children().Append(description);
+                    }
+                    row.Children().Append(content);
+
+                    if (setting.kind == glance::contracts::components::
+                            ComponentSettingKind::number)
+                    {
+                        Controls::StackPanel controls;
+                        controls.Orientation(Controls::Orientation::Horizontal);
+                        controls.Spacing(12);
+                        controls.VerticalAlignment(VerticalAlignment::Center);
+                        for (std::size_t setting_index = row_begin;
+                             setting_index < row_end;
+                             ++setting_index)
+                        {
+                            const auto number_setting = settings[setting_index];
+                            std::int64_t scale = 1;
+                            for (std::uint32_t digit = 0;
+                                 digit < number_setting.decimal_places;
+                                 ++digit)
+                            {
+                                scale *= 10;
+                            }
+                            const auto value = std::clamp(
+                                glance::app::component_setting_value(
+                                    number_setting.component_id,
+                                    number_setting.setting_id,
+                                    number_setting.default_value),
+                                number_setting.minimum_value,
+                                number_setting.maximum_value);
+                            Controls::NumberBox number;
+                            number.Width(132);
+                            number.Header(box_value(number_setting.label));
+                            number.Minimum(
+                                static_cast<double>(number_setting.minimum_value) /
+                                static_cast<double>(scale));
+                            number.Maximum(
+                                static_cast<double>(number_setting.maximum_value) /
+                                static_cast<double>(scale));
+                            number.SmallChange(
+                                static_cast<double>(number_setting.small_change) /
+                                static_cast<double>(scale));
+                            number.SpinButtonPlacementMode(
+                                Controls::NumberBoxSpinButtonPlacementMode::Inline);
+                            Windows::Globalization::NumberFormatting::DecimalFormatter
+                                formatter;
+                            formatter.FractionDigits(number_setting.decimal_places);
+                            formatter.IsGrouped(false);
+                            number.NumberFormatter(formatter);
+                            number.Value(
+                                static_cast<double>(value) /
+                                static_cast<double>(scale));
+                            number.Loaded([](
+                                IInspectable const& sender,
+                                RoutedEventArgs const&) {
+                                const auto control = sender.as<Controls::NumberBox>();
+                                control.ApplyTemplate();
+                                disable_number_box_clear_button(control);
+                            });
+                            number.ValueChanged([
+                                weak,
+                                component_id = number_setting.component_id,
+                                setting_id = number_setting.setting_id,
+                                minimum_value = number_setting.minimum_value,
+                                maximum_value = number_setting.maximum_value,
+                                scale](
+                                    IInspectable const&,
+                                    Controls::NumberBoxValueChangedEventArgs const& args) {
+                                const auto self = weak.get();
+                                if (self == nullptr || self->initializing_ ||
+                                    std::isnan(args.NewValue()))
+                                {
+                                    return;
+                                }
+                                const auto value = std::clamp(
+                                    static_cast<std::int64_t>(std::llround(
+                                        args.NewValue() * static_cast<double>(scale))),
+                                    minimum_value,
+                                    maximum_value);
+                                glance::app::save_component_setting_value(
+                                    component_id,
+                                    setting_id,
+                                    value);
+                                if (self->component_setting_changed_callback_)
+                                {
+                                    self->component_setting_changed_callback_(component_id);
+                                }
+                            });
+                            controls.Children().Append(number);
+                        }
+                        Controls::Grid::SetColumn(controls, 1);
+                        row.Children().Append(controls);
+                    }
+                    else if (setting.kind == glance::contracts::components::
+                            ComponentSettingKind::toggle)
+                    {
+                        Controls::ToggleSwitch toggle;
+                        toggle.IsOn(stored_value != 0);
+                        Controls::Grid::SetColumn(toggle, 1);
+                        toggle.Toggled([
+                            weak,
+                            component_id = setting.component_id,
+                            setting_id = setting.setting_id,
+                            description,
+                            enabled_description = setting.enabled_description,
+                            disabled_description = setting.disabled_description](
+                                IInspectable const& sender,
+                                RoutedEventArgs const&) {
+                            if (const auto self = weak.get();
+                                self != nullptr && !self->initializing_)
+                            {
+                                const bool enabled =
+                                    sender.as<Controls::ToggleSwitch>().IsOn();
+                                description.Text(
+                                    enabled
+                                        ? enabled_description
+                                        : disabled_description);
+                                glance::app::save_component_setting_value(
+                                    component_id,
+                                    setting_id,
+                                    enabled ? 1 : 0);
+                                if (self->component_setting_changed_callback_)
+                                {
+                                    self->component_setting_changed_callback_(component_id);
+                                }
+                            }
+                        });
+                        row.Children().Append(toggle);
+                    }
+                    else
+                    {
+                        Controls::ComboBox combo;
+                        combo.HorizontalAlignment(HorizontalAlignment::Stretch);
+                        combo.VerticalAlignment(VerticalAlignment::Center);
+                        int selected_index = -1;
+                        for (std::size_t option_index = 0;
+                             option_index < setting.options.size();
+                             ++option_index)
+                        {
+                            combo.Items().Append(box_value(
+                                setting.options[option_index].text));
+                            if (setting.options[option_index].value == stored_value)
+                            {
+                                selected_index = static_cast<int>(option_index);
+                            }
+                        }
+                        if (selected_index < 0)
+                        {
+                            const auto default_option = std::ranges::find_if(
+                                setting.options,
+                                [&setting](const auto& option) {
+                                    return option.value == setting.default_value;
+                                });
+                            selected_index = default_option == setting.options.end()
+                                ? 0
+                                : static_cast<int>(std::distance(
+                                    setting.options.begin(),
+                                    default_option));
+                        }
+                        combo.SelectedIndex(selected_index);
+                        Controls::Grid::SetColumn(combo, 1);
+                        combo.SelectionChanged([
+                            weak,
+                            component_id = setting.component_id,
+                            setting_id = setting.setting_id,
+                            options = setting.options](
+                                IInspectable const& sender,
+                                Controls::SelectionChangedEventArgs const&) {
+                            const auto self = weak.get();
+                            const int selected =
+                                sender.as<Controls::ComboBox>().SelectedIndex();
+                            if (self == nullptr || self->initializing_ || selected < 0 ||
+                                selected >= static_cast<int>(options.size()))
+                            {
+                                return;
+                            }
                             glance::app::save_component_setting_value(
                                 component_id,
                                 setting_id,
-                                enabled ? 1 : 0);
-                        }
-                    });
-                    row.Children().Append(toggle);
-                }
-                else
-                {
-                    Controls::ComboBox combo;
-                    combo.HorizontalAlignment(HorizontalAlignment::Stretch);
-                    combo.VerticalAlignment(VerticalAlignment::Center);
-                    int selected_index = -1;
-                    for (std::size_t option_index = 0;
-                         option_index < setting.options.size();
-                         ++option_index)
-                    {
-                        combo.Items().Append(box_value(setting.options[option_index].text));
-                        if (setting.options[option_index].value == stored_value)
-                        {
-                            selected_index = static_cast<int>(option_index);
-                        }
+                                options[static_cast<std::size_t>(selected)].value);
+                            if (self->component_setting_changed_callback_)
+                            {
+                                self->component_setting_changed_callback_(component_id);
+                            }
+                        });
+                        row.Children().Append(combo);
                     }
-                    if (selected_index < 0)
-                    {
-                        const auto default_option = std::ranges::find_if(
-                            setting.options,
-                            [&setting](const auto& option) {
-                                return option.value == setting.default_value;
-                            });
-                        selected_index = default_option == setting.options.end()
-                            ? 0
-                            : static_cast<int>(std::distance(
-                                setting.options.begin(),
-                                default_option));
-                    }
-                    combo.SelectedIndex(selected_index);
-                    Controls::Grid::SetColumn(combo, 1);
-                    combo.SelectionChanged([
-                        weak,
-                        component_id = setting.component_id,
-                        setting_id = setting.setting_id,
-                        options = setting.options](
-                            IInspectable const& sender,
-                            Controls::SelectionChangedEventArgs const&) {
-                        const auto self = weak.get();
-                        const int selected = sender.as<Controls::ComboBox>().SelectedIndex();
-                        if (self == nullptr || self->initializing_ || selected < 0 ||
-                            selected >= static_cast<int>(options.size()))
-                        {
-                            return;
-                        }
-                        glance::app::save_component_setting_value(
-                            component_id,
-                            setting_id,
-                            options[static_cast<std::size_t>(selected)].value);
-                    });
-                    row.Children().Append(combo);
+                    rows.Children().Append(row);
                 }
-                rows.Children().Append(row);
+                border.Child(rows);
+                group.Children().Append(border);
+                panel.Children().Append(group);
             }
-            border.Child(rows);
-            group.Children().Append(border);
-            panel.Children().Append(group);
-        }
+        };
+
+        rebuild_page(
+            ComponentDocumentSettingsPanel(),
+            glance::contracts::components::ComponentSettingPage::document_preview);
+        rebuild_page(
+            ComponentMediaSettingsPanel(),
+            glance::contracts::components::ComponentSettingPage::media_preview);
         initializing_ = was_initializing;
     }
 

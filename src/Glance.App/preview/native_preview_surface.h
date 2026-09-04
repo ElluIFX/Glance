@@ -5,12 +5,16 @@
 #include <windows.h>
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace glance::app
 {
@@ -18,12 +22,15 @@ namespace glance::app
     {
     public:
         using DoubleClickCallback = std::function<void()>;
+        using MouseMessageCallback =
+            std::function<bool(WPARAM, const MSLLHOOKSTRUCT&)>;
 
         NativePreviewSurface(
             HWND parent,
             std::wstring host_path,
             std::shared_ptr<void> renderer_lease,
-            DoubleClickCallback double_click_callback);
+            DoubleClickCallback double_click_callback,
+            MouseMessageCallback mouse_message_callback = {});
         ~NativePreviewSurface();
 
         NativePreviewSurface(const NativePreviewSurface&) = delete;
@@ -42,12 +49,23 @@ namespace glance::app
         void set_occlusions(std::span<const RECT> rectangles) noexcept;
         void set_visible(bool visible) noexcept;
         void set_double_click_enabled(bool enabled) noexcept;
+        [[nodiscard]] bool media_play() noexcept;
+        [[nodiscard]] bool media_pause() noexcept;
+        [[nodiscard]] bool media_seek(std::int64_t position_ticks) noexcept;
+        [[nodiscard]] bool media_set_volume(std::uint32_t percent) noexcept;
+        [[nodiscard]] bool media_set_muted(bool muted) noexcept;
+        [[nodiscard]] bool media_set_view_mode(bool projected) noexcept;
+        [[nodiscard]] bool media_set_settings(
+            std::span<const std::pair<std::wstring, std::int64_t>> settings,
+            std::uint64_t generation) noexcept;
+        [[nodiscard]] std::optional<glance::contracts::native_preview::MediaState>
+            media_state() noexcept;
         void cancel() noexcept;
         void destroy_surface() noexcept;
         void shutdown() noexcept;
         [[nodiscard]] bool handle_mouse_message(
             WPARAM message,
-            const POINT& point) noexcept;
+            const MSLLHOOKSTRUCT& input) noexcept;
 
     public:
         static LRESULT CALLBACK host_window_proc(
@@ -63,7 +81,8 @@ namespace glance::app
             const void* payload,
             std::uint32_t payload_size,
             glance::contracts::native_preview::Status& status,
-            DWORD timeout_ms) noexcept;
+            DWORD timeout_ms,
+            std::vector<std::byte>* response_payload = nullptr) noexcept;
         void close_process_locked(bool terminate) noexcept;
         void update_mouse_hook_registration() noexcept;
 
@@ -74,6 +93,7 @@ namespace glance::app
         std::wstring host_path_;
         std::shared_ptr<void> renderer_lease_;
         DoubleClickCallback double_click_callback_;
+        MouseMessageCallback mouse_message_callback_;
         std::mutex io_mutex_;
         std::mutex process_mutex_;
         std::atomic_bool cancelled_{};

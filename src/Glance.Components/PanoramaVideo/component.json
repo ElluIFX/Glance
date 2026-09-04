@@ -1,0 +1,15 @@
+{
+  "schema_version": 3,
+  "id": "panorama-video",
+  "architecture": "x64",
+  "entry_point": "Glance.PanoramaVideoComponent.dll",
+  "dependencies": [],
+  "payload_files": [
+    "Glance.PanoramaVideoHost.exe",
+    "resources.pri"
+  ],
+  "installer_names": {
+    "en-US": "Panorama video preview",
+    "zh-CN": "全景视频预览"
+  }
+}

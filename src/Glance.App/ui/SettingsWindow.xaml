@@ -940,6 +940,7 @@
                             </Grid>
                         </Border>
                     </StackPanel>
+                    <StackPanel x:Name="ComponentMediaSettingsPanel" Spacing="24" />
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="MediaGeneralGroupTitle" x:Uid="MediaGeneralGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="General" />
                         <Border Style="{StaticResource SettingsGroupStyle}">

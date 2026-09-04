@@ -703,6 +703,18 @@ namespace winrt::Glance::App::implementation
                             ->RefreshComponentContributions();
                     }
                 },
+                [this](std::wstring component_id) {
+                    if (active_window_ != nullptr)
+                    {
+                        get_self<implementation::MainWindow>(active_window_)
+                            ->ApplyComponentSettings(component_id);
+                    }
+                    for (const auto& window : detached_windows_)
+                    {
+                        get_self<implementation::MainWindow>(window)
+                            ->ApplyComponentSettings(component_id);
+                    }
+                },
                 [this](std::string language_tag) {
                     return pipe_client_.send(
                         glance::contracts::MessageType::source_status_request,
