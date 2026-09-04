@@ -4,6 +4,14 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.04] - 2026-09-04
+
+### Added
+
+- Added interactive 3D previews for Insta360 INSV and DJI OSV panorama videos.
+- Added synchronized dual 180-degree source view switching with shared playback controls.
+- Added live per-format view-angle and overlap settings for panorama stitching.
+
 ## [2026.08.25] - 2026-08-25
 
 ### Added
