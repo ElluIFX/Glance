@@ -226,6 +226,9 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
         void PdfOutlineEntry_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void PdfThumbnailList_ContainerContentChanging(
+            Microsoft::UI::Xaml::Controls::ListViewBase const&,
+            Microsoft::UI::Xaml::Controls::ContainerContentChangingEventArgs const&);
         void PasswordPromptSubmitButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PasswordPromptInput_KeyDown(
             IInspectable const&,
@@ -433,7 +436,10 @@ namespace winrt::Glance::App::implementation
             std::uint32_t page_index,
             std::uint64_t generation,
             bool dynamic_update = false);
-        winrt::fire_and_forget load_pdf_thumbnails_async(std::uint64_t generation);
+        winrt::fire_and_forget load_pdf_thumbnail_async(
+            std::uint32_t page, std::uint64_t generation,
+            winrt::weak_ref<Microsoft::UI::Xaml::Controls::Image> image,
+            std::shared_ptr<std::atomic_bool> cancellation);
         void apply_pdf_open_result(
             std::shared_ptr<glance::app::PagedDocumentRenderClient> session,
             glance::app::PagedDocumentOpenResult result,
@@ -823,7 +829,8 @@ namespace winrt::Glance::App::implementation
         std::wstring pdf_source_path_;
         std::wstring pdf_password_;
         std::vector<glance::app::PagedDocumentOutlineEntry> pdf_outline_;
-        std::vector<winrt::weak_ref<Microsoft::UI::Xaml::Controls::Image>> pdf_thumbnail_images_;
+        std::unordered_map<std::uint32_t, std::shared_ptr<std::atomic_bool>> pdf_thumbnail_cancellations_;
+        std::atomic_flag pdf_thumbnail_busy_{};
         std::uint32_t pdf_page_count_{};
         std::uint32_t pdf_thumbnail_items_built_{};
         bool pdf_thumbnail_selection_updating_{};

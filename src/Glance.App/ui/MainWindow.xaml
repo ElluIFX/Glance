@@ -679,7 +679,21 @@
                             Grid.Row="1"
                             Padding="6"
                             SelectionChanged="PdfThumbnailList_SelectionChanged"
+                            ContainerContentChanging="PdfThumbnailList_ContainerContentChanging"
                             SelectionMode="Single">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Spacing="4">
+                                        <Border Height="136" Padding="2">
+                                            <Grid>
+                                                <FontIcon Glyph="&#xE8A5;" FontSize="32" Opacity="0.35" />
+                                                <Image x:Name="ThumbnailImage" Width="176" Height="132" Stretch="Uniform" />
+                                            </Grid>
+                                        </Border>
+                                        <TextBlock x:Name="ThumbnailLabel" FontSize="11" TextAlignment="Center" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem">
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />

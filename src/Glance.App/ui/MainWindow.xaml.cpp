@@ -3005,7 +3005,6 @@ namespace winrt::Glance::App::implementation
         pdf_source_path_.clear();
         pdf_password_.clear();
         pdf_outline_.clear();
-        pdf_thumbnail_images_.clear();
         pdf_wheel_delta_ = 0;
         release_large_preview_buffers();
     }
@@ -3028,11 +3027,15 @@ namespace winrt::Glance::App::implementation
         release_string(current_text_);
         release_vector(files_);
         release_vector(pdf_outline_);
-        release_vector(pdf_thumbnail_images_);
     }
 
     void MainWindow::cancel_pdf_render() noexcept
     {
+        for (const auto& [page, cancellation] : pdf_thumbnail_cancellations_)
+        {
+            cancellation->store(true);
+        }
+        pdf_thumbnail_cancellations_.clear();
         if (pdf_render_client_ != nullptr)
         {
             const auto generation = pdf_render_client_->cancel_document();
@@ -3904,7 +3907,6 @@ namespace winrt::Glance::App::implementation
         PdfThumbnailsButton().IsChecked(true);
         PdfOutlineButton().IsChecked(false);
         PdfOutlineButton().IsEnabled(false);
-        pdf_thumbnail_images_.clear();
         pdf_thumbnail_items_built_ = 0;
         pdf_outline_.clear();
         pdf_panning_ = false;
@@ -5177,21 +5179,32 @@ namespace winrt::Glance::App::implementation
         }));
     }
 
-    fire_and_forget MainWindow::load_pdf_thumbnails_async(std::uint64_t generation)
+    fire_and_forget MainWindow::load_pdf_thumbnail_async(
+        std::uint32_t page, std::uint64_t generation,
+        winrt::weak_ref<Image> image, std::shared_ptr<std::atomic_bool> cancellation)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         const auto session = pdf_render_client_;
-        const auto page_count = pdf_page_count_;
         const auto document_generation = pdf_document_generation_;
-        co_await resume_background();
-        for (std::uint32_t page = 0; page < page_count; ++page)
+        bool acquired{};
+        try
         {
-            while (pdf_foreground_render_requests_.load(std::memory_order_acquire) != 0)
+            co_await resume_background();
+            while (!cancellation->load())
             {
-                co_await resume_after(std::chrono::milliseconds(4));
+                if (pdf_foreground_render_requests_.load() == 0 &&
+                    !pdf_thumbnail_busy_.test_and_set())
+                {
+                    acquired = true;
+                    break;
+                }
+                co_await resume_after(std::chrono::milliseconds(16));
             }
+            if (!acquired) co_return;
             auto rendered = session->render(page, 176, 132, document_generation);
+            pdf_thumbnail_busy_.clear();
+            acquired = false;
             if (rendered.status != glance::contracts::document::Status::success)
             {
                 co_return;
@@ -5200,19 +5213,20 @@ namespace winrt::Glance::App::implementation
                     lifetime,
                     session,
                     rendered = std::move(rendered),
-                    page,
+                    image,
+                    cancellation,
                     generation]() mutable {
                     if (generation != lifetime->content_generation_ ||
                         session != lifetime->pdf_render_client_ ||
-                        page >= lifetime->pdf_thumbnail_images_.size())
+                        cancellation->load())
                     {
                         return;
                     }
                     try
                     {
-                        if (auto image = lifetime->pdf_thumbnail_images_[page].get())
+                        if (auto target = image.get())
                         {
-                            image.Source(create_pdf_bitmap(rendered));
+                            target.Source(create_pdf_bitmap(rendered));
                         }
                     }
                     catch (...)
@@ -5222,7 +5236,10 @@ namespace winrt::Glance::App::implementation
             {
                 co_return;
             }
-            co_await resume_after(std::chrono::milliseconds(8));
+        }
+        catch (...)
+        {
+            if (acquired) pdf_thumbnail_busy_.clear();
         }
     }
 
@@ -10265,8 +10282,6 @@ namespace winrt::Glance::App::implementation
         pdf_thumbnail_selection_updating_ = true;
         PdfThumbnailList().Items().Clear();
         PdfOutlineTree().RootNodes().Clear();
-        pdf_thumbnail_images_.clear();
-        pdf_thumbnail_images_.reserve(pdf_page_count_);
         pdf_thumbnail_items_built_ = 0;
         pdf_thumbnail_selection_updating_ = false;
 
@@ -10323,36 +10338,7 @@ namespace winrt::Glance::App::implementation
             std::min(batch_size, pdf_page_count_ - pdf_thumbnail_items_built_);
         for (std::uint32_t page = pdf_thumbnail_items_built_; page < end; ++page)
         {
-            StackPanel content;
-            content.Spacing(4);
-            Grid preview;
-            FontIcon placeholder;
-            placeholder.Glyph(L"\xE8A5");
-            placeholder.FontSize(32);
-            placeholder.Opacity(0.35);
-            placeholder.HorizontalAlignment(HorizontalAlignment::Center);
-            placeholder.VerticalAlignment(VerticalAlignment::Center);
-            Image image;
-            image.Width(176);
-            image.Height(132);
-            image.Stretch(Microsoft::UI::Xaml::Media::Stretch::Uniform);
-            preview.Children().Append(placeholder);
-            preview.Children().Append(image);
-            Border frame;
-            frame.Height(136);
-            frame.Padding(Thickness{ 2 });
-            frame.Child(preview);
-            TextBlock label;
-            label.Text(std::to_wstring(page + 1));
-            label.FontSize(11);
-            label.TextAlignment(TextAlignment::Center);
-            content.Children().Append(frame);
-            content.Children().Append(label);
-            ListViewItem item;
-            item.Tag(box_value(page));
-            item.Content(content);
-            PdfThumbnailList().Items().Append(item);
-            pdf_thumbnail_images_.push_back(make_weak(image));
+            PdfThumbnailList().Items().Append(box_value(page));
         }
         pdf_thumbnail_items_built_ = end;
         if (end < pdf_page_count_)
@@ -10367,7 +10353,36 @@ namespace winrt::Glance::App::implementation
             return;
         }
         sync_pdf_thumbnail_selection();
-        load_pdf_thumbnails_async(generation);
+    }
+
+    void MainWindow::PdfThumbnailList_ContainerContentChanging(
+        ListViewBase const&, ContainerContentChangingEventArgs const& args)
+    {
+        const auto root = args.ItemContainer().ContentTemplateRoot().try_as<FrameworkElement>();
+        if (root == nullptr) return;
+        const auto image = root.FindName(L"ThumbnailImage").try_as<Image>();
+        if (image == nullptr) return;
+        if (image.Tag() != nullptr)
+        {
+            const auto old_page = unbox_value<std::uint32_t>(image.Tag());
+            if (const auto found = pdf_thumbnail_cancellations_.find(old_page);
+                found != pdf_thumbnail_cancellations_.end())
+            {
+                found->second->store(true);
+                pdf_thumbnail_cancellations_.erase(found);
+            }
+        }
+        image.Source(nullptr);
+        image.Tag(nullptr);
+        if (args.InRecycleQueue() || pdf_render_client_ == nullptr) return;
+        const auto page = unbox_value<std::uint32_t>(args.Item());
+        image.Tag(box_value(page));
+        root.FindName(L"ThumbnailLabel").as<TextBlock>().Text(std::to_wstring(page + 1));
+        auto cancellation = std::make_shared<std::atomic_bool>(false);
+        pdf_thumbnail_cancellations_[page] = cancellation;
+        glance::contracts::log_event(L"PDF thumbnail realized: page=" + std::to_wstring(page));
+        load_pdf_thumbnail_async(page, content_generation_, make_weak(image), std::move(cancellation));
+        args.Handled(true);
     }
 
     void MainWindow::navigate_to_pdf_page(std::uint32_t page_index)
