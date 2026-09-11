@@ -64,6 +64,7 @@ namespace glance::app
     };
 
     [[nodiscard]] PreviewKind resolve_preview_kind(const std::wstring& path);
+    [[nodiscard]] PreviewKind probe_preview_kind(const std::wstring& path);
     [[nodiscard]] glance::contracts::components::GalleryMediaKind gallery_media_kind(
         const std::wstring& path);
     [[nodiscard]] std::vector<std::wstring> gallery_extensions(

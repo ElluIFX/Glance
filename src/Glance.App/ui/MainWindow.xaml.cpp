@@ -3975,6 +3975,41 @@ namespace winrt::Glance::App::implementation
             return;
         }
         present_resolved_file(file, kind, generation);
+        if (kind == glance::app::PreviewKind::generic)
+        {
+            probe_preview_async(file, generation);
+        }
+    }
+
+    fire_and_forget MainWindow::probe_preview_async(
+        glance::app::PreviewFile file,
+        std::uint64_t generation)
+    {
+        const auto weak = get_weak();
+        const auto dispatcher = DispatcherQueue();
+        try
+        {
+            co_await resume_background();
+            const auto kind = glance::app::probe_preview_kind(file.path);
+            if (kind == glance::app::PreviewKind::generic)
+            {
+                co_return;
+            }
+            static_cast<void>(dispatcher.TryEnqueue(
+                [weak, file = std::move(file), kind, generation] {
+                    const auto self = weak.get();
+                    if (self == nullptr || generation != self->content_generation_ ||
+                        self->current_kind_ != glance::app::PreviewKind::generic)
+                    {
+                        return;
+                    }
+                    self->present_resolved_file(file, kind, generation);
+                }));
+        }
+        catch (...)
+        {
+            // Keep the generic preview when probing fails.
+        }
     }
 
     void MainWindow::present_resolved_file(

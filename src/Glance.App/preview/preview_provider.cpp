@@ -1177,6 +1177,11 @@ namespace glance::app
         {
             return PreviewKind::component;
         }
+        return PreviewKind::generic;
+    }
+
+    PreviewKind probe_preview_kind(const std::wstring& path)
+    {
         return sniff_unknown_file(path);
     }
 

@@ -348,6 +348,9 @@ namespace winrt::Glance::App::implementation
             const glance::app::PreviewFile& file,
             bool allow_text_preview = false,
             bool allow_advanced_info = false);
+        winrt::fire_and_forget probe_preview_async(
+            glance::app::PreviewFile file,
+            std::uint64_t generation);
         winrt::fire_and_forget materialize_shell_file_async(
             std::uint32_t index,
             std::wstring parsing_name,
