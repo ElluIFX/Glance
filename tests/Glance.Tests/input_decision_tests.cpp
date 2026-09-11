@@ -8,6 +8,7 @@
 #include "fullscreen_interaction.h"
 #include "media_preview_preferences.h"
 #include "office_preview_benchmark.h"
+#include "panorama_preview_benchmark.h"
 #include "pan_interaction.h"
 #include "paged_document_render_client.h"
 #include "text_font_fallback.h"
@@ -935,6 +936,10 @@ namespace
 
 int wmain(int argument_count, wchar_t* arguments[])
 {
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--panorama-benchmark")
+    {
+        return glance::tests::run_panorama_preview_benchmark(argument_count, arguments);
+    }
     if (argument_count > 1 &&
         std::wstring_view(arguments[1]) == L"--office-benchmark")
     {

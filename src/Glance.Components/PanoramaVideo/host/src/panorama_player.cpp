@@ -332,7 +332,8 @@ float4 sampleFisheye(
 
     struct SoftwareFrame
     {
-        std::vector<std::byte> pixels;
+        winrt::com_ptr<IMFSample> sample;
+        winrt::com_ptr<IMFMediaBuffer> buffer;
         std::int64_t timestamp{};
     };
 
@@ -1377,22 +1378,15 @@ float4 sampleFisheye(
                     }
 
                     SoftwareFrame frame;
+                    frame.sample = sample;
                     frame.timestamp = timestamp;
-                    frame.pixels.resize(
-                        static_cast<std::size_t>(software_frame_size) *
-                        software_frame_size * 4);
-                    winrt::com_ptr<IMFMediaBuffer> buffer;
-                    winrt::check_hresult(sample->ConvertToContiguousBuffer(buffer.put()));
-                    BYTE* source{};
+                    winrt::check_hresult(sample->ConvertToContiguousBuffer(frame.buffer.put()));
                     DWORD length{};
-                    winrt::check_hresult(buffer->Lock(&source, nullptr, &length));
-                    if (length < frame.pixels.size())
+                    winrt::check_hresult(frame.buffer->GetCurrentLength(&length));
+                    if (length < software_frame_size * software_frame_size * 4)
                     {
-                        buffer->Unlock();
                         winrt::throw_hresult(MF_E_BUFFERTOOSMALL);
                     }
-                    std::memcpy(frame.pixels.data(), source, frame.pixels.size());
-                    buffer->Unlock();
 
                     bool discard = false;
                     while (!software_stop_.load(std::memory_order_acquire) &&
@@ -1468,13 +1462,13 @@ float4 sampleFisheye(
 
         void on_software_frames(std::uint64_t generation) noexcept
         {
-            const auto pending = software_pending_mask_.exchange(
-                0,
-                std::memory_order_acq_rel);
             if (!software_active_ || generation != generation_)
             {
                 return;
             }
+            const auto pending = software_pending_mask_.exchange(
+                0,
+                std::memory_order_acq_rel);
             try
             {
                 std::array<std::optional<SoftwareFrame>, 2> frames;
@@ -1499,13 +1493,16 @@ float4 sampleFisheye(
                     {
                         continue;
                     }
+                    BYTE* pixels{};
+                    winrt::check_hresult(frames[slot]->buffer->Lock(&pixels, nullptr, nullptr));
                     context_->UpdateSubresource(
                         software_frames_[slot].texture.get(),
                         0,
                         nullptr,
-                        frames[slot]->pixels.data(),
+                        pixels,
                         software_frame_size * 4,
                         0);
+                    winrt::check_hresult(frames[slot]->buffer->Unlock());
                     software_frames_[slot].valid = true;
                 }
                 render();
@@ -1740,13 +1737,13 @@ float4 sampleFisheye(
 
         void on_frames(std::uint64_t generation) noexcept
         {
-            const auto pending = pending_frame_mask_.exchange(
-                0,
-                std::memory_order_acq_rel);
             if (generation != generation_)
             {
                 return;
             }
+            const auto pending = pending_frame_mask_.exchange(
+                0,
+                std::memory_order_acq_rel);
             try
             {
                 for (std::uint32_t slot = 0; slot < players_.size(); ++slot)
