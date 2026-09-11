@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "../Common/preview_cancellation.h"
 
 #include "adobe_preview_service.h"
 
@@ -744,10 +745,12 @@ namespace
             }
 
             DWORD wait_result{};
+            const auto deadline = GetTickCount64() + 60000;
             do
             {
                 wait_result = WaitForSingleObject(process.hProcess, 100);
-            } while (wait_result == WAIT_TIMEOUT && !shutting_down.load());
+            } while (wait_result == WAIT_TIMEOUT && !shutting_down.load() &&
+                !glance::components::preview_cancelled() && GetTickCount64() < deadline);
             if (wait_result == WAIT_TIMEOUT)
             {
                 TerminateProcess(process.hProcess, ERROR_CANCELLED);

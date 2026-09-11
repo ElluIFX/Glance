@@ -231,6 +231,19 @@ namespace
         }
 
         void* image_metadata_pointer{};
+        void* cancellation_pointer{};
+        check(api.query_interface(&cancellable_preview_api_id, 1, &cancellation_pointer) &&
+            cancellation_pointer != nullptr, "cancellation interface");
+        if (cancellation_pointer != nullptr)
+        {
+            PreviewCancellation cancellation{
+                .is_cancelled = [](void*) noexcept -> BOOL { return TRUE; } };
+            PreviewPreparationOptions options;
+            PreparedPreview preview;
+            check(static_cast<const CancellablePreviewApi*>(cancellation_pointer)->prepare_preview(
+                preview_path.c_str(), &options, &cancellation, &preview) == PrepareStatus::cancelled &&
+                preview.lease_token == 0, "cancelled preparation creates no preview lease");
+        }
         check(
             api.query_interface != nullptr &&
                 api.query_interface(

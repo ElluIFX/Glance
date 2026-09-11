@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "../Common/preview_cancellation.h"
 
 #include "glance/contracts/component_api.h"
 #include "office_availability.h"
@@ -112,12 +113,11 @@ namespace
             return {};
         }
         const auto destination = directory / (L"preview" + source.extension().wstring());
-        if (!std::filesystem::copy_file(
-                source,
-                destination,
-                std::filesystem::copy_options::overwrite_existing,
-                error) ||
-            error)
+        const auto progress = [](LARGE_INTEGER, LARGE_INTEGER, LARGE_INTEGER, LARGE_INTEGER,
+            DWORD, DWORD, HANDLE, HANDLE, LPVOID) -> DWORD {
+            return glance::components::preview_cancelled() ? PROGRESS_CANCEL : PROGRESS_CONTINUE;
+        };
+        if (!CopyFileExW(source.c_str(), destination.c_str(), progress, nullptr, nullptr, 0))
         {
             std::filesystem::remove_all(directory, error);
             return {};
@@ -361,6 +361,13 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
+        if (interface_id != nullptr && IsEqualGUID(*interface_id, cancellable_preview_api_id))
+        {
+            if (minimum_version > cancellable_preview_api_version) return FALSE;
+            static auto api = glance::components::cancellable_preview_api<prepare_preview>();
+            *interface_pointer = &api;
+            return TRUE;
+        }
         if (IsEqualGUID(*interface_id, native_preview_renderer_api_id) &&
             minimum_version <= native_preview_renderer_api_version)
         {

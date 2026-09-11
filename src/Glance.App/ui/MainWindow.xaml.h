@@ -741,6 +741,7 @@ namespace winrt::Glance::App::implementation
         Windows::Foundation::Point image_pan_start_{};
         std::uint64_t content_generation_{};
         std::shared_ptr<std::atomic_bool> shell_file_cancellation_;
+        std::shared_ptr<std::atomic_bool> component_preparation_cancellation_;
         std::uint64_t component_placement_generation_{};
         std::wstring current_text_;
         std::wstring current_text_path_;

@@ -2864,6 +2864,11 @@ namespace winrt::Glance::App::implementation
         }
         defer_auto_fit_show_ = false;
         cancel_pdf_render();
+        if (component_preparation_cancellation_)
+        {
+            component_preparation_cancellation_->store(true);
+            component_preparation_cancellation_.reset();
+        }
         cancel_archive_icon_load();
         glance::app::cancel_text_preview_read(current_text_reader_);
         reset_json_preview();
@@ -3827,6 +3832,11 @@ namespace winrt::Glance::App::implementation
             return;
         }
         release_native_preview_surface();
+        if (component_preparation_cancellation_)
+        {
+            component_preparation_cancellation_->store(true);
+            component_preparation_cancellation_.reset();
+        }
         if (shell_file_cancellation_)
         {
             shell_file_cancellation_->store(true, std::memory_order_release);
@@ -5855,6 +5865,8 @@ namespace winrt::Glance::App::implementation
             ? glance::contracts::components::PreviewColorScheme::dark
             : glance::contracts::components::PreviewColorScheme::light;
         glance::contracts::components::PreviewPreparationOptions options;
+        const auto cancellation = std::make_shared<std::atomic_bool>(false);
+        component_preparation_cancellation_ = cancellation;
         co_await resume_background();
 
         auto result = glance::app::prepare_component_preview(
@@ -5883,7 +5895,7 @@ namespace winrt::Glance::App::implementation
                             : std::move(text));
                     lifetime->ComponentLoadingText().Visibility(Visibility::Visible);
                 }));
-            });
+            }, cancellation);
 
         static_cast<void>(dispatcher.TryEnqueue([
             weak,

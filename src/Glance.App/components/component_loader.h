@@ -277,7 +277,8 @@ namespace glance::app
         std::wstring_view language_tag,
         glance::contracts::components::PreviewPreparationOptions options,
         glance::contracts::components::PreviewColorScheme color_scheme,
-        const ComponentLoadingTextCallback& loading_callback) noexcept;
+        const ComponentLoadingTextCallback& loading_callback,
+        const std::shared_ptr<std::atomic_bool>& cancellation = {}) noexcept;
     [[nodiscard]] ComponentPreviewResult refine_component_preview(
         const std::shared_ptr<void>& refinement,
         std::wstring_view language_tag) noexcept;

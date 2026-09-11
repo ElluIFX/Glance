@@ -93,6 +93,7 @@ namespace
         ComponentApi api;
         ComponentRegistration registration;
         std::optional<ConfigurablePreviewApi> configurable_preview;
+        std::optional<glance::contracts::components::CancellablePreviewApi> cancellable_preview;
         std::optional<ProgressivePreviewApi> progressive_preview;
         std::optional<PreviewNoticeApi> preview_notice;
         std::optional<WebPreviewApi> web_preview;
@@ -169,6 +170,7 @@ namespace
         std::shared_ptr<LoadedComponent> component;
         std::shared_ptr<void> initial_lease;
         ProgressivePreviewApi api;
+        std::shared_ptr<std::atomic_bool> cancellation;
         glance::contracts::components::PreviewPreparationOptions options;
         PreviewContentKind kind{ PreviewContentKind::none };
         PreviewContentFormat format{ PreviewContentFormat::none };
@@ -539,6 +541,21 @@ namespace
                 interface_api->prepare_preview != nullptr)
             {
                 component->configurable_preview = *interface_api;
+            }
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
+                &glance::contracts::components::cancellable_preview_api_id,
+                glance::contracts::components::cancellable_preview_api_version,
+                &interface_pointer) && interface_pointer != nullptr)
+        {
+            using glance::contracts::components::CancellablePreviewApi;
+            const auto* api = static_cast<const CancellablePreviewApi*>(interface_pointer);
+            if (api->size >= sizeof(CancellablePreviewApi) &&
+                api->version == glance::contracts::components::cancellable_preview_api_version &&
+                api->prepare_preview != nullptr)
+            {
+                component->cancellable_preview = *api;
             }
         }
         interface_pointer = nullptr;
@@ -1910,7 +1927,8 @@ namespace glance::app
         std::wstring_view language_tag,
         glance::contracts::components::PreviewPreparationOptions options,
         glance::contracts::components::PreviewColorScheme color_scheme,
-        const ComponentLoadingTextCallback& loading_callback) noexcept
+        const ComponentLoadingTextCallback& loading_callback,
+        const std::shared_ptr<std::atomic_bool>& cancellation) noexcept
     {
         ComponentPreviewResult result;
         try
@@ -1936,7 +1954,20 @@ namespace glance::app
 
                 PreparedPreview preview;
                 options.size = sizeof(options);
-                result.status = component->configurable_preview.has_value()
+                const glance::contracts::components::PreviewCancellation probe{
+                    .context = cancellation.get(),
+                    .is_cancelled = [](void* context) noexcept -> BOOL {
+                        return context != nullptr && static_cast<std::atomic_bool*>(context)->load();
+                    } };
+                if (probe.is_cancelled(probe.context))
+                {
+                    result.status = glance::contracts::components::PrepareStatus::cancelled;
+                    return result;
+                }
+                result.status = component->cancellable_preview.has_value()
+                    ? component->cancellable_preview->prepare_preview(
+                        path.c_str(), &options, &probe, &preview)
+                    : component->configurable_preview.has_value()
                     ? component->configurable_preview->prepare_preview(
                         path.c_str(),
                         &options,
@@ -2009,6 +2040,7 @@ namespace glance::app
                     session->component = component;
                     session->initial_lease = result.lease;
                     session->api = *component->progressive_preview;
+                    session->cancellation = cancellation;
                     session->options = options;
                     session->kind = preview.kind;
                     session->format = preview.format;
@@ -2043,7 +2075,16 @@ namespace glance::app
                 std::static_pointer_cast<RefinementSession>(refinement);
             PreparedPreview preview;
             static_cast<void>(language_tag);
-            result.status = session->api.prepare_refined_preview(
+            const glance::contracts::components::PreviewCancellation probe{
+                .context = session->cancellation.get(),
+                .is_cancelled = [](void* context) noexcept -> BOOL {
+                    return context != nullptr && static_cast<std::atomic_bool*>(context)->load();
+                } };
+            result.status = session->component->cancellable_preview.has_value() &&
+                session->component->cancellable_preview->prepare_refined_preview != nullptr
+                ? session->component->cancellable_preview->prepare_refined_preview(
+                    session->token, &session->options, &probe, &preview)
+                : session->api.prepare_refined_preview(
                 session->token,
                 &session->options,
                 &preview);

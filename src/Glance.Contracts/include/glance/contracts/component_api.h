@@ -707,6 +707,28 @@ namespace glance::contracts::components
         PreparePreviewWithOptionsFunction prepare_preview{};
     };
 
+    inline constexpr GUID cancellable_preview_api_id{
+        0x27cc9ee3, 0x178c, 0x4a7f, { 0x83, 0x3f, 0xb2, 0x20, 0x29, 0x54, 0x14, 0x68 } };
+    inline constexpr std::uint32_t cancellable_preview_api_version = 1;
+
+    struct PreviewCancellation
+    {
+        void* context{};
+        BOOL(WINAPI* is_cancelled)(void* context) noexcept {};
+    };
+
+    struct CancellablePreviewApi
+    {
+        std::uint32_t size{ sizeof(CancellablePreviewApi) };
+        std::uint32_t version{ cancellable_preview_api_version };
+        PrepareStatus(WINAPI* prepare_preview)(
+            const wchar_t*, const PreviewPreparationOptions*,
+            const PreviewCancellation*, PreparedPreview*) noexcept {};
+        PrepareStatus(WINAPI* prepare_refined_preview)(
+            std::uint64_t, const PreviewPreparationOptions*,
+            const PreviewCancellation*, PreparedPreview*) noexcept {};
+    };
+
     struct ProgressivePreviewApi
     {
         std::uint32_t size{ sizeof(ProgressivePreviewApi) };

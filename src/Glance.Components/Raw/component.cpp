@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "../Common/preview_cancellation.h"
 
 #include "raw_preview_service.h"
 #include "../Common/component_text.h"
@@ -187,6 +188,13 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
+        if (interface_id != nullptr && IsEqualGUID(*interface_id, cancellable_preview_api_id))
+        {
+            if (minimum_version > cancellable_preview_api_version) return FALSE;
+            static auto api = glance::components::cancellable_preview_api<prepare_preview>();
+            *interface_pointer = &api;
+            return TRUE;
+        }
         if (interface_id == nullptr || minimum_version > 1)
         {
             return FALSE;

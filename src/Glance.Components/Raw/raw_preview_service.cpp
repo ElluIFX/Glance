@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "../Common/preview_cancellation.h"
 #include "raw_preview_service.h"
 #include "../Common/image_metadata_sidecar.h"
 
@@ -106,11 +107,16 @@ namespace
 
     void wait_for_process(HANDLE process) noexcept
     {
-        WaitForSingleObject(process, host_timeout_ms);
+        const auto deadline = GetTickCount64() + host_timeout_ms;
+        while (WaitForSingleObject(process, 50) == WAIT_TIMEOUT &&
+            !glance::components::preview_cancelled() && GetTickCount64() < deadline)
+        {
+        }
         DWORD exit_code{};
         if (GetExitCodeProcess(process, &exit_code) && exit_code == STILL_ACTIVE)
         {
             TerminateProcess(process, 1);
+            WaitForSingleObject(process, 5000);
         }
     }
 
