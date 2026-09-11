@@ -4975,8 +4975,10 @@ namespace winrt::Glance::App::implementation
         pdf_source_path_ = path;
         pdf_password_ = password;
         PdfLoadingText().Visibility(Visibility::Visible);
+        const auto document_generation = session->begin_document();
+        pdf_document_generation_ = document_generation;
         co_await resume_background();
-        auto result = session->open(path, password);
+        auto result = session->open(path, password, document_generation);
         static_cast<void>(dispatcher.TryEnqueue([
             lifetime,
             session,
@@ -5007,7 +5009,6 @@ namespace winrt::Glance::App::implementation
             L", pages=" + std::to_wstring(result.page_count));
         if (generation != content_generation_ || session != pdf_render_client_)
         {
-            session->close_document();
             return;
         }
         if (result.status == Status::password_required || result.status == Status::invalid_password)
@@ -5068,6 +5069,7 @@ namespace winrt::Glance::App::implementation
                     L"render-dimension",
                     glance::app::default_pdf_preview_render_dimension)));
         AtomicCounterGuard foreground_render(pdf_foreground_render_requests_);
+        const auto document_generation = pdf_document_generation_;
         co_await resume_background();
         if (request != pdf_render_request_.load(std::memory_order_relaxed))
         {
@@ -5076,7 +5078,8 @@ namespace winrt::Glance::App::implementation
         auto rendered = session->render(
             page_index,
             render_dimension,
-            render_dimension);
+            render_dimension,
+            document_generation);
         static_cast<void>(dispatcher.TryEnqueue([
             lifetime,
             session,
@@ -5155,6 +5158,7 @@ namespace winrt::Glance::App::implementation
         const auto dispatcher = DispatcherQueue();
         const auto session = pdf_render_client_;
         const auto page_count = pdf_page_count_;
+        const auto document_generation = pdf_document_generation_;
         co_await resume_background();
         for (std::uint32_t page = 0; page < page_count; ++page)
         {
@@ -5162,7 +5166,7 @@ namespace winrt::Glance::App::implementation
             {
                 co_await resume_after(std::chrono::milliseconds(4));
             }
-            auto rendered = session->render(page, 176, 132);
+            auto rendered = session->render(page, 176, 132, document_generation);
             if (rendered.status != glance::contracts::document::Status::success)
             {
                 co_return;

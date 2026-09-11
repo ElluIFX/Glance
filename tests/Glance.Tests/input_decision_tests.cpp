@@ -1886,6 +1886,28 @@ int wmain(int argument_count, wchar_t* arguments[])
                         rendered.pixel_height > 0 &&
                         !rendered.pixels.empty(),
                     "PDF Host renders page");
+                const auto stale_generation = client.begin_document();
+                const auto current_generation = client.begin_document();
+                expect(
+                    client.open(pdf_path.wstring(), L"", current_generation).status ==
+                        glance::contracts::document::Status::success,
+                    "PDF Host opens replacement document");
+                expect(
+                    client.open(L"missing.pdf", L"", stale_generation).status !=
+                        glance::contracts::document::Status::success &&
+                    client.render(0, 256, 256, stale_generation).status !=
+                        glance::contracts::document::Status::success,
+                    "PDF Host rejects stale open and render requests");
+                expect(
+                    client.render(0, 256, 256, current_generation).status ==
+                        glance::contracts::document::Status::success,
+                    "PDF replacement survives stale requests");
+                const auto cancelled_generation = client.begin_document();
+                client.close_document();
+                expect(
+                    client.open(pdf_path.wstring(), L"", cancelled_generation).status !=
+                        glance::contracts::document::Status::success,
+                    "PDF cancelled queued open cannot revive document");
             }
         }
         std::filesystem::remove_all(test_directory, cleanup_error);

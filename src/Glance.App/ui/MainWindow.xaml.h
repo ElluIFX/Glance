@@ -801,6 +801,7 @@ namespace winrt::Glance::App::implementation
         std::wstring component_hover_cache_component_id_;
         std::wstring component_hover_cache_info_id_;
         std::shared_ptr<glance::app::PagedDocumentRenderClient> pdf_render_client_;
+        std::uint64_t pdf_document_generation_{};
         std::shared_ptr<glance::app::NativePreviewSurface> native_preview_surface_;
         std::wstring active_native_media_component_id_;
         std::atomic_uint64_t native_media_settings_generation_{};

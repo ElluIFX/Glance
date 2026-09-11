@@ -54,11 +54,14 @@ namespace glance::app
 
         [[nodiscard]] PagedDocumentOpenResult open(
             const std::wstring& path,
-            const std::wstring& password);
+            const std::wstring& password,
+            std::uint64_t generation = 0);
+        [[nodiscard]] std::uint64_t begin_document() noexcept;
         [[nodiscard]] PagedDocumentRenderResult render(
             std::uint32_t page_index,
             std::uint32_t maximum_width,
-            std::uint32_t maximum_height);
+            std::uint32_t maximum_height,
+            std::uint64_t generation = 0);
         void close_document() noexcept;
 
     private:
@@ -87,6 +90,7 @@ namespace glance::app
         std::mutex mutex_;
         std::mutex process_handle_mutex_;
         std::atomic_bool cancelled_{};
+        std::atomic_uint64_t document_generation_{};
         PTP_TIMER idle_timer_{};
         HANDLE process_{};
         HANDLE request_pipe_{};

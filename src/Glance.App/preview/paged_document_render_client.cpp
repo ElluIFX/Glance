@@ -434,6 +434,7 @@ namespace glance::app
 
     void PagedDocumentRenderClient::close_document() noexcept
     {
+        document_generation_.fetch_add(1, std::memory_order_acq_rel);
         cancelled_.store(true, std::memory_order_release);
         std::unique_lock lock(mutex_, std::try_to_lock);
         if (!lock.owns_lock())
@@ -502,11 +503,25 @@ namespace glance::app
         return true;
     }
 
+    std::uint64_t PagedDocumentRenderClient::begin_document() noexcept
+    {
+        return document_generation_.fetch_add(1, std::memory_order_acq_rel) + 1;
+    }
+
     PagedDocumentOpenResult PagedDocumentRenderClient::open(
         const std::wstring& path,
-        const std::wstring& password)
+        const std::wstring& password,
+        std::uint64_t generation)
     {
+        if (generation == 0)
+        {
+            generation = begin_document();
+        }
         std::scoped_lock lock(mutex_);
+        if (generation != document_generation_.load(std::memory_order_acquire))
+        {
+            return {};
+        }
         stop_idle_timer();
         cancelled_.store(false, std::memory_order_release);
         PagedDocumentOpenResult result;
@@ -567,9 +582,15 @@ namespace glance::app
     PagedDocumentRenderResult PagedDocumentRenderClient::render(
         std::uint32_t page_index,
         std::uint32_t maximum_width,
-        std::uint32_t maximum_height)
+        std::uint32_t maximum_height,
+        std::uint64_t generation)
     {
         std::scoped_lock lock(mutex_);
+        if (generation != 0 &&
+            generation != document_generation_.load(std::memory_order_acquire))
+        {
+            return {};
+        }
         PagedDocumentRenderResult result;
         const RenderRequest request{
             .page_index = page_index,
