@@ -5,6 +5,7 @@
 #include <psapi.h>
 #include <tlhelp32.h>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <future>
 #include <iostream>
@@ -99,6 +100,7 @@ namespace
             glance::app::NativePreviewSurface surface(parent, host_path, nullptr, [] {});
             surface.set_bounds(0, 0, 640, 480);
             surface.set_visible(true);
+            const auto opened_tick = GetTickCount64();
             success = pump([&] {
                 return surface.open(path, {}, 96) == Status::success &&
                     surface.media_set_muted(true) && surface.media_play();
@@ -130,13 +132,58 @@ namespace
                 if (process != nullptr) CloseHandle(process);
                 success = success && pump([&] { return surface.media_seek(20000000) &&
                     surface.media_set_view_mode(false); }) && wait_ready(surface, L"dual");
+                const auto report_memory = [](const wchar_t* stage) {
+                    const HANDLE host = find_host();
+                    PROCESS_MEMORY_COUNTERS_EX counters{};
+                    if (host != nullptr && K32GetProcessMemoryInfo(host,
+                        reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters)))
+                    {
+                        std::wcout << stage << L" private_mib=" << counters.PrivateUsage / (1024 * 1024)
+                                   << std::endl;
+                    }
+                    if (host != nullptr) CloseHandle(host);
+                };
+                report_memory(L"dual");
                 success = success && pump([&] { return surface.media_set_view_mode(true); }) &&
                     wait_ready(surface, L"projected");
+                report_memory(L"projected");
+                const auto settle_start = GetTickCount64();
+                while (success && GetTickCount64() - settle_start < 5000)
+                {
+                    const auto state = pump([&] { return surface.media_state(); });
+                    success = state && (state->flags & media_state_ready) != 0 &&
+                        (state->flags & media_state_failed) == 0;
+                    Sleep(20);
+                }
+                report_memory(L"projected_settled");
                 success = success && pump([&] { return surface.media_set_view_mode(false) &&
                     surface.media_set_view_mode(true) && surface.media_set_view_mode(false); }) &&
                     wait_ready(surface, L"rapid_switch");
+                success = success && pump([&] { return surface.media_pause(); });
+                const auto paused = pump([&] { return surface.media_state(); });
+                success = success && paused && pump([&] { return surface.media_set_view_mode(true) &&
+                    surface.media_set_view_mode(false); }) && wait_ready(surface, L"paused_switch");
+                const auto resumed = pump([&] { return surface.media_state(); });
+                success = success && resumed && (resumed->flags & media_state_playing) == 0 &&
+                    std::abs(resumed->position_ticks - paused->position_ticks) < 5000000;
+                std::wcout << L"paused_position_preserved=" << success << std::endl;
+                while (success && GetTickCount64() - opened_tick < 21000)
+                {
+                    const auto state = pump([&] { return surface.media_state(); });
+                    success = state && (state->flags & media_state_ready) != 0 &&
+                        (state->flags & media_state_failed) == 0;
+                    Sleep(50);
+                }
+                success = success && pump([&] { return surface.media_set_view_mode(true) &&
+                    surface.media_set_view_mode(false); }) && wait_ready(surface, L"late_switch");
+                success = success && pump([&] { return surface.media_set_view_mode(true) &&
+                    surface.media_set_view_mode(false); });
+                surface.cancel();
             }
+            const auto shutdown_start = GetTickCount64();
             pump([&] { surface.shutdown(); });
+            std::wcout << L"shutdown_ms=" << GetTickCount64() - shutdown_start << std::endl;
+            success = success && GetTickCount64() - shutdown_start < 5000;
             surface.destroy_surface();
         }
         DestroyWindow(parent);

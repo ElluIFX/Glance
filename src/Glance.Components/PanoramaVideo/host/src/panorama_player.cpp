@@ -27,7 +27,6 @@
 #include <array>
 #include <atomic>
 #include <cmath>
-#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -57,6 +56,7 @@ namespace
     constexpr UINT media_failed_message = WM_APP + 4;
     constexpr UINT tracks_changed_message = WM_APP + 5;
     constexpr UINT software_frame_message = WM_APP + 6;
+    constexpr UINT_PTR software_retirement_timer = 1;
     constexpr UINT software_failed_message = WM_APP + 7;
     constexpr wchar_t player_window_class[] = L"Glance.PanoramaVideoHost";
     constexpr float minimum_fov = 30.0F;
@@ -536,13 +536,10 @@ float4 sampleFisheye(
             projected_view_ = requested_projected;
             if (proxy_mode_)
             {
+                open_started_tick_ = GetTickCount64();
                 if (projected_view_)
                 {
-                    suspend_software_decoder();
-                }
-                else if (software_active_)
-                {
-                    resume_software_decoder();
+                    stop_software_decoder(false);
                 }
                 else if (!start_software_decoder())
                 {
@@ -805,8 +802,15 @@ float4 sampleFisheye(
             case software_frame_message:
                 self->on_software_frames(static_cast<std::uint64_t>(lparam));
                 return 0;
+            case WM_TIMER:
+                if (wparam == software_retirement_timer)
+                {
+                    self->finish_software_retirement();
+                }
+                return 0;
             case software_failed_message:
-                if (static_cast<std::uint64_t>(lparam) == self->generation_)
+                if (static_cast<std::uint64_t>(lparam) ==
+                    self->software_generation_.load(std::memory_order_acquire))
                 {
                     self->record_failure(
                         failure_media_player,
@@ -1118,16 +1122,18 @@ float4 sampleFisheye(
             {
                 return true;
             }
-            stop_software_decoder();
+            stop_software_decoder(false);
+            if (!reap_software_threads(false))
+            {
+                software_restart_mask_ = slot_mask;
+                return SetTimer(window_, software_retirement_timer, 25, nullptr) != 0;
+            }
             software_active_ = true;
-            software_slot_mask_ = slot_mask;
             software_stop_.store(false, std::memory_order_release);
-            software_suspended_.store(false, std::memory_order_release);
             software_pending_mask_.store(0, std::memory_order_release);
             software_seek_generation_.fetch_add(1, std::memory_order_acq_rel);
-            software_generation_.store(generation_, std::memory_order_release);
             sync_software_clock();
-            const auto generation = generation_;
+            const auto generation = software_generation_.fetch_add(1, std::memory_order_acq_rel) + 1;
             const auto path = source_path_.wstring();
             try
             {
@@ -1152,25 +1158,48 @@ float4 sampleFisheye(
             }
         }
 
-        void stop_software_decoder() noexcept
+        bool reap_software_threads(bool wait) noexcept
         {
+            bool complete = true;
+            for (auto& thread : retiring_software_threads_)
             {
-                std::scoped_lock lock(software_state_mutex_);
-                software_stop_.store(true, std::memory_order_release);
-                software_suspended_.store(false, std::memory_order_release);
-            }
-            software_seek_generation_.fetch_add(1, std::memory_order_acq_rel);
-            software_condition_.notify_all();
-            for (auto& thread : software_threads_)
-            {
-                if (thread.joinable())
-                {
+                if (!thread.joinable()) continue;
+                if (wait || WaitForSingleObject(thread.native_handle(), 0) == WAIT_OBJECT_0)
                     thread.join();
+                else
+                    complete = false;
+            }
+            return complete;
+        }
+
+        void finish_software_retirement() noexcept
+        {
+            if (!reap_software_threads(false)) return;
+            KillTimer(window_, software_retirement_timer);
+            const auto pending = std::exchange(software_restart_mask_, 0U);
+            if (pending != 0 && !start_software_decoder(pending))
+            {
+                record_failure(failure_media_player, E_FAIL);
+            }
+        }
+
+        void stop_software_decoder(bool wait = true) noexcept
+        {
+            if (window_ != nullptr) KillTimer(window_, software_retirement_timer);
+            software_restart_mask_ = 0;
+            software_stop_.store(true, std::memory_order_release);
+            software_generation_.fetch_add(1, std::memory_order_acq_rel);
+            software_seek_generation_.fetch_add(1, std::memory_order_acq_rel);
+            for (std::size_t slot = 0; slot < software_threads_.size(); ++slot)
+            {
+                if (software_threads_[slot].joinable())
+                {
+                    retiring_software_threads_[slot] = std::move(software_threads_[slot]);
                 }
             }
+            if (!reap_software_threads(wait) && window_ != nullptr)
+                SetTimer(window_, software_retirement_timer, 25, nullptr);
             software_active_ = false;
-            software_slot_mask_ = 0;
-            software_generation_.store(0, std::memory_order_release);
             software_pending_mask_.store(0, std::memory_order_release);
             {
                 std::scoped_lock lock(software_frame_mutex_);
@@ -1180,44 +1209,6 @@ float4 sampleFisheye(
             {
                 frame.reset();
             }
-        }
-
-        void suspend_software_decoder() noexcept
-        {
-            if (!software_active_)
-            {
-                return;
-            }
-            sync_software_clock();
-            std::scoped_lock lock(software_state_mutex_);
-            software_suspended_.store(true, std::memory_order_release);
-        }
-
-        void resume_software_decoder() noexcept
-        {
-            if (!software_active_)
-            {
-                return;
-            }
-            sync_software_clock();
-            software_seek_generation_.fetch_add(1, std::memory_order_acq_rel);
-            software_pending_mask_.store(0, std::memory_order_release);
-            {
-                std::scoped_lock lock(software_frame_mutex_);
-                software_pending_frames_ = {};
-            }
-            for (std::uint32_t slot = 0; slot < software_frames_.size(); ++slot)
-            {
-                if ((software_slot_mask_ & (1U << slot)) != 0)
-                {
-                    software_frames_[slot].reset();
-                }
-            }
-            {
-                std::scoped_lock lock(software_state_mutex_);
-                software_suspended_.store(false, std::memory_order_release);
-            }
-            software_condition_.notify_all();
         }
 
         void decode_software_track(
@@ -1333,21 +1324,6 @@ float4 sampleFisheye(
                 while (!software_stop_.load(std::memory_order_acquire) &&
                     generation == software_generation_.load(std::memory_order_acquire))
                 {
-                    {
-                        std::unique_lock lock(software_state_mutex_);
-                        software_condition_.wait(lock, [this, generation] {
-                            return software_stop_.load(std::memory_order_acquire) ||
-                                generation != software_generation_.load(
-                                    std::memory_order_acquire) ||
-                                !software_suspended_.load(std::memory_order_acquire);
-                        });
-                    }
-                    if (software_stop_.load(std::memory_order_acquire) ||
-                        generation != software_generation_.load(
-                            std::memory_order_acquire))
-                    {
-                        break;
-                    }
                     const auto requested_seek = software_seek_generation_.load(
                         std::memory_order_acquire);
                     if (requested_seek != seek_generation)
@@ -1395,11 +1371,6 @@ float4 sampleFisheye(
                     {
                         if (software_seek_generation_.load(std::memory_order_acquire) !=
                             seek_generation)
-                        {
-                            discard = true;
-                            break;
-                        }
-                        if (software_suspended_.load(std::memory_order_acquire))
                         {
                             discard = true;
                             break;
@@ -1462,7 +1433,8 @@ float4 sampleFisheye(
 
         void on_software_frames(std::uint64_t generation) noexcept
         {
-            if (!software_active_ || generation != generation_)
+            if (!software_active_ ||
+                generation != software_generation_.load(std::memory_order_acquire))
             {
                 return;
             }
@@ -1913,10 +1885,10 @@ float4 sampleFisheye(
         std::array<FrameResource, 2> frames_;
         std::array<FrameResource, 2> software_frames_;
         std::array<std::thread, 2> software_threads_;
+        std::array<std::thread, 2> retiring_software_threads_;
+        std::uint32_t software_restart_mask_{};
         std::array<std::optional<SoftwareFrame>, 2> software_pending_frames_;
         std::mutex software_frame_mutex_;
-        std::mutex software_state_mutex_;
-        std::condition_variable software_condition_;
         winrt::com_ptr<ID3D11Device> device_;
         winrt::com_ptr<ID3D11DeviceContext> context_;
         winrt::com_ptr<IDXGISwapChain1> swap_chain_;
@@ -1933,14 +1905,12 @@ float4 sampleFisheye(
         std::uint32_t opened_mask_{};
         std::uint32_t track_selected_mask_{};
         std::uint32_t frame_ready_mask_{};
-        std::uint32_t software_slot_mask_{};
         std::atomic_uint32_t pending_frame_mask_{};
         std::atomic_uint32_t software_pending_mask_{};
         std::atomic_uint64_t software_generation_{};
         std::atomic_uint64_t software_seek_generation_{};
         std::atomic_int64_t software_clock_position_{};
         std::atomic_bool software_stop_{ true };
-        std::atomic_bool software_suspended_{};
         std::atomic_uint64_t active_frame_generation_{};
         std::atomic_uint32_t failure_kind_{};
         std::atomic_int32_t failure_hresult_{};
