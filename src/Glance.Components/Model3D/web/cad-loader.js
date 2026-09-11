@@ -55,6 +55,9 @@ function buildCadModel(payload, darkTheme, THREE) {
         let groupCount = 0;
         if (source.faces.length > 0) {
             const colorMaterials = new Map();
+            if (Array.isArray(source.color) && source.color.length >= 3) {
+                colorMaterials.set(source.color.slice(0, 3).join(","), 0);
+            }
             const triangleCount = source.index.length / 3;
             geometry.clearGroups();
             for (const face of source.faces) {
@@ -77,11 +80,16 @@ function buildCadModel(payload, darkTheme, THREE) {
                     }
                     materialIndex = colorMaterials.get(key);
                 }
-                geometry.addGroup(
-                    first * 3,
-                    (last - first + 1) * 3,
-                    materialIndex);
-                ++groupCount;
+                const start = first * 3;
+                const count = (last - first + 1) * 3;
+                const previous = geometry.groups[geometry.groups.length - 1];
+                if (previous && previous.materialIndex === materialIndex &&
+                    previous.start + previous.count === start) {
+                    previous.count += count;
+                } else {
+                    geometry.addGroup(start, count, materialIndex);
+                    ++groupCount;
+                }
             }
         }
         geometries.push(geometry);
