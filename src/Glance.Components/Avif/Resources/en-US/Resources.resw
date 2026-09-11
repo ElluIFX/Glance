@@ -16,4 +16,5 @@
   <data name="Preview.Loading" xml:space="preserve"><value>Loading AVIF image...</value></data>
   <data name="Preview.Unavailable" xml:space="preserve"><value>This AVIF image is not supported</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Could not prepare this AVIF image</value></data>
+  <data name="Preview.Refining" xml:space="preserve"><value>Preparing full-resolution image...</value></data>
 </root>

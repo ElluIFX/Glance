@@ -727,6 +727,7 @@ namespace glance::contracts::components
         PrepareStatus(WINAPI* prepare_refined_preview)(
             std::uint64_t, const PreviewPreparationOptions*,
             const PreviewCancellation*, PreparedPreview*) noexcept {};
+        BOOL refine_on_zoom{};
     };
 
     struct ProgressivePreviewApi

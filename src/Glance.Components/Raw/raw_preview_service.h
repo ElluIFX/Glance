@@ -28,5 +28,6 @@ namespace glance::components::raw
         std::uint64_t lease_token,
         const glance::contracts::components::ImageMetadataSink* sink) noexcept;
     void release_preview(std::uint64_t lease_token) noexcept;
+    [[nodiscard]] std::filesystem::path refinement_source(std::uint64_t lease_token) noexcept;
     void shutdown() noexcept;
 }

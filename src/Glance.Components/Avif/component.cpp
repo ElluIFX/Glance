@@ -147,6 +147,45 @@ namespace
         glance::components::avif::release_preview(lease_token);
     }
 
+    PrepareStatus WINAPI prepare_preview_with_options(
+        const wchar_t* path, const PreviewPreparationOptions* options, PreparedPreview* preview) noexcept
+    {
+        if (path == nullptr || preview == nullptr || preview->size < sizeof(PreparedPreview))
+            return PrepareStatus::failed;
+        const auto requested = options != nullptr ? options->maximum_dimension : preview_dimension;
+        const auto dimension = requested <= 1024 ? 1024U : requested <= 2048 ? 2048U :
+            requested <= 4096 ? 4096U : 8192U;
+        return copy_preview_result(
+            glance::components::avif::prepare_preview(path, dimension), preview);
+    }
+
+    BOOL WINAPI can_refine(std::uint64_t token) noexcept
+    {
+        return !glance::components::avif::refinement_source(token).empty();
+    }
+
+    BOOL WINAPI query_refinement_text(std::uint64_t, ComponentLoadingTextResult* result) noexcept
+    {
+        return result != nullptr && result->size >= sizeof(ComponentLoadingTextResult) &&
+            glance::components::copy_resource_key(L"Preview.Refining", result->key);
+    }
+
+    PrepareStatus WINAPI prepare_refined_preview(
+        std::uint64_t token, const PreviewPreparationOptions*, PreparedPreview* preview) noexcept
+    {
+        if (preview == nullptr || preview->size < sizeof(PreparedPreview))
+            return PrepareStatus::failed;
+        const auto source = glance::components::avif::refinement_source(token);
+        if (source.empty()) return PrepareStatus::unavailable;
+        return copy_preview_result(
+            glance::components::avif::prepare_preview(source, preview_dimension), preview);
+    }
+
+    ProgressivePreviewApi progressive_api{
+        .can_refine = can_refine,
+        .query_refinement_text = query_refinement_text,
+        .prepare_refined_preview = prepare_refined_preview };
+
     GalleryMediaKind WINAPI classify_gallery_extension(const wchar_t* extension) noexcept
     {
         if (extension != nullptr && _wcsicmp(extension, L".avif") == 0)
@@ -182,8 +221,19 @@ namespace
         if (interface_id != nullptr && IsEqualGUID(*interface_id, cancellable_preview_api_id))
         {
             if (minimum_version > cancellable_preview_api_version) return FALSE;
-            static auto api = glance::components::cancellable_preview_api<prepare_preview>();
+            static auto api = [] {
+                auto result = glance::components::cancellable_preview_api<
+                    prepare_preview_with_options, prepare_refined_preview>();
+                result.refine_on_zoom = TRUE;
+                return result;
+            }();
             *interface_pointer = &api;
+            return TRUE;
+        }
+        if (interface_id != nullptr && IsEqualGUID(*interface_id, progressive_preview_api_id))
+        {
+            if (minimum_version > progressive_preview_api_version) return FALSE;
+            *interface_pointer = &progressive_api;
             return TRUE;
         }
         if (interface_id == nullptr || minimum_version > 1)

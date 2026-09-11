@@ -16,4 +16,5 @@
   <data name="Preview.Loading" xml:space="preserve"><value>Loading HEIC image...</value></data>
   <data name="Preview.Unavailable" xml:space="preserve"><value>This HEIC image is not supported</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Could not prepare this HEIC image</value></data>
+  <data name="Preview.Refining" xml:space="preserve"><value>Preparing full-resolution image...</value></data>
 </root>

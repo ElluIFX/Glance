@@ -416,7 +416,8 @@ namespace winrt::Glance::App::implementation
         Windows::Foundation::IAsyncAction load_image_async(
             std::wstring path,
             std::uint64_t generation,
-            bool first_frame_presented = false);
+            bool first_frame_presented = false,
+            bool full_resolution = false);
         Windows::Foundation::IAsyncAction preload_gallery_image_async(
             glance::app::PreviewFile file,
             std::uint64_t generation);
@@ -835,6 +836,10 @@ namespace winrt::Glance::App::implementation
         std::uint32_t pdf_thumbnail_items_built_{};
         bool pdf_thumbnail_selection_updating_{};
         bool component_refinement_started_{};
+        bool component_refinement_on_zoom_{};
+        std::wstring image_full_resolution_path_;
+        bool image_full_resolution_requested_{};
+        std::uint64_t image_load_request_{};
         bool pdf_panning_{};
         std::uint32_t pdf_page_index_{};
         double pdf_pan_horizontal_offset_{};

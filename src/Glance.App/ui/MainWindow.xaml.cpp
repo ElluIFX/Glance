@@ -4069,6 +4069,8 @@ namespace winrt::Glance::App::implementation
             image_panning_ = false;
             image_pixel_width_ = 0;
             image_pixel_height_ = 0;
+            image_full_resolution_path_ = file.path;
+            image_full_resolution_requested_ = false;
             image_bits_per_pixel_ = 0;
             image_metadata_.clear();
             image_metadata_json_.clear();
@@ -4499,18 +4501,31 @@ namespace winrt::Glance::App::implementation
     Windows::Foundation::IAsyncAction MainWindow::load_image_async(
         std::wstring path,
         std::uint64_t generation,
-        bool first_frame_presented)
+        bool first_frame_presented,
+        bool full_resolution)
     {
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         auto cancellation = co_await winrt::get_cancellation_token();
         cancellation.enable_propagation();
+        const auto request = ++image_load_request_;
+        const double scale = ImagePanel().XamlRoot() != nullptr
+            ? ImagePanel().XamlRoot().RasterizationScale() : 1.0;
+        const auto decode_extent = std::clamp(
+            std::max(ImageScroller().ActualWidth(), ImageScroller().ActualHeight()) * scale,
+            1024.0, 8192.0);
         try
         {
             const auto file = co_await Windows::Storage::StorageFile::GetFileFromPathAsync(path);
             const auto properties = co_await file.Properties().GetImagePropertiesAsync();
             const auto stream = co_await file.OpenReadAsync();
             Microsoft::UI::Xaml::Media::Imaging::BitmapImage bitmap;
+            const auto longest_side = std::max(properties.Width(), properties.Height());
+            if (!full_resolution && longest_side > decode_extent && properties.Width() != 0)
+            {
+                bitmap.DecodePixelWidth(std::max(1, static_cast<int>(
+                    properties.Width() * decode_extent / longest_side)));
+            }
             co_await bitmap.SetSourceAsync(stream);
             const auto width = properties.Width() != 0 ? properties.Width() : static_cast<std::uint32_t>(bitmap.PixelWidth());
             const auto height = properties.Height() != 0 ? properties.Height() : static_cast<std::uint32_t>(bitmap.PixelHeight());
@@ -4520,8 +4535,9 @@ namespace winrt::Glance::App::implementation
                 generation,
                 width,
                 height,
+                request,
                 first_frame_presented] {
-                if (generation != lifetime->content_generation_)
+                if (generation != lifetime->content_generation_ || request != lifetime->image_load_request_)
                 {
                     return;
                 }
@@ -4560,8 +4576,9 @@ namespace winrt::Glance::App::implementation
         catch (const hresult_error& error)
         {
             const auto message = glance::app::localize_format(L"ImageDecodeError", { error.message() });
-            static_cast<void>(dispatcher.TryEnqueue([lifetime, message, generation] {
-                lifetime->show_provider_error(message, generation);
+            static_cast<void>(dispatcher.TryEnqueue([lifetime, message, generation, request] {
+                if (request == lifetime->image_load_request_)
+                    lifetime->show_provider_error(message, generation);
             }));
         }
     }
@@ -5897,6 +5914,11 @@ namespace winrt::Glance::App::implementation
             ? glance::contracts::components::PreviewColorScheme::dark
             : glance::contracts::components::PreviewColorScheme::light;
         glance::contracts::components::PreviewPreparationOptions options;
+        const auto raster_scale = RootGrid().XamlRoot() != nullptr
+            ? RootGrid().XamlRoot().RasterizationScale() : 1.0;
+        options.maximum_dimension = static_cast<std::uint32_t>(std::clamp(
+            std::max(RootGrid().ActualWidth(), RootGrid().ActualHeight()) * raster_scale,
+            1024.0, 8192.0));
         const auto cancellation = std::make_shared<std::atomic_bool>(false);
         component_preparation_cancellation_ = cancellation;
         co_await resume_background();
@@ -6369,6 +6391,7 @@ namespace winrt::Glance::App::implementation
             ? std::move(result.refinement)
             : nullptr;
         component_refinement_text_ = std::move(result.refinement_text);
+        component_refinement_on_zoom_ = result.refinement_on_zoom;
         component_refinement_started_ = false;
         ComponentLoadingText().Visibility(Visibility::Collapsed);
         auto prepared_file = files_[current_index_];
@@ -6393,6 +6416,10 @@ namespace winrt::Glance::App::implementation
             current_kind_ != glance::app::PreviewKind::image ||
             active_component_refinement_ == nullptr ||
             component_refinement_started_)
+        {
+            return;
+        }
+        if (component_refinement_on_zoom_ && ImageScroller().ZoomFactor() <= 1.001F)
         {
             return;
         }
@@ -6494,6 +6521,8 @@ namespace winrt::Glance::App::implementation
                 : static_cast<std::uint32_t>(bitmap.PixelHeight());
             active_component_preview_ = std::move(result.lease);
             active_component_refinement_.reset();
+            image_full_resolution_requested_ = true;
+            image_full_resolution_path_ = path;
             component_refinement_text_.clear();
             component_refinement_started_ = false;
             image_pixel_width_ = width;
@@ -9736,6 +9765,19 @@ namespace winrt::Glance::App::implementation
     {
         update_image_zoom_controls();
         update_image_zoom_map();
+        if (current_kind_ == glance::app::PreviewKind::image && ImageScroller().ZoomFactor() > 1.001F)
+        {
+            if (active_component_refinement_ != nullptr)
+            {
+                begin_component_refinement(content_generation_);
+            }
+            else if (!image_full_resolution_requested_ && !image_full_resolution_path_.empty())
+            {
+                image_full_resolution_requested_ = true;
+                image_load_operation_ = load_image_async(
+                    image_full_resolution_path_, content_generation_, true, true);
+            }
+        }
     }
 
     void MainWindow::ImageZoomMapOverlay_PointerPressed(

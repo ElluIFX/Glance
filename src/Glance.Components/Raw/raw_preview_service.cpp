@@ -35,6 +35,8 @@ namespace
     {
         std::filesystem::path directory;
         std::vector<ImageMetadataEntry> metadata;
+        std::filesystem::path source;
+        std::uint32_t maximum_dimension{};
     };
 
     std::atomic_bool shutting_down{};
@@ -309,7 +311,7 @@ namespace glance::components::raw
                 token = next_lease.fetch_add(1, std::memory_order_relaxed);
                 leases[token] = LeaseRecord{
                     directory,
-                    read_image_metadata_sidecar(metadata_output) };
+                        read_image_metadata_sidecar(metadata_output), path, maximum_dimension };
             }
             result.status = PrepareStatus::success;
             result.kind = PreviewContentKind::image;
@@ -363,6 +365,18 @@ namespace glance::components::raw
         {
             return false;
         }
+    }
+
+    std::filesystem::path refinement_source(std::uint64_t lease_token) noexcept
+    {
+        try
+        {
+            std::lock_guard guard(lease_mutex);
+            const auto found = leases.find(lease_token);
+            return found != leases.end() && found->second.maximum_dimension < 8192
+                ? found->second.source : std::filesystem::path{};
+        }
+        catch (...) { return {}; }
     }
 
     void release_preview(std::uint64_t lease_token) noexcept

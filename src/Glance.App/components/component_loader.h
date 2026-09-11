@@ -148,6 +148,7 @@ namespace glance::app
         std::shared_ptr<NativePreviewRendererRegistration> native_renderer;
         std::shared_ptr<NativeMediaRendererRegistration> native_media_renderer;
         std::wstring refinement_text;
+        bool refinement_on_zoom{};
         std::wstring notice;
         glance::contracts::components::PreviewNoticeSeverity notice_severity{
             glance::contracts::components::PreviewNoticeSeverity::informational };

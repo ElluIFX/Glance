@@ -1953,6 +1953,12 @@ namespace glance::app
                 }
 
                 PreparedPreview preview;
+                if (!component->cancellable_preview.has_value() ||
+                    !component->cancellable_preview->refine_on_zoom)
+                {
+                    options.maximum_dimension =
+                        glance::contracts::components::PreviewPreparationOptions{}.maximum_dimension;
+                }
                 options.size = sizeof(options);
                 const glance::contracts::components::PreviewCancellation probe{
                     .context = cancellation.get(),
@@ -2048,6 +2054,8 @@ namespace glance::app
                     result.refinement_text =
                         query_refinement_text(*session);
                     result.refinement = std::move(session);
+                    result.refinement_on_zoom = component->cancellable_preview.has_value() &&
+                        component->cancellable_preview->refine_on_zoom;
                 }
                 return result;
             }
