@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "../Common/preview_cancellation.h"
+#include "../Common/preview_directory_cleanup.h"
 #include "heic_preview_service.h"
 #include "../Common/image_metadata_sidecar.h"
 
@@ -117,7 +118,6 @@ namespace
     {
         try
         {
-            const auto current_pid = std::to_wstring(GetCurrentProcessId());
             const auto lease_root =
                 std::filesystem::temp_directory_path() / L"Glance" / L"HeicPreview";
             std::error_code error;
@@ -126,7 +126,7 @@ namespace
                  iterator.increment(error))
             {
                 if (iterator->is_directory(error) &&
-                    iterator->path().filename().wstring() != current_pid)
+                    glance::components::preview_owner_has_exited(iterator->path().filename().wstring()))
                 {
                     std::filesystem::remove_all(iterator->path(), error);
                 }

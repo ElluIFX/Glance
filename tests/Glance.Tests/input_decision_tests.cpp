@@ -13,6 +13,7 @@
 #include "text_font_fallback.h"
 #include "update_preferences.h"
 #include "../../src/version.h"
+#include "../../src/Glance.Components/Common/preview_directory_cleanup.h"
 
 #include <array>
 #include <cmath>
@@ -83,6 +84,82 @@ namespace
                  glance::contracts::components::file_directory_preview_api_id) &&
              interface_version ==
                  glance::contracts::components::file_directory_preview_api_version);
+    }
+
+    void test_preview_directory_ownership(
+        const std::filesystem::path& component_root, const std::wstring& executable)
+    {
+        using namespace glance::contracts::components;
+        using glance::components::preview_owner_has_exited;
+        expect(!preview_owner_has_exited(L"invalid") &&
+            !preview_owner_has_exited(L"4294967296") &&
+            !preview_owner_has_exited(L"0"), "Unknown preview owners are preserved");
+        struct ProbeProcess
+        {
+            PROCESS_INFORMATION value{};
+            ~ProbeProcess()
+            {
+                if (value.hProcess != nullptr)
+                {
+                    TerminateProcess(value.hProcess, 0);
+                    WaitForSingleObject(value.hProcess, 5000);
+                    CloseHandle(value.hThread);
+                    CloseHandle(value.hProcess);
+                }
+            }
+        } probe;
+        STARTUPINFOW startup{ sizeof(STARTUPINFOW) };
+        std::wstring command = L"\"" + executable + L"\"";
+        const bool started = CreateProcessW(executable.c_str(), command.data(), nullptr,
+            nullptr, FALSE, CREATE_SUSPENDED | CREATE_NO_WINDOW, nullptr, nullptr,
+            &startup, &probe.value) != FALSE;
+        expect(started, "Preview ownership probe starts");
+        if (!started) return;
+        const auto owner = std::to_wstring(probe.value.dwProcessId);
+        expect(!preview_owner_has_exited(owner), "Live preview owner is preserved");
+        struct ComponentCase { const wchar_t* id; const wchar_t* dll; const wchar_t* root; };
+        const std::array cases{
+            ComponentCase{ L"heic", L"Glance.HeicComponent.dll", L"HeicPreview" },
+            ComponentCase{ L"avif", L"Glance.AvifComponent.dll", L"AvifPreview" },
+            ComponentCase{ L"raw", L"Glance.RawComponent.dll", L"RawPreview" },
+            ComponentCase{ L"adobe", L"Glance.AdobeComponent.dll", L"AdobePreview" } };
+        for (const auto& item : cases)
+        {
+            const auto directory = std::filesystem::temp_directory_path() /
+                L"Glance" / item.root / owner;
+            std::filesystem::create_directories(directory);
+            const auto marker = directory / (L"regression-" + std::to_wstring(GetCurrentProcessId()));
+            { std::ofstream file(marker); file << "active preview"; }
+            const auto module = LoadLibraryExW((component_root / item.id / item.dll).c_str(),
+                nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                    LOAD_LIBRARY_SEARCH_SYSTEM32);
+            expect(module != nullptr, "Ownership component loads");
+            if (module != nullptr)
+            {
+                const auto get_api = reinterpret_cast<GetApiFunction>(GetProcAddress(module, get_api_export));
+                ComponentApi api;
+                if (get_api != nullptr && get_api(abi_version, &api))
+                {
+                    std::vector<std::wstring> extensions;
+                    ComponentRegistrar registrar{ .context = &extensions,
+                        .register_extension = collect_extension, .register_renderer = accept_renderer };
+                    auto registration = std::make_unique<ComponentRegistration>();
+                    expect(api.initialize(&registrar, registration.get()) != FALSE,
+                        "Ownership component initializes");
+                    expect(std::filesystem::is_regular_file(marker),
+                        "Component initialization preserves another live process preview");
+                    api.shutdown();
+                }
+                else expect(false, "Ownership component ABI negotiation");
+                FreeLibrary(module);
+            }
+            std::error_code error;
+            std::filesystem::remove(marker, error);
+            std::filesystem::remove(directory, error);
+        }
+        TerminateProcess(probe.value.hProcess, 0);
+        expect(WaitForSingleObject(probe.value.hProcess, 5000) == WAIT_OBJECT_0 &&
+            preview_owner_has_exited(owner), "Exited preview owner is eligible for cleanup");
     }
 
     struct ImageCodecComponentCase
@@ -1179,6 +1256,7 @@ int wmain(int argument_count, wchar_t* arguments[])
     executable_path.resize(executable_length);
     const auto component_root =
         std::filesystem::path(executable_path).parent_path() / L"components";
+    test_preview_directory_ownership(component_root, executable_path);
     test_image_codec_component(
         component_root,
         {
