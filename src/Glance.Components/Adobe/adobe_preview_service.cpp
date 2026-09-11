@@ -728,7 +728,9 @@ namespace
             if (process_job != nullptr)
             {
                 JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
-                limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                limits.BasicLimitInformation.LimitFlags =
+                    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+                limits.ProcessMemoryLimit = 1024ULL * 1024ULL * 1024ULL;
                 if (!SetInformationJobObject(
                         process_job,
                         JobObjectExtendedLimitInformation,

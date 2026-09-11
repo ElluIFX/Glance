@@ -20,6 +20,8 @@
 namespace
 {
     using Microsoft::WRL::ComPtr;
+    constexpr std::uint64_t maximum_decode_pixels = 64ULL * 1024ULL * 1024ULL;
+    constexpr std::streamoff maximum_input_bytes = 256LL * 1024LL * 1024LL;
 
     bool read_exact(
         std::istream& input,
@@ -195,7 +197,7 @@ namespace
         }
         const auto pixel_count =
             static_cast<std::uint64_t>(width) * height;
-        if (pixel_count >
+        if (pixel_count > maximum_decode_pixels || pixel_count >
             std::numeric_limits<std::size_t>::max() / 4)
         {
             return false;
@@ -298,7 +300,7 @@ namespace
         std::ifstream input(path, std::ios::binary | std::ios::ate);
         const auto length = input.tellg();
         if (length <= 0 ||
-            length > static_cast<std::streamoff>(std::numeric_limits<int>::max()))
+            length > maximum_input_bytes)
         {
             return {};
         }
@@ -445,6 +447,13 @@ namespace glance::components::adobe
             int width{};
             int height{};
             int channels{};
+            if (!stbi_info_from_memory(
+                    bytes.data(), static_cast<int>(bytes.size()), &width, &height, &channels) ||
+                width <= 0 || height <= 0 ||
+                static_cast<std::uint64_t>(width) * height > maximum_decode_pixels)
+            {
+                return false;
+            }
             unsigned char* pixels = stbi_load_from_memory(
                 bytes.data(),
                 static_cast<int>(bytes.size()),

@@ -1678,6 +1678,34 @@ int wmain(int argument_count, wchar_t* arguments[])
                         std::filesystem::path(refined_preview.path),
                 "Adobe component reuses high-resolution preview cache");
 
+            const auto oversized_path = test_directory / L"oversized.psd";
+            auto oversized_fixture = make_psd_thumbnail_fixture();
+            for (const auto offset : { 14U, 18U })
+            {
+                oversized_fixture[offset] = 0;
+                oversized_fixture[offset + 1] = 1;
+                oversized_fixture[offset + 2] = 0;
+                oversized_fixture[offset + 3] = 0;
+            }
+            PreparedPreview oversized_preview;
+            expect(
+                write_bytes(oversized_path, oversized_fixture) &&
+                    configurable->prepare_preview(
+                        oversized_path.c_str(), &preview_options, &oversized_preview) ==
+                        PrepareStatus::success,
+                "Oversized PSD retains its embedded thumbnail");
+            if (oversized_preview.lease_token != 0)
+            {
+                PreparedPreview oversized_refined;
+                expect(
+                    progressive->prepare_refined_preview(
+                        oversized_preview.lease_token, &preview_options, &oversized_refined) !=
+                        PrepareStatus::success &&
+                        std::filesystem::is_regular_file(oversized_preview.path),
+                    "Oversized PSD refinement fails without discarding the thumbnail");
+                api.release_preview(oversized_preview.lease_token);
+            }
+
             const auto psb_path = test_directory / L"embedded.psb";
             auto psb_fixture = make_psd_thumbnail_fixture();
             psb_fixture[5] = 2;
