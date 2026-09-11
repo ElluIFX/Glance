@@ -1949,6 +1949,14 @@ int wmain(int argument_count, wchar_t* arguments[])
                     client.open(pdf_path.wstring(), L"", cancelled_generation).status !=
                         glance::contracts::document::Status::success,
                     "PDF cancelled queued open cannot revive document");
+                const auto delayed_close = client.cancel_document();
+                const auto replacement = client.begin_document();
+                expect(client.open(pdf_path.wstring(), L"", replacement).status ==
+                    glance::contracts::document::Status::success, "PDF reopens before queued close");
+                client.close_document(delayed_close);
+                expect(client.render(0, 256, 256, replacement).status ==
+                    glance::contracts::document::Status::success,
+                    "Delayed PDF close preserves replacement document");
             }
         }
         std::filesystem::remove_all(test_directory, cleanup_error);

@@ -62,7 +62,8 @@ namespace glance::app
             std::uint32_t maximum_width,
             std::uint32_t maximum_height,
             std::uint64_t generation = 0);
-        void close_document() noexcept;
+        [[nodiscard]] std::uint64_t cancel_document() noexcept;
+        void close_document(std::uint64_t generation = 0) noexcept;
 
     private:
         static void CALLBACK idle_timeout_callback(

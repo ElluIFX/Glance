@@ -432,16 +432,23 @@ namespace glance::app
             response.payload_size == 0;
     }
 
-    void PagedDocumentRenderClient::close_document() noexcept
+    std::uint64_t PagedDocumentRenderClient::cancel_document() noexcept
     {
-        document_generation_.fetch_add(1, std::memory_order_acq_rel);
+        const auto generation = document_generation_.fetch_add(1, std::memory_order_acq_rel) + 1;
         cancelled_.store(true, std::memory_order_release);
         std::unique_lock lock(mutex_, std::try_to_lock);
         if (!lock.owns_lock())
         {
             terminate_process();
-            return;
         }
+        return generation;
+    }
+
+    void PagedDocumentRenderClient::close_document(std::uint64_t generation) noexcept
+    {
+        if (generation == 0) generation = cancel_document();
+        std::scoped_lock lock(mutex_);
+        if (generation != document_generation_.load(std::memory_order_acquire)) return;
         if (process_ != nullptr && !send_control_command_locked(Command::close_document))
         {
             close_process_locked(false);
@@ -525,6 +532,11 @@ namespace glance::app
         stop_idle_timer();
         cancelled_.store(false, std::memory_order_release);
         PagedDocumentOpenResult result;
+        if (generation != document_generation_.load(std::memory_order_acquire))
+        {
+            cancelled_.store(true, std::memory_order_release);
+            return result;
+        }
         const OpenRequest request{
             .path_characters = static_cast<std::uint32_t>(path.size()),
             .password_characters = static_cast<std::uint32_t>(password.size()),

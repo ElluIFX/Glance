@@ -3035,7 +3035,22 @@ namespace winrt::Glance::App::implementation
     {
         if (pdf_render_client_ != nullptr)
         {
-            pdf_render_client_->close_document();
+            const auto generation = pdf_render_client_->cancel_document();
+            close_pdf_document_async(pdf_render_client_, generation);
+        }
+    }
+
+    fire_and_forget MainWindow::close_pdf_document_async(
+        std::shared_ptr<glance::app::PagedDocumentRenderClient> session,
+        std::uint64_t generation)
+    {
+        try
+        {
+            co_await resume_background();
+            session->close_document(generation);
+        }
+        catch (...)
+        {
         }
     }
 

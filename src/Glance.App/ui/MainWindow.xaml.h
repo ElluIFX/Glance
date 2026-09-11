@@ -304,6 +304,9 @@ namespace winrt::Glance::App::implementation
         void update_preview_navigation_ui();
         [[nodiscard]] const glance::app::ArchiveEntry* selected_folder_entry() noexcept;
         void cancel_pdf_render() noexcept;
+        static winrt::fire_and_forget close_pdf_document_async(
+            std::shared_ptr<glance::app::PagedDocumentRenderClient> session,
+            std::uint64_t generation);
         void release_native_preview_surface() noexcept;
         winrt::fire_and_forget shutdown_native_preview_surface_async(
             std::shared_ptr<glance::app::NativePreviewSurface> surface);
