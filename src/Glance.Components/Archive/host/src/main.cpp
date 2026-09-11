@@ -767,8 +767,16 @@ namespace
         }
         std::map<std::wstring, std::uint64_t, std::less<>> folders;
         bool truncated{};
+        const auto scan_deadline = GetTickCount64() + 10000;
         for (UInt32 index = 0; index < count; ++index)
         {
+            if (result.nodes.size() >= maximum_entries || index >= maximum_entries * 4U ||
+                GetTickCount64() >= scan_deadline)
+            {
+                truncated = true;
+                result.flags |= response_partial_statistics;
+                break;
+            }
             bool is_folder{};
             static_cast<void>(property_bool(archive.get(), index, kpidIsDir, is_folder));
             std::uint64_t size{};

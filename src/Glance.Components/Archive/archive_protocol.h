@@ -28,6 +28,7 @@ namespace glance::components::archive
         response_has_packed_size = 1U << 3U,
         response_has_original_size = 1U << 4U,
         response_has_encrypted_items = 1U << 5U,
+        response_partial_statistics = 1U << 6U,
     };
 
     enum EntryFlags : std::uint32_t

@@ -19,4 +19,6 @@
   <data name="Value.No" xml:space="preserve"><value>No</value></data>
   <data name="Value.Folder" xml:space="preserve"><value>Folder</value></data>
   <data name="Value.File" xml:space="preserve"><value>File</value></data>
+  <data name="Info.ScannedFileCount" xml:space="preserve"><value>Scanned files</value></data>
+  <data name="Info.ScannedOriginalSize" xml:space="preserve"><value>Scanned original size</value></data>
 </root>

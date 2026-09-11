@@ -19,4 +19,6 @@
   <data name="Value.No" xml:space="preserve"><value>否</value></data>
   <data name="Value.Folder" xml:space="preserve"><value>文件夹</value></data>
   <data name="Value.File" xml:space="preserve"><value>文件</value></data>
+  <data name="Info.ScannedFileCount" xml:space="preserve"><value>已扫描文件</value></data>
+  <data name="Info.ScannedOriginalSize" xml:space="preserve"><value>已扫描原始大小</value></data>
 </root>

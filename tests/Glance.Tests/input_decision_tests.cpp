@@ -2137,6 +2137,27 @@ int wmain(int argument_count, wchar_t* arguments[])
                         }
                     }
                     api.release_preview(preview.lease_token);
+                    auto large_fixture = std::make_unique<std::array<wchar_t, 32768>>();
+                    if (GetEnvironmentVariableW(L"GLANCE_ARCHIVE_TEST_FILE", large_fixture->data(),
+                        static_cast<DWORD>(large_fixture->size())) != 0)
+                    {
+                        const auto large_preview = std::make_unique<PreparedPreview>();
+                        const auto large_descriptor = std::make_unique<FileDirectoryDescriptor>();
+                        expect(api.prepare_preview(large_fixture->data(), large_preview.get()) ==
+                            PrepareStatus::success, "Large ZIP fixture preparation");
+                        if (large_preview->lease_token != 0)
+                        {
+                            expect(directory_api->open(large_preview->lease_token, L"", large_descriptor.get()) ==
+                                FileDirectoryOpenStatus::ready && large_descriptor->truncated,
+                                "Large ZIP returns bounded partial directory");
+                            expect(std::wstring_view(large_descriptor->info_fields[0].label_key) ==
+                                L"Info.ScannedFileCount", "Large ZIP statistics are explicitly partial");
+                            for (std::uint32_t field = 0; field < large_descriptor->info_field_count; ++field)
+                                expect(std::wstring_view(large_descriptor->info_fields[field].id) != L"ratio",
+                                    "Partial archive omits compression ratio");
+                            api.release_preview(large_preview->lease_token);
+                        }
+                    }
                 }
                 std::filesystem::remove_all(test_directory, cleanup_error);
                 api.shutdown();

@@ -626,7 +626,8 @@ namespace
         if (!add_info_field(
                 result,
                 L"file-count",
-                L"Info.FileCount",
+                (index.flags & response_partial_statistics) != 0
+                    ? L"Info.ScannedFileCount" : L"Info.FileCount",
                 FileDirectoryValueKind::unsigned_integer,
                 index.file_count) ||
             !add_info_field(
@@ -650,10 +651,11 @@ namespace
             (!add_info_field(
                  result,
                  L"original-size",
-                 L"Info.OriginalSize",
+                 (index.flags & response_partial_statistics) != 0
+                    ? L"Info.ScannedOriginalSize" : L"Info.OriginalSize",
                  FileDirectoryValueKind::bytes,
                  index.original_size) ||
-             (index.original_size != 0 &&
+             ((index.flags & response_partial_statistics) == 0 && index.original_size != 0 &&
               !add_info_field(
                   result,
                   L"ratio",
