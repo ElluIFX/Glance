@@ -340,7 +340,6 @@
                                     <Grid
                                         MinHeight="30"
                                         Background="Transparent"
-                                        PointerEntered="JsonTreeRow_PointerEntered"
                                         PointerPressed="JsonTreeRow_PointerPressed" />
                                 </DataTemplate>
                             </ListView.ItemTemplate>

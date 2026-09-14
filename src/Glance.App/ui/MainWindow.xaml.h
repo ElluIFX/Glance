@@ -100,9 +100,7 @@ namespace winrt::Glance::App::implementation
         void JsonTreeRow_PointerPressed(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
-        void JsonTreeRow_PointerEntered(
-            IInspectable const&,
-            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void update_json_row_tooltip(Microsoft::UI::Xaml::FrameworkElement const& row);
         void LineNumbersButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void SyntaxHighlightButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void WordWrapButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);

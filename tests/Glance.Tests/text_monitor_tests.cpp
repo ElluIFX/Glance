@@ -115,6 +115,8 @@ namespace
             ScintillaTextView view(owner, [] {}, [](int) {}, [] { return false; });
             require(view.available(), "Load actual Scintilla runtime");
             view.set_bounds(0, 0, 620, 440);
+            ShowWindow(owner, SW_SHOWNOACTIVATE);
+            view.set_visible(true);
             view.set_word_wrap(false);
             struct Search { HWND owner; HWND editor{}; } search{ owner };
             EnumThreadWindows(GetCurrentThreadId(), [](HWND window, LPARAM data) -> BOOL {
@@ -150,10 +152,29 @@ namespace
             pump();
             require(call(SCI_GETFIRSTVISIBLELINE) == position, "Replacement preserves viewing position");
             require(call(SCI_GETANCHOR) == 23 && call(SCI_GETCURRENTPOS) == 42, "Replacement preserves selection");
+            call(SCI_SETFIRSTVISIBLELINE, std::numeric_limits<int>::max());
+            const auto anchor_before_follow = call(SCI_GETANCHOR);
             view.refresh_text(L"new tail\n", false, true, false);
             pump();
-            require(call(SCI_GETCURRENTPOS) == call(SCI_GETLENGTH), "Follow moves caret to latest content");
-            require(call(SCI_GETFIRSTVISIBLELINE) > position, "Follow scrolls to latest content");
+            const auto at_bottom = [&] {
+                const auto last = call(SCI_GETLINECOUNT) - 1;
+                RECT client{};
+                GetClientRect(search.editor, &client);
+                const auto end_y = call(SCI_POINTYFROMPOSITION, 0, call(SCI_GETLENGTH));
+                return call(SCI_GETFIRSTVISIBLELINE) + call(SCI_LINESONSCREEN) >=
+                    call(SCI_VISIBLEFROMDOCLINE, last) + call(SCI_WRAPCOUNT, last) &&
+                    end_y >= 0 && end_y + call(SCI_TEXTHEIGHT, last) <= client.bottom;
+            };
+            require(at_bottom(), "Follow reaches the actual scrollbar bottom");
+            require(call(SCI_GETANCHOR) == anchor_before_follow, "Follow preserves selection");
+            call(WM_VSCROLL, SB_TOP);
+            view.refresh_text(L"read without following\n", false, true, false);
+            pump();
+            require(call(SCI_GETFIRSTVISIBLELINE) == 0, "Manual upward scrolling disengages follow");
+            call(WM_VSCROLL, SB_BOTTOM);
+            view.refresh_text(L"resume following\n", false, true, false);
+            pump();
+            require(at_bottom(), "Returning to bottom resumes follow");
             view.refresh_text(L"", true, false, false);
             require(call(SCI_GETLENGTH) == 0, "Truncation clears the existing document");
             require(call(SCI_GETREADONLY) != 0, "Refresh keeps the document read-only");
@@ -176,6 +197,17 @@ namespace
             pump();
             require(call(SCI_DOCLINEFROMVISIBLE, call(SCI_GETFIRSTVISIBLELINE)) == wrapped_document_line,
                 "Multi-chunk replacement restores a wrapped viewing position");
+            call(WM_VSCROLL, SB_BOTTOM);
+            view.refresh_text(long_line, false, true, false);
+            for (int frame = 0; frame < 10; ++frame) { pump(); }
+            require(at_bottom(), "Wrapped append remains at the actual bottom after layout");
+            const auto before_rewrite = call(SCI_GETFIRSTVISIBLELINE);
+            view.refresh_text(wrapped.substr(0, 401), true, true, true);
+            require(call(SCI_GETFIRSTVISIBLELINE) == before_rewrite,
+                "First replacement chunk retains the existing viewport");
+            view.refresh_text(wrapped.substr(401), false, true, false);
+            for (int frame = 0; frame < 10; ++frame) { pump(); }
+            require(at_bottom(), "Replacement completes at the actual bottom after layout");
             view.set_file_path(L"example.LOG");
             view.refresh_text(L"2026-09-14 12:34:56.123 [INFO] key=value DEBUG warning ERROR informationX\n", true, false, false);
             call(SCI_COLOURISE, 0, -1);
@@ -191,7 +223,7 @@ namespace
             view.set_syntax_highlighting(false);
             require(call(SCI_GETSTYLEAT, 1) == 0, "Disable log highlighting");
             view.set_syntax_highlighting(true);
-            call(SCI_COLOURISE, 0, -1);
+            pump();
             require(call(SCI_GETSTYLEAT, 1) == 5, "Re-enable log highlighting");
             TextPreferences themed;
             view.set_preferences(themed, true, true);
@@ -233,7 +265,7 @@ int run_text_monitor_tests()
     try
     {
         TextPreferences defaults;
-        require(!defaults.monitor_file && !defaults.scroll_to_latest && defaults.refresh_interval_ms == 1000,
+        require(!defaults.monitor_file && defaults.refresh_interval_ms == 1000,
             "Monitoring defaults");
         write_file(path, "start\n");
         Preview preview;

@@ -26,6 +26,7 @@ namespace
     constexpr UINT near_end_check_message = WM_APP + 1;
     constexpr UINT copy_selection_message = WM_APP + 2;
     constexpr UINT clear_selection_message = WM_APP + 3;
+    constexpr UINT follow_layout_message = WM_APP + 4;
     constexpr WPARAM active_layout_threads = 4;
     constexpr WPARAM idle_layout_threads = 1;
 
@@ -660,6 +661,8 @@ namespace glance::app
     void ScintillaTextView::clear() noexcept
     {
         refresh_position_.reset();
+        replacement_offset_.reset();
+        follow_after_layout_ = false;
         release_copy_shortcut(host_);
         if (editor_ == nullptr)
         {
@@ -693,13 +696,18 @@ namespace glance::app
     }
 
     void ScintillaTextView::refresh_text(
-        std::wstring_view text, bool replace, bool follow, bool has_more)
+        std::wstring_view text, bool replace, bool auto_follow, bool has_more)
     {
         if (editor_ == nullptr)
         {
             return;
         }
         const auto first = call(SCI_GETFIRSTVISIBLELINE);
+        const auto last_line = std::max<LRESULT>(0, call(SCI_GETLINECOUNT) - 1);
+        const auto display_lines = call(SCI_VISIBLEFROMDOCLINE, last_line) + call(SCI_WRAPCOUNT, last_line);
+        const bool follow = auto_follow && !refresh_position_ &&
+            (follow_after_layout_ || first + std::max<LRESULT>(1, call(SCI_LINESONSCREEN)) >= display_lines);
+        follow_after_layout_ = follow;
         const auto line = call(SCI_DOCLINEFROMVISIBLE, first);
         const RefreshPosition position{
             line, first - call(SCI_VISIBLEFROMDOCLINE, line),
@@ -709,24 +717,58 @@ namespace glance::app
             refresh_position_ = position;
         }
         const auto encoded = utf8(text);
+        if (replace) { replacement_offset_ = 0; }
+        std::string existing;
+        if (replacement_offset_)
+        {
+            const auto offset = *replacement_offset_;
+            const auto count = std::min<LRESULT>(static_cast<LRESULT>(encoded.size()),
+                std::max<LRESULT>(0, call(SCI_GETLENGTH) - offset));
+            existing.resize(static_cast<std::size_t>(count) + 1);
+            Sci_TextRangeFull range{ { offset, offset + count }, existing.data() };
+            call(SCI_GETTEXTRANGEFULL, 0, reinterpret_cast<LPARAM>(&range));
+            existing.resize(static_cast<std::size_t>(count));
+        }
         // Mutate the existing document without exposing a cleared intermediate frame.
         SendMessageW(editor_, WM_SETREDRAW, FALSE, 0);
-        if (replace)
-        {
-            call(SCI_SETREADONLY, FALSE);
-            call(SCI_CLEARALL);
-            call(SCI_EMPTYUNDOBUFFER);
-            call(SCI_SETREADONLY, TRUE);
-        }
         call(SCI_SETREADONLY, FALSE);
-        call(SCI_APPENDTEXT, static_cast<WPARAM>(encoded.size()), reinterpret_cast<LPARAM>(encoded.data()));
+        if (replacement_offset_)
+        {
+            // Keep matching bytes and the unread tail in place while replacement chunks arrive.
+            std::size_t prefix{};
+            while (prefix < existing.size() && prefix < encoded.size() && existing[prefix] == encoded[prefix]) { ++prefix; }
+            std::size_t suffix{};
+            while (suffix < existing.size() - prefix && suffix < encoded.size() - prefix &&
+                existing[existing.size() - suffix - 1] == encoded[encoded.size() - suffix - 1]) { ++suffix; }
+            if (prefix + suffix != existing.size() || prefix + suffix != encoded.size())
+            {
+                call(SCI_SETTARGETSTART, *replacement_offset_ + prefix);
+                call(SCI_SETTARGETEND, *replacement_offset_ + existing.size() - suffix);
+                call(SCI_REPLACETARGET, encoded.size() - prefix - suffix,
+                    reinterpret_cast<LPARAM>(encoded.data() + prefix));
+            }
+            *replacement_offset_ += static_cast<LRESULT>(encoded.size());
+            if (!has_more)
+            {
+                if (*replacement_offset_ < call(SCI_GETLENGTH))
+                {
+                    call(SCI_SETTARGETSTART, *replacement_offset_);
+                    call(SCI_SETTARGETEND, call(SCI_GETLENGTH));
+                    call(SCI_REPLACETARGET, 0, reinterpret_cast<LPARAM>(""));
+                }
+                replacement_offset_.reset();
+            }
+        }
+        else
+        {
+            call(SCI_APPENDTEXT, static_cast<WPARAM>(encoded.size()), reinterpret_cast<LPARAM>(encoded.data()));
+        }
         call(SCI_SETREADONLY, TRUE);
         update_line_number_width();
         if (follow)
         {
             refresh_position_.reset();
-            call(SCI_GOTOPOS, call(SCI_GETLENGTH));
-            call(SCI_SCROLLCARET);
+            call(SCI_SETFIRSTVISIBLELINE, std::numeric_limits<int>::max());
         }
         else
         {
@@ -842,6 +884,15 @@ namespace glance::app
         }
         if (self != nullptr)
         {
+            if (message == follow_layout_message)
+            {
+                self->follow_message_pending_ = false;
+                if (self->follow_after_layout_)
+                {
+                    self->call(SCI_SETFIRSTVISIBLELINE, std::numeric_limits<int>::max());
+                }
+                return 0;
+            }
             if (message == WM_MOUSEACTIVATE)
             {
                 return MA_NOACTIVATE;
@@ -906,6 +957,12 @@ namespace glance::app
         DWORD_PTR reference_data) noexcept
     {
         auto* self = reinterpret_cast<ScintillaTextView*>(reference_data);
+        if (self != nullptr && (message == WM_MOUSEWHEEL || message == WM_VSCROLL ||
+            message == WM_KEYDOWN || message == WM_LBUTTONDOWN))
+        {
+            self->follow_after_layout_ = false;
+            self->refresh_position_.reset();
+        }
         if (message == WM_LBUTTONDBLCLK && self != nullptr &&
             self->double_click_callback_ && self->double_click_callback_())
         {
@@ -980,6 +1037,11 @@ namespace glance::app
             call(SCI_SETILEXER, 0, 0);
             call(SCI_CLEARDOCUMENTSTYLE);
             apply_theme(dark_);
+            if (syntax_highlighting_ && highlight_rules_ != nullptr)
+            {
+                call(SCI_COLOURISE, 0, -1);
+            }
+            InvalidateRect(editor_, nullptr, FALSE);
             return;
         }
         if (!load_lexilla())
@@ -1346,6 +1408,16 @@ namespace glance::app
         }
         const auto& notification =
             reinterpret_cast<const SCNotification&>(header);
+        if (header.code == SCN_PAINTED && follow_after_layout_ && !follow_message_pending_)
+        {
+            const auto last = std::max<LRESULT>(0, call(SCI_GETLINECOUNT) - 1);
+            const auto bottom = std::max<LRESULT>(0, call(SCI_VISIBLEFROMDOCLINE, last) +
+                call(SCI_WRAPCOUNT, last) - std::max<LRESULT>(1, call(SCI_LINESONSCREEN)));
+            if (call(SCI_GETFIRSTVISIBLELINE) < bottom)
+            {
+                follow_message_pending_ = PostMessageW(host_, follow_layout_message, 0, 0) != FALSE;
+            }
+        }
         if (header.code == SCN_STYLENEEDED)
         {
             if (syntax_highlighting_ && highlight_rules_ != nullptr)

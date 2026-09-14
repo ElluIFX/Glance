@@ -450,7 +450,6 @@ namespace winrt::Glance::App::implementation
         WordWrapToggle().IsOn(text_preferences_.word_wrap);
         MonitorTextFileToggle().IsOn(text_preferences_.monitor_file);
         TextRefreshIntervalNumberBox().Value(text_preferences_.refresh_interval_ms / 1000.0);
-        TextScrollLatestToggle().IsOn(text_preferences_.scroll_to_latest);
         TextFileMonitorOptions().Visibility(text_preferences_.monitor_file ? Visibility::Visible : Visibility::Collapsed);
         path_copy_preferences_ = glance::app::load_path_copy_preferences();
         QuoteCopiedPathToggle().IsOn(path_copy_preferences_.quote_path);
@@ -819,8 +818,6 @@ namespace winrt::Glance::App::implementation
         set_text(MonitorTextFileDescription(), L"MonitorTextFileDescription.Text");
         set_text(TextRefreshIntervalLabel(), L"TextRefreshIntervalLabel.Text");
         set_text(TextRefreshIntervalDescription(), L"TextRefreshIntervalDescription.Text");
-        set_text(TextScrollLatestLabel(), L"TextScrollLatestLabel.Text");
-        set_text(TextScrollLatestDescription(), L"TextScrollLatestDescription.Text");
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
         set_text(FontFamilyDescription(), L"FontFamilyDescription.Text");
         set_text(FontSizeLabel(), L"FontSizeLabel.Text");
@@ -2615,7 +2612,6 @@ namespace winrt::Glance::App::implementation
         text_preferences_.line_numbers = LineNumbersToggle().IsOn();
         text_preferences_.word_wrap = WordWrapToggle().IsOn();
         text_preferences_.monitor_file = MonitorTextFileToggle().IsOn();
-        text_preferences_.scroll_to_latest = TextScrollLatestToggle().IsOn();
         TextFileMonitorOptions().Visibility(text_preferences_.monitor_file ? Visibility::Visible : Visibility::Collapsed);
         if (std::isfinite(TextRefreshIntervalNumberBox().Value()))
         {

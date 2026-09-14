@@ -119,7 +119,6 @@ namespace glance::app
         result.line_numbers = read_dword(L"LineNumbers", 1) != 0;
         result.monitor_file = read_dword(L"MonitorFile", 0) != 0;
         result.refresh_interval_ms = std::clamp<DWORD>(read_dword(L"RefreshIntervalMs", 1000), 100, 60000);
-        result.scroll_to_latest = read_dword(L"ScrollToLatest", 0) != 0;
         return result;
     }
 
@@ -146,7 +145,6 @@ namespace glance::app
         const DWORD line_numbers = preferences.line_numbers;
         const DWORD monitor_file = preferences.monitor_file;
         const DWORD refresh_interval = std::clamp<DWORD>(preferences.refresh_interval_ms, 100, 60000);
-        const DWORD scroll_to_latest = preferences.scroll_to_latest;
         RegSetValueExW(
             key,
             L"FontFamily",
@@ -161,7 +159,6 @@ namespace glance::app
         RegSetValueExW(key, L"LineNumbers", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&line_numbers), sizeof(line_numbers));
         RegSetValueExW(key, L"MonitorFile", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&monitor_file), sizeof(monitor_file));
         RegSetValueExW(key, L"RefreshIntervalMs", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&refresh_interval), sizeof(refresh_interval));
-        RegSetValueExW(key, L"ScrollToLatest", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&scroll_to_latest), sizeof(scroll_to_latest));
         RegCloseKey(key);
     }
 }

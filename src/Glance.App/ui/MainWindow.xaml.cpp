@@ -6660,7 +6660,7 @@ namespace winrt::Glance::App::implementation
             if (text_reader_monitored_)
             {
                 text_editor_->refresh_text(initial_content, false,
-                    text_preferences_.scroll_to_latest, current_text_has_more_);
+                    false, current_text_has_more_);
             }
             else
             {
@@ -6844,7 +6844,7 @@ namespace winrt::Glance::App::implementation
                     if (self->text_editor_ && (result.replace_content || !result.content.empty()))
                     {
                         self->text_editor_->refresh_text(result.content, result.replace_content,
-                            self->text_preferences_.monitor_file && self->text_preferences_.scroll_to_latest,
+                            self->text_preferences_.monitor_file,
                             result.has_more);
                     }
                     if (self->current_text_encoding_ == glance::app::TextEncoding::automatic &&
@@ -9092,11 +9092,8 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void MainWindow::JsonTreeRow_PointerEntered(
-        IInspectable const& sender,
-        PointerRoutedEventArgs const&)
+    void MainWindow::update_json_row_tooltip(FrameworkElement const& row)
     {
-        const auto row = sender.try_as<FrameworkElement>();
         if (!row)
         {
             return;
@@ -9120,7 +9117,7 @@ namespace winrt::Glance::App::implementation
             ancestors.push_back(node_id);
             node_id = parent_id;
         }
-        std::wstring path = L"root";
+        std::wstring path;
         for (auto iterator = ancestors.rbegin(); iterator != ancestors.rend(); ++iterator)
         {
             const auto& node = json_nodes_[*iterator];
@@ -9139,7 +9136,8 @@ namespace winrt::Glance::App::implementation
                 });
             if (identifier)
             {
-                path += L"." + node.key;
+                if (!path.empty()) { path += L"."; }
+                path += node.key;
             }
             else
             {
@@ -9148,7 +9146,7 @@ namespace winrt::Glance::App::implementation
                 path += L"]";
             }
         }
-        ToolTipService::SetToolTip(row, box_value(path));
+        if (!path.empty()) { ToolTipService::SetToolTip(row, box_value(path)); }
     }
 
     void MainWindow::JsonTreeRow_PointerPressed(
@@ -9273,6 +9271,7 @@ namespace winrt::Glance::App::implementation
         }
         row.Tag(box_value(row_id));
         ToolTipService::SetToolTip(row, nullptr);
+        update_json_row_tooltip(row);
         row.Children().Clear();
         row.ColumnDefinitions().Clear();
         row.MinHeight(30.0);

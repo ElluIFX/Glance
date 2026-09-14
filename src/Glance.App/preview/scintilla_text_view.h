@@ -38,7 +38,7 @@ namespace glance::app
         void set_visible(bool visible) noexcept;
         void clear() noexcept;
         void append_text(std::wstring_view text);
-        void refresh_text(std::wstring_view text, bool replace, bool follow, bool has_more);
+        void refresh_text(std::wstring_view text, bool replace, bool auto_follow, bool has_more);
         void set_file_path(std::wstring_view path);
         void set_preferences(
             const TextPreferences& preferences,
@@ -104,5 +104,8 @@ namespace glance::app
             LRESULT caret{};
         };
         std::optional<RefreshPosition> refresh_position_;
+        std::optional<LRESULT> replacement_offset_;
+        bool follow_after_layout_{};
+        bool follow_message_pending_{};
     };
 }
