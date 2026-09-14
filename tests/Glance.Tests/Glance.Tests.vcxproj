@@ -37,6 +37,7 @@
     <ClCompile Include="text_monitor_tests.cpp" />
     <ClCompile Include="..\..\src\Glance.App\preview\preview_provider.cpp" />
     <ClCompile Include="..\..\src\Glance.App\preview\scintilla_text_view.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\text_highlighting.cpp" />
     <ClCompile Include="..\..\src\Glance.App\preview\syntax_theme.cpp">
       <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>

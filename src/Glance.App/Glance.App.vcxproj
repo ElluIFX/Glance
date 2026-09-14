@@ -85,6 +85,7 @@
     <ClInclude Include="preview\preview_provider.h" />
     <ClInclude Include="preview\scintilla_text_view.h" />
     <ClInclude Include="preview\syntax_theme.h" />
+    <ClInclude Include="preview\text_highlighting.h" />
     <ClInclude Include="application\startup_registration.h" />
     <ClInclude Include="preview\text_font_fallback.h" />
     <ClInclude Include="preferences\text_preferences.h" />
@@ -133,6 +134,7 @@
     <ClCompile Include="application\pipe_client.cpp" />
     <ClCompile Include="preview\preview_provider.cpp" />
     <ClCompile Include="preview\scintilla_text_view.cpp" />
+    <ClCompile Include="preview\text_highlighting.cpp" />
     <ClCompile Include="preview\shell_icon_provider.cpp" />
     <ClCompile Include="preview\syntax_theme.cpp" />
     <ClCompile Include="application\startup_registration.cpp" />

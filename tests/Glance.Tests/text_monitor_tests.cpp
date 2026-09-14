@@ -95,6 +95,19 @@ namespace
 
     void test_scintilla()
     {
+        const HighlightRule sample_rules[] = {
+            { HighlightMatch::word, "READY", HighlightStyle::string, true },
+            { HighlightMatch::digit_pattern, "v##.##", HighlightStyle::number },
+            { HighlightMatch::identifier_before, ":", HighlightStyle::attribute },
+        };
+        const HighlightRuleSet sample{ {}, sample_rules };
+        const std::string sample_text = "ready v12.34 name: READY_more";
+        std::vector<char> sample_styles(sample_text.size());
+        highlight_text(sample, sample_text, 0, sample_styles);
+        require(sample_styles[0] == static_cast<char>(HighlightStyle::string) &&
+            sample_styles[6] == static_cast<char>(HighlightStyle::number) &&
+            sample_styles[13] == static_cast<char>(HighlightStyle::attribute) && sample_styles[19] == 0,
+            "Independent declarative rule set uses the shared engine");
         const HWND owner = CreateWindowExW(WS_EX_NOACTIVATE, L"STATIC", L"Glance text regression",
             WS_OVERLAPPEDWINDOW, 0, 0, 640, 480, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
         require(owner != nullptr, "Create regression window");
@@ -163,6 +176,46 @@ namespace
             pump();
             require(call(SCI_DOCLINEFROMVISIBLE, call(SCI_GETFIRSTVISIBLELINE)) == wrapped_document_line,
                 "Multi-chunk replacement restores a wrapped viewing position");
+            view.set_file_path(L"example.LOG");
+            view.refresh_text(L"2026-09-14 12:34:56.123 [INFO] key=value DEBUG warning ERROR informationX\n", true, false, false);
+            call(SCI_COLOURISE, 0, -1);
+            require(call(SCI_GETSTYLEAT, 0) == 1 && call(SCI_GETSTYLEAT, 11) == 1, "Log timestamps");
+            require(call(SCI_GETSTYLEAT, 25) == 3 && call(SCI_GETSTYLEAT, 31) == 6, "Log level and field key");
+            require(call(SCI_GETSTYLEAT, 41) == 2 && call(SCI_GETSTYLEAT, 47) == 4 &&
+                call(SCI_GETSTYLEAT, 55) == 5 && call(SCI_GETSTYLEAT, 61) == 0, "Log levels and word boundaries");
+            view.refresh_text(L"[ER", true, false, false);
+            call(SCI_COLOURISE, 0, -1);
+            view.refresh_text(L"ROR] 中文\n", false, false, false);
+            call(SCI_COLOURISE, 0, -1);
+            require(call(SCI_GETSTYLEAT, 1) == 5 && call(SCI_GETSTYLEAT, 8) == 0, "Split level and UTF-8 text");
+            view.set_syntax_highlighting(false);
+            require(call(SCI_GETSTYLEAT, 1) == 0, "Disable log highlighting");
+            view.set_syntax_highlighting(true);
+            call(SCI_COLOURISE, 0, -1);
+            require(call(SCI_GETSTYLEAT, 1) == 5, "Re-enable log highlighting");
+            TextPreferences themed;
+            view.set_preferences(themed, true, true);
+            call(SCI_COLOURISE, 0, -1);
+            const auto dark_color = call(SCI_STYLEGETFORE, 5);
+            view.set_preferences(themed, true, false);
+            call(SCI_COLOURISE, 0, -1);
+            require(call(SCI_GETSTYLEAT, 1) == 5 && call(SCI_STYLEGETFORE, 5) != dark_color,
+                "Theme change preserves tokens and updates colors");
+            view.refresh_text(L"2026-09-14T12:34:56.123Z INFO", true, false, false);
+            call(SCI_COLOURISE, 0, -1);
+            require(call(SCI_GETSTYLEAT, 11) == 1 && call(SCI_GETSTYLEAT, 22) == 1,
+                "ISO timestamp with fractional seconds");
+            std::wstring boundary(32765, L' ');
+            boundary += L"ERROR ";
+            boundary += std::wstring(256 * 1024, L'x');
+            boundary += L" WARN\n";
+            view.refresh_text(boundary, true, false, false);
+            call(SCI_COLOURISE, 0, -1);
+            require(call(SCI_GETSTYLEAT, 32765) == 5 && call(SCI_GETSTYLEAT, 32769) == 5,
+                "Level spanning styling blocks");
+            require(call(SCI_GETSTYLEAT, boundary.size() - 3) == 4, "Long line retains trailing level");
+            view.set_file_path(L"example.txt");
+            require(call(SCI_GETSTYLEAT, 32765) == 0, "Switch to ordinary text clears log styles");
         }
         DestroyWindow(owner);
         pump();

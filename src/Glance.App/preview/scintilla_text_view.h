@@ -1,6 +1,7 @@
 #pragma once
 
 #include "text_preferences.h"
+#include "text_highlighting.h"
 
 #include <array>
 #include <functional>
@@ -70,6 +71,7 @@ namespace glance::app
         void update_lexer();
         void apply_theme(bool dark);
         void apply_lexer_styles();
+        void style_custom_text(LRESULT end) noexcept;
         void update_line_number_width() noexcept;
         void request_near_end_check() noexcept;
         void handle_notification(const NMHDR& header) noexcept;
@@ -84,6 +86,7 @@ namespace glance::app
         std::wstring error_;
         std::wstring path_;
         std::string lexer_name_;
+        const HighlightRuleSet* highlight_rules_{};
         std::array<std::string, 3> lexer_keywords_;
         TextPreferences preferences_{};
         bool syntax_highlighting_{ true };

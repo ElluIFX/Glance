@@ -750,6 +750,7 @@ namespace glance::app
     void ScintillaTextView::set_file_path(std::wstring_view path)
     {
         path_.assign(path);
+        highlight_rules_ = highlighting_for_extension(lower_extension(path));
         const auto lexer = lexer_for_path(path);
         lexer_name_.assign(lexer.name);
         for (std::size_t index = 0; index < lexer_keywords_.size(); ++index)
@@ -973,7 +974,8 @@ namespace glance::app
         {
             return;
         }
-        if (!syntax_highlighting_ || lexer_name_.empty() || lexer_name_ == "null")
+        if (!syntax_highlighting_ || lexer_name_.empty() || lexer_name_ == "null" ||
+            highlight_rules_ != nullptr)
         {
             call(SCI_SETILEXER, 0, 0);
             call(SCI_CLEARDOCUMENTSTYLE);
@@ -1052,7 +1054,17 @@ namespace glance::app
             }
         };
 
-        if (lexer_name_ == "cpp")
+        if (highlight_rules_ != nullptr)
+        {
+            style({ static_cast<int>(HighlightStyle::number) }, palette.number);
+            style({ static_cast<int>(HighlightStyle::comment) }, palette.comment);
+            style({ static_cast<int>(HighlightStyle::string) }, palette.string);
+            style({ static_cast<int>(HighlightStyle::preprocessor) }, palette.preprocessor);
+            style({ static_cast<int>(HighlightStyle::error) }, palette.error);
+            style({ static_cast<int>(HighlightStyle::attribute) }, palette.attribute);
+            bold({ static_cast<int>(HighlightStyle::preprocessor), static_cast<int>(HighlightStyle::error) });
+        }
+        else if (lexer_name_ == "cpp")
         {
             style({ SCE_C_COMMENT, SCE_C_COMMENTLINE, SCE_C_COMMENTDOC,
                     SCE_C_COMMENTLINEDOC, SCE_C_PREPROCESSORCOMMENT,
@@ -1299,14 +1311,50 @@ namespace glance::app
         }
     }
 
+    void ScintillaTextView::style_custom_text(LRESULT end) noexcept
+    {
+        constexpr LRESULT block_size = 32 * 1024;
+        constexpr auto context = static_cast<LRESULT>(highlight_context_bytes);
+        std::array<char, block_size + 2 * context + 1> text{};
+        std::array<char, block_size + 2 * context> styles{};
+        auto start = std::max<LRESULT>(0, call(SCI_GETENDSTYLED) - context);
+        end = std::min(end, call(SCI_GETLENGTH));
+        while (start < end)
+        {
+            // Read context on both sides, but publish only the requested block.
+            const auto read_start = std::max<LRESULT>(0, start - context);
+            const auto finish = std::min(end, start + block_size);
+            const auto read_end = std::min(call(SCI_GETLENGTH), finish + context);
+            const auto length = static_cast<std::size_t>(read_end - read_start);
+            Sci_TextRangeFull range{ { read_start, read_end }, text.data() };
+            call(SCI_GETTEXTRANGEFULL, 0, reinterpret_cast<LPARAM>(&range));
+            const auto preceding = read_start > 0
+                ? static_cast<unsigned char>(call(SCI_GETCHARAT, read_start - 1)) : static_cast<unsigned char>(0);
+            highlight_text(*highlight_rules_, { text.data(), length }, preceding, { styles.data(), length });
+            call(SCI_STARTSTYLING, start);
+            call(SCI_SETSTYLINGEX, finish - start,
+                reinterpret_cast<LPARAM>(styles.data() + (start - read_start)));
+            start = finish;
+        }
+    }
+
     void ScintillaTextView::handle_notification(const NMHDR& header) noexcept
     {
-        if (header.hwndFrom != editor_ || header.code != SCN_UPDATEUI)
+        if (header.hwndFrom != editor_)
         {
             return;
         }
         const auto& notification =
             reinterpret_cast<const SCNotification&>(header);
+        if (header.code == SCN_STYLENEEDED)
+        {
+            if (syntax_highlighting_ && highlight_rules_ != nullptr)
+            {
+                style_custom_text(notification.position);
+            }
+            return;
+        }
+        if (header.code != SCN_UPDATEUI) { return; }
         if ((notification.updated & SC_UPDATE_V_SCROLL) != 0)
         {
             request_near_end_check();
