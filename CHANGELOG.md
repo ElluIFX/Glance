@@ -4,6 +4,29 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.14] - 2026-09-14
+
+### Added
+
+- Added optional file monitoring for plain-text previews, with a configurable polling interval, incremental updates, and optional scrolling to the latest content.
+- Added log highlighting for timestamps, severity levels, and field names through extensible highlighting rules.
+- Added JSON node path tooltips, such as `root.data.items[3]`.
+
+### Improved
+
+- Reduced image preview memory usage with viewport-sized decoding and higher-resolution loading on zoom.
+- Reduced PDF thumbnail work and kept document closing off the UI thread.
+- Reduced panorama playback frame copying and released full-resolution decoders in the background when returning to proxy playback.
+- Reduced CAD draw calls by merging adjacent faces with the same material.
+- Bounded archive metadata scans, PSD refinement memory, and concurrent component preparation; obsolete preview requests are cancelled.
+- Moved unknown-format probing off the UI thread.
+
+### Fixed
+
+- Preserved the current preview when Everything refreshes its results without changing the selected file.
+- Rejected stale PDF operations after switching documents.
+- Preserved temporary preview files owned by running Glance instances.
+
 ## [2026.09.04] - 2026-09-04
 
 ### Added
