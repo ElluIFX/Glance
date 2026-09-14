@@ -976,8 +976,14 @@ namespace
     }
 }
 
+int run_text_monitor_tests();
+
 int wmain(int argument_count, wchar_t* arguments[])
 {
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--text-monitor-tests")
+    {
+        return run_text_monitor_tests();
+    }
     if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--panorama-benchmark")
     {
         return glance::tests::run_panorama_preview_benchmark(argument_count, arguments);

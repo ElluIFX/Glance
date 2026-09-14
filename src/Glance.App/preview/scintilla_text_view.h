@@ -4,6 +4,7 @@
 
 #include <array>
 #include <functional>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -36,6 +37,7 @@ namespace glance::app
         void set_visible(bool visible) noexcept;
         void clear() noexcept;
         void append_text(std::wstring_view text);
+        void refresh_text(std::wstring_view text, bool replace, bool follow, bool has_more);
         void set_file_path(std::wstring_view path);
         void set_preferences(
             const TextPreferences& preferences,
@@ -90,5 +92,14 @@ namespace glance::app
         bool visible_{};
         bool near_end_check_pending_{};
         int wheel_delta_{};
+        struct RefreshPosition
+        {
+            LRESULT line{};
+            LRESULT subline{};
+            LRESULT x{};
+            LRESULT anchor{};
+            LRESULT caret{};
+        };
+        std::optional<RefreshPosition> refresh_position_;
     };
 }

@@ -1,0 +1,350 @@
+#include "pch.h"
+#include "preview_provider.h"
+#include "scintilla_text_view.h"
+#include "component_loader.h"
+#include "localization.h"
+#include "third_party/scintilla/include/Scintilla.h"
+
+#include <atomic>
+#include <chrono>
+#include <filesystem>
+#include <iostream>
+#include <stdexcept>
+#include <thread>
+
+// Only application services unrelated to text decoding are substituted.
+namespace glance::app
+{
+    std::wstring localize(std::wstring_view key) { return std::wstring(key); }
+    bool component_has_extension(std::wstring_view) noexcept { return false; }
+    contracts::components::GalleryMediaKind component_gallery_media_kind(std::wstring_view) noexcept
+    {
+        return contracts::components::GalleryMediaKind::none;
+    }
+    std::vector<std::wstring> component_gallery_extensions(contracts::components::GalleryMediaKind) noexcept
+    {
+        return {};
+    }
+}
+
+namespace
+{
+    using namespace glance::app;
+    constexpr std::size_t chunk_size = 256 * 1024;
+    void require(bool condition, const char* message)
+    {
+        if (!condition) { throw std::runtime_error(message); }
+    }
+
+    void write_file(const std::filesystem::path& path, std::string_view bytes, bool append = false)
+    {
+        winrt::handle file(CreateFileW(path.c_str(), GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+            append ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+        require(static_cast<bool>(file), "Open test log for writing");
+        if (append)
+        {
+            LARGE_INTEGER zero{};
+            require(SetFilePointerEx(file.get(), zero, nullptr, FILE_END) != FALSE, "Seek test log");
+        }
+        DWORD written{};
+        require(WriteFile(file.get(), bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) &&
+            written == bytes.size(), "Write test log");
+        static std::atomic<std::uint64_t> sequence{ 133000000000000000ULL };
+        const auto tick = sequence.fetch_add(10000);
+        const FILETIME time{ static_cast<DWORD>(tick), static_cast<DWORD>(tick >> 32) };
+        require(SetFileTime(file.get(), nullptr, nullptr, &time) != FALSE, "Stamp test log");
+    }
+
+    struct Preview
+    {
+        std::shared_ptr<IncrementalTextReader> reader;
+        std::wstring text;
+        std::uint64_t bytes{};
+        bool apply(TextPreview update)
+        {
+            require(update.error.empty(), "Text decoding succeeded");
+            require(update.bytes_read <= chunk_size + 32768, "Bounded read size");
+            bytes += update.bytes_read;
+            if (update.retry_later) { return false; }
+            if (update.replace_content) { text.clear(); }
+            text += update.content;
+            reader = std::move(update.reader);
+            return update.has_more;
+        }
+        void poll()
+        {
+            for (int count = 0; count < 1000; ++count)
+            {
+                if (!apply(load_next_text_preview_chunk(reader, chunk_size))) { return; }
+            }
+            require(false, "Finite backlog drains");
+        }
+    };
+
+    void pump()
+    {
+        MSG message{};
+        const auto deadline = GetTickCount64() + 100;
+        while (GetTickCount64() < deadline && PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+
+    void test_scintilla()
+    {
+        const HWND owner = CreateWindowExW(WS_EX_NOACTIVATE, L"STATIC", L"Glance text regression",
+            WS_OVERLAPPEDWINDOW, 0, 0, 640, 480, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+        require(owner != nullptr, "Create regression window");
+        {
+            ScintillaTextView view(owner, [] {}, [](int) {}, [] { return false; });
+            require(view.available(), "Load actual Scintilla runtime");
+            view.set_bounds(0, 0, 620, 440);
+            view.set_word_wrap(false);
+            struct Search { HWND owner; HWND editor{}; } search{ owner };
+            EnumThreadWindows(GetCurrentThreadId(), [](HWND window, LPARAM data) -> BOOL {
+                auto& state = *reinterpret_cast<Search*>(data);
+                if (GetWindow(window, GW_OWNER) == state.owner)
+                {
+                    state.editor = FindWindowExW(window, nullptr, L"Scintilla", nullptr);
+                    if (state.editor) { return FALSE; }
+                }
+                return TRUE;
+            }, reinterpret_cast<LPARAM>(&search));
+            require(search.editor != nullptr, "Find own Scintilla editor");
+            const auto call = [&](UINT message, WPARAM w = 0, LPARAM l = 0) {
+                return SendMessageW(search.editor, message, w, l);
+            };
+            std::wstring text;
+            for (int i = 0; i < 2000; ++i) { text += L"log line " + std::to_wstring(i) + L"\n"; }
+            view.append_text(text);
+            pump();
+            call(SCI_SETSEL, 23, 42);
+            call(SCI_SETFIRSTVISIBLELINE, 300);
+            const auto position = call(SCI_GETFIRSTVISIBLELINE);
+            const auto document = call(SCI_GETDOCPOINTER);
+            for (int i = 0; i < 100; ++i)
+            {
+                view.refresh_text(L"appended log\n", false, false, false);
+            }
+            pump();
+            require(call(SCI_GETFIRSTVISIBLELINE) == position, "Append preserves viewing position");
+            require(call(SCI_GETANCHOR) == 23 && call(SCI_GETCURRENTPOS) == 42, "Append preserves selection");
+            require(call(SCI_GETDOCPOINTER) == document, "Append retains the native document");
+            view.refresh_text(text, true, false, false);
+            pump();
+            require(call(SCI_GETFIRSTVISIBLELINE) == position, "Replacement preserves viewing position");
+            require(call(SCI_GETANCHOR) == 23 && call(SCI_GETCURRENTPOS) == 42, "Replacement preserves selection");
+            view.refresh_text(L"new tail\n", false, true, false);
+            pump();
+            require(call(SCI_GETCURRENTPOS) == call(SCI_GETLENGTH), "Follow moves caret to latest content");
+            require(call(SCI_GETFIRSTVISIBLELINE) > position, "Follow scrolls to latest content");
+            view.refresh_text(L"", true, false, false);
+            require(call(SCI_GETLENGTH) == 0, "Truncation clears the existing document");
+            require(call(SCI_GETREADONLY) != 0, "Refresh keeps the document read-only");
+            view.set_word_wrap(true);
+            const std::wstring long_line(400, L'x');
+            std::wstring wrapped;
+            for (int i = 0; i < 800; ++i) { wrapped += long_line + L"\n"; }
+            view.refresh_text(wrapped, true, false, false);
+            pump();
+            call(SCI_SCROLLVERTICAL, 150, 1);
+            pump();
+            const auto wrapped_first = call(SCI_GETFIRSTVISIBLELINE);
+            const auto wrapped_document_line = call(SCI_DOCLINEFROMVISIBLE, wrapped_first);
+            view.refresh_text(long_line, false, false, false);
+            pump();
+            require(call(SCI_DOCLINEFROMVISIBLE, call(SCI_GETFIRSTVISIBLELINE)) == wrapped_document_line,
+                "Wrapped append preserves the first document line");
+            view.refresh_text(wrapped.substr(0, 401), true, false, true);
+            view.refresh_text(wrapped.substr(401), false, false, false);
+            pump();
+            require(call(SCI_DOCLINEFROMVISIBLE, call(SCI_GETFIRSTVISIBLELINE)) == wrapped_document_line,
+                "Multi-chunk replacement restores a wrapped viewing position");
+        }
+        DestroyWindow(owner);
+        pump();
+        std::cout << "Scintilla: append, replacement, selection, viewport, follow, empty file passed\n";
+    }
+}
+
+int run_text_monitor_tests()
+{
+    const auto directory = std::filesystem::current_path() / L".tmp" /
+        (L"text-monitor-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64()));
+    std::filesystem::create_directories(directory);
+    const auto path = directory / L"live.log";
+    const auto replacement = directory / L"replacement.log";
+    try
+    {
+        TextPreferences defaults;
+        require(!defaults.monitor_file && !defaults.scroll_to_latest && defaults.refresh_interval_ms == 1000,
+            "Monitoring defaults");
+        write_file(path, "start\n");
+        Preview preview;
+        preview.apply(load_text_preview(path, chunk_size, TextEncoding::utf8, true));
+        require(preview.text == L"start\n", "Initial preview");
+        const auto initial_bytes = preview.bytes;
+        for (int i = 0; i < 1000; ++i) { preview.poll(); }
+        require(preview.bytes == initial_bytes, "Unchanged polls perform zero content reads");
+        for (int i = 0; i < 1000; ++i)
+        {
+            const auto noise = directory / (L"unrelated-" + std::to_wstring(i) + L".log");
+            write_file(noise, "unrelated log\n");
+            preview.poll();
+            require(DeleteFileW(noise.c_str()) != FALSE, "Delete unrelated test log");
+            preview.poll();
+        }
+        require(preview.bytes == initial_bytes, "Unrelated file creation/deletion triggers zero content reads");
+        write_file(path, "\xe4", true);
+        preview.poll();
+        require(preview.text == L"start\n", "Hold incomplete UTF-8 at EOF");
+        write_file(path, "\xb8\xad\xf0\x9f", true);
+        preview.poll();
+        require(preview.text == L"start\n中", "Finish split UTF-8 and retain next partial character");
+        write_file(path, "\x98\x80\n", true);
+        preview.poll();
+        require(preview.text == L"start\n中😀\n", "Finish split supplementary character");
+
+        std::string burst;
+        for (int i = 0; i < 150000; ++i) { burst += "burst log line " + std::to_string(i) + "\n"; }
+        const auto before_burst = preview.bytes;
+        const auto before_burst_characters = preview.text.size();
+        write_file(path, burst, true);
+        preview.poll();
+        require(preview.text.size() == before_burst_characters + burst.size(), "Multi-chunk burst has no duplicates or omissions");
+        require(preview.text.substr(before_burst_characters) == std::wstring(burst.begin(), burst.end()),
+            "Every burst line is in source order");
+        require(preview.bytes - before_burst <= burst.size() + 8192, "Append reads only new data and bounded guards");
+        write_file(path, "");
+        preview.poll();
+        require(preview.text.empty(), "Truncate to empty");
+        write_file(path, "regrown\n", true);
+        preview.poll();
+        require(preview.text == L"regrown\n", "Append after empty truncation");
+        write_file(path, "changed\n");
+        preview.poll();
+        require(preview.text == L"changed\n", "Same-size rewrite");
+        write_file(path, "truncate and regrow beyond old size\n");
+        preview.poll();
+        require(preview.text == L"truncate and regrow beyond old size\n", "Truncate and regrow between polls");
+
+        require(DeleteFileW(path.c_str()) != FALSE, "No retained source handle prevents deletion");
+        const auto retained = preview.text;
+        for (int i = 0; i < 100; ++i) { preview.poll(); }
+        require(preview.text == retained, "Missing file preserves last available content");
+        write_file(path, "recreated\n");
+        preview.poll();
+        require(preview.text == L"recreated\n", "Recreated file resumes monitoring");
+        for (int i = 0; i < 1000; ++i)
+        {
+            const auto line = "replacement " + std::to_string(i) + "\n";
+            write_file(replacement, line);
+            require(MoveFileExW(replacement.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING) != FALSE,
+                "Atomic log rotation");
+            preview.poll();
+            require(preview.text == std::wstring(line.begin(), line.end()), "Rotation follows path identity");
+        }
+        DWORD handles_before{};
+        GetProcessHandleCount(GetCurrentProcess(), &handles_before);
+        std::atomic_bool done{};
+        std::atomic_bool writer_failed{};
+        std::jthread writer([&] {
+            try
+            {
+                for (int i = 0; i < 2000; ++i)
+                {
+                    DeleteFileW(path.c_str());
+                    write_file(path, "rotating burst " + std::to_string(i) + "\n");
+                    write_file(path, "tail\n", true);
+                }
+            }
+            catch (...) { writer_failed = true; }
+            done = true;
+        });
+        std::size_t polls{};
+        while (!done)
+        {
+            auto update = load_next_text_preview_chunk(preview.reader, chunk_size);
+            if (update.error.empty()) { preview.apply(std::move(update)); }
+            ++polls;
+        }
+        writer.join();
+        require(!writer_failed, "Concurrent writer completed");
+        write_file(path, "final stable log after churn\n");
+        preview.poll();
+        require(preview.text == L"final stable log after churn\n", "Converges after concurrent delete/create/append burst");
+        {
+            winrt::handle locked(CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr,
+                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            require(static_cast<bool>(locked), "Writer can acquire exclusive access between polls");
+            const auto retained_while_locked = preview.text;
+            preview.poll();
+            require(preview.text == retained_while_locked, "Sharing violation retains visible content");
+        }
+        preview.poll();
+        require(preview.text == L"final stable log after churn\n", "Recover after sharing violation");
+        {
+            winrt::handle writer_open(CreateFileW(path.c_str(), FILE_APPEND_DATA,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            require(static_cast<bool>(writer_open), "Open persistent log writer");
+            DWORD written{};
+            require(WriteFile(writer_open.get(), "open writer\n", 12, &written, nullptr) && written == 12,
+                "Append without closing writer");
+            preview.poll();
+            require(preview.text.ends_with(L"open writer\n"), "Detect growth while writer keeps its handle open");
+        }
+        DWORD handles_after{};
+        GetProcessHandleCount(GetCurrentProcess(), &handles_after);
+        require(handles_after <= handles_before + 4, "No handle leak during file churn");
+        cancel_text_preview_read(preview.reader);
+        const auto cancelled = load_next_text_preview_chunk(preview.reader, chunk_size);
+        require(cancelled.content.empty() && cancelled.bytes_read == 0, "Cancelled preview performs no file I/O");
+
+        write_file(path, std::string("\xff\xfe\x41\x00", 4));
+        Preview utf16;
+        utf16.apply(load_text_preview(path, chunk_size, TextEncoding::automatic, true));
+        write_file(path, std::string("\x2d", 1), true);
+        utf16.poll();
+        require(utf16.text == L"A", "Hold incomplete UTF-16 code unit");
+        write_file(path, std::string("\x4e", 1), true);
+        utf16.poll();
+        require(utf16.text == L"A中", "Finish split UTF-16 code unit");
+        write_file(path, std::string("\x3d\xd8", 2), true);
+        utf16.poll();
+        require(utf16.text == L"A中", "Hold incomplete UTF-16 surrogate pair");
+        write_file(path, std::string("\x00\xde", 2), true);
+        utf16.poll();
+        require(utf16.text == L"A中😀", "Finish split UTF-16 surrogate pair");
+        write_file(path, "");
+        Preview empty;
+        empty.apply(load_text_preview(path, chunk_size, TextEncoding::automatic, true));
+        write_file(path, std::string("\xff\xfe\x41\x00", 4), true);
+        empty.poll();
+        require(empty.text == L"A", "Detect encoding when an initially empty log receives content");
+        write_file(path, "GBK:");
+        Preview gbk;
+        gbk.apply(load_text_preview(path, chunk_size, TextEncoding::gbk, true));
+        write_file(path, "\xd6", true);
+        gbk.poll();
+        require(gbk.text == L"GBK:", "Hold incomplete GBK character");
+        write_file(path, "\xd0", true);
+        gbk.poll();
+        require(gbk.text == L"GBK:中", "Finish split GBK character");
+        std::cout << "Reader: idle_reads=0, burst_bytes=" << burst.size()
+            << ", rotations=1000, concurrent_cycles=2000, concurrent_polls=" << polls << '\n';
+        test_scintilla();
+        std::filesystem::remove(path);
+        std::filesystem::remove(directory);
+        std::cout << "All text monitor tests passed\n";
+        return 0;
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "FAILED: " << error.what() << "\nFixtures retained at " << directory << '\n';
+        return 1;
+    }
+}

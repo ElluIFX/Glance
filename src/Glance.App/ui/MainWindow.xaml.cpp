@@ -2058,6 +2058,7 @@ namespace winrt::Glance::App::implementation
         }
         refresh_realized_json_rows();
         update_preview_as_text_button();
+        schedule_text_monitor();
     }
 
     void MainWindow::update_archive_header_state()
@@ -2653,7 +2654,11 @@ namespace winrt::Glance::App::implementation
             source_kind_ == source_kind && source_window_ == source_window &&
             !source_id.empty() && source_id_ == source_id &&
             files.size() == 1 && current_index_ < files_.size() &&
-            glance::app::same_filesystem_preview(files_[current_index_], files.front()))
+            (glance::app::same_filesystem_preview(files_[current_index_], files.front()) ||
+             (text_preferences_.monitor_file && text_reader_monitored_ &&
+              current_kind_ == glance::app::PreviewKind::text && files.front().is_filesystem &&
+              (files.front().attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
+              files_[current_index_].path == files.front().path)))
         {
             source_capabilities_ = source_capabilities;
             GalleryModeButton().Visibility(
@@ -2861,6 +2866,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::clear_preview_content()
     {
+        stop_text_monitor();
         leave_gallery(false);
         release_native_preview_surface();
         if (shell_file_cancellation_)
@@ -4375,6 +4381,7 @@ namespace winrt::Glance::App::implementation
         bool markdown,
         bool web)
     {
+        stop_text_monitor();
         clear_web_view_content();
         glance::app::cancel_text_preview_read(current_text_reader_);
         reset_json_preview();
@@ -4493,17 +4500,20 @@ namespace winrt::Glance::App::implementation
         glance::app::TextEncoding encoding,
         bool preview_as_text_attempt)
     {
+        stop_text_monitor();
         glance::app::cancel_text_preview_read(current_text_reader_);
         text_chunk_loading_ = true;
         current_text_has_more_ = false;
         current_text_reader_.reset();
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
+        const bool monitor = text_preferences_.monitor_file && !markdown && !web && !current_text_json_;
+        text_reader_monitored_ = monitor;
         co_await resume_background();
         const auto initial_bytes = markdown
             ? static_cast<std::size_t>(maximum_preview_as_text_bytes)
             : text_chunk_bytes;
-        auto preview = glance::app::load_text_preview(path, initial_bytes, encoding);
+        auto preview = glance::app::load_text_preview(path, initial_bytes, encoding, monitor);
         static_cast<void>(dispatcher.TryEnqueue(
             [lifetime, preview = std::move(preview), markdown, web, generation, preview_as_text_attempt]() mutable {
                 lifetime->apply_text_preview(
@@ -6597,6 +6607,12 @@ namespace winrt::Glance::App::implementation
         if (!preview.error.empty())
         {
             set_text_loading(false);
+            if (text_reader_monitored_ && !preview_as_text_attempt)
+            {
+                show_text_preview_error(std::move(preview.error));
+                schedule_text_monitor();
+                return;
+            }
             if (preview_as_text_attempt)
             {
                 PreviewAsTextButton().IsEnabled(true);
@@ -6641,11 +6657,21 @@ namespace winrt::Glance::App::implementation
         if (text_editor_ != nullptr)
         {
             text_editor_->clear();
-            text_editor_->append_text(initial_content);
+            if (text_reader_monitored_)
+            {
+                text_editor_->refresh_text(initial_content, false,
+                    text_preferences_.scroll_to_latest, current_text_has_more_);
+            }
+            else
+            {
+                text_editor_->append_text(initial_content);
+            }
         }
         update_line_number_visibility();
         set_text_loading(false);
         ensure_text_viewport_filled();
+
+        schedule_text_monitor();
 
         if (markdown)
         {
@@ -6668,6 +6694,11 @@ namespace winrt::Glance::App::implementation
 
     fire_and_forget MainWindow::load_next_text_chunk_async(std::uint64_t generation)
     {
+        if (text_preferences_.monitor_file && text_reader_monitored_)
+        {
+            refresh_monitored_text_async();
+            co_return;
+        }
         if (text_chunk_loading_ || !current_text_has_more_ || current_text_reader_ == nullptr)
         {
             co_return;
@@ -6708,6 +6739,7 @@ namespace winrt::Glance::App::implementation
                 }
                 lifetime->set_text_loading(false);
                 lifetime->ensure_text_viewport_filled();
+                lifetime->schedule_text_monitor();
                 glance::contracts::log_event(
                     L"Incremental text chunk applied: characters=" +
                     std::to_wstring(appended.size()) +
@@ -6725,6 +6757,114 @@ namespace winrt::Glance::App::implementation
                         lifetime->web_preview_available_ &&
                         !lifetime->current_text_has_more_);
                 }
+            }));
+    }
+
+    void MainWindow::stop_text_monitor()
+    {
+        if (text_monitor_timer_ != nullptr)
+        {
+            text_monitor_timer_.Stop();
+        }
+    }
+
+    void MainWindow::schedule_text_monitor()
+    {
+        stop_text_monitor();
+        if (!visible_ || !text_preferences_.monitor_file ||
+            current_kind_ != glance::app::PreviewKind::text || current_text_json_ ||
+            current_text_path_.empty() || text_chunk_loading_)
+        {
+            return;
+        }
+        if (text_monitor_timer_ == nullptr)
+        {
+            text_monitor_timer_ = DispatcherTimer();
+            text_monitor_timer_.Tick([weak = get_weak()](auto const&, auto const&) {
+                if (auto self = weak.get())
+                {
+                    self->stop_text_monitor();
+                    self->refresh_monitored_text_async();
+                }
+            });
+        }
+        text_monitor_timer_.Interval(std::chrono::milliseconds(text_preferences_.refresh_interval_ms));
+        text_monitor_timer_.Start();
+    }
+
+    fire_and_forget MainWindow::refresh_monitored_text_async()
+    {
+        if (text_chunk_loading_ || !visible_ || !text_preferences_.monitor_file ||
+            current_kind_ != glance::app::PreviewKind::text || current_text_json_ ||
+            current_text_path_.empty())
+        {
+            co_return;
+        }
+        stop_text_monitor();
+        text_chunk_loading_ = true;
+        const auto generation = content_generation_;
+        const auto reader = current_text_reader_;
+        const bool restart = !text_reader_monitored_ || reader == nullptr;
+        const auto path = current_text_path_;
+        const auto encoding = current_text_encoding_;
+        const auto weak = get_weak();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        glance::app::TextPreview result;
+        try
+        {
+            result = restart
+                ? glance::app::load_text_preview(path, text_chunk_bytes, encoding, true)
+                : glance::app::load_next_text_preview_chunk(reader, text_chunk_bytes);
+            result.replace_content = result.replace_content || restart;
+        }
+        catch (...)
+        {
+            result.retry_later = true;
+        }
+        static_cast<void>(dispatcher.TryEnqueue(
+            [weak, reader, generation, result = std::move(result)]() mutable {
+                const auto self = weak.get();
+                if (!self || generation != self->content_generation_ ||
+                    reader != self->current_text_reader_ || !self->visible_)
+                {
+                    glance::app::cancel_text_preview_read(result.reader);
+                    return;
+                }
+                self->text_chunk_loading_ = false;
+                if (!result.retry_later && result.error.empty())
+                {
+                    if (reader == nullptr)
+                    {
+                        self->dismiss_preview_info_bar();
+                    }
+                    self->current_text_reader_ = std::move(result.reader);
+                    self->text_reader_monitored_ = true;
+                    self->current_text_has_more_ = result.has_more;
+                    if (self->text_editor_ && (result.replace_content || !result.content.empty()))
+                    {
+                        self->text_editor_->refresh_text(result.content, result.replace_content,
+                            self->text_preferences_.monitor_file && self->text_preferences_.scroll_to_latest,
+                            result.has_more);
+                    }
+                    if (self->current_text_encoding_ == glance::app::TextEncoding::automatic &&
+                        !result.encoding.empty())
+                    {
+                        self->EncodingSelector().Content(box_value(result.encoding));
+                    }
+                    if (result.has_more && self->text_preferences_.monitor_file)
+                    {
+                        // One chunk per dispatcher turn bounds memory and lets input run.
+                        self->DispatcherQueue().TryEnqueue([weak, generation] {
+                            if (auto window = weak.get(); window && generation == window->content_generation_)
+                            {
+                                window->refresh_monitored_text_async();
+                            }
+                        });
+                        return;
+                    }
+                }
+                self->schedule_text_monitor();
             }));
     }
 

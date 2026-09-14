@@ -22,17 +22,24 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\src\Glance.App\preferences;$(ProjectDir)..\..\src\Glance.App\preview;$(ProjectDir)..\..\src\Glance.Contracts\include;$(ProjectDir)..\..\src\Glance.Core\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\src\Glance.App;$(ProjectDir)..\..\src\Glance.App\application;$(ProjectDir)..\..\src\Glance.App\components;$(ProjectDir)..\..\src\Glance.App\preferences;$(ProjectDir)..\..\src\Glance.App\preview;$(ProjectDir)..\..\src\Glance.Contracts\include;$(ProjectDir)..\..\src\Glance.Core\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>GLANCE_PAGED_DOCUMENT_CLIENT_NO_COMPONENT_FACTORY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>icu.lib;Comctl32.lib;Ole32.lib;Shell32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="input_decision_tests.cpp" />
     <ClCompile Include="office_preview_benchmark.cpp" />
     <ClCompile Include="panorama_preview_benchmark.cpp" />
+    <ClCompile Include="text_monitor_tests.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\preview_provider.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\scintilla_text_view.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\syntax_theme.cpp">
+      <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="..\..\src\Glance.App\preview\native_preview_surface.cpp" />
     <ClCompile Include="..\..\src\Glance.App\preview\paged_document_render_client.cpp" />
   </ItemGroup>

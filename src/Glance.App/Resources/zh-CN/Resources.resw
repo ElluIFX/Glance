@@ -423,4 +423,10 @@
   <data name="JsonNodeCopied" xml:space="preserve"><value>已复制 JSON 节点</value></data>
   <data name="JsonNodeCopyUnavailable" xml:space="preserve"><value>JSON 节点尚未准备好复制</value></data>
   <data name="JsonNodeCopyFailed" xml:space="preserve"><value>无法复制 JSON 节点</value></data>
+  <data name="MonitorTextFileLabel.Text" xml:space="preserve"><value>监视文件变化</value></data>
+  <data name="MonitorTextFileDescription.Text" xml:space="preserve"><value>文件变化时原位更新纯文本日志</value></data>
+  <data name="TextRefreshIntervalLabel.Text" xml:space="preserve"><value>最短刷新间隔（秒）</value></data>
+  <data name="TextRefreshIntervalDescription.Text" xml:space="preserve"><value>每隔 0.1–60 秒检查文件元数据</value></data>
+  <data name="TextScrollLatestLabel.Text" xml:space="preserve"><value>滚动到最新内容</value></data>
+  <data name="TextScrollLatestDescription.Text" xml:space="preserve"><value>跟随新增内容，关闭时尽量保持当前查看位置</value></data>
 </root>

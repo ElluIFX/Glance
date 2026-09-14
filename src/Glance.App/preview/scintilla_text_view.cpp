@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cwctype>
 #include <filesystem>
 #include <initializer_list>
 #include <mutex>
@@ -658,6 +659,7 @@ namespace glance::app
 
     void ScintillaTextView::clear() noexcept
     {
+        refresh_position_.reset();
         release_copy_shortcut(host_);
         if (editor_ == nullptr)
         {
@@ -688,6 +690,61 @@ namespace glance::app
             reinterpret_cast<LPARAM>(encoded.data()));
         call(SCI_SETREADONLY, TRUE);
         update_line_number_width();
+    }
+
+    void ScintillaTextView::refresh_text(
+        std::wstring_view text, bool replace, bool follow, bool has_more)
+    {
+        if (editor_ == nullptr)
+        {
+            return;
+        }
+        const auto first = call(SCI_GETFIRSTVISIBLELINE);
+        const auto line = call(SCI_DOCLINEFROMVISIBLE, first);
+        const RefreshPosition position{
+            line, first - call(SCI_VISIBLEFROMDOCLINE, line),
+            call(SCI_GETXOFFSET), call(SCI_GETANCHOR), call(SCI_GETCURRENTPOS) };
+        if (replace && !follow)
+        {
+            refresh_position_ = position;
+        }
+        const auto encoded = utf8(text);
+        // Mutate the existing document without exposing a cleared intermediate frame.
+        SendMessageW(editor_, WM_SETREDRAW, FALSE, 0);
+        if (replace)
+        {
+            call(SCI_SETREADONLY, FALSE);
+            call(SCI_CLEARALL);
+            call(SCI_EMPTYUNDOBUFFER);
+            call(SCI_SETREADONLY, TRUE);
+        }
+        call(SCI_SETREADONLY, FALSE);
+        call(SCI_APPENDTEXT, static_cast<WPARAM>(encoded.size()), reinterpret_cast<LPARAM>(encoded.data()));
+        call(SCI_SETREADONLY, TRUE);
+        update_line_number_width();
+        if (follow)
+        {
+            refresh_position_.reset();
+            call(SCI_GOTOPOS, call(SCI_GETLENGTH));
+            call(SCI_SCROLLCARET);
+        }
+        else
+        {
+            const auto restore = refresh_position_.value_or(position);
+            if (replace || refresh_position_)
+            {
+                const auto length = call(SCI_GETLENGTH);
+                call(SCI_SETSEL, std::min(restore.anchor, length), std::min(restore.caret, length));
+            }
+            call(SCI_SCROLLVERTICAL, restore.line, restore.subline);
+            call(SCI_SETXOFFSET, restore.x);
+            if (!has_more || call(SCI_GETLINECOUNT) > restore.line)
+            {
+                refresh_position_.reset();
+            }
+        }
+        SendMessageW(editor_, WM_SETREDRAW, TRUE, 0);
+        InvalidateRect(editor_, nullptr, FALSE);
     }
 
     void ScintillaTextView::set_file_path(std::wstring_view path)

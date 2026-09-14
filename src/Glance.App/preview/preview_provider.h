@@ -36,6 +36,9 @@ namespace glance::app
         std::wstring error;
         std::shared_ptr<IncrementalTextReader> reader;
         bool has_more{};
+        bool replace_content{};
+        bool retry_later{};
+        std::uint64_t bytes_read{};
     };
 
     struct MaterializedShellFile
@@ -78,7 +81,8 @@ namespace glance::app
     [[nodiscard]] TextPreview load_text_preview(
         const std::wstring& path,
         std::size_t chunk_bytes = 256U * 1024U,
-        TextEncoding encoding = TextEncoding::automatic);
+        TextEncoding encoding = TextEncoding::automatic,
+        bool monitor = false);
     [[nodiscard]] TextPreview load_next_text_preview_chunk(
         const std::shared_ptr<IncrementalTextReader>& reader,
         std::size_t chunk_bytes = 256U * 1024U);

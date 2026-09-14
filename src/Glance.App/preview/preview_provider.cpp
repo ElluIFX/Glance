@@ -4,6 +4,7 @@
 #include "preview_provider.h"
 
 #include <windows.h>
+#include <winrt/base.h>
 #include <icu.h>
 #include <propkey.h>
 #include <shellapi.h>
@@ -772,26 +773,117 @@ namespace glance::app
             std::uint64_t file_size,
             std::uint64_t byte_offset,
             std::wstring display_encoding,
-            std::unique_ptr<UConverter, ConverterCloser> converter)
+            std::unique_ptr<UConverter, ConverterCloser> converter,
+            BY_HANDLE_FILE_INFORMATION information,
+            TextEncoding encoding,
+            bool monitor)
             : path_(std::move(path)),
               file_size_(file_size),
               byte_offset_(byte_offset),
               display_encoding_(std::move(display_encoding)),
-              converter_(std::move(converter))
+              converter_(std::move(converter)),
+              information_(information),
+              encoding_(encoding),
+              monitor_(monitor)
         {
         }
 
-        TextPreview read_next(std::size_t chunk_bytes)
+        TextPreview read_next(std::size_t chunk_bytes, bool allow_reload = true)
         {
-            std::scoped_lock lock(mutex_);
+            std::unique_lock lock(mutex_);
             TextPreview result;
             result.reader = shared_from_this();
             result.encoding = display_encoding_;
             if (cancelled_.load(std::memory_order_relaxed) ||
-                failed_ ||
-                byte_offset_ >= file_size_)
+                (!monitor_ && (failed_ || byte_offset_ >= file_size_)))
             {
                 return result;
+            }
+
+            winrt::handle file(CreateFileW(path_.c_str(), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            BY_HANDLE_FILE_INFORMATION information{};
+            if (!file || !GetFileInformationByHandle(file.get(), &information))
+            {
+                if (monitor_)
+                {
+                    retry_reset_ = true;
+                    result.retry_later = true;
+                }
+                else
+                {
+                    result.error = localize(L"TextFileOpenError");
+                }
+                return result;
+            }
+            const auto size = (static_cast<std::uint64_t>(information.nFileSizeHigh) << 32) |
+                information.nFileSizeLow;
+            const auto read_at = [&](std::uint64_t offset, std::span<std::byte> target) {
+                LARGE_INTEGER position{};
+                position.QuadPart = static_cast<LONGLONG>(offset);
+                DWORD count{};
+                if (!SetFilePointerEx(file.get(), position, nullptr, FILE_BEGIN) ||
+                    !ReadFile(file.get(), target.data(), static_cast<DWORD>(target.size()), &count, nullptr))
+                {
+                    return std::size_t{};
+                }
+                result.bytes_read += count;
+                return static_cast<std::size_t>(count);
+            };
+            if (monitor_)
+            {
+                const bool changed = size != file_size_ ||
+                    information.dwVolumeSerialNumber != information_.dwVolumeSerialNumber ||
+                    information.nFileIndexHigh != information_.nFileIndexHigh ||
+                    information.nFileIndexLow != information_.nFileIndexLow ||
+                    CompareFileTime(&information.ftCreationTime, &information_.ftCreationTime) != 0 ||
+                    CompareFileTime(&information.ftLastWriteTime, &information_.ftLastWriteTime) != 0;
+                bool reset = retry_reset_ || (changed && (failed_ || file_size_ == 0 || size <= file_size_ ||
+                    information.dwVolumeSerialNumber != information_.dwVolumeSerialNumber ||
+                    information.nFileIndexHigh != information_.nFileIndexHigh ||
+                    information.nFileIndexLow != information_.nFileIndexLow ||
+                    CompareFileTime(&information.ftCreationTime, &information_.ftCreationTime) != 0));
+                if (changed && !reset && !anchor_.empty())
+                {
+                    std::vector<std::byte> check(anchor_.size());
+                    reset = read_at(anchor_offset_, check) != check.size() || check != anchor_;
+                    if (!reset && !prefix_.empty())
+                    {
+                        check.resize(prefix_.size());
+                        reset = read_at(0, check) != check.size() || check != prefix_;
+                    }
+                }
+                if (reset)
+                {
+                    if (!allow_reload)
+                    {
+                        result.retry_later = true;
+                        return result;
+                    }
+                    file.close();
+                    lock.unlock();
+                    auto replacement = load_text_preview(path_, chunk_bytes, encoding_, true);
+                    if (cancelled_.load(std::memory_order_relaxed))
+                    {
+                        cancel_text_preview_read(replacement.reader);
+                        return {};
+                    }
+                    if (!replacement.error.empty() || replacement.retry_later)
+                    {
+                        result.retry_later = true;
+                        return result;
+                    }
+                    replacement.replace_content = true;
+                    replacement.bytes_read += result.bytes_read;
+                    return replacement;
+                }
+                information_ = information;
+                file_size_ = size;
+                if (failed_ || byte_offset_ >= file_size_)
+                {
+                    return result;
+                }
             }
 
             const auto remaining = file_size_ - byte_offset_;
@@ -799,32 +891,37 @@ namespace glance::app
                 remaining,
                 std::max<std::size_t>(1, chunk_bytes)));
             std::vector<std::byte> bytes(requested);
-            {
-                std::ifstream stream(std::filesystem::path(path_), std::ios::binary);
-                if (!stream)
-                {
-                    failed_ = true;
-                    result.error = localize(L"TextFileOpenError");
-                    return result;
-                }
-                stream.seekg(static_cast<std::streamoff>(byte_offset_), std::ios::beg);
-                stream.read(
-                    reinterpret_cast<char*>(bytes.data()),
-                    static_cast<std::streamsize>(bytes.size()));
-                bytes.resize(static_cast<std::size_t>(stream.gcount()));
-            }
+            bytes.resize(read_at(byte_offset_, bytes));
             if (cancelled_.load(std::memory_order_relaxed))
             {
                 return result;
             }
             if (bytes.empty())
             {
+                if (monitor_)
+                {
+                    retry_reset_ = true;
+                    result.retry_later = true;
+                    return result;
+                }
                 failed_ = true;
                 result.error = localize(L"TextFileOpenError");
                 return result;
             }
 
             byte_offset_ += bytes.size();
+            if (monitor_)
+            {
+                // Bounded guards detect common truncate-and-regrow log rotation.
+                const auto count = std::min<std::size_t>(4096, bytes.size());
+                anchor_.assign(bytes.end() - count, bytes.end());
+                anchor_offset_ = byte_offset_ - count;
+                if (prefix_.empty())
+                {
+                    prefix_.resize(static_cast<std::size_t>(std::min<std::uint64_t>(4096, byte_offset_)));
+                    prefix_.resize(read_at(0, prefix_));
+                }
+            }
             const bool end_of_file = byte_offset_ >= file_size_;
             std::vector<UChar> decoded(bytes.size() * 2U + 32U);
             const char* source = reinterpret_cast<const char*>(bytes.data());
@@ -839,7 +936,7 @@ namespace glance::app
                 &source,
                 source_limit,
                 nullptr,
-                end_of_file,
+                end_of_file && !monitor_,
                 &status);
             if (U_FAILURE(status) || source != source_limit)
             {
@@ -876,6 +973,13 @@ namespace glance::app
         std::mutex mutex_;
         std::atomic_bool cancelled_{};
         bool failed_{};
+        BY_HANDLE_FILE_INFORMATION information_{};
+        TextEncoding encoding_{};
+        bool monitor_{};
+        bool retry_reset_{};
+        std::vector<std::byte> anchor_;
+        std::vector<std::byte> prefix_;
+        std::uint64_t anchor_offset_{};
     };
 
     bool can_try_preview_as_text(const std::wstring& path)
@@ -1188,33 +1292,34 @@ namespace glance::app
     TextPreview load_text_preview(
         const std::wstring& path,
         std::size_t chunk_bytes,
-        TextEncoding encoding)
+        TextEncoding encoding,
+        bool monitor)
     {
         TextPreview result;
-        std::ifstream stream(std::filesystem::path(path), std::ios::binary);
-        if (!stream)
+        winrt::handle file(CreateFileW(path.c_str(), GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        BY_HANDLE_FILE_INFORMATION information{};
+        if (!file || !GetFileInformationByHandle(file.get(), &information))
         {
             result.error = localize(L"TextFileOpenError");
             return result;
         }
 
-        stream.seekg(0, std::ios::end);
-        const auto file_size = stream.tellg();
-        stream.seekg(0, std::ios::beg);
-        if (file_size < 0)
-        {
-            result.error = localize(L"TextFileSizeError");
-            return result;
-        }
-
-        const auto file_size_bytes = static_cast<std::uint64_t>(file_size);
+        const auto file_size_bytes = (static_cast<std::uint64_t>(information.nFileSizeHigh) << 32) |
+            information.nFileSizeLow;
         const auto bytes_to_read = std::min<std::uint64_t>(
             file_size_bytes,
             maximum_encoding_detection_bytes);
         std::vector<std::byte> bytes(static_cast<std::size_t>(bytes_to_read));
-        stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        bytes.resize(static_cast<std::size_t>(stream.gcount()));
-        stream.close();
+        DWORD read{};
+        if (!ReadFile(file.get(), bytes.data(), static_cast<DWORD>(bytes.size()), &read, nullptr))
+        {
+            result.error = localize(L"TextFileOpenError");
+            return result;
+        }
+        bytes.resize(read);
+        file.close();
 
         const std::span<const std::byte> payload = bytes;
         const bool utf8_bom = payload.size() >= 3 &&
@@ -1282,8 +1387,10 @@ namespace glance::app
             file_size_bytes,
             plan->byte_offset,
             plan->display_name,
-            std::move(converter));
-        return reader->read_next(chunk_bytes);
+            std::move(converter), information, encoding, monitor);
+        result = reader->read_next(chunk_bytes, false);
+        result.bytes_read += read;
+        return result;
     }
 
     TextPreview load_next_text_preview_chunk(

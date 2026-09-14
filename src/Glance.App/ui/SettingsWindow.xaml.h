@@ -142,6 +142,8 @@ namespace winrt::Glance::App::implementation
         void SyntaxThemeComboBox_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+        void TextRefreshIntervalNumberBox_ValueChanged(
+            IInspectable const&, Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
         void TextPreferenceToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);

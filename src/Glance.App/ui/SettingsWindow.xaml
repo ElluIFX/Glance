@@ -807,6 +807,35 @@
                                 </StackPanel>
                                 <ToggleSwitch x:Name="WordWrapToggle" Grid.Column="1" HorizontalAlignment="Right" OffContent="{x:Null}" OnContent="{x:Null}" VerticalAlignment="Center" Toggled="TextPreferenceToggle_Toggled" />
                             </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="MonitorTextFileLabel" x:Uid="MonitorTextFileLabel" />
+                                    <TextBlock x:Name="MonitorTextFileDescription" x:Uid="MonitorTextFileDescription" Style="{StaticResource SettingsDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="MonitorTextFileToggle" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" OffContent="{x:Null}" OnContent="{x:Null}" Toggled="TextPreferenceToggle_Toggled" />
+                            </Grid>
+                            <StackPanel x:Name="TextFileMonitorOptions" Visibility="Collapsed">
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="TextRefreshIntervalLabel" x:Uid="TextRefreshIntervalLabel" />
+                                        <TextBlock x:Name="TextRefreshIntervalDescription" x:Uid="TextRefreshIntervalDescription" Style="{StaticResource SettingsDescriptionStyle}" />
+                                    </StackPanel>
+                                    <NumberBox x:Name="TextRefreshIntervalNumberBox" Grid.Column="1" Width="130" Minimum="0.1" Maximum="60" SmallChange="0.1" LargeChange="1" SpinButtonPlacementMode="Compact" ValueChanged="TextRefreshIntervalNumberBox_ValueChanged" />
+                                </Grid>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="TextScrollLatestLabel" x:Uid="TextScrollLatestLabel" />
+                                        <TextBlock x:Name="TextScrollLatestDescription" x:Uid="TextScrollLatestDescription" Style="{StaticResource SettingsDescriptionStyle}" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="TextScrollLatestToggle" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" OffContent="{x:Null}" OnContent="{x:Null}" Toggled="TextPreferenceToggle_Toggled" />
+                                </Grid>
+                            </StackPanel>
                         </StackPanel>
                         </Border>
                     </StackPanel>

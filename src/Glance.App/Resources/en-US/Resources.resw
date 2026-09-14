@@ -423,4 +423,10 @@
   <data name="JsonNodeCopied" xml:space="preserve"><value>JSON node copied</value></data>
   <data name="JsonNodeCopyUnavailable" xml:space="preserve"><value>The JSON node is not ready to copy</value></data>
   <data name="JsonNodeCopyFailed" xml:space="preserve"><value>Could not copy JSON node</value></data>
+  <data name="MonitorTextFileLabel.Text" xml:space="preserve"><value>Monitor file changes</value></data>
+  <data name="MonitorTextFileDescription.Text" xml:space="preserve"><value>Update plain text logs in place as they change</value></data>
+  <data name="TextRefreshIntervalLabel.Text" xml:space="preserve"><value>Minimum refresh interval (seconds)</value></data>
+  <data name="TextRefreshIntervalDescription.Text" xml:space="preserve"><value>Check file metadata every 0.1–60 seconds</value></data>
+  <data name="TextScrollLatestLabel.Text" xml:space="preserve"><value>Scroll to latest content</value></data>
+  <data name="TextScrollLatestDescription.Text" xml:space="preserve"><value>Follow new content; when off, keep the viewing position where possible</value></data>
 </root>

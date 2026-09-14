@@ -384,6 +384,9 @@ namespace winrt::Glance::App::implementation
             glance::app::TextEncoding encoding,
             bool preview_as_text_attempt = false);
         winrt::fire_and_forget load_next_text_chunk_async(std::uint64_t generation);
+        void stop_text_monitor();
+        void schedule_text_monitor();
+        winrt::fire_and_forget refresh_monitored_text_async();
         void start_json_preview(
             const std::wstring& path,
             std::uint64_t generation,
@@ -778,6 +781,7 @@ namespace winrt::Glance::App::implementation
         std::unique_ptr<glance::app::WindowAcrylicBackdrop> acrylic_backdrop_;
         bool acrylic_enabled_{};
         bool current_text_has_more_{};
+        bool text_reader_monitored_{};
         bool text_chunk_loading_{};
         bool text_loading_{};
         glance::app::TextEncoding current_text_encoding_{ glance::app::TextEncoding::automatic };
@@ -854,6 +858,7 @@ namespace winrt::Glance::App::implementation
         int media_seek_wheel_delta_{};
         int media_volume_wheel_delta_{};
         Microsoft::UI::Xaml::DispatcherTimer focus_timer_{ nullptr };
+        Microsoft::UI::Xaml::DispatcherTimer text_monitor_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer fullscreen_chrome_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer media_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer copy_feedback_timer_{ nullptr };
