@@ -20,6 +20,7 @@
 #include "window_size_store.h"
 #include "window_preferences.h"
 #include "glance/contracts/diagnostics.h"
+#include "glance/contracts/file_descriptor.h"
 #include "glance/contracts/source_api.h"
 #if __has_include("MainWindow.g.cpp")
 #include "MainWindow.g.cpp"
@@ -2645,6 +2646,22 @@ namespace winrt::Glance::App::implementation
         std::uint64_t source_capabilities)
     {
         const bool new_session = !visible_;
+        // External result lists may republish focus while retaining the same file.
+        // Preserve playback, zoom, and in-flight preparation across those updates.
+        if (!new_session &&
+            source_kind == static_cast<std::uint32_t>(glance::contracts::HostKind::external_source) &&
+            source_kind_ == source_kind && source_window_ == source_window &&
+            !source_id.empty() && source_id_ == source_id &&
+            files.size() == 1 && current_index_ < files_.size() &&
+            glance::app::same_filesystem_preview(files_[current_index_], files.front()))
+        {
+            source_capabilities_ = source_capabilities;
+            GalleryModeButton().Visibility(
+                gallery_source_available() &&
+                        gallery_media_kind_ != glance::contracts::components::GalleryMediaKind::none
+                    ? Visibility::Visible : Visibility::Collapsed);
+            return;
+        }
         const bool replace_deferred_session = defer_auto_fit_show_;
         leave_gallery(false);
         stop_detached_focus_monitor();

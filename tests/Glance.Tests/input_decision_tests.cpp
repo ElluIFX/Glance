@@ -9,6 +9,7 @@
 #include "media_preview_preferences.h"
 #include "office_preview_benchmark.h"
 #include "panorama_preview_benchmark.h"
+#include "preview_file.h"
 #include "pan_interaction.h"
 #include "paged_document_render_client.h"
 #include "text_font_fallback.h"
@@ -161,6 +162,47 @@ namespace
         TerminateProcess(probe.value.hProcess, 0);
         expect(WaitForSingleObject(probe.value.hProcess, 5000) == WAIT_OBJECT_0 &&
             preview_owner_has_exited(owner), "Exited preview owner is eligible for cleanup");
+    }
+
+    void test_repeated_source_preview()
+    {
+        glance::app::PreviewFile current;
+        current.path = L"C:\\media\\clip.insv";
+        current.display_name = L"clip.insv";
+        current.is_filesystem = true;
+        current.size = 1024;
+        current.creation_time = 10;
+        current.last_write_time = 20;
+        auto next = current;
+        expect(glance::app::same_filesystem_preview(current, next),
+            "Repeated source focus preserves the current file");
+        next.path = L"C:\\other\\clip.insv";
+        expect(!glance::app::same_filesystem_preview(current, next),
+            "A different file with the same name requires loading");
+        next = current;
+        ++next.last_write_time;
+        expect(!glance::app::same_filesystem_preview(current, next),
+            "Modified content at the same path requires loading");
+        next = current;
+        ++next.size;
+        expect(!glance::app::same_filesystem_preview(current, next),
+            "Growing media at the same path requires loading");
+        next = current;
+        ++next.creation_time;
+        expect(!glance::app::same_filesystem_preview(current, next),
+            "Replaced files require loading");
+        next = current;
+        next.is_cloud_placeholder = true;
+        expect(!glance::app::same_filesystem_preview(current, next),
+            "Cloud availability changes require loading");
+        next = current;
+        next.is_filesystem = false;
+        expect(!glance::app::same_filesystem_preview(current, next),
+            "Virtual shell items do not use filesystem deduplication");
+        current.path.clear();
+        next = current;
+        expect(!glance::app::same_filesystem_preview(current, next),
+            "Empty paths do not suppress preview loading");
     }
 
     struct ImageCodecComponentCase
@@ -949,6 +991,8 @@ int wmain(int argument_count, wchar_t* arguments[])
     }
 
     using glance::core::should_capture_key;
+
+    test_repeated_source_preview();
 
     expect(should_capture_key(VK_SPACE, true, false, true, false, false), "eligible Space");
     expect(should_capture_key(VK_SPACE, true, true, false, false, false), "active Space");
