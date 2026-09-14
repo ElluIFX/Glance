@@ -8934,6 +8934,7 @@ namespace winrt::Glance::App::implementation
             if (const auto row = container.ContentTemplateRoot().try_as<Grid>())
             {
                 row.Tag(nullptr);
+                ToolTipService::SetToolTip(row, nullptr);
                 row.Children().Clear();
                 row.ColumnDefinitions().Clear();
             }
@@ -8949,6 +8950,65 @@ namespace winrt::Glance::App::implementation
             request_more_json_children(
                 static_cast<std::size_t>(row_id & ~json_sentinel_mask));
         }
+    }
+
+    void MainWindow::JsonTreeRow_PointerEntered(
+        IInspectable const& sender,
+        PointerRoutedEventArgs const&)
+    {
+        const auto row = sender.try_as<FrameworkElement>();
+        if (!row)
+        {
+            return;
+        }
+        const auto row_id = unbox_value_or<std::uint64_t>(
+            row.Tag(), std::numeric_limits<std::uint64_t>::max());
+        if ((row_id & json_sentinel_mask) != 0 || row_id >= json_nodes_.size())
+        {
+            return;
+        }
+        std::vector<std::size_t> ancestors;
+        auto node_id = static_cast<std::size_t>(row_id);
+        while (json_nodes_[node_id].parent_id != glance::app::json_no_parent)
+        {
+            const auto parent_id = json_nodes_[node_id].parent_id;
+            // Parser nodes are appended after their parents.
+            if (parent_id >= node_id)
+            {
+                return;
+            }
+            ancestors.push_back(node_id);
+            node_id = parent_id;
+        }
+        std::wstring path = L"root";
+        for (auto iterator = ancestors.rbegin(); iterator != ancestors.rend(); ++iterator)
+        {
+            const auto& node = json_nodes_[*iterator];
+            if (json_nodes_[node.parent_id].kind == glance::app::JsonNodeKind::array)
+            {
+                path += L"[" + node.key + L"]";
+                continue;
+            }
+            const auto identifier_start = [](wchar_t value) {
+                return (value >= L'a' && value <= L'z') ||
+                    (value >= L'A' && value <= L'Z') || value == L'_' || value == L'$';
+            };
+            const bool identifier = !node.key.empty() && identifier_start(node.key.front()) &&
+                std::all_of(node.key.begin(), node.key.end(), [&](wchar_t value) {
+                    return identifier_start(value) || (value >= L'0' && value <= L'9');
+                });
+            if (identifier)
+            {
+                path += L"." + node.key;
+            }
+            else
+            {
+                path += L"[";
+                append_json_string(path, node.key);
+                path += L"]";
+            }
+        }
+        ToolTipService::SetToolTip(row, box_value(path));
     }
 
     void MainWindow::JsonTreeRow_PointerPressed(
@@ -9072,6 +9132,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
         row.Tag(box_value(row_id));
+        ToolTipService::SetToolTip(row, nullptr);
         row.Children().Clear();
         row.ColumnDefinitions().Clear();
         row.MinHeight(30.0);
