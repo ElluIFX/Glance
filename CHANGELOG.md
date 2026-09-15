@@ -4,6 +4,20 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.15] - 2026-09-15
+
+### Improved
+
+- Preserve readable text around isolated undecodable bytes and display those bytes as red hexadecimal boxes without adding display digits to copied text.
+- Automatically follow file updates while scrolled to the bottom; scrolling up keeps the current reading position, and returning to the bottom resumes following.
+- Simplified file monitoring settings and descriptions.
+
+### Fixed
+
+- Fixed text refresh scrolling through the document and stopping above the final line, including wrapped lines.
+- Fixed log highlighting failing to return after being switched off and on.
+- Fixed unreliable JSON path tooltips and removed the artificial `root` prefix.
+
 ## [2026.09.14] - 2026-09-14
 
 ### Added
