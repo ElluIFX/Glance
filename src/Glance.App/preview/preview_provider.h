@@ -29,9 +29,16 @@ namespace glance::app
         component,
     };
 
+    struct UndecodableByte
+    {
+        std::size_t offset{}; // UTF-16 offset of the replacement character in this chunk.
+        std::uint8_t value{};
+    };
+
     struct TextPreview
     {
         std::wstring content;
+        std::vector<UndecodableByte> undecodable_bytes;
         std::wstring encoding;
         std::wstring error;
         std::shared_ptr<IncrementalTextReader> reader;

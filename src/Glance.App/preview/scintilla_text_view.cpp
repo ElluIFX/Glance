@@ -2,6 +2,7 @@
 #include "scintilla_text_view.h"
 
 #include "syntax_theme.h"
+#include "preview_provider.h"
 
 #include "third_party/scintilla/include/ILexer.h"
 #include "third_party/scintilla/include/Lexilla.h"
@@ -29,6 +30,9 @@ namespace
     constexpr UINT follow_layout_message = WM_APP + 4;
     constexpr WPARAM active_layout_threads = 4;
     constexpr WPARAM idle_layout_threads = 1;
+    constexpr int invalid_byte_box = 20;
+    constexpr int invalid_byte_foreground = 21;
+    constexpr WORD scintilla_copy_menu_id = 13; // ScintillaBase::idcmdCopy in the pinned runtime.
 
     struct LexerDefinition
     {
@@ -262,6 +266,44 @@ namespace
             nullptr,
             nullptr);
         return result;
+    }
+
+    struct DisplayText
+    {
+        std::string text;
+        std::vector<std::pair<std::size_t, std::uint8_t>> invalid;
+    };
+
+    DisplayText encode_display_text(std::wstring_view text, std::span<const glance::app::UndecodableByte> bytes)
+    {
+        DisplayText result;
+        std::size_t start{};
+        constexpr char hex[] = "0123456789ABCDEF";
+        for (const auto& byte : bytes)
+        {
+            if (byte.offset < start || byte.offset >= text.size() || text[byte.offset] != 0xFFFD) { continue; }
+            result.text += utf8(text.substr(start, byte.offset - start));
+            result.invalid.emplace_back(result.text.size(), byte.value);
+            result.text += hex[byte.value >> 4];
+            result.text += hex[byte.value & 15];
+            start = byte.offset + 1;
+        }
+        result.text += utf8(text.substr(start));
+        return result;
+    }
+
+    void mark_undecodable_bytes(HWND editor, LRESULT offset, const DisplayText& display)
+    {
+        for (const auto indicator : { invalid_byte_box, invalid_byte_foreground })
+        {
+            SendMessageW(editor, SCI_SETINDICATORCURRENT, indicator, 0);
+            SendMessageW(editor, SCI_INDICATORCLEARRANGE, offset, display.text.size());
+            for (const auto& [position, value] : display.invalid)
+            {
+                SendMessageW(editor, SCI_SETINDICATORVALUE, value + 1, 0);
+                SendMessageW(editor, SCI_INDICATORFILLRANGE, offset + position, 2);
+            }
+        }
     }
 
     COLORREF color_ref(std::uint32_t color) noexcept
@@ -663,6 +705,7 @@ namespace glance::app
         refresh_position_.reset();
         replacement_offset_.reset();
         follow_after_layout_ = false;
+        has_undecodable_bytes_ = false;
         release_copy_shortcut(host_);
         if (editor_ == nullptr)
         {
@@ -675,28 +718,33 @@ namespace glance::app
         update_line_number_width();
     }
 
-    void ScintillaTextView::append_text(std::wstring_view text)
+    void ScintillaTextView::append_text(std::wstring_view text, std::span<const UndecodableByte> bytes)
     {
         if (editor_ == nullptr || text.empty())
         {
             return;
         }
-        const auto encoded = utf8(text);
+        const auto display = encode_display_text(text, bytes);
+        has_undecodable_bytes_ = has_undecodable_bytes_ || !display.invalid.empty();
+        const auto& encoded = display.text;
         if (encoded.empty())
         {
             return;
         }
+        const auto offset = call(SCI_GETLENGTH);
         call(SCI_SETREADONLY, FALSE);
         call(
             SCI_APPENDTEXT,
             static_cast<WPARAM>(encoded.size()),
             reinterpret_cast<LPARAM>(encoded.data()));
         call(SCI_SETREADONLY, TRUE);
+        mark_undecodable_bytes(editor_, offset, display);
         update_line_number_width();
     }
 
     void ScintillaTextView::refresh_text(
-        std::wstring_view text, bool replace, bool auto_follow, bool has_more)
+        std::wstring_view text, bool replace, bool auto_follow, bool has_more,
+        std::span<const UndecodableByte> bytes)
     {
         if (editor_ == nullptr)
         {
@@ -716,8 +764,11 @@ namespace glance::app
         {
             refresh_position_ = position;
         }
-        const auto encoded = utf8(text);
+        const auto display = encode_display_text(text, bytes);
+        has_undecodable_bytes_ = has_undecodable_bytes_ || !display.invalid.empty();
+        const auto& encoded = display.text;
         if (replace) { replacement_offset_ = 0; }
+        const auto display_offset = replacement_offset_.value_or(call(SCI_GETLENGTH));
         std::string existing;
         if (replacement_offset_)
         {
@@ -767,12 +818,14 @@ namespace glance::app
         update_line_number_width();
         if (follow)
         {
+            mark_undecodable_bytes(editor_, display_offset, display);
             refresh_position_.reset();
             call(SCI_SETFIRSTVISIBLELINE, std::numeric_limits<int>::max());
         }
         else
         {
             const auto restore = refresh_position_.value_or(position);
+            mark_undecodable_bytes(editor_, display_offset, display);
             if (replace || refresh_position_)
             {
                 const auto length = call(SCI_GETLENGTH);
@@ -957,6 +1010,13 @@ namespace glance::app
         DWORD_PTR reference_data) noexcept
     {
         auto* self = reinterpret_cast<ScintillaTextView*>(reference_data);
+        const bool copy_command = message == SCI_COPY || message == WM_COPY ||
+            (message == WM_COMMAND && LOWORD(wparam) == scintilla_copy_menu_id) ||
+            (message == WM_KEYDOWN && wparam == 'C' && (GetKeyState(VK_CONTROL) & 0x8000) != 0);
+        if (self != nullptr && copy_command && self->copy_decoded_selection())
+        {
+            return 0;
+        }
         if (self != nullptr && (message == WM_MOUSEWHEEL || message == WM_VSCROLL ||
             message == WM_KEYDOWN || message == WM_LBUTTONDOWN))
         {
@@ -1023,6 +1083,10 @@ namespace glance::app
         call(SCI_SETMARGINS, 1);
         call(SCI_SETMARGINSENSITIVEN, 0, FALSE);
         call(SCI_SETMARGINCURSORN, 0, SC_CURSORARROW);
+        call(SCI_INDICSETSTYLE, invalid_byte_box, INDIC_ROUNDBOX);
+        call(SCI_INDICSETALPHA, invalid_byte_box, 30);
+        call(SCI_INDICSETOUTLINEALPHA, invalid_byte_box, 255);
+        call(SCI_INDICSETSTYLE, invalid_byte_foreground, INDIC_TEXTFORE);
     }
 
     void ScintillaTextView::update_lexer()
@@ -1092,6 +1156,20 @@ namespace glance::app
         call(SCI_STYLESETBACK, STYLE_LINENUMBER, color_ref(palette.line_number_background));
         call(SCI_SETSELBACK, TRUE, color_ref(palette.selection));
         call(SCI_SETCARETFORE, color_ref(palette.foreground));
+        call(SCI_INDICSETFORE, invalid_byte_box, color_ref(palette.error));
+        call(SCI_INDICSETFORE, invalid_byte_foreground, color_ref(palette.error));
+        constexpr char hex[] = "0123456789ABCDEF";
+        for (unsigned char value = 0; value < 32; ++value)
+        {
+            if (value == '\t' || value == '\n' || value == '\r' || value == '\f') { continue; }
+            const char character[]{ static_cast<char>(value), 0 };
+            const char label[]{ hex[value >> 4], hex[value & 15], 0 };
+            call(SCI_SETREPRESENTATION, reinterpret_cast<WPARAM>(character), reinterpret_cast<LPARAM>(label));
+            call(SCI_SETREPRESENTATIONAPPEARANCE, reinterpret_cast<WPARAM>(character),
+                SC_REPRESENTATION_BLOB | SC_REPRESENTATION_COLOUR);
+            call(SCI_SETREPRESENTATIONCOLOUR, reinterpret_cast<WPARAM>(character),
+                color_ref(palette.error) | 0xFF000000U);
+        }
         apply_lexer_styles();
         update_line_number_width();
     }
@@ -1435,6 +1513,47 @@ namespace glance::app
         {
             update_copy_shortcut();
         }
+    }
+
+    bool ScintillaTextView::copy_decoded_selection() noexcept
+    {
+        if (!has_undecodable_bytes_) { return false; }
+        try
+        {
+            const auto start = call(SCI_GETSELECTIONSTART);
+            const auto end = call(SCI_GETSELECTIONEND);
+            std::string text(static_cast<std::size_t>(end - start) + 1, '\0');
+            Sci_TextRangeFull range{ { start, end }, text.data() };
+            call(SCI_GETTEXTRANGEFULL, 0, reinterpret_cast<LPARAM>(&range));
+            std::string decoded;
+            bool replaced{};
+            for (auto position = start; position < end;)
+            {
+                const auto value = call(SCI_INDICATORVALUEAT, invalid_byte_box, position);
+                const auto boundary = std::min(end, call(SCI_INDICATOREND, invalid_byte_box, position));
+                if (boundary <= position) { return false; }
+                if (value)
+                {
+                    replaced = true;
+                    const auto origin = call(SCI_INDICATORSTART, invalid_byte_box, position);
+                    while (position < boundary)
+                    {
+                        decoded += "\xEF\xBF\xBD";
+                        position += 2 - ((position - origin) % 2);
+                    }
+                }
+                else
+                {
+                    decoded.append(text, static_cast<std::size_t>(position - start),
+                        static_cast<std::size_t>(boundary - position));
+                    position = boundary;
+                }
+            }
+            if (!replaced) { return false; }
+            call(SCI_COPYTEXT, decoded.size(), reinterpret_cast<LPARAM>(decoded.data()));
+            return true;
+        }
+        catch (...) { return true; }
     }
 
     void ScintillaTextView::update_copy_shortcut() noexcept

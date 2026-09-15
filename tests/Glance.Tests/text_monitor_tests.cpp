@@ -248,6 +248,31 @@ namespace
             require(call(SCI_GETSTYLEAT, boundary.size() - 3) == 4, "Long line retains trailing level");
             view.set_file_path(L"example.txt");
             require(call(SCI_GETSTYLEAT, 32765) == 0, "Switch to ordinary text clears log styles");
+            const std::array<UndecodableByte, 1> invalid{ UndecodableByte{ 1, 0xFF } };
+            view.refresh_text(L"A\uFFFD中文 FF", true, false, false, invalid);
+            require(call(SCI_INDICATORVALUEAT, 20, 1) == 256 &&
+                call(SCI_INDICATORVALUEAT, 20, 2) == 256 &&
+                call(SCI_INDICATORVALUEAT, 20, 3) == 0, "Invalid byte has an isolated numeric box");
+            require(call(SCI_INDICGETSTYLE, 20) == INDIC_ROUNDBOX &&
+                call(SCI_INDICGETSTYLE, 21) == INDIC_TEXTFORE, "Numeric box and foreground styling are independent");
+            std::string copied;
+            SetWindowSubclass(search.editor, [](HWND window, UINT message, WPARAM w, LPARAM l,
+                UINT_PTR, DWORD_PTR data) -> LRESULT {
+                if (message == SCI_COPYTEXT)
+                {
+                    *reinterpret_cast<std::string*>(data) =
+                        std::string(reinterpret_cast<const char*>(l), static_cast<std::size_t>(w));
+                    return 0;
+                }
+                return DefSubclassProc(window, message, w, l);
+            }, 100, reinterpret_cast<DWORD_PTR>(&copied));
+            call(SCI_SETSEL, 0, call(SCI_GETLENGTH));
+            call(SCI_COPY);
+            require(copied == "A\xEF\xBF\xBD中文 FF", "Copy preserves decoded text without injecting display hex digits");
+            view.set_syntax_highlighting(false);
+            require(call(SCI_INDICATORVALUEAT, 20, 1) == 256, "Invalid byte markers survive highlighting changes");
+            view.refresh_text(L"AFF中文 FF", true, false, false);
+            require(call(SCI_INDICATORVALUEAT, 20, 1) == 0, "Identical display text clears obsolete invalid-byte metadata");
         }
         DestroyWindow(owner);
         pump();
@@ -421,6 +446,47 @@ int run_text_monitor_tests()
         require(gbk.text == L"GBK:中", "Finish split GBK character");
         std::cout << "Reader: idle_reads=0, burst_bytes=" << burst.size()
             << ", rotations=1000, concurrent_cycles=2000, concurrent_polls=" << polls << '\n';
+        write_file(path, std::string("A\xFF") + "中文" + std::string("\0Z", 2));
+        auto damaged = load_text_preview(path, chunk_size, TextEncoding::utf8);
+        require(damaged.error.empty() && damaged.content == std::wstring(L"A\uFFFD中文\0Z", 6) &&
+            damaged.undecodable_bytes.size() == 1 && damaged.undecodable_bytes[0].offset == 1 &&
+            damaged.undecodable_bytes[0].value == 255, "Recover invalid UTF-8 and preserve surrounding text and NUL");
+        std::string mostly_utf8;
+        for (int i = 0; i < 100; ++i) { mostly_utf8 += "正常 UTF-8 text\n"; }
+        write_file(path, mostly_utf8 + "\xFF" + "正常 tail");
+        auto automatic = load_text_preview(path);
+        require(automatic.error.empty() && automatic.encoding == L"UTF-8" &&
+            automatic.undecodable_bytes.size() == 1 && automatic.content.ends_with(L"正常 tail"),
+            "Automatic encoding tolerates isolated corrupt UTF-8");
+        write_file(path, std::string("\xff\xfe\x00\xd8\x58\x00", 6));
+        auto broken_utf16 = load_text_preview(path);
+        require(broken_utf16.error.empty() && broken_utf16.content == L"\uFFFD\uFFFDX" &&
+            broken_utf16.undecodable_bytes.size() == 2 && broken_utf16.undecodable_bytes[1].value == 0xD8,
+            "UTF-16 recovery keeps each original invalid byte");
+        write_file(path, "GBK:\xff tail");
+        auto broken_gbk = load_text_preview(path, chunk_size, TextEncoding::gbk);
+        require(broken_gbk.error.empty() && broken_gbk.undecodable_bytes.empty() &&
+            broken_gbk.content == L"GBK:\uF8F5 tail", "Valid GBK private-use mapping is preserved");
+        write_file(path, "GBK:\x81 tail");
+        broken_gbk = load_text_preview(path, chunk_size, TextEncoding::gbk);
+        require(broken_gbk.error.empty() && broken_gbk.undecodable_bytes.size() == 1 &&
+            broken_gbk.content.ends_with(L" tail"), "Recover invalid GBK");
+        write_file(path, std::string(1000, '\xff'));
+        require(!load_text_preview(path, chunk_size, TextEncoding::utf8).error.empty(),
+            "Reject predominantly undecodable data");
+        write_file(path, "valid \xef\xbf\xbd text");
+        auto valid_replacement = load_text_preview(path, chunk_size, TextEncoding::utf8);
+        require(valid_replacement.error.empty() && valid_replacement.undecodable_bytes.empty(),
+            "Literal replacement character is not an invalid-byte marker");
+        write_file(path, std::string(chunk_size - 1, 'a') + "\xe4");
+        auto split_bad = load_text_preview(path, chunk_size, TextEncoding::utf8, true);
+        require(split_bad.undecodable_bytes.empty(), "Incomplete monitored UTF-8 waits for the next write");
+        write_file(path, "X tail", true);
+        auto completed_bad = load_next_text_preview_chunk(split_bad.reader, chunk_size);
+        require(completed_bad.error.empty() && completed_bad.content == L"\uFFFDX tail" &&
+            completed_bad.undecodable_bytes.size() == 1 && completed_bad.undecodable_bytes[0].value == 0xE4,
+            "Invalid split sequence reports buffered bytes and resumes decoding");
+        std::cout << "Damaged text: UTF-8, UTF-16, GBK, automatic encoding, NUL, density, split writes passed\n";
         test_scintilla();
         std::filesystem::remove(path);
         std::filesystem::remove(directory);

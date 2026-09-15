@@ -313,17 +313,13 @@ namespace
         for (const std::byte value : bytes)
         {
             const auto character = std::to_integer<unsigned char>(value);
-            if (character == 0)
-            {
-                return true;
-            }
             control_count +=
                 (character < 0x20U && character != '\t' && character != '\n' &&
                  character != '\f' && character != '\r') || character == 0x7FU
                 ? 1U
                 : 0U;
         }
-        return control_count * 100U > bytes.size();
+        return control_count > std::max<std::size_t>(8, bytes.size() / 100);
     }
 
     bool looks_like_non_text_content(std::wstring_view content)
@@ -332,10 +328,6 @@ namespace
         for (std::size_t index = 0; index < content.size(); ++index)
         {
             const wchar_t character = content[index];
-            if (character == L'\0')
-            {
-                return true;
-            }
             if (character >= 0xD800 && character <= 0xDBFF)
             {
                 if (index + 1 >= content.size() ||
@@ -357,7 +349,7 @@ namespace
                 ++invalid_count;
             }
         }
-        return !content.empty() && invalid_count * 100U > content.size();
+        return invalid_count > std::max<std::size_t>(8, content.size() / 100);
     }
 
     glance::app::PreviewKind sniff_unknown_file(const std::wstring& path)
@@ -583,6 +575,33 @@ namespace
         return result.display_name.empty() ? std::nullopt : std::optional{ std::move(result) };
     }
 
+    struct DecodeRecovery
+    {
+        UChar* begin;
+        std::vector<glance::app::UndecodableByte>* bytes;
+        std::size_t limit;
+    };
+
+    void U_CALLCONV recover_undecodable_bytes(const void* context, UConverterToUnicodeArgs* args,
+        const char* bytes, int32_t length, UConverterCallbackReason reason, UErrorCode* error)
+    {
+        if (reason > UCNV_IRREGULAR) { return; }
+        const auto& recovery = *static_cast<const DecodeRecovery*>(context);
+        if (length < 0 || recovery.bytes->size() + static_cast<std::size_t>(length) > recovery.limit ||
+            args->targetLimit - args->target < length) { return; }
+        try
+        {
+            for (int32_t i = 0; i < length; ++i)
+            {
+                recovery.bytes->push_back({ static_cast<std::size_t>(args->target - recovery.begin),
+                    static_cast<std::uint8_t>(bytes[i]) });
+                *args->target++ = 0xFFFD;
+            }
+            *error = U_ZERO_ERROR;
+        }
+        catch (...) { *error = U_MEMORY_ALLOCATION_ERROR; }
+    }
+
     struct EncodingPlan
     {
         std::string converter_name;
@@ -685,7 +704,30 @@ namespace
         {
             return EncodingPlan{ "UTF-8", L"UTF-8", 0 };
         }
-        if (auto detected = detect_text_encoding(sample))
+        auto detected = detect_text_encoding(sample);
+        if (!likely_utf16_without_bom(sample))
+        {
+            UErrorCode status = U_ZERO_ERROR;
+            std::unique_ptr<UConverter, ConverterCloser> converter(ucnv_open("UTF-8", &status));
+            if (U_SUCCESS(status) && converter)
+            {
+                std::vector<UChar> decoded(sample.size() * 2 + 32);
+                std::vector<glance::app::UndecodableByte> invalid;
+                DecodeRecovery recovery{ decoded.data(), &invalid, std::max<std::size_t>(2, sample.size() / 100) };
+                ucnv_setToUCallBack(converter.get(), recover_undecodable_bytes, &recovery, nullptr, nullptr, &status);
+                const auto* source = reinterpret_cast<const char*>(sample.data());
+                auto* target = decoded.data();
+                ucnv_toUnicode(converter.get(), &target, decoded.data() + decoded.size(),
+                    &source, source + sample.size(), nullptr, false, &status);
+                const bool plausible_utf8 = U_SUCCESS(status) &&
+                    (!detected || detected->confidence < 50 ||
+                        std::any_of(decoded.data(), target, [](UChar c) { return c > 127 && c != 0xFFFD; }));
+                // Close while the callback context is still alive.
+                converter.reset();
+                if (plausible_utf8) { return EncodingPlan{ "UTF-8", L"UTF-8", 0 }; }
+            }
+        }
+        if (detected)
         {
             return EncodingPlan{
                 std::move(detected->converter_name),
@@ -929,6 +971,9 @@ namespace glance::app
             UChar* target = decoded.data();
             const UChar* target_limit = decoded.data() + decoded.size();
             UErrorCode status = U_ZERO_ERROR;
+            DecodeRecovery recovery{ decoded.data(), &result.undecodable_bytes,
+                std::max<std::size_t>(8, bytes.size() / 100) };
+            ucnv_setToUCallBack(converter_.get(), recover_undecodable_bytes, &recovery, nullptr, nullptr, &status);
             ucnv_toUnicode(
                 converter_.get(),
                 &target,
@@ -938,6 +983,8 @@ namespace glance::app
                 nullptr,
                 end_of_file && !monitor_,
                 &status);
+            UErrorCode callback_status = U_ZERO_ERROR;
+            ucnv_setToUCallBack(converter_.get(), UCNV_TO_U_CALLBACK_STOP, nullptr, nullptr, nullptr, &callback_status);
             if (U_FAILURE(status) || source != source_limit)
             {
                 failed_ = true;

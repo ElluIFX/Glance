@@ -12,6 +12,7 @@
 
 namespace glance::app
 {
+    struct UndecodableByte;
     class ScintillaTextView
     {
     public:
@@ -37,8 +38,9 @@ namespace glance::app
         void set_occlusions(std::span<const RECT> rectangles) noexcept;
         void set_visible(bool visible) noexcept;
         void clear() noexcept;
-        void append_text(std::wstring_view text);
-        void refresh_text(std::wstring_view text, bool replace, bool auto_follow, bool has_more);
+        void append_text(std::wstring_view text, std::span<const UndecodableByte> bytes = {});
+        void refresh_text(std::wstring_view text, bool replace, bool auto_follow, bool has_more,
+            std::span<const UndecodableByte> bytes = {});
         void set_file_path(std::wstring_view path);
         void set_preferences(
             const TextPreferences& preferences,
@@ -76,6 +78,7 @@ namespace glance::app
         void request_near_end_check() noexcept;
         void handle_notification(const NMHDR& header) noexcept;
         void update_copy_shortcut() noexcept;
+        bool copy_decoded_selection() noexcept;
 
         HWND parent_{};
         HWND host_{};
@@ -107,5 +110,6 @@ namespace glance::app
         std::optional<LRESULT> replacement_offset_;
         bool follow_after_layout_{};
         bool follow_message_pending_{};
+        bool has_undecodable_bytes_{};
     };
 }
