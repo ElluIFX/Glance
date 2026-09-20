@@ -55,6 +55,27 @@
     <PRIResource Include="Resources\zh-CN\Resources.resw" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="web\index.html"><TargetPath>web\index.html</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="web\host-page.js"><TargetPath>web\host-page.js</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="web\workbook-preview.css"><TargetPath>web\workbook-preview.css</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\bin\workbook-preview.mjs"><TargetPath>web\workbook-preview.mjs</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\bin\workbook-worker.mjs"><TargetPath>web\workbook-worker.mjs</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\bin\workbook-chart-preview.mjs"><TargetPath>web\workbook-chart-preview.mjs</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\bin\presentation-engine.mjs"><TargetPath>web\presentation-engine.mjs</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\exceljs\4.4.0\LICENSE"><TargetPath>exceljs-LICENSE.txt</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\ssf\0.11.2\LICENSE"><TargetPath>ssf-LICENSE.txt</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\bin\presentation-preview.mjs"><TargetPath>web\presentation-preview.mjs</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\pptx-renderer\1.3.0\LICENSE"><TargetPath>licenses\pptx-renderer\LICENSE</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\pptx-renderer\1.3.0\THIRD_PARTY_NOTICES.md"><TargetPath>licenses\pptx-renderer\THIRD_PARTY_NOTICES.md</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\pptx-renderer\1.3.0\licenses\mtx-decompressor-MPL-2.0.txt"><TargetPath>licenses\pptx-renderer\licenses\mtx-decompressor-MPL-2.0.txt</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\pptx-renderer\1.3.0\licenses\ECMA-text-copyright-notice.txt"><TargetPath>licenses\pptx-renderer\licenses\ECMA-text-copyright-notice.txt</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\bin\document-preview.mjs"><TargetPath>web\document-preview.mjs</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\jszip\3.10.1\LICENSE.markdown"><TargetPath>jszip-LICENSE.txt</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\docx-preview\0.4.0\LICENSE"><TargetPath>docx-preview-LICENSE.txt</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\saxes\6.0.0\LICENSE"><TargetPath>saxes-LICENSE.txt</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="third_party\web\xmlchars\2.2.0\LICENSE"><TargetPath>xmlchars-LICENSE.txt</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.5" />
     <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.3" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />

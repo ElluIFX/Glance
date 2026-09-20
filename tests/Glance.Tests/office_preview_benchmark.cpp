@@ -27,6 +27,8 @@ namespace
         std::filesystem::path input;
         std::filesystem::path output;
         std::uint32_t iterations{ 1 };
+        std::uint32_t visible_duration_ms{};
+        std::uint32_t cancel_after_ms{};
     };
 
     struct BenchmarkResult
@@ -37,10 +39,24 @@ namespace
         std::int64_t component_prepare_ms{ -1 };
         std::int64_t host_create_ms{ -1 };
         std::int64_t do_preview_return_ms{ -1 };
-        std::int64_t first_surface_ready_ms{ -1 };
+        std::int64_t open_response_ms{ -1 };
         std::int64_t unload_ms{ -1 };
         bool native_output_valid{};
         bool host_started{};
+    };
+
+    struct PreparedPreviewLease
+    {
+        const ComponentApi& api;
+        PreparedPreview preview{};
+
+        ~PreparedPreviewLease()
+        {
+            if (preview.lease_token != 0)
+            {
+                api.release_preview(preview.lease_token);
+            }
+        }
     };
 
     bool parse_number(
@@ -65,7 +81,8 @@ namespace
         std::wcout
             << L"Usage:\n"
             << L"  Glance.Tests.exe --office-benchmark <file-or-directory> "
-               L"[--iterations <1-20>] [--output <csv>]\n";
+               L"[--iterations <1-20>] [--output <csv>] [--visible-duration-ms <1-60000>] "
+               L"[--cancel-after-ms <1-8000>]\n";
     }
 
     std::optional<BenchmarkOptions> parse_options(
@@ -81,6 +98,16 @@ namespace
         for (int index = 3; index < argument_count; ++index)
         {
             const std::wstring_view argument{ arguments[index] };
+            if (argument == L"--cancel-after-ms" && index + 1 < argument_count &&
+                parse_number(arguments[++index], 1, 8000, options.cancel_after_ms))
+            {
+                continue;
+            }
+            if (argument == L"--visible-duration-ms" && index + 1 < argument_count &&
+                parse_number(arguments[++index], 1, 60000, options.visible_duration_ms))
+            {
+                continue;
+            }
             if (argument == L"--iterations" && index + 1 < argument_count &&
                 parse_number(arguments[++index], 1, 20, options.iterations))
             {
@@ -187,19 +214,24 @@ namespace
         const std::filesystem::path& source,
         const ComponentApi& api,
         const std::filesystem::path& host_path,
-        HWND parent)
+        HWND parent,
+        std::uint32_t visible_duration_ms,
+        std::uint32_t cancel_after_ms)
     {
         BenchmarkResult result;
-        PreparedPreview preview;
+        PreparedPreviewLease lease{ api };
+        auto& preview = lease.preview;
         const auto total_start = steady_clock::now();
         const auto prepare_start = steady_clock::now();
         result.prepare_status = api.prepare_preview(source.c_str(), &preview);
         result.component_prepare_ms = duration_cast<milliseconds>(
             steady_clock::now() - prepare_start).count();
+        std::error_code path_error;
         result.native_output_valid = result.prepare_status == PrepareStatus::success &&
             preview.kind == PreviewContentKind::document &&
             preview.format == PreviewContentFormat::native_surface &&
-            std::filesystem::path(preview.path) == source;
+            std::filesystem::path(preview.path).is_absolute() &&
+            std::filesystem::is_regular_file(preview.path, path_error);
         if (!result.native_output_valid)
         {
             return result;
@@ -219,8 +251,16 @@ namespace
             steady_clock::now() - host_start).count();
         if (result.host_started)
         {
+            std::future<void> cancellation;
+            if (cancel_after_ms != 0)
+            {
+                cancellation = std::async(std::launch::async, [surface, cancel_after_ms] {
+                    Sleep(cancel_after_ms);
+                    surface->cancel();
+                });
+            }
             const auto preview_start = steady_clock::now();
-            result.open_status = run_with_message_pump([surface, path = source.wstring()] {
+            result.open_status = run_with_message_pump([surface, path = std::wstring(preview.path)] {
                 return surface->open(
                     path,
                     {
@@ -231,11 +271,23 @@ namespace
             });
             result.do_preview_return_ms = duration_cast<milliseconds>(
                 steady_clock::now() - preview_start).count();
+            if (cancellation.valid()) cancellation.get();
             if (result.open_status ==
                 glance::contracts::native_preview::Status::success)
             {
-                result.first_surface_ready_ms = duration_cast<milliseconds>(
+                result.open_response_ms = duration_cast<milliseconds>(
                     steady_clock::now() - total_start).count();
+                if (visible_duration_ms != 0 && cancel_after_ms == 0)
+                {
+                    ShowWindow(parent, SW_SHOWNOACTIVATE);
+                    surface->set_visible(true);
+                    run_with_message_pump([visible_duration_ms] {
+                        Sleep(visible_duration_ms);
+                        return true;
+                    });
+                    surface->set_visible(false);
+                    ShowWindow(parent, SW_HIDE);
+                }
             }
         }
 
@@ -247,10 +299,6 @@ namespace
         result.unload_ms = duration_cast<milliseconds>(
             steady_clock::now() - unload_start).count();
         surface->destroy_surface();
-        if (preview.lease_token != 0)
-        {
-            api.release_preview(preview.lease_token);
-        }
         return result;
     }
 
@@ -305,7 +353,7 @@ namespace
         output
             << "schema_version,source,extension,source_bytes,iteration,"
                "component_prepare_ms,host_create_ms,do_preview_return_ms,"
-               "first_surface_ready_ms,full_content_ready,unload_ms,prepare_status,"
+               "open_response_ms,full_content_ready,unload_ms,prepare_status,"
                "open_status,native_output_valid,host_started\n";
     }
 
@@ -316,11 +364,11 @@ namespace
         std::uint32_t iteration,
         const BenchmarkResult& result)
     {
-        output << "2," << csv_text(to_utf8(source.wstring())) << ','
+        output << "3," << csv_text(to_utf8(source.wstring())) << ','
                << csv_text(to_utf8(source.extension().wstring())) << ','
                << source_bytes << ',' << iteration << ','
                << result.component_prepare_ms << ',' << result.host_create_ms << ','
-               << result.do_preview_return_ms << ',' << result.first_surface_ready_ms << ','
+               << result.do_preview_return_ms << ',' << result.open_response_ms << ','
                << "not_applicable," << result.unload_ms << ','
                << static_cast<std::uint32_t>(result.prepare_status) << ','
                << static_cast<std::uint32_t>(result.open_status) << ','
@@ -443,13 +491,16 @@ namespace glance::tests
             }
             for (std::uint32_t iteration = 1; iteration <= options.iterations; ++iteration)
             {
-                const auto result = measure(input, api, host_path, parent);
+                const auto result = measure(input, api, host_path, parent, options.visible_duration_ms, options.cancel_after_ms);
                 write_result(output, input, source_bytes, iteration, result);
-                all_successful = all_successful && successful(result);
+                const bool expected = options.cancel_after_ms == 0 ? successful(result) :
+                    result.host_started && result.open_status == glance::contracts::native_preview::Status::cancelled &&
+                    result.unload_ms >= 0 && result.unload_ms < 2000;
+                all_successful = all_successful && expected;
                 std::wcout << input.filename() << L" iteration " << iteration
                            << L": prepare " << result.component_prepare_ms
                            << L" ms, host " << result.host_create_ms
-                           << L" ms, first surface " << result.first_surface_ready_ms
+                           << L" ms, open response " << result.open_response_ms
                            << L" ms, unload " << result.unload_ms << L" ms\n";
             }
         }

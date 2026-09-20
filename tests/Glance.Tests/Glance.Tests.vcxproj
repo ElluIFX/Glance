@@ -27,12 +27,14 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>icu.lib;Comctl32.lib;Ole32.lib;Shell32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>icu.lib;Comctl32.lib;Ole32.lib;OleAut32.lib;Urlmon.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="input_decision_tests.cpp" />
     <ClCompile Include="office_preview_benchmark.cpp" />
+    <ClCompile Include="office_package_tests.cpp" />
+    <ClCompile Include="..\..\src\Glance.Components\Office\host\src\presentation_package.cpp" />
     <ClCompile Include="panorama_preview_benchmark.cpp" />
     <ClCompile Include="text_monitor_tests.cpp" />
     <ClCompile Include="..\..\src\Glance.App\preview\preview_provider.cpp" />

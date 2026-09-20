@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { projectDocumentBody } from '../../src/Glance.Components/Office/third_party/web/bin/document-projection.mjs';
+
+const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const wrap = body => `<q:document xmlns:q="${ns}"><q:body>${body}</q:body></q:document>`;
+const paragraph = '<q:p><q:r><q:t>One &amp; two</q:t></q:r></q:p>';
+const table = '<q:tbl><q:tr><q:tc><q:p><q:r><q:t>Inside table</q:t></q:r></q:p></q:tc></q:tr></q:tbl>';
+const section = '<q:sectPr><q:pgSz q:w="11906" q:h="16838"></q:pgSz></q:sectPr>';
+const input = wrap(paragraph + table + '<q:p><q:r><q:t>Later</q:t></q:r></q:p>' + section);
+assert.deepEqual(projectDocumentBody(input, 2), { xml: wrap(paragraph + table + section), truncated: true });
+assert.deepEqual(projectDocumentBody(input, 3), { xml: input, truncated: false });
+assert.deepEqual(projectDocumentBody(`<?xml version="1.0"?>\n${input}\n`, 3), { xml: input, truncated: false });
+assert.deepEqual(projectDocumentBody(wrap(section)), { xml: wrap(section), truncated: false });
+
+const whitespace = wrap('<q:p q:label="A&#10;B&#9;C&#13;D"><q:r><q:t><![CDATA[a < b && c > d]]></q:t></q:r></q:p>');
+const projected = projectDocumentBody(whitespace).xml;
+assert.ok(projected.includes('q:label="A&#10;B&#9;C&#13;D"'));
+assert.ok(projected.includes('a &lt; b &amp;&amp; c &gt; d'));
+assert.equal(projectDocumentBody(projected).xml, projected);
+const strict = input.replaceAll(ns, 'http://purl.oclc.org/ooxml/wordprocessingml/main');
+assert.equal(projectDocumentBody(strict, 1).truncated, true);
+assert.throws(() => projectDocumentBody(input, 0), RangeError);
+assert.throws(() => projectDocumentBody(input, 1.5), RangeError);
+assert.throws(() => projectDocumentBody('<root/>'), /body is missing/);
+assert.throws(() => projectDocumentBody(`<!DOCTYPE q:document>${input}`), /Document types/);
+assert.throws(() => projectDocumentBody(input.replace('</q:tbl>', '</q:p>')));
+assert.throws(() => projectDocumentBody(input.replace('</q:document>', '<q:body/></q:document>')), /Duplicate/);
+assert.throws(() => projectDocumentBody(input.replaceAll(ns, 'urn:unrelated')), /body is missing/);
+assert.throws(() => projectDocumentBody(wrap(paragraph + '<q:altChunk/>'), 1), /alternate documents/);
+console.log('Office document projection regression tests passed');

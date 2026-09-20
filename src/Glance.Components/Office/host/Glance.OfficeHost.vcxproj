@@ -8,6 +8,7 @@
     <ProjectGuid>{D890E6BE-551D-498E-94EC-E219044D3B77}</ProjectGuid>
     <RootNamespace>Glance.OfficeHost</RootNamespace>
     <ProjectName>Glance.OfficeHost</ProjectName>
+    <WebView2LoaderPreference>Static</WebView2LoaderPreference>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
@@ -26,15 +27,19 @@
   <ItemDefinitionGroup>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Ole32.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Ole32.lib;OleAut32.lib;Urlmon.lib;Shell32.lib;Shlwapi.lib;Crypt32.lib;Gdiplus.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\preview_handler_host.cpp" />
+    <ClCompile Include="src\web_preview_session.cpp" />
+    <ClCompile Include="src\presentation_package.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\preview_handler_host.h" />
+    <ClInclude Include="include\web_preview_session.h" />
+    <ClInclude Include="include\presentation_package.h" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
@@ -44,6 +49,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.CppWinRT" Version="3.0.260715.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3719.77" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

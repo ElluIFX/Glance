@@ -1,4 +1,5 @@
 #include "../include/preview_handler_host.h"
+#include "../include/web_preview_session.h"
 
 #include "glance/contracts/native_preview_protocol.h"
 
@@ -155,7 +156,8 @@ namespace
             HWND parent,
             const RECT& bounds,
             const PreviewVisuals& visuals,
-            HANDLE cancellation_event)
+            HANDLE cancellation_event,
+            bool use_web = true)
         {
             unload();
             std::error_code error;
@@ -175,8 +177,25 @@ namespace
                 return Status::cancelled;
             }
 
+            bounds_ = bounds;
+            current_visuals_ = visuals;
+            if (use_web && web_.available(path))
+            {
+                const auto web_status = web_.open(path, parent, bounds, visuals, cancellation_event,
+                    [this, path, parent, cancellation_event] {
+                        const auto fallback_bounds = bounds_;
+                        const auto fallback_visuals = current_visuals_;
+                        static_cast<void>(open(path, parent, fallback_bounds, fallback_visuals, cancellation_event, false));
+                    });
+                if (web_status == Status::success || web_status == Status::cancelled) return web_status;
+            }
+
             for (int attempt = 0; attempt != 2; ++attempt)
             {
+                const auto cancelled = [cancellation_event] {
+                    return WaitForSingleObject(cancellation_event, 0) == WAIT_OBJECT_0;
+                };
+                if (cancelled()) return Status::cancelled;
                 winrt::com_ptr<IPreviewHandler> handler;
                 HRESULT status = CoCreateInstance(
                     *class_id,
@@ -185,6 +204,7 @@ namespace
                     __uuidof(IPreviewHandler),
                     handler.put_void());
                 Status failure = Status::handler_creation_failed;
+                if (cancelled()) return Status::cancelled;
                 if (SUCCEEDED(status))
                 {
                     const auto initialize = handler.try_as<IInitializeWithFile>();
@@ -193,6 +213,7 @@ namespace
                         : initialize->Initialize(path.c_str(), STGM_READ);
                     failure = Status::initialization_failed;
                 }
+                if (cancelled()) status = HRESULT_FROM_WIN32(ERROR_CANCELLED);
 
                 auto frame = winrt::make_self<PreviewHandlerFrame>();
                 const auto site = handler == nullptr
@@ -217,6 +238,7 @@ namespace
                     status = handler->SetWindow(parent, &bounds);
                     failure = Status::window_binding_failed;
                 }
+                if (cancelled()) status = HRESULT_FROM_WIN32(ERROR_CANCELLED);
                 if (SUCCEEDED(status))
                 {
                     status = handler->DoPreview();
@@ -264,6 +286,7 @@ namespace
 
         Status resize(const RECT& bounds)
         {
+            if (web_.active()) { bounds_ = bounds; web_.resize(bounds); return Status::success; }
             if (handler_ == nullptr)
             {
                 return Status::invalid_request;
@@ -276,6 +299,8 @@ namespace
 
         Status set_visuals(const PreviewVisuals& visuals)
         {
+            current_visuals_ = visuals;
+            if (web_.active()) { web_.set_visuals(visuals); return Status::success; }
             if (handler_ == nullptr)
             {
                 return Status::invalid_request;
@@ -295,6 +320,7 @@ namespace
 
         void unload() noexcept
         {
+            web_.close();
             if (handler_ != nullptr)
             {
                 static_cast<void>(handler_->Unload());
@@ -316,11 +342,13 @@ namespace
         }
 
     private:
+        glance::office::WebPreviewSession web_;
         winrt::com_ptr<IPreviewHandler> handler_;
         winrt::com_ptr<IObjectWithSite> site_;
         winrt::com_ptr<IPreviewHandlerVisuals> visuals_;
         winrt::com_ptr<PreviewHandlerFrame> frame_;
         RECT bounds_{};
+        PreviewVisuals current_visuals_{};
     };
 
     struct QueuedRequest

@@ -278,6 +278,93 @@ if (-not (Test-Dependency -Path $esbuildDestination -Sha256 $esbuildSha256)) {
     }
 }
 
+& (Join-Path $PSScriptRoot "prepare-office-web.ps1")
+$officeWebRoot = Join-Path $repositoryRoot "src\Glance.Components\Office\web"
+$officeDependencyRoot = Join-Path $repositoryRoot "src\Glance.Components\Office\third_party\web"
+& $esbuildDestination `
+    (Join-Path $officeWebRoot "workbook-preview.js") `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" "--legal-comments=inline" `
+    "--alias:ssf=$(Join-Path $officeDependencyRoot 'ssf\0.11.2\ssf.js')" `
+    "--external:./workbook-chart-preview.mjs" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\workbook-preview.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office workbook preview script."
+}
+& $esbuildDestination `
+    (Join-Path $officeWebRoot "workbook-archive.js") `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" `
+    "--alias:jszip=$(Join-Path $officeDependencyRoot 'jszip\3.10.1\dist\jszip.min.js')" `
+    "--alias:saxes=$(Join-Path $officeDependencyRoot 'saxes\6.0.0\saxes.js')" `
+    "--alias:xmlchars=$(Join-Path $officeDependencyRoot 'xmlchars\2.2.0')" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\workbook-archive.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office workbook archive script."
+}
+& $esbuildDestination `
+    (Join-Path $officeWebRoot "workbook-worker.js") `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" "--legal-comments=inline" `
+    "--alias:exceljs=$(Join-Path $officeDependencyRoot 'exceljs\4.4.0\dist\exceljs.bare.js')" `
+    "--alias:jszip=$(Join-Path $officeDependencyRoot 'jszip\3.10.1\dist\jszip.min.js')" `
+    "--alias:saxes=$(Join-Path $officeDependencyRoot 'saxes\6.0.0\saxes.js')" `
+    "--alias:xmlchars=$(Join-Path $officeDependencyRoot 'xmlchars\2.2.0')" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\workbook-worker.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office workbook worker script."
+}
+& $esbuildDestination `
+    (Join-Path $officeWebRoot "workbook-drawings.js") `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" `
+    "--alias:jszip=$(Join-Path $officeDependencyRoot 'jszip\3.10.1\dist\jszip.min.js')" `
+    "--alias:saxes=$(Join-Path $officeDependencyRoot 'saxes\6.0.0\saxes.js')" `
+    "--alias:xmlchars=$(Join-Path $officeDependencyRoot 'xmlchars\2.2.0')" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\workbook-drawings.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office workbook drawing parser."
+}
+& $esbuildDestination `
+    (Join-Path $officeDependencyRoot 'pptx-renderer\1.3.0\dist\aiden0z-pptx-renderer.browser.es.js') `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" "--legal-comments=inline" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\presentation-engine.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office presentation engine."
+}
+& $esbuildDestination `
+    (Join-Path $officeWebRoot "workbook-chart-preview.js") `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" "--legal-comments=inline" `
+    "--external:./presentation-engine.mjs" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\workbook-chart-preview.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office workbook chart renderer."
+}
+& $esbuildDestination `
+    (Join-Path $officeWebRoot "presentation-preview.js") `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" "--legal-comments=inline" `
+    "--external:./presentation-engine.mjs" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\presentation-preview.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office presentation preview script."
+}
+& $esbuildDestination `
+    (Join-Path $officeWebRoot "document-projection.js") `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" `
+    "--alias:saxes=$(Join-Path $officeDependencyRoot 'saxes\6.0.0\saxes.js')" `
+    "--alias:xmlchars=$(Join-Path $officeDependencyRoot 'xmlchars\2.2.0')" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\document-projection.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office document projection script."
+}
+& $esbuildDestination `
+    (Join-Path $officeWebRoot "document-preview.js") `
+    "--bundle" "--format=esm" "--platform=browser" "--target=es2022" "--minify" `
+    "--alias:jszip=$(Join-Path $officeDependencyRoot 'jszip\3.10.1\dist\jszip.min.js')" `
+    "--alias:docx-preview=$(Join-Path $officeDependencyRoot 'docx-preview\0.4.0\dist\docx-preview.mjs')" `
+    "--alias:saxes=$(Join-Path $officeDependencyRoot 'saxes\6.0.0\saxes.js')" `
+    "--alias:xmlchars=$(Join-Path $officeDependencyRoot 'xmlchars\2.2.0')" `
+    "--outfile=$(Join-Path $officeDependencyRoot 'bin\document-preview.mjs')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to build the Office document preview script."
+}
+
 $modelWebRoot = Join-Path $repositoryRoot "src\Glance.Components\Model3D\web"
 $generatedWebRoot = Join-Path $repositoryRoot `
     "src\Glance.Components\Model3D\third_party\web\bin"

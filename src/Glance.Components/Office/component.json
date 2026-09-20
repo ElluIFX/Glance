@@ -6,7 +6,26 @@
   "dependencies": [],
   "payload_files": [
     "Glance.OfficeHost.exe",
-    "resources.pri"
+    "resources.pri",
+    "web/index.html",
+    "web/host-page.js",
+    "web/workbook-preview.css",
+    "web/workbook-preview.mjs",
+    "web/workbook-worker.mjs",
+    "web/workbook-chart-preview.mjs",
+    "web/presentation-engine.mjs",
+    "exceljs-LICENSE.txt",
+    "ssf-LICENSE.txt",
+    "web/presentation-preview.mjs",
+    "licenses/pptx-renderer/LICENSE",
+    "licenses/pptx-renderer/THIRD_PARTY_NOTICES.md",
+    "licenses/pptx-renderer/licenses/mtx-decompressor-MPL-2.0.txt",
+    "licenses/pptx-renderer/licenses/ECMA-text-copyright-notice.txt",
+    "web/document-preview.mjs",
+    "jszip-LICENSE.txt",
+    "docx-preview-LICENSE.txt",
+    "saxes-LICENSE.txt",
+    "xmlchars-LICENSE.txt"
   ],
   "installer_names": {
     "en-US": "Microsoft Office preview",

@@ -145,6 +145,7 @@ if ($RunTests) {
     if ($LASTEXITCODE -ne 0) {
         throw "Release regression tests failed with exit code $LASTEXITCODE."
     }
+    & (Join-Path $PSScriptRoot 'test-office-preview.ps1') -Configuration Release -BuildOutputDirectory $payloadDirectory
 }
 
 $symbolFiles = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File -Filter "*.pdb" |
