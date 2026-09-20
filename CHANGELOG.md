@@ -4,6 +4,15 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.20] - 2026-09-20
+
+### Improved
+
+- Show DOCX previews sooner with an initial document view followed by the complete content while preserving the reading position.
+- Render XLSX worksheets in a background worker with virtualized cells and on-demand pictures and charts.
+- Load PPTX slides as they become visible and stream embedded audio and video in large presentations on demand.
+- Recognize Open XML documents saved with legacy Office extensions and improve cancellation during native Office preview loading.
+
 ## [2026.09.15] - 2026-09-15
 
 ### Improved
