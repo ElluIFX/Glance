@@ -46,7 +46,7 @@ jobs:
 
       - name: Build Release
         shell: pwsh
-        run: .\scripts\build.ps1 -Configuration Release -Platform x64
+        run: .\scripts\build.ps1 -Configuration Release -Platform x64 -SelfContained
 
       - name: Verify test build output
         shell: pwsh
