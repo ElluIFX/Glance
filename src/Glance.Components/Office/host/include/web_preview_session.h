@@ -21,6 +21,7 @@ namespace glance::office
             const glance::contracts::native_preview::PreviewVisuals& visuals,
             HANDLE cancellation, std::function<void()> failure);
         bool active() const noexcept;
+        glance::contracts::native_preview::ContentSize content_size() const noexcept;
         void resize(const RECT& bounds);
         void set_visuals(const glance::contracts::native_preview::PreviewVisuals& visuals);
         void close() noexcept;

@@ -25,6 +25,7 @@ namespace glance::contracts::native_preview
         media_query_state = 11,
         media_set_view_mode = 12,
         media_set_settings = 13,
+        query_content_size = 14,
     };
 
     enum class Status : std::uint32_t
@@ -87,6 +88,13 @@ namespace glance::contracts::native_preview
     {
         PreviewBounds bounds{};
         std::uint32_t dpi{ 96 };
+    };
+
+    // Preferred first-view dimensions in device-independent pixels; zero means unknown.
+    struct ContentSize
+    {
+        std::uint32_t width{};
+        std::uint32_t height{};
     };
 
     struct MediaValueRequest

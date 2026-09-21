@@ -284,6 +284,11 @@ namespace
             return Status::open_failed;
         }
 
+        ContentSize content_size() const noexcept
+        {
+            return web_.content_size();
+        }
+
         Status resize(const RECT& bounds)
         {
             if (web_.active()) { bounds_ = bounds; web_.resize(bounds); return Status::success; }
@@ -446,6 +451,8 @@ namespace
         case Command::unload:
             session.unload();
             return Status::success;
+        case Command::query_content_size:
+            return queued.payload.empty() ? Status::success : Status::invalid_request;
         case Command::shutdown:
             session.unload();
             return Status::success;
@@ -520,8 +527,14 @@ namespace glance::office
             while (const auto request = queue.pop())
             {
                 const auto status = process_request(*request, session, cancellation_event);
-                const ResponseHeader response{ .status = status };
-                if (!write_exact(response_pipe, &response, sizeof(response)))
+                const bool include_size = status == Status::success &&
+                    request->header.command == Command::query_content_size;
+                const auto size = session.content_size();
+                const ResponseHeader response{
+                    .status = status,
+                    .payload_size = include_size ? static_cast<std::uint32_t>(sizeof(size)) : 0U };
+                if (!write_exact(response_pipe, &response, sizeof(response)) ||
+                    (include_size && !write_exact(response_pipe, &size, sizeof(size))))
                 {
                     running = false;
                     break;

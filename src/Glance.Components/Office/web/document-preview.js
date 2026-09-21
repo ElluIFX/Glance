@@ -213,7 +213,11 @@ export async function renderDocumentPreview(bytes, container, { signal, convertI
         checkCancellation(signal);
         container.replaceChildren(...initial.nodes);
         await visibleAssets(container, signal);
-        onFirstReady?.();
+        const page = container.querySelector('section.docx');
+        onFirstReady?.(page ? {
+            width: page.offsetWidth,
+            height: parseFloat(getComputedStyle(page).minHeight) || page.offsetHeight,
+        } : undefined);
         if (truncated) {
             // Yield until the host has shown the initially hidden native surface.
             await afterFirstPaint(signal);

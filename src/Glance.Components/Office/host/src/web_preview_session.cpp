@@ -233,6 +233,7 @@ namespace glance::office
         std::filesystem::path profile;
         std::wstring path;
         bool format_ready{};
+        glance::contracts::native_preview::ContentSize content_size{};
         bool presentation{};
         bool workbook{};
         std::atomic_bool stopped{};
@@ -372,6 +373,24 @@ namespace glance::office
                 poll();
             }
             else if (text == L"ready") ready = true;
+            else if (text.starts_with(L"size:"))
+            {
+                const auto separator = text.find(L':', 5);
+                if (separator != std::wstring::npos && text.size() <= 32)
+                {
+                    const auto width_text = text.substr(5, separator - 5);
+                    const auto height_text = text.substr(separator + 1);
+                    if (!width_text.empty() && !height_text.empty() &&
+                        width_text.find_first_not_of(L"0123456789") == std::wstring::npos &&
+                        height_text.find_first_not_of(L"0123456789") == std::wstring::npos)
+                    {
+                        const auto width = wcstoul(width_text.c_str(), nullptr, 10);
+                        const auto height = wcstoul(height_text.c_str(), nullptr, 10);
+                        if (width > 0 && height > 0 && width <= 1000000 && height <= 1000000)
+                            content_size = { width, height };
+                    }
+                }
+            }
             else if (text == L"error" || text.starts_with(L"error:")) error();
             else if (text.starts_with(L"image:") && images.size() < 2)
             {
@@ -431,6 +450,11 @@ namespace glance::office
     }
 
     bool WebPreviewSession::active() const noexcept { return state_ != nullptr; }
+
+    glance::contracts::native_preview::ContentSize WebPreviewSession::content_size() const noexcept
+    {
+        return state_ ? state_->content_size : glance::contracts::native_preview::ContentSize{};
+    }
 
     Status WebPreviewSession::open(const std::wstring& path, HWND parent, const RECT& bounds,
         const glance::contracts::native_preview::PreviewVisuals& visuals, HANDLE cancellation,

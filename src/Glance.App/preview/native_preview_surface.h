@@ -43,6 +43,8 @@ namespace glance::app
             const glance::contracts::native_preview::PreviewVisuals& visuals,
             std::uint32_t dpi);
         void resize(std::uint32_t width, std::uint32_t height, std::uint32_t dpi) noexcept;
+        [[nodiscard]] std::optional<glance::contracts::native_preview::ContentSize>
+            content_size() noexcept;
         void set_visuals(
             const glance::contracts::native_preview::PreviewVisuals& visuals) noexcept;
         void set_bounds(int x, int y, int width, int height) noexcept;

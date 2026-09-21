@@ -41,7 +41,7 @@ export async function renderPresentationPreview(bytes, container, { signal, onFi
         }).map(image => image.decode()));
         signal?.throwIfAborted();
         if (failure) throw failure;
-        onFirstReady?.();
+        onFirstReady?.({ width: viewer.slideWidth, height: viewer.slideHeight });
         return { viewer, dispose };
     } catch (error) {
         dispose();

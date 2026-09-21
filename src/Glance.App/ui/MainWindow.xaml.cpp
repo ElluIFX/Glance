@@ -3189,7 +3189,8 @@ namespace winrt::Glance::App::implementation
             return false;
         }
 
-        return kind == glance::app::PreviewKind::image ||
+        return kind == glance::app::PreviewKind::component ||
+            kind == glance::app::PreviewKind::image ||
             kind == glance::app::PreviewKind::document ||
             (kind == glance::app::PreviewKind::media &&
              glance::app::gallery_media_kind(file.path) !=
@@ -3239,6 +3240,7 @@ namespace winrt::Glance::App::implementation
         }
         return current_kind_ == glance::app::PreviewKind::image ||
             current_kind_ == glance::app::PreviewKind::document ||
+            current_kind_ == glance::app::PreviewKind::native_document ||
             (current_kind_ == glance::app::PreviewKind::media && !media_is_audio_);
     }
 
@@ -3276,17 +3278,20 @@ namespace winrt::Glance::App::implementation
             ? ImagePanel().as<FrameworkElement>()
             : current_kind_ == glance::app::PreviewKind::media
                 ? MediaPanel().as<FrameworkElement>()
-                : PdfPanel().as<FrameworkElement>();
+                : current_kind_ == glance::app::PreviewKind::native_document
+                    ? NativeDocumentPanel().as<FrameworkElement>()
+                    : PdfPanel().as<FrameworkElement>();
+        const double layout_scale = GetDpiForWindow(window_) / 96.0;
         const int current_width = bounds.right - bounds.left;
         const int current_height = bounds.bottom - bounds.top;
         int horizontal_chrome = std::max(
             0,
-            current_width - static_cast<int>(std::lround(panel.ActualWidth())));
+            current_width - static_cast<int>(std::lround(panel.ActualWidth() * layout_scale)));
         if (current_kind_ == glance::app::PreviewKind::document)
         {
-            horizontal_chrome += static_cast<int>(std::lround(PdfNavigationColumn().ActualWidth()));
+            horizontal_chrome += static_cast<int>(std::lround(PdfNavigationColumn().ActualWidth() * layout_scale));
         }
-        const int vertical_chrome = std::max(0, current_height - static_cast<int>(std::lround(panel.ActualHeight())));
+        const int vertical_chrome = std::max(0, current_height - static_cast<int>(std::lround(panel.ActualHeight() * layout_scale)));
         const int work_width = info.rcWork.right - info.rcWork.left;
         const int work_height = info.rcWork.bottom - info.rcWork.top;
         const auto preferences = glance::app::load_window_preferences();
@@ -3460,12 +3465,17 @@ namespace winrt::Glance::App::implementation
         const auto dispatcher = DispatcherQueue();
         const auto visuals = native_preview_visuals(RootGrid().ActualTheme());
         const auto dpi = GetDpiForWindow(window_);
+        const bool request_size = auto_fit_applies();
         co_await resume_background();
         const auto status = surface->open(path, visuals, dpi);
+        const auto content_size = status == glance::contracts::native_preview::Status::success && request_size
+            ? surface->content_size()
+            : std::optional<glance::contracts::native_preview::ContentSize>{};
         static_cast<void>(dispatcher.TryEnqueue([
             weak,
             surface = std::move(surface),
             status,
+            content_size,
             generation]() mutable {
             const auto lifetime = weak.get();
             if (lifetime == nullptr ||
@@ -3490,6 +3500,11 @@ namespace winrt::Glance::App::implementation
             }
             lifetime->native_preview_ready_ = true;
             lifetime->NativeDocumentLoadingOverlay().Visibility(Visibility::Collapsed);
+            const auto preferences = glance::app::load_window_preferences();
+            const double scale = GetDpiForWindow(lifetime->window_) / 96.0;
+            lifetime->auto_fit_window_to_content(
+                (content_size ? content_size->width : preferences.default_width) * scale,
+                (content_size ? content_size->height : preferences.default_height) * scale);
             lifetime->update_native_preview_bounds();
             surface->set_visible(
                 lifetime->visible_ && !lifetime->xaml_modal_overlay_active_);
@@ -4237,6 +4252,10 @@ namespace winrt::Glance::App::implementation
             load_generic_file_info_async(file.path, content_generation_);
         }
         update_footer_metadata();
+        if (allow_text_preview || allow_advanced_info)
+        {
+            restore_component_window_placement(content_generation_);
+        }
     }
 
     fire_and_forget MainWindow::materialize_shell_file_async(
@@ -6129,6 +6148,20 @@ namespace winrt::Glance::App::implementation
         }));
     }
 
+    void MainWindow::restore_component_window_placement(std::uint64_t generation)
+    {
+        const bool restore = generation == component_placement_generation_;
+        component_placement_generation_ = 0;
+        if (!auto_fit_applies())
+        {
+            if (restore && !topmost_ && !user_sized_)
+            {
+                position_initial_window();
+            }
+            reveal_deferred_preview();
+        }
+    }
+
     void MainWindow::apply_component_preview(
         glance::app::ComponentPreviewResult result,
         std::uint64_t generation)
@@ -6325,6 +6358,7 @@ namespace winrt::Glance::App::implementation
             native_preview_surface_ = surface;
             native_preview_ready_ = false;
             surface->set_double_click_enabled(double_click_fullscreen_enabled_);
+            restore_component_window_placement(generation);
             update_native_preview_bounds();
             load_native_media_async(
                 std::move(surface),
@@ -6360,7 +6394,7 @@ namespace winrt::Glance::App::implementation
             auto surface = std::make_shared<glance::app::NativePreviewSurface>(
                 window_,
                 result.native_renderer->host_path,
-                result.lease,
+                active_component_preview_,
                 [weak = get_weak()] {
                     if (const auto self = weak.get())
                     {
@@ -6374,7 +6408,10 @@ namespace winrt::Glance::App::implementation
             }
             native_preview_surface_ = surface;
             surface->set_double_click_enabled(double_click_fullscreen_enabled_);
+            restore_component_window_placement(generation);
             update_native_preview_bounds();
+            // Show the loading state while the native document host prepares its content.
+            reveal_deferred_preview();
             load_native_preview_async(
                 std::move(surface),
                 result.output_path,
@@ -6403,6 +6440,7 @@ namespace winrt::Glance::App::implementation
             ArchiveEntryTree().RootNodes().Clear();
             FolderEntryList().Items().Clear();
             ComponentLoadingText().Visibility(Visibility::Collapsed);
+            restore_component_window_placement(generation);
             load_component_file_directory_async(
                 active_component_file_directory_,
                 {},
@@ -6426,14 +6464,8 @@ namespace winrt::Glance::App::implementation
         prepared_file.parsing_name = prepared_file.path;
         prepared_file.is_filesystem = true;
         prepared_file.is_cloud_placeholder = false;
-        const bool restore_component_placement =
-            generation == component_placement_generation_;
-        component_placement_generation_ = 0;
         present_resolved_file(prepared_file, kind, generation);
-        if (restore_component_placement && !topmost_ && !user_sized_ && !auto_fit_applies())
-        {
-            position_initial_window();
-        }
+        restore_component_window_placement(generation);
         show_component_notice();
     }
 

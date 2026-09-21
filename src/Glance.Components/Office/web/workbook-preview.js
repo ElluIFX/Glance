@@ -150,7 +150,11 @@ export async function renderWorkbookPreview(bytes, container, { signal, onFirstR
         if (!ready && fontsReady && !disposed && [...wantedImages].every(id => images.has(id)) &&
             [...wantedCharts].every(id => charts.get(id)?.ready)) {
             ready = true;
-            onFirstReady?.();
+            // Limit the preferred viewport; a worksheet can contain millions of cells.
+            onFirstReady?.({
+                width: Math.min(1280, columnOffsets.at(-1) + rowHeaders.offsetWidth),
+                height: Math.min(960, rowOffsets.at(-1) + columnHeaders.offsetHeight + tabs.offsetHeight),
+            });
         }
     }
     function imageBounds(range) {

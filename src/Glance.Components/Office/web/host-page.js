@@ -84,7 +84,13 @@ chrome.webview.addEventListener('sharedbufferreceived', async event => {
         await renderer(bytes, document.querySelector('#document'), {
             signal: cancellation.signal,
             convertImage,
-            onFirstReady: () => chrome.webview.postMessage('ready'),
+            onFirstReady: size => {
+                if (Number.isFinite(size?.width) && Number.isFinite(size?.height) &&
+                    size.width > 0 && size.height > 0) {
+                    chrome.webview.postMessage(`size:${Math.ceil(size.width)}:${Math.ceil(size.height)}`);
+                }
+                chrome.webview.postMessage('ready');
+            },
             onError: reportError,
             onSourceConsumed: release,
         });

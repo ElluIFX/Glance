@@ -567,6 +567,25 @@ namespace glance::app
             status == Status::success;
     }
 
+    std::optional<ContentSize> NativePreviewSurface::content_size() noexcept
+    {
+        std::vector<std::byte> payload;
+        std::scoped_lock lock(io_mutex_);
+        Status status{};
+        if (!transact_locked(Command::query_content_size, nullptr, 0, status, 1000, &payload) ||
+            status != Status::success || payload.size() != sizeof(ContentSize))
+        {
+            return std::nullopt;
+        }
+        ContentSize size{};
+        std::memcpy(&size, payload.data(), sizeof(size));
+        if (size.width == 0 || size.height == 0 || size.width > 1000000 || size.height > 1000000)
+        {
+            return std::nullopt;
+        }
+        return size;
+    }
+
     std::optional<MediaState> NativePreviewSurface::media_state() noexcept
     {
         std::vector<std::byte> payload;
