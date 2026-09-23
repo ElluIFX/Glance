@@ -185,6 +185,35 @@ foreach ($artifact in $developmentArtifacts) {
     Remove-GlanceWorkspaceItem -Path $artifact.FullName
 }
 
+# Keep this list scoped to application-root SDK files. Component payloads own
+# their dependencies. Glance uses its own restart path and no push notifications,
+# XAML designer, or framework-package bootstrap in the self-contained release.
+# Include obsolete SDK diagnostics/deployment payloads for upgrades from old builds.
+$unusedSdkFiles = @(
+    "RestartAgent.exe",
+    "PushNotificationsLongRunningTask.ProxyStub.dll",
+    "Microsoft.UI.Designer.dll",
+    "Microsoft.WindowsAppRuntime.Bootstrap.dll",
+    "createdump.exe",
+    "dbgshim.dll",
+    "WindowsAppRuntime.png",
+    "WindowsAppSdk.AppxDeploymentExtensions.Desktop-EventLog-Instrumentation.dll",
+    "WindowsAppSdk.AppxDeploymentExtensions.Desktop.dll"
+)
+$removedBytes = 0L
+$upgradeCleanup = foreach ($file in $unusedSdkFiles) {
+    $path = Join-Path $payloadDirectory $file
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        $removedBytes += (Get-Item -LiteralPath $path).Length
+        Remove-GlanceWorkspaceItem -Path $path
+    }
+    # Generate from the same list so installer upgrades remove the exact files
+    # excluded from portable packages, without deleting unrelated user content.
+    'Type: files; Name: "{app}\' + $file + '"'
+}
+$upgradeCleanup | Set-Content -LiteralPath (Join-Path $artifactsDirectory "package\sdk-cleanup.iss") -Encoding utf8
+Write-Host "Removed $removedBytes bytes of unused SDK payload."
+
 $licenseDirectory = Join-Path $payloadDirectory "licenses"
 New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\Scintilla-Lexilla.txt") `

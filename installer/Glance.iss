@@ -97,6 +97,7 @@ Name: "{group}\Glance"; Filename: "{app}\Glance.exe"; Tasks: startmenuicon
 Name: "{autodesktop}\Glance"; Filename: "{app}\Glance.exe"; Tasks: desktopicon
 
 [InstallDelete]
+#include PayloadDir + "\..\sdk-cleanup.iss"
 Type: filesandordirs; Name: "{app}\plugins"
 #include ComponentInnoDir + "\component-delete.iss"
 Type: files; Name: "{group}\Glance.lnk"; Tasks: not startmenuicon
