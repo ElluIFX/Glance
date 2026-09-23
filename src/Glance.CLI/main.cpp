@@ -1,11 +1,11 @@
 #include "glance/contracts/cli_protocol.h"
 #include "../version.h"
+#include "help.h"
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 #include <algorithm>
 #include <cmath>
-#include <charconv>
 #include <cstdio>
 #include <set>
 
@@ -169,6 +169,7 @@ int wmain(int argc, wchar_t** argv)
         {
             const std::wstring arg(argv[i]);
             if (!positional && arg == L"--") { positional = true; continue; }
+            if (!positional && arg == L"-h") { command = "help"; continue; }
             if (positional || !arg.starts_with(L"--")) { words.push_back(arg); continue; }
             if (!seen.insert(arg).second) throw Error(2, "duplicate_option", "Duplicate option");
             const auto next = [&]() -> std::wstring {
@@ -185,18 +186,20 @@ int wmain(int argc, wchar_t** argv)
             if (arg == L"--id")
             {
                 auto value = utf8(next());
-                if (value.empty() || value.size() > 20 || value.find_first_not_of("0123456789") != std::string::npos)
-                    throw Error(2, "invalid_id", "Window ID must be an unsigned decimal integer");
-                std::uint64_t id{};
-                const auto parsed = std::from_chars(value.data(), value.data() + value.size(), id);
-                if (parsed.ec != std::errc{}) throw Error(2, "invalid_id", "Window ID is out of range");
+                if (value.size() != 36) throw Error(2, "invalid_id", "Window ID must be a UUID from 'preview' or 'windows'");
+                for (std::size_t position = 0; position < value.size(); ++position)
+                {
+                    auto& character = value[position];
+                    if (character >= 'A' && character <= 'F') character += 'a' - 'A';
+                    const bool separator = position == 8 || position == 13 || position == 18 || position == 23;
+                    if (separator ? character != '-' : !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')))
+                        throw Error(2, "invalid_id", "Window ID must be a UUID from 'preview' or 'windows'");
+                }
                 string_member(request, "id", value); continue;
             }
             if (arg == L"--topmost")
             {
-                const auto value = next();
-                if (value != L"on" && value != L"off") throw Error(2, "invalid_boolean", "Expected on or off");
-                request.AddMember("topmost", value == L"on", allocator); continue;
+                request.AddMember("topmost", true, allocator); continue;
             }
             if (arg == L"--monitor" || arg == L"--close-after")
             {
@@ -214,16 +217,16 @@ int wmain(int argc, wchar_t** argv)
             }
             throw Error(2, "unknown_option", "Unknown option: " + utf8(arg));
         }
-        if (command == "help" || argc == 1)
+        const bool help_command = !words.empty() && words.front() == L"help";
+        const bool command_group = words.size() == 1 &&
+            (words.front() == L"window" || words.front() == L"settings") && seen.empty();
+        if (command == "help" || argc == 1 || help_command || command_group)
         {
-            const std::string help = "Glance.CLI " GLANCE_VERSION_STRING "\n"
-                "preview PATH... [--size W H] [--position X Y | --center-offset X Y]\n"
-                "  [--monitor INDEX] [--topmost on|off] [--pin] [--close-after SECONDS] [--wait]\n"
-                "window get|close|move|resize|topmost on|off|pin on|off [--id ID]\n"
-                "windows | status | settings list [PREFIX] | settings get|reset KEY\n"
-                "settings set KEY VALUE | check-update | quit\n"
-                "Global: --json --no-start --timeout SECONDS --help --version\n"
-                "Coordinates and outer sizes are physical pixels. ID 0 targets the dynamic window.";
+            if (help_command) words.erase(words.begin());
+            std::string topic = words.empty() ? "" : utf8(words[0]);
+            if ((topic == "window" || topic == "settings") && words.size() > 1)
+                topic += " " + utf8(words[1]);
+            const auto help = help_text(topic);
             if (json)
             {
                 Json result(rapidjson::kObjectType);
@@ -251,22 +254,24 @@ int wmain(int argc, wchar_t** argv)
             words.erase(words.begin());
         }
         const std::set<std::string> known{ "preview", "window.get", "window.close", "window.move", "window.resize",
-            "window.topmost", "window.pin", "windows", "status", "settings.list", "settings.get", "settings.set", "settings.reset", "check-update", "quit" };
+            "window.topmost", "window.pin", "window.set", "windows", "status", "settings.list", "settings.get", "settings.set", "settings.reset", "check-update", "quit" };
         if (!known.contains(command)) throw Error(2, "unknown_command", "Unknown command: " + command);
         std::set<std::wstring> allowed{ L"--json", L"--no-start", L"--timeout" };
         if (command.starts_with("window.")) allowed.insert(L"--id");
         if (command == "preview") allowed.insert({ L"--size", L"--position", L"--center-offset", L"--monitor", L"--topmost", L"--pin", L"--close-after", L"--wait" });
         if (command == "window.move") allowed.insert({ L"--position", L"--center-offset", L"--monitor" });
         if (command == "window.resize") allowed.insert(L"--size");
+        if (command == "window.set") allowed.insert(L"--wait");
         for (const auto& option : seen) if (!allowed.contains(option)) throw Error(2, "invalid_option", "Option not applicable to command: " + utf8(option));
         if (request.HasMember("position") && request.HasMember("center_offset")) throw Error(2, "position_conflict", "Position modes are mutually exclusive");
         if (request.HasMember("monitor") && !request.HasMember("center_offset")) throw Error(2, "monitor_mode", "Monitor requires center-offset");
         if (command == "window.move" && !request.HasMember("position") && !request.HasMember("center_offset")) throw Error(2, "missing_position", "Position required");
         if (command == "window.resize" && !request.HasMember("size")) throw Error(2, "missing_size", "Size required");
         if (request.HasMember("pin") && request.HasMember("topmost") && !request["topmost"].GetBool()) throw Error(8, "pinned_topmost", "Pinned windows must be topmost");
-        if (command == "preview")
+        if (command == "preview" || command == "window.set")
         {
             if (words.empty()) throw Error(2, "missing_path", "At least one path is required");
+            if (command == "preview" && !request.HasMember("topmost")) request.AddMember("topmost", request.HasMember("pin"), allocator);
             rapidjson::Value paths(rapidjson::kArrayType);
             for (const auto& path : words)
             {

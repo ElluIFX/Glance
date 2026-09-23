@@ -68,7 +68,8 @@ namespace winrt::Glance::App::implementation
             std::uint32_t source_kind,
             HWND source_window,
             std::wstring source_id = {},
-            std::uint64_t source_capabilities = 0);
+            std::uint64_t source_capabilities = 0,
+            bool preserve_window = false);
         [[nodiscard]] bool IsPreviewingFile(const std::wstring& path) const noexcept;
         void CloseForReplacement();
         void HidePreview();
@@ -85,6 +86,7 @@ namespace winrt::Glance::App::implementation
         void HandleGalleryResponse(std::string_view payload);
         void HandleGalleryDisconnect();
         [[nodiscard]] std::uint64_t InstanceId() const noexcept { return instance_id_; }
+        [[nodiscard]] const std::wstring& CliId() const noexcept { return cli_id_; }
 
         void TopmostButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PreviewModeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -675,6 +677,7 @@ namespace winrt::Glance::App::implementation
         bool cli_explicit_geometry_{};
         Microsoft::UI::Xaml::DispatcherTimer cli_close_timer_{ nullptr };
         std::uint64_t instance_id_{};
+        std::wstring cli_id_;
         StateCallback state_callback_;
         GalleryRequestCallback gallery_request_callback_;
         ComponentActionCallback component_action_callback_;

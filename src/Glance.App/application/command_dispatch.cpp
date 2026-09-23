@@ -56,7 +56,7 @@ namespace winrt::Glance::App::implementation
             for (const auto& item : request) if (!fields.contains(std::wstring(item.Key()))) throw Error(2, "unknown_field", "Unknown request field");
             if (request.HasKey(L"position") && request.HasKey(L"center_offset")) throw Error(2, "position_conflict", "Position modes are mutually exclusive");
             std::vector<glance::app::PreviewFile> files;
-            if (command == L"preview")
+            if (command == L"preview" || command == L"window.set")
             {
                 auto paths = request.GetNamedArray(L"paths");
                 if (!paths.Size() || paths.Size() > 4096) throw Error(2, "invalid_paths", "Expected 1 to 4096 paths");
@@ -117,7 +117,7 @@ namespace winrt::Glance::App::implementation
                 data.SetNamedValue(L"download_url", JsonValue::CreateStringValue(update.installer.download_url));
             }
             else data = on_ui(request, std::move(files));
-            if (command == L"preview" && request.GetNamedBoolean(L"wait", false))
+            if ((command == L"preview" || command == L"window.set") && request.GetNamedBoolean(L"wait", false))
             {
                 const auto id = data.GetNamedString(L"id");
                 const auto generation = data.GetNamedString(L"generation");
@@ -237,13 +237,13 @@ namespace winrt::Glance::App::implementation
             return result;
         }
         auto window = active_window_;
-        const auto id_text = request.GetNamedString(L"id", L"0");
-        if (id_text != L"0")
+        if (command != L"preview")
         {
+            const auto id_text = request.GetNamedString(L"id", cli_last_window_id_);
             window = nullptr;
             for (const auto& item : detached_windows_)
-                if (std::to_wstring(get_self<MainWindow>(item)->InstanceId()) == id_text) window = item;
-            if (active_window_ && std::to_wstring(get_self<MainWindow>(active_window_)->InstanceId()) == id_text) window = active_window_;
+                if (get_self<MainWindow>(item)->CliId() == id_text) window = item;
+            if (active_window_ && get_self<MainWindow>(active_window_)->CliId() == id_text) window = active_window_;
         }
         if (!window) throw Error(3, "window_not_found", "Window ID not found");
         auto implementation = get_self<MainWindow>(window);
@@ -252,16 +252,23 @@ namespace winrt::Glance::App::implementation
             implementation->CliConfigure(request, true);
             implementation->ShowPreview(std::move(files), 0, 0, nullptr);
             implementation->CliConfigure(request);
+            cli_last_window_id_ = implementation->CliId();
+        }
+        else if (command == L"window.set")
+        {
+            if (!implementation->CliSnapshot().GetNamedBoolean(L"visible"))
+                throw Error(8, "window_hidden", "Target window has no active preview");
+            implementation->ShowPreview(std::move(files), 0, 0, nullptr, {}, 0, true);
         }
         else if (command == L"window.close")
         {
-            result.SetNamedValue(L"id", JsonValue::CreateStringValue(std::to_wstring(implementation->InstanceId())));
+            result.SetNamedValue(L"id", JsonValue::CreateStringValue(implementation->CliId()));
             if (window == active_window_) implementation->HidePreview(); else implementation->CloseForReplacement();
             return result;
         }
         else if (command == L"window.pin")
         {
-            result.SetNamedValue(L"id", JsonValue::CreateStringValue(std::to_wstring(implementation->InstanceId())));
+            result.SetNamedValue(L"id", JsonValue::CreateStringValue(implementation->CliId()));
             implementation->CliPin(request.GetNamedBoolean(L"enabled"));
             return result;
         }

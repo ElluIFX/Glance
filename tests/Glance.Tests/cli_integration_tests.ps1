@@ -30,6 +30,10 @@ try {
     Invoke-Cli -Arguments @('status', '--no-start') -Expected 4 | Out-Null
     $help = (& $cli --help --json | ConvertFrom-Json)
     Assert-True ($help.ok -and $help.command -eq 'help') 'JSON help is invalid'
+    foreach ($topic in @(@('preview', '-h'), @('window', 'set', '-h'), @('help', 'window', 'resize'))) {
+        $page = (& $cli @topic --json | ConvertFrom-Json)
+        Assert-True ($page.ok -and $page.data.text.StartsWith('usage:')) 'Command help is invalid'
+    }
     Invoke-Cli -Arguments @('preview', '--position', '1', '2', '--center-offset', '0', '0', 'unused.txt') -Expected 2 | Out-Null
     Invoke-Cli -Arguments @('preview', '--size', '1', 'bad') -Expected 2 | Out-Null
     Invoke-Cli -Arguments @('status', '--no-start') -Expected 4 | Out-Null
@@ -75,6 +79,9 @@ try {
     Assert-True ($opened.state -eq 'ready' -and $opened.paths.Count -eq 2) 'Multi-path preview not ready'
     Assert-True ($opened.bounds.width -eq 1000 -and $opened.bounds.height -eq 700 -and $opened.bounds.x -eq 100) 'Explicit geometry not preserved'
     $id = $opened.id
+    Assert-True ($id -match '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$') 'Window ID is not a UUID'
+    Assert-True (-not $opened.topmost) 'Preview should default to non-topmost'
+    Invoke-Cli -Arguments @('window', 'get', '--id', '0') -Expected 2 | Out-Null
     Invoke-Cli -Arguments @('preview', $second, '--size', '1', '1') -Expected 2 | Out-Null
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.generation -eq $opened.generation) 'Invalid preview replaced content'
     Invoke-Cli -Arguments @('window', 'move', '--position', '-50', '100') | Out-Null
@@ -82,11 +89,27 @@ try {
     Invoke-Cli -Arguments @('window', 'move', '--center-offset', '0', '0', '--monitor', '0') | Out-Null
     $pinned = (Invoke-Cli -Arguments @('window', 'pin', 'on')).data
     Assert-True ($pinned.id -eq $id) 'Pin changed window ID'
+    Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.id -eq $id) 'Pin changed the default target'
     Invoke-Cli -Arguments @('window', 'topmost', 'off', '--id', $id) -Expected 8 | Out-Null
     $windows = (Invoke-Cli -Arguments @('windows')).data.windows
     Assert-True ($windows.Count -eq 2) 'Pin did not create a new dynamic window'
     Invoke-Cli -Arguments @('window', 'resize', '--id', $id, '--size', '1100', '750') | Out-Null
+    $replaced = (Invoke-Cli -Arguments @('window', 'set', $second, '--wait')).data
+    Assert-True ($replaced.id -eq $id -and $replaced.paths[0] -eq $second) 'Set changed the window ID or failed to replace the file'
+    Assert-True ($replaced.bounds.width -eq 1100 -and $replaced.bounds.height -eq 750 -and $replaced.pinned -and $replaced.topmost) 'Set changed geometry or pinning'
+    Invoke-Cli -Arguments @('window', 'set', (Join-Path $fixture 'missing.txt')) -Expected 3 | Out-Null
+    Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.generation -eq $replaced.generation) 'Invalid set replaced content'
+    $other = (Invoke-Cli -Arguments @('preview', $first, '--topmost', '--wait')).data
+    Assert-True ($other.id -ne $id -and $other.topmost) 'New window UUID or topmost flag failed'
+    $targeted = (Invoke-Cli -Arguments @('window', 'set', $first, $second, '--id', $id.ToUpperInvariant(), '--wait')).data
+    Assert-True ($targeted.id -eq $id -and $targeted.paths.Count -eq 2) 'Explicit UUID set failed'
+    Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.id -eq $other.id) 'Explicit target changed the default UUID'
+    Invoke-Cli -Arguments @('window', 'close') | Out-Null
+    Invoke-Cli -Arguments @('window', 'resize', '--size', '1100', '750') -Expected 8 | Out-Null
     Invoke-Cli -Arguments @('window', 'pin', 'off', '--id', $id) | Out-Null
+    $defaultPinned = (Invoke-Cli -Arguments @('preview', $second, '--pin', '--wait')).data
+    Invoke-Cli -Arguments @('window', 'pin', 'off') | Out-Null
+    Invoke-Cli -Arguments @('window', 'get') -Expected 3 | Out-Null
     Invoke-Cli -Arguments @('window', 'get', '--id', $id) -Expected 3 | Out-Null
 
     $delayed = (Invoke-Cli -Arguments @('preview', $first, '--pin', '--wait', '--close-after', '0.3')).data

@@ -40,7 +40,7 @@ namespace winrt::Glance::App::implementation
     JsonObject MainWindow::CliSnapshot()
     {
         JsonObject result;
-        result.SetNamedValue(L"id", JsonValue::CreateStringValue(std::to_wstring(instance_id_)));
+        result.SetNamedValue(L"id", JsonValue::CreateStringValue(cli_id_));
         result.SetNamedValue(L"generation", JsonValue::CreateStringValue(std::to_wstring(content_generation_)));
         result.SetNamedValue(L"visible", JsonValue::CreateBooleanValue(visible_));
         result.SetNamedValue(L"pinned", JsonValue::CreateBooleanValue(pinned_));
@@ -65,7 +65,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::CliTopmost(bool enabled)
     {
         if (pinned_ && !enabled) throw glance::cli::Error(8, "pinned_topmost", "Pinned windows must be topmost");
-        if (!visible_) throw glance::cli::Error(8, "window_hidden", "Window has no active preview");
+        if (!visible_) throw glance::cli::Error(8, "window_hidden", "Target window has no active preview; use 'windows' to find the visible window, then pass --id ID");
         topmost_ = enabled;
         TopmostButton().IsChecked(enabled);
         set_topmost(enabled);
@@ -74,7 +74,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::CliPin(bool enabled)
     {
-        if (!visible_) throw glance::cli::Error(8, "window_hidden", "Window has no active preview");
+        if (!visible_) throw glance::cli::Error(8, "window_hidden", "Target window has no active preview; use 'windows' to find the visible window, then pass --id ID");
         if (pinned_ == enabled) return;
         PinButton().IsChecked(enabled);
         PinButton_Click(nullptr, nullptr);
@@ -91,6 +91,8 @@ namespace winrt::Glance::App::implementation
             if (!std::isfinite(seconds) || seconds <= 0 || seconds > 86400) throw Error(2, "invalid_delay", "Invalid close delay");
         }
         const bool geometry = options.HasKey(L"size") || options.HasKey(L"position") || options.HasKey(L"center_offset");
+        if (geometry && !validate_only && !visible_)
+            throw Error(8, "window_hidden", "Target window has no active preview; use 'windows' to find the visible window, then pass --id ID");
         RECT bounds{};
         GetWindowRect(window_, &bounds);
         int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;

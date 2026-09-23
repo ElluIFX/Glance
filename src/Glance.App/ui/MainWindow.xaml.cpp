@@ -1113,6 +1113,14 @@ namespace winrt::Glance::App::implementation
 {
     MainWindow::MainWindow()
     {
+        GUID cli_id{};
+        check_hresult(CoCreateGuid(&cli_id));
+        wchar_t cli_id_text[39]{};
+        StringFromGUID2(cli_id, cli_id_text, 39);
+        cli_id_.assign(cli_id_text + 1, 36);
+        std::transform(cli_id_.begin(), cli_id_.end(), cli_id_.begin(), [](wchar_t value) {
+            return value >= L'A' && value <= L'F' ? static_cast<wchar_t>(value + (L'a' - L'A')) : value;
+        });
         glance::contracts::log_event(L"MainWindow InitializeComponent begin.");
         InitializeComponent();
         glance::contracts::log_event(L"MainWindow InitializeComponent complete.");
@@ -2644,7 +2652,8 @@ namespace winrt::Glance::App::implementation
         std::uint32_t source_kind,
         HWND source_window,
         std::wstring source_id,
-        std::uint64_t source_capabilities)
+        std::uint64_t source_capabilities,
+        bool preserve_window)
     {
         const bool new_session = !visible_;
         // External result lists may republish focus while retaining the same file.
@@ -2668,7 +2677,8 @@ namespace winrt::Glance::App::implementation
             return;
         }
         const bool replace_deferred_session = defer_auto_fit_show_;
-        cli_explicit_geometry_ = false;
+        cli_explicit_geometry_ = preserve_window;
+        if (preserve_window) component_placement_generation_ = 0;
         if (cli_close_timer_) cli_close_timer_.Stop();
         leave_gallery(false);
         stop_detached_focus_monitor();
@@ -2708,7 +2718,7 @@ namespace winrt::Glance::App::implementation
         }
         update_preview_navigation_ui();
 
-        const bool position_window = !topmost_ && (new_session || !user_sized_);
+        const bool position_window = !preserve_window && !topmost_ && (new_session || !user_sized_);
         present_file(current_index_, current_kind);
         if (position_window)
         {

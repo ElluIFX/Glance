@@ -92,6 +92,7 @@ namespace winrt::Glance::App::implementation
         std::unique_ptr<glance::app::TrayIcon> tray_icon_;
         std::uint64_t next_instance_id_{ 1 };
         std::wstring cli_session_id_;
+        std::wstring cli_last_window_id_;
         bool automatic_update_check_in_flight_{};
         bool update_prompt_active_{};
         std::optional<glance::contracts::UpdateCheckResult> pending_update_;
