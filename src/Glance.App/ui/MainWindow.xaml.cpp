@@ -2668,6 +2668,8 @@ namespace winrt::Glance::App::implementation
             return;
         }
         const bool replace_deferred_session = defer_auto_fit_show_;
+        cli_explicit_geometry_ = false;
+        if (cli_close_timer_) cli_close_timer_.Stop();
         leave_gallery(false);
         stop_detached_focus_monitor();
         preview_navigation_.clear();
@@ -2733,6 +2735,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::CloseForReplacement()
     {
+        if (cli_close_timer_) cli_close_timer_.Stop();
         stop_detached_focus_monitor();
         clear_preview_content();
         Close();
@@ -2740,6 +2743,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::HidePreview()
     {
+        if (cli_close_timer_) cli_close_timer_.Stop();
         if (!visible_ || detached_)
         {
             return;
@@ -3250,6 +3254,7 @@ namespace winrt::Glance::App::implementation
         double content_height,
         bool dynamic_update) noexcept
     {
+        if (cli_explicit_geometry_) { reveal_deferred_preview(); return; }
         if (window_ == nullptr)
         {
             return;
@@ -3375,6 +3380,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::save_current_window_placement() const noexcept
     {
+        if (cli_explicit_geometry_) return;
         if (!visible_ || fullscreen_ || window_ == nullptr || IsZoomed(window_) || detached_ ||
             (pinned_ && topmost_))
         {

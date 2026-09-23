@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "window_preferences.h"
+#include "public_settings.h"
 
 #include <algorithm>
 #include <cwctype>
@@ -7,22 +8,24 @@
 
 namespace
 {
+    const glance::app::RegisterPublicSettings public_settings{
+        { L"Window/DefaultWidth", L"integer", L"720", 480, 7680, L"", L"next_preview" },
+        { L"Window/DefaultHeight", L"integer", L"520", 320, 4320, L"", L"next_preview" },
+        { L"Window/RememberSize", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"Window/AutoFitMedia", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"Window/ShowAfterAutoFit", L"boolean", L"0", 0, 1, L"", L"next_preview" },
+        { L"Window/DynamicAutoFit", L"boolean", L"0", 0, 1, L"", L"next_preview" },
+        { L"Window/AdaptiveMinimumPercent", L"integer", L"40", 10, 100, L"", L"next_preview" },
+        { L"Window/AdaptiveMaximumPercent", L"integer", L"75", 10, 100, L"", L"next_preview" },
+        { L"Window/AutoFitIgnoredExtensions", L"string", L"", 0, 4096, L"", L"next_preview" },
+        { L"Window/RememberPosition", L"boolean", L"0", 0, 1, L"", L"next_preview" },
+        { L"Window/DoubleClickFullscreen", L"boolean", L"0", 0, 1, L"", L"immediate" },
+    };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Window";
 
     DWORD read_dword(const wchar_t* name, DWORD fallback) noexcept
     {
-        DWORD value{};
-        DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   registry_path,
-                   name,
-                   RRF_RT_REG_DWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS
-            ? value
-            : fallback;
+        return glance::app::read_public_dword(registry_path, name, fallback);
     }
 
     bool read_legacy_auto_fit() noexcept

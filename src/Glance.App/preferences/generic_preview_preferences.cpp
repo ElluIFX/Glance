@@ -1,24 +1,17 @@
 #include "pch.h"
 #include "generic_preview_preferences.h"
+#include "public_settings.h"
 
 namespace
 {
+    const glance::app::RegisterPublicSettings public_settings{
+        { L"GenericPreview/ShowAdvancedInfo", L"boolean", L"0", 0, 1, L"", L"next_preview" },
+    };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\GenericPreview";
 
     DWORD read_dword(const wchar_t* name, DWORD fallback) noexcept
     {
-        DWORD value{};
-        DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   registry_path,
-                   name,
-                   RRF_RT_REG_DWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS
-            ? value
-            : fallback;
+        return glance::app::read_public_dword(registry_path, name, fallback);
     }
 }
 

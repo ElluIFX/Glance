@@ -218,6 +218,11 @@ namespace winrt::Glance::App::implementation
             glance::contracts::log_event(
                 L"WinUI unhandled exception: " + std::wstring(event.Message()));
         });
+        GUID session{};
+        check_hresult(CoCreateGuid(&session));
+        std::memcpy(&next_instance_id_, &session, sizeof(next_instance_id_));
+        next_instance_id_ = (next_instance_id_ & 0x7fffffffffffffffULL) | 1;
+        cli_session_id_ = std::to_wstring(next_instance_id_);
 #if defined _DEBUG && !defined DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION
         UnhandledException([](IInspectable const&, UnhandledExceptionEventArgs const& event)
         {
@@ -235,6 +240,7 @@ namespace winrt::Glance::App::implementation
     {
         shutting_down_.store(true, std::memory_order_release);
         core_network_client_.disconnect();
+        command_server_.reset();
         pipe_client_.stop();
         close_core_process();
         if (shutdown_event_ != nullptr)
@@ -251,9 +257,6 @@ namespace winrt::Glance::App::implementation
 
     void App::OnLaunched(LaunchActivatedEventArgs const&)
     {
-#if defined _DEBUG
-        std::wstring debug_preview_path;
-#endif
         for (const auto& argument : command_line_arguments())
         {
             if (argument == L"--register-core-task")
@@ -281,13 +284,6 @@ namespace winrt::Glance::App::implementation
             {
                 ExitProcess(signal_existing_instance_shutdown() ? 0 : 1);
             }
-#if defined _DEBUG
-            constexpr std::wstring_view debug_preview_prefix = L"--debug-preview=";
-            if (argument.starts_with(debug_preview_prefix))
-            {
-                debug_preview_path = argument.substr(debug_preview_prefix.size());
-            }
-#endif
         }
 
         glance::contracts::initialize_diagnostics(L"Glance.App");
@@ -317,39 +313,6 @@ namespace winrt::Glance::App::implementation
         glance::app::initialize_components();
         glance::contracts::log_event(L"Creating the initial preview window.");
         create_active_window();
-#if defined _DEBUG
-        if (!debug_preview_path.empty())
-        {
-            WIN32_FILE_ATTRIBUTE_DATA data{};
-            if (GetFileAttributesExW(
-                    debug_preview_path.c_str(),
-                    GetFileExInfoStandard,
-                    &data))
-            {
-                glance::app::PreviewFile file;
-                file.path = debug_preview_path;
-                file.parsing_name = debug_preview_path;
-                file.display_name = std::filesystem::path(debug_preview_path).filename().wstring();
-                file.size =
-                    (static_cast<std::uint64_t>(data.nFileSizeHigh) << 32U) |
-                    data.nFileSizeLow;
-                file.creation_time =
-                    (static_cast<std::uint64_t>(data.ftCreationTime.dwHighDateTime) << 32U) |
-                    data.ftCreationTime.dwLowDateTime;
-                file.last_write_time =
-                    (static_cast<std::uint64_t>(data.ftLastWriteTime.dwHighDateTime) << 32U) |
-                    data.ftLastWriteTime.dwLowDateTime;
-                file.attributes = data.dwFileAttributes;
-                file.is_filesystem = true;
-                get_self<implementation::MainWindow>(active_window_)->ShowPreview(
-                    { std::move(file) },
-                    0,
-                    0,
-                    nullptr);
-                request_automatic_update_check();
-            }
-        }
-#endif
         glance::contracts::log_event(L"Creating the notification area icon.");
         tray_icon_ = std::make_unique<glance::app::TrayIcon>();
         if (!tray_icon_->create(
@@ -364,6 +327,15 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"Starting the Core pipe client.");
         static_cast<void>(pipe_client_.start());
         start_core_watchdog();
+        command_server_ = std::make_unique<glance::app::CommandServer>(
+            [this](std::string payload, HANDLE cancelled, HANDLE connection) {
+                return handle_cli_request(std::move(payload), cancelled, connection);
+            },
+            [this](std::string_view response) {
+                const auto result = Windows::Data::Json::JsonObject::Parse(to_hstring(response));
+                if (result.GetNamedString(L"command", L"") == L"quit" && result.GetNamedBoolean(L"ok", false))
+                    dispatcher_.TryEnqueue([this] { exit_application(); });
+            });
     }
 
     void App::show_duplicate_instance_notice()

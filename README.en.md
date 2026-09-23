@@ -17,6 +17,8 @@
   ·
   <a href="https://github.com/ElluIFX/Glance/issues">Issues</a>
   ·
+  <a href="src/Glance.CLI/README.en.md">Command-line interface</a>
+  ·
   <a href="LICENSE">GPL-3.0</a>
 </p>
 

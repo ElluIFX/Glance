@@ -64,6 +64,7 @@ namespace winrt::Glance::App::implementation
             NetworkDownloadCallback network_download_callback,
             UpdatePreferencesChangedCallback update_preferences_changed_callback);
         void ApplyAppearancePreferences();
+        void ReloadPreferences();
         void ApplyLocalizedResources();
         void ShowAndActivate();
         void ShowComponentAction(

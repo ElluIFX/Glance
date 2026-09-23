@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "startup_registration.h"
+#include "public_settings.h"
 
 #include <shellapi.h>
 
@@ -9,6 +10,10 @@
 
 namespace
 {
+    const glance::app::RegisterPublicSettings public_settings{
+        { L"Startup/LaunchAtSignIn", L"boolean", L"0", 0, 1, L"" },
+        { L"Diagnostics/Enabled", L"boolean", L"0", 0, 1, L"" },
+    };
     constexpr wchar_t run_key_path[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
     constexpr wchar_t run_value_name[] = L"Glance";
 

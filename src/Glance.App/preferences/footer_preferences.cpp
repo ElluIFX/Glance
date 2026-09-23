@@ -1,10 +1,15 @@
 #include "pch.h"
 #include "footer_preferences.h"
+#include "public_settings.h"
 
 #include <array>
 
 namespace
 {
+    const glance::app::RegisterPublicSettings public_settings{
+        { L"Footer/EnabledFields", L"integer", L"19", 0, 63, L"", L"immediate" },
+        { L"Footer/FieldOrder", L"array", L"[0,1,5,2,3,4]", 0, 5, L"", L"immediate" },
+    };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Footer";
     constexpr std::size_t legacy_field_count = 4;
     constexpr std::size_t previous_field_count = 5;

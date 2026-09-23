@@ -1,26 +1,20 @@
 #include "pch.h"
 #include "update_preferences.h"
+#include "public_settings.h"
 
 #include <algorithm>
 
 namespace
 {
+    const glance::app::RegisterPublicSettings public_settings{
+        { L"Update/AutomaticCheckEnabled", L"boolean", L"1", 0, 1, L"", L"immediate" },
+        { L"Update/CheckFrequency", L"integer", L"1", 0, 3, L"", L"immediate" },
+    };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Update";
 
     DWORD read_dword(const wchar_t* name, DWORD fallback) noexcept
     {
-        DWORD value{};
-        DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   registry_path,
-                   name,
-                   RRF_RT_REG_DWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS
-            ? value
-            : fallback;
+        return glance::app::read_public_dword(registry_path, name, fallback);
     }
 
     std::uint64_t read_qword(const wchar_t* name) noexcept

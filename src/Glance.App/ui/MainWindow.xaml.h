@@ -51,6 +51,12 @@ namespace winrt::Glance::App::implementation
 
         MainWindow();
 
+        Windows::Data::Json::JsonObject CliSnapshot();
+        void CliConfigure(Windows::Data::Json::JsonObject const& options, bool validate_only = false);
+        void CliPin(bool enabled);
+        void CliTopmost(bool enabled);
+        std::wstring CliLoadState();
+
         void InitializeSession(
             std::uint64_t instance_id,
             StateCallback callback,
@@ -666,6 +672,8 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] std::wstring formatted_time(std::uint64_t file_time) const;
 
         HWND window_{};
+        bool cli_explicit_geometry_{};
+        Microsoft::UI::Xaml::DispatcherTimer cli_close_timer_{ nullptr };
         std::uint64_t instance_id_{};
         StateCallback state_callback_;
         GalleryRequestCallback gallery_request_callback_;

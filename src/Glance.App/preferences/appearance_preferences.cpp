@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "appearance_preferences.h"
+#include "public_settings.h"
 #include "localization.h"
 
 #include <winrt/Windows.UI.ViewManagement.h>
@@ -13,22 +14,18 @@ namespace Media = Microsoft::UI::Xaml::Media;
 
 namespace
 {
+    const glance::app::RegisterPublicSettings public_settings{
+        { L"Appearance/Theme", L"integer", L"0", 0, 2, L"", L"immediate" },
+        { L"Appearance/Accent", L"integer", L"0", 0, 7, L"", L"immediate" },
+        { L"Appearance/Acrylic", L"boolean", L"1", 0, 1, L"", L"immediate" },
+        { L"Appearance/AcrylicOpacityPercent", L"integer", L"100", 10, 100, L"", L"immediate" },
+        { L"Appearance/Language", L"string", L"", 0, 31, L"|en-US|zh-CN", L"immediate" },
+    };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Appearance";
 
     DWORD read_dword(const wchar_t* name, DWORD fallback) noexcept
     {
-        DWORD value{};
-        DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   registry_path,
-                   name,
-                   RRF_RT_REG_DWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS
-            ? value
-            : fallback;
+        return glance::app::read_public_dword(registry_path, name, fallback);
     }
 
     Windows::UI::Color accent_color(glance::app::AccentPreference preference)

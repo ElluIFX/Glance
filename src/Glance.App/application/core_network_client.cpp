@@ -15,7 +15,8 @@ namespace glance::app
     }
 
     glance::contracts::UpdateCheckResult CoreNetworkClient::check_for_updates(
-        std::wstring_view current_version)
+        std::wstring_view current_version,
+        const std::function<bool()>& cancelled)
     {
         const auto request_id = next_request_id();
         const auto waiter = std::make_shared<UpdateWaitState>();
@@ -43,12 +44,15 @@ namespace glance::app
         }
 
         std::unique_lock lock(mutex_);
-        if (!waiter->condition.wait_for(lock, std::chrono::seconds(30), [&waiter] {
-                return waiter->completed;
-            }))
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        while (!waiter->completed)
         {
-            update_waiters_.erase(request_id);
-            return {};
+            if (std::chrono::steady_clock::now() >= deadline || (cancelled && cancelled()))
+            {
+                update_waiters_.erase(request_id);
+                return {};
+            }
+            waiter->condition.wait_for(lock, std::chrono::milliseconds(50));
         }
         update_waiters_.erase(request_id);
         return waiter->result;

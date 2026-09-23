@@ -114,6 +114,7 @@ Copy-MsvcRuntime `
 
 $requiredFiles = @(
     "Glance.exe",
+    "Glance.CLI.exe",
     "Glance.Core.exe",
     "Glance.DialogBroker32.exe",
     "Glance.DialogHook.dll",
@@ -213,6 +214,10 @@ $upgradeCleanup = foreach ($file in $unusedSdkFiles) {
 }
 $upgradeCleanup | Set-Content -LiteralPath (Join-Path $artifactsDirectory "package\sdk-cleanup.iss") -Encoding utf8
 Write-Host "Removed $removedBytes bytes of unused SDK payload."
+
+if ($RunTests) {
+    & (Join-Path $repositoryRoot "tests\Glance.Tests\cli_integration_tests.ps1") -BuildOutputDirectory $payloadDirectory
+}
 
 $licenseDirectory = Join-Path $payloadDirectory "licenses"
 New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null

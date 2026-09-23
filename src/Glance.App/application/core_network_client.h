@@ -30,7 +30,8 @@ namespace glance::app
         CoreNetworkClient(SendCallback send, AutomaticUpdateCallback automatic_update);
 
         [[nodiscard]] glance::contracts::UpdateCheckResult check_for_updates(
-            std::wstring_view current_version);
+            std::wstring_view current_version,
+            const std::function<bool()>& cancelled = {});
         [[nodiscard]] bool request_automatic_update_check(
             std::wstring_view current_version,
             std::uint64_t last_successful_check);

@@ -377,97 +377,7 @@ namespace winrt::Glance::App::implementation
         const int y = monitor_info.rcWork.top + ((monitor_info.rcWork.bottom - monitor_info.rcWork.top) - height) / 2;
         SetWindowPos(window, nullptr, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
 
-        appearance_preferences_ = glance::app::load_appearance_preferences();
-        LanguageComboBox().SelectedIndex(appearance_preferences_.language == L"zh-CN" ? 1 : 0);
-        ThemeComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.theme));
-        AccentComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.accent));
-        const bool acrylic_supported = glance::app::acrylic_material_supported();
-        AcrylicMaterialRow().Visibility(acrylic_supported ? Visibility::Visible : Visibility::Collapsed);
-        AcrylicMaterialDivider().Visibility(acrylic_supported ? Visibility::Visible : Visibility::Collapsed);
-        AcrylicOpacitySlider().Value(appearance_preferences_.acrylic_opacity_percent);
-        if (acrylic_supported)
-        {
-            AcrylicMaterialToggle().IsOn(appearance_preferences_.acrylic_enabled);
-        }
-        LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
-        update_preferences_ = glance::app::load_update_preferences();
-        AutomaticUpdateCheckToggle().IsOn(update_preferences_.automatic_check_enabled);
-        UpdateCheckFrequencyComboBox().SelectedIndex(
-            static_cast<int>(update_preferences_.frequency));
-        DiagnosticsToggle().IsOn(glance::contracts::diagnostics_enabled());
-        window_preferences_ = glance::app::load_window_preferences();
-        DefaultWindowWidthNumberBox().Value(window_preferences_.default_width);
-        DefaultWindowHeightNumberBox().Value(window_preferences_.default_height);
-        RememberWindowSizeToggle().IsOn(window_preferences_.remember_size);
-        AutoFitWindowSizeToggle().IsOn(window_preferences_.auto_fit_media);
-        ShowAfterAutoFitToggle().IsOn(window_preferences_.show_after_auto_fit);
-        DynamicAutoFitToggle().IsOn(window_preferences_.dynamic_auto_fit);
-        AdaptiveMinimumPercentNumberBox().Value(window_preferences_.adaptive_minimum_percent);
-        AdaptiveMaximumPercentNumberBox().Value(window_preferences_.adaptive_maximum_percent);
-        AutoFitIgnoredExtensionsTextBox().Text(window_preferences_.auto_fit_ignored_extensions);
-        RememberWindowPositionToggle().IsOn(window_preferences_.remember_position);
-        DoubleClickFullscreenToggle().IsOn(window_preferences_.double_click_fullscreen);
-        media_preview_preferences_ = glance::app::load_media_preview_preferences();
-        DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
-        DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
-        AutoplayAudioToggle().IsOn(media_preview_preferences_.autoplay_audio);
-        AutoplayVideoToggle().IsOn(media_preview_preferences_.autoplay_video);
-        ReverseSeekWheelToggle().IsOn(media_preview_preferences_.reverse_seek_wheel);
-        MiddleClickGalleryModeToggle().IsOn(
-            media_preview_preferences_.middle_click_gallery_mode);
-        LoopGalleryScrollingToggle().IsOn(
-            media_preview_preferences_.loop_gallery_scrolling);
-        GallerySameExtensionOnlyToggle().IsOn(
-            media_preview_preferences_.gallery_same_extension_only);
-        ImageZoomMapToggle().IsOn(media_preview_preferences_.show_image_zoom_map);
-        text_preferences_ = glance::app::load_text_preferences();
-        auto font_families = glance::app::system_font_families();
-        if (font_families.empty())
-        {
-            for (const auto font_family : glance::app::preferred_text_font_families)
-            {
-                font_families.emplace_back(font_family);
-            }
-        }
-        int selected_font = -1;
-        for (std::size_t index = 0; index < font_families.size(); ++index)
-        {
-            FontFamilyComboBox().Items().Append(box_value(font_families[index]));
-            if (_wcsicmp(font_families[index].c_str(), text_preferences_.font_family.c_str()) == 0)
-            {
-                selected_font = static_cast<int>(index);
-            }
-        }
-        if (selected_font < 0)
-        {
-            selected_font = static_cast<int>(font_families.size());
-            FontFamilyComboBox().Items().Append(box_value(text_preferences_.font_family));
-        }
-        FontFamilyComboBox().SelectedIndex(selected_font);
-        FontSizeNumberBox().Value(text_preferences_.font_size);
-        SyntaxHighlightingToggle().IsOn(text_preferences_.syntax_highlighting);
-        SyntaxThemeComboBox().SelectedIndex(static_cast<int>(text_preferences_.syntax_theme));
-        SyntaxThemeComboBox().IsEnabled(text_preferences_.syntax_highlighting);
-        LineNumbersToggle().IsOn(text_preferences_.line_numbers);
-        WordWrapToggle().IsOn(text_preferences_.word_wrap);
-        MonitorTextFileToggle().IsOn(text_preferences_.monitor_file);
-        TextRefreshIntervalNumberBox().Value(text_preferences_.refresh_interval_ms / 1000.0);
-        TextFileMonitorOptions().Visibility(text_preferences_.monitor_file ? Visibility::Visible : Visibility::Collapsed);
-        path_copy_preferences_ = glance::app::load_path_copy_preferences();
-        QuoteCopiedPathToggle().IsOn(path_copy_preferences_.quote_path);
-        UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
-        footer_preferences_ = glance::app::load_footer_preferences();
-        rebuild_footer_field_rows();
-        acrylic_opacity_region_.initialize(
-            AcrylicOpacityRegion(),
-            acrylic_supported && appearance_preferences_.acrylic_enabled);
-        update_frequency_region_.initialize(
-            UpdateFrequencyRegion(),
-            update_preferences_.automatic_check_enabled);
-        auto_fit_options_region_.initialize(
-            AutoFitOptionsRegion(),
-            window_preferences_.auto_fit_media);
-        refresh_toggle_descriptions();
+        ReloadPreferences();
         initializing_ = false;
         refresh_diagnostic_bundle_status();
         Activated([this](IInspectable const&, WindowActivatedEventArgs const& args) {
@@ -1548,6 +1458,105 @@ namespace winrt::Glance::App::implementation
             DiagnosticBundleStatusText().Text(glance::app::localize(L"DiagnosticBundleDescription"));
             break;
         }
+    }
+
+    void SettingsWindow::ReloadPreferences()
+    {
+        initializing_ = true;
+        FontFamilyComboBox().Items().Clear();
+        appearance_preferences_ = glance::app::load_appearance_preferences();
+        LanguageComboBox().SelectedIndex(appearance_preferences_.language == L"zh-CN" ? 1 : 0);
+        ThemeComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.theme));
+        AccentComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.accent));
+        const bool acrylic_supported = glance::app::acrylic_material_supported();
+        AcrylicMaterialRow().Visibility(acrylic_supported ? Visibility::Visible : Visibility::Collapsed);
+        AcrylicMaterialDivider().Visibility(acrylic_supported ? Visibility::Visible : Visibility::Collapsed);
+        AcrylicOpacitySlider().Value(appearance_preferences_.acrylic_opacity_percent);
+        if (acrylic_supported)
+        {
+            AcrylicMaterialToggle().IsOn(appearance_preferences_.acrylic_enabled);
+        }
+        LaunchAtSignInToggle().IsOn(launch_at_sign_in_enabled());
+        update_preferences_ = glance::app::load_update_preferences();
+        AutomaticUpdateCheckToggle().IsOn(update_preferences_.automatic_check_enabled);
+        UpdateCheckFrequencyComboBox().SelectedIndex(
+            static_cast<int>(update_preferences_.frequency));
+        DiagnosticsToggle().IsOn(glance::contracts::diagnostics_enabled());
+        window_preferences_ = glance::app::load_window_preferences();
+        DefaultWindowWidthNumberBox().Value(window_preferences_.default_width);
+        DefaultWindowHeightNumberBox().Value(window_preferences_.default_height);
+        RememberWindowSizeToggle().IsOn(window_preferences_.remember_size);
+        AutoFitWindowSizeToggle().IsOn(window_preferences_.auto_fit_media);
+        ShowAfterAutoFitToggle().IsOn(window_preferences_.show_after_auto_fit);
+        DynamicAutoFitToggle().IsOn(window_preferences_.dynamic_auto_fit);
+        AdaptiveMinimumPercentNumberBox().Value(window_preferences_.adaptive_minimum_percent);
+        AdaptiveMaximumPercentNumberBox().Value(window_preferences_.adaptive_maximum_percent);
+        AutoFitIgnoredExtensionsTextBox().Text(window_preferences_.auto_fit_ignored_extensions);
+        RememberWindowPositionToggle().IsOn(window_preferences_.remember_position);
+        DoubleClickFullscreenToggle().IsOn(window_preferences_.double_click_fullscreen);
+        media_preview_preferences_ = glance::app::load_media_preview_preferences();
+        DefaultAudioVolumeNumberBox().Value(media_preview_preferences_.audio_volume_percent);
+        DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
+        AutoplayAudioToggle().IsOn(media_preview_preferences_.autoplay_audio);
+        AutoplayVideoToggle().IsOn(media_preview_preferences_.autoplay_video);
+        ReverseSeekWheelToggle().IsOn(media_preview_preferences_.reverse_seek_wheel);
+        MiddleClickGalleryModeToggle().IsOn(
+            media_preview_preferences_.middle_click_gallery_mode);
+        LoopGalleryScrollingToggle().IsOn(
+            media_preview_preferences_.loop_gallery_scrolling);
+        GallerySameExtensionOnlyToggle().IsOn(
+            media_preview_preferences_.gallery_same_extension_only);
+        ImageZoomMapToggle().IsOn(media_preview_preferences_.show_image_zoom_map);
+        text_preferences_ = glance::app::load_text_preferences();
+        auto font_families = glance::app::system_font_families();
+        if (font_families.empty())
+        {
+            for (const auto font_family : glance::app::preferred_text_font_families)
+            {
+                font_families.emplace_back(font_family);
+            }
+        }
+        int selected_font = -1;
+        for (std::size_t index = 0; index < font_families.size(); ++index)
+        {
+            FontFamilyComboBox().Items().Append(box_value(font_families[index]));
+            if (_wcsicmp(font_families[index].c_str(), text_preferences_.font_family.c_str()) == 0)
+            {
+                selected_font = static_cast<int>(index);
+            }
+        }
+        if (selected_font < 0)
+        {
+            selected_font = static_cast<int>(font_families.size());
+            FontFamilyComboBox().Items().Append(box_value(text_preferences_.font_family));
+        }
+        FontFamilyComboBox().SelectedIndex(selected_font);
+        FontSizeNumberBox().Value(text_preferences_.font_size);
+        SyntaxHighlightingToggle().IsOn(text_preferences_.syntax_highlighting);
+        SyntaxThemeComboBox().SelectedIndex(static_cast<int>(text_preferences_.syntax_theme));
+        SyntaxThemeComboBox().IsEnabled(text_preferences_.syntax_highlighting);
+        LineNumbersToggle().IsOn(text_preferences_.line_numbers);
+        WordWrapToggle().IsOn(text_preferences_.word_wrap);
+        MonitorTextFileToggle().IsOn(text_preferences_.monitor_file);
+        TextRefreshIntervalNumberBox().Value(text_preferences_.refresh_interval_ms / 1000.0);
+        TextFileMonitorOptions().Visibility(text_preferences_.monitor_file ? Visibility::Visible : Visibility::Collapsed);
+        path_copy_preferences_ = glance::app::load_path_copy_preferences();
+        QuoteCopiedPathToggle().IsOn(path_copy_preferences_.quote_path);
+        UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
+        footer_preferences_ = glance::app::load_footer_preferences();
+        rebuild_footer_field_rows();
+        acrylic_opacity_region_.initialize(
+            AcrylicOpacityRegion(),
+            acrylic_supported && appearance_preferences_.acrylic_enabled);
+        update_frequency_region_.initialize(
+            UpdateFrequencyRegion(),
+            update_preferences_.automatic_check_enabled);
+        auto_fit_options_region_.initialize(
+            AutoFitOptionsRegion(),
+            window_preferences_.auto_fit_media);
+        refresh_toggle_descriptions();
+        rebuild_component_settings();
+        initializing_ = false;
     }
 
     void SettingsWindow::LaunchAtSignInToggle_Toggled(IInspectable const&, RoutedEventArgs const&)

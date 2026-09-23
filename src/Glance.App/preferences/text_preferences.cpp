@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "text_preferences.h"
+#include "public_settings.h"
 #include "text_font_fallback.h"
 
 #include <dwrite.h>
@@ -9,22 +10,21 @@
 
 namespace
 {
+    const glance::app::RegisterPublicSettings public_settings{
+        { L"TextPreview/FontFamily", L"string", L"", 0, 31, L"", L"immediate" },
+        { L"TextPreview/FontSize", L"integer", L"9", 7, 32, L"", L"immediate" },
+        { L"TextPreview/SyntaxTheme", L"integer", L"0", 0, 17, L"", L"immediate" },
+        { L"TextPreview/WordWrap", L"boolean", L"1", 0, 1, L"", L"immediate" },
+        { L"TextPreview/SyntaxHighlighting", L"boolean", L"1", 0, 1, L"", L"immediate" },
+        { L"TextPreview/LineNumbers", L"boolean", L"1", 0, 1, L"", L"immediate" },
+        { L"TextPreview/MonitorFile", L"boolean", L"0", 0, 1, L"", L"immediate" },
+        { L"TextPreview/RefreshIntervalMs", L"integer", L"1000", 100, 60000, L"", L"immediate" },
+    };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\TextPreview";
 
     DWORD read_dword(const wchar_t* name, DWORD fallback) noexcept
     {
-        DWORD value{};
-        DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   registry_path,
-                   name,
-                   RRF_RT_REG_DWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS
-            ? value
-            : fallback;
+        return glance::app::read_public_dword(registry_path, name, fallback);
     }
 }
 

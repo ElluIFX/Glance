@@ -123,6 +123,10 @@
     <ClCompile Include="preview\image_metadata_provider.cpp" />
     <ClCompile Include="application\localization.cpp" />
     <ClCompile Include="preview\markdown_renderer.cpp" />
+    <ClCompile Include="application\command_server.cpp" />
+    <ClCompile Include="application\command_dispatch.cpp" />
+    <ClCompile Include="preferences\settings_commands.cpp" />
+    <ClCompile Include="ui\command_window.cpp" />
     <ClCompile Include="preview\native_preview_surface.cpp" />
     <ClCompile Include="preferences\media_preview_preferences.cpp" />
     <ClCompile Include="preferences\path_copy_preferences.cpp" />

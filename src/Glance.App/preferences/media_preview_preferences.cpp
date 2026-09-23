@@ -1,44 +1,32 @@
 #include "pch.h"
 #include "media_preview_preferences.h"
+#include "public_settings.h"
 
 #include <algorithm>
 
 namespace
 {
+    const glance::app::RegisterPublicSettings public_settings{
+        { L"MediaPreview/AudioVolume", L"integer", L"100", 0, 100, L"", L"next_preview" },
+        { L"MediaPreview/VideoVolume", L"integer", L"100", 0, 100, L"", L"next_preview" },
+        { L"MediaPreview/AutoplayAudio", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"MediaPreview/AutoplayVideo", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"MediaPreview/ReverseSeekWheel", L"boolean", L"0", 0, 1, L"", L"next_preview" },
+        { L"MediaPreview/MiddleClickGalleryMode", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"MediaPreview/LoopGalleryScrolling", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"MediaPreview/GallerySameExtensionOnly", L"boolean", L"0", 0, 1, L"", L"next_preview" },
+        { L"MediaPreview/ShowImageZoomMap", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+    };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\MediaPreview";
 
     DWORD read_volume(const wchar_t* name) noexcept
     {
-        DWORD value{};
-        DWORD size = sizeof(value);
-        if (RegGetValueW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                name,
-                RRF_RT_REG_DWORD,
-                nullptr,
-                &value,
-                &size) != ERROR_SUCCESS)
-        {
-            return 100;
-        }
-        return std::min<DWORD>(value, 100);
+        return glance::app::read_public_dword(registry_path, name, 100);
     }
 
     bool read_bool(const wchar_t* name, bool fallback) noexcept
     {
-        DWORD value{};
-        DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   registry_path,
-                   name,
-                   RRF_RT_REG_DWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS
-            ? value != 0
-            : fallback;
+        return glance::app::read_public_dword(registry_path, name, fallback ? 1 : 0) != 0;
     }
 
     void write_volume(HKEY key, const wchar_t* name, std::uint32_t volume) noexcept

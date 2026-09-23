@@ -8,6 +8,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $applicationRoot = (Resolve-Path -LiteralPath $ApplicationDirectory).Path
 $applicationPath = Join-Path $applicationRoot 'Glance.exe'
+$cliPath = Join-Path $applicationRoot 'Glance.CLI.exe'
 $corePath = Join-Path $applicationRoot 'Glance.Core.exe'
 
 Add-Type @'
@@ -42,13 +43,9 @@ function Wait-ProcessState([string]$Name, [int]$PreviousId = 0) {
 
 function Wait-CoreConnection([int]$CoreId) {
     $deadline = [DateTime]::UtcNow.AddSeconds(25)
-    $log = Join-Path $env:LOCALAPPDATA 'Glance\Logs\Glance.Core.log'
     do {
-        $lines = Get-Content -LiteralPath $log -Tail 60
-        if ($lines | Where-Object {
-            $_.Contains("[pid:$CoreId] UI pipe connected.") -or
-            $_.Contains("[pid:$CoreId] Keyboard hook recovered: UI connection restored.")
-        }) { return }
+        $status = (& $cliPath status --no-start --json | ConvertFrom-Json)
+        if ($LASTEXITCODE -eq 0 -and $status.data.core_connected -and $status.data.core_process_id -eq $CoreId) { return }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
     throw 'Core did not establish IPC'
@@ -74,7 +71,8 @@ try {
         'PASS: delayed task exits without resurrecting the App'
     }
     if (-not (Get-Process Glance -ErrorAction SilentlyContinue)) {
-        Start-Process -FilePath $applicationPath -WorkingDirectory $applicationRoot -WindowStyle Hidden
+        & $cliPath status --json | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'CLI failed to start App' }
     }
     $app = Wait-ProcessState 'Glance'
     $core = Wait-ProcessState 'Glance.Core'
@@ -100,10 +98,6 @@ try {
     if ([GlanceAccessTestToken]::Elevated($app.Id)) { throw 'Recovered App must remain unelevated' }
     'PASS: App crash recovery preserves ordinary token'
 } finally {
-    $shutdown = Start-Process -FilePath $applicationPath -ArgumentList '--shutdown' -WindowStyle Hidden -PassThru
-    $shutdown.WaitForExit(10000) | Out-Null
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    while ((Get-Process Glance,Glance.Core -ErrorAction SilentlyContinue) -and [DateTime]::UtcNow -lt $deadline) {
-        Start-Sleep -Milliseconds 100
-    }
+    & $cliPath quit --json | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'CLI shutdown failed' }
 }

@@ -7,6 +7,7 @@
 #include "pipe_client.h"
 #include "preview_file.h"
 #include "tray_icon.h"
+#include "command_server.h"
 
 #include "glance/contracts/preview_state.h"
 
@@ -60,6 +61,11 @@ namespace winrt::Glance::App::implementation
         void open_preview(std::string_view payload);
         void handle_preview_input(glance::contracts::PreviewInputAction action);
         void close_active_preview();
+        std::string handle_cli_request(std::string payload, HANDLE cancelled, HANDLE connection);
+        Windows::Data::Json::JsonObject execute_cli_command(
+            Windows::Data::Json::JsonObject const& request,
+            std::vector<glance::app::PreviewFile> files);
+        std::unique_ptr<glance::app::CommandServer> command_server_;
 
         HANDLE instance_mutex_{};
         HANDLE shutdown_event_{};
@@ -85,6 +91,7 @@ namespace winrt::Glance::App::implementation
         std::vector<Glance::App::MainWindow> detached_windows_;
         std::unique_ptr<glance::app::TrayIcon> tray_icon_;
         std::uint64_t next_instance_id_{ 1 };
+        std::wstring cli_session_id_;
         bool automatic_update_check_in_flight_{};
         bool update_prompt_active_{};
         std::optional<glance::contracts::UpdateCheckResult> pending_update_;
