@@ -1155,8 +1155,8 @@
                                     <TextBlock x:Name="AdministratorAccessStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                    <Button x:Name="RepairCoreAccessButton" x:Uid="RepairCoreAccessButton" Content="Enable / repair" Visibility="Collapsed" Click="RepairCoreAccessButton_Click" />
                                     <FontIcon x:Name="AdministratorAccessStatusIcon" FontSize="18" VerticalAlignment="Center" />
-                                    <Button x:Name="RepairCoreAccessButton" x:Uid="RepairCoreAccessButton" Content="Enable / repair" Click="RepairCoreAccessButton_Click" />
                                 </StackPanel>
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />

@@ -870,12 +870,16 @@ namespace winrt::Glance::App::implementation
             L"WebViewUnavailable");
         WebViewDownloadLink().Visibility(
             webview_available ? Visibility::Collapsed : Visibility::Visible);
+        const bool administrator_access =
+            core_running && named_mutex_exists(L"Local\\Glance.Core.Elevated");
         set_status_indicator(
             AdministratorAccessStatusIcon(),
             AdministratorAccessStatusText(),
-            core_running && named_mutex_exists(L"Local\\Glance.Core.Elevated"),
+            administrator_access,
             L"AdministratorAccessAvailable",
             L"AdministratorAccessUnavailable");
+        RepairCoreAccessButton().Visibility(
+            administrator_access ? Visibility::Collapsed : Visibility::Visible);
     }
 
     fire_and_forget SettingsWindow::RepairCoreAccessButton_Click(IInspectable const&, RoutedEventArgs const&)
