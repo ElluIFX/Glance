@@ -36,8 +36,6 @@ namespace glance::app
         bool word_wrap{ true };
         bool syntax_highlighting{ true };
         bool line_numbers{ true };
-        bool monitor_file{};
-        std::uint32_t refresh_interval_ms{ 1000 };
     };
 
     [[nodiscard]] TextPreferences load_text_preferences();

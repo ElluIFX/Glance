@@ -423,10 +423,6 @@
   <data name="JsonNodeCopied" xml:space="preserve"><value>已复制 JSON 节点</value></data>
   <data name="JsonNodeCopyUnavailable" xml:space="preserve"><value>JSON 节点尚未准备好复制</value></data>
   <data name="JsonNodeCopyFailed" xml:space="preserve"><value>无法复制 JSON 节点</value></data>
-  <data name="MonitorTextFileLabel.Text" xml:space="preserve"><value>监视文件变化</value></data>
-  <data name="MonitorTextFileDescription.Text" xml:space="preserve"><value>文件变化时自动更新预览内容</value></data>
-  <data name="TextRefreshIntervalLabel.Text" xml:space="preserve"><value>最短刷新间隔（秒）</value></data>
-  <data name="TextRefreshIntervalDescription.Text" xml:space="preserve"><value>检查文件更新的间隔</value></data>
   <data name="RepairCoreAccessButton.Content" xml:space="preserve"><value>启用／修复</value></data>
   <data name="CoreAccessUnsafeLocation" xml:space="preserve"><value>请将 Glance 安装到 Program Files 等受保护目录，再启用管理员权限</value></data>
   <data name="CoreAccessAdministratorRequired" xml:space="preserve"><value>此功能需要使用 Windows 管理员账户</value></data>
@@ -435,4 +431,7 @@
   <data name="CopyCliPathButton.Content" xml:space="preserve"><value>复制路径</value></data>
   <data name="CliPathCopied" xml:space="preserve"><value>已复制</value></data>
   <data name="CliPathCopyFailed" xml:space="preserve"><value>复制失败，重试</value></data>
+  <data name="TextMonitorButton.ToolTipService.ToolTip" xml:space="preserve"><value>切换文件监视&#xA;右键刷新一次</value></data>
+  <data name="TextMonitorEnabledNotice" xml:space="preserve"><value>已开启文件监视</value></data>
+  <data name="TextMonitorPausedNotice" xml:space="preserve"><value>已暂停文件监视</value></data>
 </root>

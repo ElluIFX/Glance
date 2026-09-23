@@ -727,10 +727,6 @@ namespace winrt::Glance::App::implementation
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
         set_text(PlainTextPreviewSectionTitle(), L"PlainTextPreviewSectionTitle.Text");
-        set_text(MonitorTextFileLabel(), L"MonitorTextFileLabel.Text");
-        set_text(MonitorTextFileDescription(), L"MonitorTextFileDescription.Text");
-        set_text(TextRefreshIntervalLabel(), L"TextRefreshIntervalLabel.Text");
-        set_text(TextRefreshIntervalDescription(), L"TextRefreshIntervalDescription.Text");
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
         set_text(FontFamilyDescription(), L"FontFamilyDescription.Text");
         set_text(FontSizeLabel(), L"FontSizeLabel.Text");
@@ -1544,9 +1540,6 @@ namespace winrt::Glance::App::implementation
         SyntaxThemeComboBox().IsEnabled(text_preferences_.syntax_highlighting);
         LineNumbersToggle().IsOn(text_preferences_.line_numbers);
         WordWrapToggle().IsOn(text_preferences_.word_wrap);
-        MonitorTextFileToggle().IsOn(text_preferences_.monitor_file);
-        TextRefreshIntervalNumberBox().Value(text_preferences_.refresh_interval_ms / 1000.0);
-        TextFileMonitorOptions().Visibility(text_preferences_.monitor_file ? Visibility::Visible : Visibility::Collapsed);
         path_copy_preferences_ = glance::app::load_path_copy_preferences();
         QuoteCopiedPathToggle().IsOn(path_copy_preferences_.quote_path);
         UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
@@ -2691,13 +2684,6 @@ namespace winrt::Glance::App::implementation
         SyntaxThemeComboBox().IsEnabled(text_preferences_.syntax_highlighting);
         text_preferences_.line_numbers = LineNumbersToggle().IsOn();
         text_preferences_.word_wrap = WordWrapToggle().IsOn();
-        text_preferences_.monitor_file = MonitorTextFileToggle().IsOn();
-        TextFileMonitorOptions().Visibility(text_preferences_.monitor_file ? Visibility::Visible : Visibility::Collapsed);
-        if (std::isfinite(TextRefreshIntervalNumberBox().Value()))
-        {
-            text_preferences_.refresh_interval_ms = static_cast<std::uint32_t>(
-                std::clamp(TextRefreshIntervalNumberBox().Value(), 0.1, 60.0) * 1000.0);
-        }
         glance::app::save_text_preferences(text_preferences_);
         if (text_preferences_changed_callback_)
         {
@@ -2737,23 +2723,6 @@ namespace winrt::Glance::App::implementation
         IInspectable const&,
         Controls::SelectionChangedEventArgs const&)
     {
-        save_text_preferences();
-    }
-
-    void SettingsWindow::TextRefreshIntervalNumberBox_ValueChanged(
-        IInspectable const&, Controls::NumberBoxValueChangedEventArgs const& args)
-    {
-        if (initializing_)
-        {
-            return;
-        }
-        if (!std::isfinite(args.NewValue()))
-        {
-            initializing_ = true;
-            TextRefreshIntervalNumberBox().Value(text_preferences_.refresh_interval_ms / 1000.0);
-            initializing_ = false;
-            return;
-        }
         save_text_preferences();
     }
 

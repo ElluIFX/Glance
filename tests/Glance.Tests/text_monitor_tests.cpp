@@ -289,9 +289,6 @@ int run_text_monitor_tests()
     const auto replacement = directory / L"replacement.log";
     try
     {
-        TextPreferences defaults;
-        require(!defaults.monitor_file && defaults.refresh_interval_ms == 1000,
-            "Monitoring defaults");
         write_file(path, "start\n");
         Preview preview;
         preview.apply(load_text_preview(path, chunk_size, TextEncoding::utf8, true));
@@ -352,8 +349,16 @@ int run_text_monitor_tests()
         {
             const auto line = "replacement " + std::to_string(i) + "\n";
             write_file(replacement, line);
-            require(MoveFileExW(replacement.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING) != FALSE,
-                "Atomic log rotation");
+            DWORD rotation_error{};
+            for (int attempt = 0; attempt < 50; ++attempt)
+            {
+                if (MoveFileExW(replacement.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING))
+                { rotation_error = 0; break; }
+                rotation_error = GetLastError();
+                if (rotation_error != ERROR_ACCESS_DENIED && rotation_error != ERROR_SHARING_VIOLATION) break;
+                Sleep(2);
+            }
+            if (rotation_error) throw std::runtime_error("Atomic log rotation: " + std::to_string(rotation_error));
             preview.poll();
             require(preview.text == std::wstring(line.begin(), line.end()), "Rotation follows path identity");
         }

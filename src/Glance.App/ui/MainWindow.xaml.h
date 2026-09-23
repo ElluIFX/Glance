@@ -111,6 +111,8 @@ namespace winrt::Glance::App::implementation
         void update_json_row_tooltip(Microsoft::UI::Xaml::FrameworkElement const& row);
         void LineNumbersButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void SyntaxHighlightButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void TextMonitorButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void TextMonitorButton_RightTapped(IInspectable const&, Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void WordWrapButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void ArchiveHeaderButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void FolderEntryList_DoubleTapped(
@@ -873,6 +875,9 @@ namespace winrt::Glance::App::implementation
         int media_volume_wheel_delta_{};
         Microsoft::UI::Xaml::DispatcherTimer focus_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer text_monitor_timer_{ nullptr };
+        bool text_monitor_enabled_{};
+        bool text_refresh_requested_{};
+        std::uint64_t text_monitor_epoch_{};
         Microsoft::UI::Xaml::DispatcherTimer fullscreen_chrome_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer media_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer copy_feedback_timer_{ nullptr };

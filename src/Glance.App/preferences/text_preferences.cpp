@@ -17,8 +17,6 @@ namespace
         { L"TextPreview/WordWrap", L"boolean", L"1", 0, 1, L"", L"immediate" },
         { L"TextPreview/SyntaxHighlighting", L"boolean", L"1", 0, 1, L"", L"immediate" },
         { L"TextPreview/LineNumbers", L"boolean", L"1", 0, 1, L"", L"immediate" },
-        { L"TextPreview/MonitorFile", L"boolean", L"0", 0, 1, L"", L"immediate" },
-        { L"TextPreview/RefreshIntervalMs", L"integer", L"1000", 100, 60000, L"", L"immediate" },
     };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\TextPreview";
 
@@ -117,8 +115,6 @@ namespace glance::app
         result.word_wrap = read_dword(L"WordWrap", 1) != 0;
         result.syntax_highlighting = read_dword(L"SyntaxHighlighting", 1) != 0;
         result.line_numbers = read_dword(L"LineNumbers", 1) != 0;
-        result.monitor_file = read_dword(L"MonitorFile", 0) != 0;
-        result.refresh_interval_ms = std::clamp<DWORD>(read_dword(L"RefreshIntervalMs", 1000), 100, 60000);
         return result;
     }
 
@@ -143,8 +139,6 @@ namespace glance::app
         const DWORD word_wrap = preferences.word_wrap;
         const DWORD syntax_highlighting = preferences.syntax_highlighting;
         const DWORD line_numbers = preferences.line_numbers;
-        const DWORD monitor_file = preferences.monitor_file;
-        const DWORD refresh_interval = std::clamp<DWORD>(preferences.refresh_interval_ms, 100, 60000);
         RegSetValueExW(
             key,
             L"FontFamily",
@@ -157,8 +151,6 @@ namespace glance::app
         RegSetValueExW(key, L"WordWrap", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&word_wrap), sizeof(word_wrap));
         RegSetValueExW(key, L"SyntaxHighlighting", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&syntax_highlighting), sizeof(syntax_highlighting));
         RegSetValueExW(key, L"LineNumbers", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&line_numbers), sizeof(line_numbers));
-        RegSetValueExW(key, L"MonitorFile", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&monitor_file), sizeof(monitor_file));
-        RegSetValueExW(key, L"RefreshIntervalMs", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&refresh_interval), sizeof(refresh_interval));
         RegCloseKey(key);
     }
 }

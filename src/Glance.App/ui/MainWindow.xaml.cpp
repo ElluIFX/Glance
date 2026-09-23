@@ -2035,6 +2035,7 @@ namespace winrt::Glance::App::implementation
         update_archive_header_state();
         SystemAnsiItem().Text(glance::app::localize(L"SystemAnsiItem.Text"));
         set_tooltip(SyntaxHighlightButton(), L"SyntaxHighlightButton.ToolTipService.ToolTip");
+        set_tooltip(TextMonitorButton(), L"TextMonitorButton.ToolTipService.ToolTip");
         set_tooltip(ImageZoomButton(), L"ImageZoomButton.ToolTipService.ToolTip");
         ImageZoomLabel().Text(glance::app::localize(L"ImageZoomLabel.Text"));
         set_tooltip(RotateButton(), L"RotateButton.ToolTipService.ToolTip");
@@ -2664,7 +2665,7 @@ namespace winrt::Glance::App::implementation
             !source_id.empty() && source_id_ == source_id &&
             files.size() == 1 && current_index_ < files_.size() &&
             (glance::app::same_filesystem_preview(files_[current_index_], files.front()) ||
-             (text_preferences_.monitor_file && text_reader_monitored_ &&
+             (text_monitor_enabled_ && text_reader_monitored_ &&
               current_kind_ == glance::app::PreviewKind::text && files.front().is_filesystem &&
               (files.front().attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
               files_[current_index_].path == files.front().path)))
@@ -2719,6 +2720,10 @@ namespace winrt::Glance::App::implementation
         update_preview_navigation_ui();
 
         const bool position_window = !preserve_window && !topmost_ && (new_session || !user_sized_);
+        text_monitor_enabled_ = false;
+        text_refresh_requested_ = false;
+        ++text_monitor_epoch_;
+        TextMonitorButton().IsChecked(false);
         present_file(current_index_, current_kind);
         if (position_window)
         {
@@ -2880,6 +2885,10 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::clear_preview_content()
     {
+        text_monitor_enabled_ = false;
+        text_refresh_requested_ = false;
+        ++text_monitor_epoch_;
+        TextMonitorButton().IsChecked(false);
         stop_text_monitor();
         leave_gallery(false);
         release_native_preview_surface();
@@ -2999,6 +3008,7 @@ namespace winrt::Glance::App::implementation
         TextStatusControls().Visibility(Visibility::Collapsed);
         ImageStatusControls().Visibility(Visibility::Collapsed);
         SyntaxHighlightButton().Visibility(Visibility::Collapsed);
+        TextMonitorButton().Visibility(Visibility::Collapsed);
         WordWrapButton().Visibility(Visibility::Collapsed);
         LineNumbersButton().Visibility(Visibility::Collapsed);
 
@@ -3904,6 +3914,13 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        if (index != current_index_ || current_text_path_ != files_[index].path)
+        {
+            text_monitor_enabled_ = false;
+            text_refresh_requested_ = false;
+            ++text_monitor_epoch_;
+            TextMonitorButton().IsChecked(false);
+        }
         release_native_preview_surface();
         if (component_preparation_cancellation_)
         {
@@ -4543,7 +4560,7 @@ namespace winrt::Glance::App::implementation
         current_text_reader_.reset();
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
-        const bool monitor = text_preferences_.monitor_file && !markdown && !web && !current_text_json_;
+        const bool monitor = text_monitor_enabled_ && !markdown && !web && !current_text_json_;
         text_reader_monitored_ = monitor;
         co_await resume_background();
         const auto initial_bytes = markdown
@@ -6779,8 +6796,9 @@ namespace winrt::Glance::App::implementation
 
     fire_and_forget MainWindow::load_next_text_chunk_async(std::uint64_t generation)
     {
-        if (text_preferences_.monitor_file && text_reader_monitored_)
+        if (text_reader_monitored_ && current_text_has_more_)
         {
+            text_refresh_requested_ = true;
             refresh_monitored_text_async();
             co_return;
         }
@@ -6856,7 +6874,12 @@ namespace winrt::Glance::App::implementation
     void MainWindow::schedule_text_monitor()
     {
         stop_text_monitor();
-        if (!visible_ || !text_preferences_.monitor_file ||
+        if (text_refresh_requested_ && !text_chunk_loading_)
+        {
+            refresh_monitored_text_async();
+            return;
+        }
+        if (!visible_ || !text_monitor_enabled_ ||
             current_kind_ != glance::app::PreviewKind::text || current_text_json_ ||
             current_text_path_.empty() || text_chunk_loading_)
         {
@@ -6873,13 +6896,13 @@ namespace winrt::Glance::App::implementation
                 }
             });
         }
-        text_monitor_timer_.Interval(std::chrono::milliseconds(text_preferences_.refresh_interval_ms));
+        text_monitor_timer_.Interval(std::chrono::milliseconds(1000));
         text_monitor_timer_.Start();
     }
 
     fire_and_forget MainWindow::refresh_monitored_text_async()
     {
-        if (text_chunk_loading_ || !visible_ || !text_preferences_.monitor_file ||
+        if (text_chunk_loading_ || !visible_ || (!text_monitor_enabled_ && !text_refresh_requested_) ||
             current_kind_ != glance::app::PreviewKind::text || current_text_json_ ||
             current_text_path_.empty())
         {
@@ -6890,6 +6913,7 @@ namespace winrt::Glance::App::implementation
         const auto generation = content_generation_;
         const auto reader = current_text_reader_;
         const bool restart = !text_reader_monitored_ || reader == nullptr;
+        const auto monitor_epoch = text_monitor_epoch_;
         const auto path = current_text_path_;
         const auto encoding = current_text_encoding_;
         const auto weak = get_weak();
@@ -6908,7 +6932,7 @@ namespace winrt::Glance::App::implementation
             result.retry_later = true;
         }
         static_cast<void>(dispatcher.TryEnqueue(
-            [weak, reader, generation, result = std::move(result)]() mutable {
+            [weak, reader, generation, monitor_epoch, result = std::move(result)]() mutable {
                 const auto self = weak.get();
                 if (!self || generation != self->content_generation_ ||
                     reader != self->current_text_reader_ || !self->visible_)
@@ -6917,6 +6941,12 @@ namespace winrt::Glance::App::implementation
                     return;
                 }
                 self->text_chunk_loading_ = false;
+                if (monitor_epoch != self->text_monitor_epoch_)
+                {
+                    self->text_reader_monitored_ = false;
+                    self->schedule_text_monitor();
+                    return;
+                }
                 if (!result.retry_later && result.error.empty())
                 {
                     if (reader == nullptr)
@@ -6929,7 +6959,7 @@ namespace winrt::Glance::App::implementation
                     if (self->text_editor_ && (result.replace_content || !result.content.empty()))
                     {
                         self->text_editor_->refresh_text(result.content, result.replace_content,
-                            self->text_preferences_.monitor_file,
+                            true,
                             result.has_more, result.undecodable_bytes);
                     }
                     if (self->current_text_encoding_ == glance::app::TextEncoding::automatic &&
@@ -6937,8 +6967,9 @@ namespace winrt::Glance::App::implementation
                     {
                         self->EncodingSelector().Content(box_value(result.encoding));
                     }
-                    if (result.has_more && self->text_preferences_.monitor_file)
+                    if (result.has_more)
                     {
+                        self->text_refresh_requested_ = true;
                         // One chunk per dispatcher turn bounds memory and lets input run.
                         self->DispatcherQueue().TryEnqueue([weak, generation] {
                             if (auto window = weak.get(); window && generation == window->content_generation_)
@@ -6949,6 +6980,7 @@ namespace winrt::Glance::App::implementation
                         return;
                     }
                 }
+                self->text_refresh_requested_ = false;
                 self->schedule_text_monitor();
             }));
     }
@@ -8139,6 +8171,9 @@ namespace winrt::Glance::App::implementation
             text && !component_web && (!current_text_json_ || !json_tree_mode_)
                 ? Visibility::Visible
                 : Visibility::Collapsed);
+        TextMonitorButton().Visibility(
+            kind == glance::app::PreviewKind::text && !current_text_json_
+                ? Visibility::Visible : Visibility::Collapsed);
         WordWrapButton().Visibility(
             text && !component_web && (!current_text_json_ || !json_tree_mode_)
                 ? Visibility::Visible
@@ -9613,6 +9648,23 @@ namespace winrt::Glance::App::implementation
         text_preferences_.word_wrap = word_wrap_;
         glance::app::save_text_preferences(text_preferences_);
         update_text_layout();
+    }
+
+    void MainWindow::TextMonitorButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        text_monitor_enabled_ = TextMonitorButton().IsChecked().Value();
+        ++text_monitor_epoch_;
+        text_refresh_requested_ = text_monitor_enabled_;
+        stop_text_monitor();
+        show_preview_notice(text_monitor_enabled_ ? L"TextMonitorEnabledNotice" : L"TextMonitorPausedNotice");
+        if (text_monitor_enabled_) refresh_monitored_text_async();
+    }
+
+    void MainWindow::TextMonitorButton_RightTapped(IInspectable const&, RightTappedRoutedEventArgs const& args)
+    {
+        args.Handled(true);
+        text_refresh_requested_ = true;
+        refresh_monitored_text_async();
     }
 
     void MainWindow::ArchiveHeaderButton_Click(IInspectable const& sender, RoutedEventArgs const&)
