@@ -65,7 +65,7 @@
   <data name="CoreRunning" xml:space="preserve"><value>Running</value></data>
   <data name="CoreNotRunning" xml:space="preserve"><value>Not running</value></data>
   <data name="AdministratorAccessAvailable" xml:space="preserve"><value>Acquired</value></data>
-  <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>Not acquired</value></data>
+  <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>Not acquired · Preview in administrator applications may be unavailable</value></data>
   <data name="SizesReset" xml:space="preserve"><value>Saved sizes reset</value></data>
   <data name="SizesResetFailed" xml:space="preserve"><value>Could not reset saved sizes</value></data>
   <data name="PositionsReset" xml:space="preserve"><value>Saved positions reset</value></data>
@@ -427,4 +427,8 @@
   <data name="MonitorTextFileDescription.Text" xml:space="preserve"><value>Automatically update the preview when the file changes</value></data>
   <data name="TextRefreshIntervalLabel.Text" xml:space="preserve"><value>Minimum refresh interval (seconds)</value></data>
   <data name="TextRefreshIntervalDescription.Text" xml:space="preserve"><value>Interval between checks for file updates</value></data>
+  <data name="RepairCoreAccessButton.Content" xml:space="preserve"><value>Enable / repair</value></data>
+  <data name="CoreAccessUnsafeLocation" xml:space="preserve"><value>Install Glance in a protected folder such as Program Files, then enable administrator access</value></data>
+  <data name="CoreAccessAdministratorRequired" xml:space="preserve"><value>This feature requires a Windows administrator account</value></data>
+  <data name="CoreAccessRepairFailed" xml:space="preserve"><value>Administrator access could not be enabled · Check Task Scheduler or repair the installation</value></data>
 </root>

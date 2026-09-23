@@ -33,7 +33,7 @@ namespace glance::core
         CoreApplication(const CoreApplication&) = delete;
         CoreApplication& operator=(const CoreApplication&) = delete;
 
-        [[nodiscard]] int run(HINSTANCE instance, DWORD app_process_id);
+        [[nodiscard]] int run(HINSTANCE instance, DWORD app_process_id, bool scheduled = false);
 
     private:
         static constexpr UINT hook_action_message = WM_APP + 1;
@@ -101,6 +101,7 @@ namespace glance::core
         unique_handle app_token_;
         DWORD app_process_id_{};
         bool elevated_{};
+        std::uint64_t scheduled_launch_deadline_{};
         std::atomic_bool shutting_down_{};
         std::uint32_t heartbeat_sequence_{};
         std::uint32_t pending_heartbeat_{};

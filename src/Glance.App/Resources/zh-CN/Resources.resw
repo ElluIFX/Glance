@@ -65,7 +65,7 @@
   <data name="CoreRunning" xml:space="preserve"><value>正在运行</value></data>
   <data name="CoreNotRunning" xml:space="preserve"><value>未运行</value></data>
   <data name="AdministratorAccessAvailable" xml:space="preserve"><value>已获取</value></data>
-  <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>未获取</value></data>
+  <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>未获取 · 管理员权限程序中的预览可能不可用</value></data>
   <data name="SizesReset" xml:space="preserve"><value>已重置保存的窗口尺寸</value></data>
   <data name="SizesResetFailed" xml:space="preserve"><value>无法重置保存的窗口尺寸</value></data>
   <data name="PositionsReset" xml:space="preserve"><value>已重置保存的窗口位置</value></data>
@@ -427,4 +427,8 @@
   <data name="MonitorTextFileDescription.Text" xml:space="preserve"><value>文件变化时自动更新预览内容</value></data>
   <data name="TextRefreshIntervalLabel.Text" xml:space="preserve"><value>最短刷新间隔（秒）</value></data>
   <data name="TextRefreshIntervalDescription.Text" xml:space="preserve"><value>检查文件更新的间隔</value></data>
+  <data name="RepairCoreAccessButton.Content" xml:space="preserve"><value>启用／修复</value></data>
+  <data name="CoreAccessUnsafeLocation" xml:space="preserve"><value>请将 Glance 安装到 Program Files 等受保护目录，再启用管理员权限</value></data>
+  <data name="CoreAccessAdministratorRequired" xml:space="preserve"><value>此功能需要使用 Windows 管理员账户</value></data>
+  <data name="CoreAccessRepairFailed" xml:space="preserve"><value>启用管理员权限失败 · 请检查任务计划程序或修复安装</value></data>
 </root>

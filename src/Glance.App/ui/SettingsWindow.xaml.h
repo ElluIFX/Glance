@@ -48,6 +48,9 @@ namespace winrt::Glance::App::implementation
         using UpdatePreferencesChangedCallback = std::function<void()>;
 
         SettingsWindow();
+        winrt::fire_and_forget RepairCoreAccessButton_Click(
+            winrt::Windows::Foundation::IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
         void InitializeSession(
             ExitCallback exit_callback,
             AppearanceChangedCallback appearance_changed_callback,

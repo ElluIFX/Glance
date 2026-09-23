@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "SettingsWindow.xaml.h"
+#include "App.xaml.h"
+#include "core_task.h"
 #include "appearance_preferences.h"
 #include "component_loader.h"
 #include "footer_preferences.h"
@@ -898,6 +900,7 @@ namespace winrt::Glance::App::implementation
         set_text(WebViewAvailabilityLabel(), L"WebViewAvailabilityLabel.Text");
         set_content(WebViewDownloadLink(), L"WebViewDownloadLink.Content");
         set_text(AdministratorAccessLabel(), L"AdministratorAccessLabel.Text");
+        RepairCoreAccessButton().Content(box_value(glance::app::localize(L"RepairCoreAccessButton.Content")));
         set_text(DiagnosticBundleLabel(), L"DiagnosticBundleLabel.Text");
         set_content(ExportDiagnosticBundleButton(), L"ExportDiagnosticBundleButton.Content");
         set_text(ResetAllSettingsLabel(), L"ResetAllSettingsLabel.Text");
@@ -963,6 +966,45 @@ namespace winrt::Glance::App::implementation
             core_running && named_mutex_exists(L"Local\\Glance.Core.Elevated"),
             L"AdministratorAccessAvailable",
             L"AdministratorAccessUnavailable");
+    }
+
+    fire_and_forget SettingsWindow::RepairCoreAccessButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        const auto lifetime = get_strong();
+        const apartment_context ui;
+        RepairCoreAccessButton().IsEnabled(false);
+        auto result = glance::app::CoreAccessResult::failed;
+        try
+        {
+            HWND owner{};
+            check_hresult(this->try_as<::IWindowNative>()->get_WindowHandle(&owner));
+            co_await resume_background();
+            result = glance::app::repair_core_task(owner);
+            co_await ui;
+            if (result == glance::app::CoreAccessResult::success)
+            {
+                const auto app = Application::Current().as<implementation::App>();
+                if (!co_await app->RestartCoreAfterAccessRepair())
+                    result = glance::app::CoreAccessResult::failed;
+            }
+        }
+        catch (...) {}
+        co_await ui;
+        RepairCoreAccessButton().IsEnabled(true);
+        refresh_runtime_statuses();
+        if (result == glance::app::CoreAccessResult::success || result == glance::app::CoreAccessResult::cancelled) co_return;
+        try
+        {
+            Controls::ContentDialog dialog;
+            dialog.XamlRoot(RootGrid().XamlRoot());
+            dialog.Title(box_value(glance::app::localize(L"AdministratorAccessLabel.Text")));
+            const auto key = result == glance::app::CoreAccessResult::unsafe_location ? L"CoreAccessUnsafeLocation" :
+                result == glance::app::CoreAccessResult::administrator_required ? L"CoreAccessAdministratorRequired" : L"CoreAccessRepairFailed";
+            dialog.Content(box_value(glance::app::localize(key)));
+            dialog.CloseButtonText(glance::app::localize(L"OK"));
+            co_await dialog.ShowAsync();
+        }
+        catch (...) {}
     }
 
     void SettingsWindow::refresh_component_statuses()

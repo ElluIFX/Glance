@@ -36,5 +36,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command_line, int)
 {
     glance::contracts::initialize_diagnostics(L"Glance.Core");
     glance::core::CoreApplication application;
-    return application.run(instance, app_process_id(command_line));
+    return application.run(instance, app_process_id(command_line),
+        command_line != nullptr && std::wstring_view(command_line) == L"--scheduled");
 }

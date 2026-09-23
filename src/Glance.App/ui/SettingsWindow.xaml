@@ -1154,7 +1154,10 @@
                                     <TextBlock x:Name="AdministratorAccessLabel" x:Uid="AdministratorAccessLabel" Text="Administrator access" />
                                     <TextBlock x:Name="AdministratorAccessStatusText" Style="{StaticResource SettingsDescriptionStyle}" />
                                 </StackPanel>
-                                <FontIcon x:Name="AdministratorAccessStatusIcon" Grid.Column="1" FontSize="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                    <FontIcon x:Name="AdministratorAccessStatusIcon" FontSize="18" VerticalAlignment="Center" />
+                                    <Button x:Name="RepairCoreAccessButton" x:Uid="RepairCoreAccessButton" Content="Enable / repair" Click="RepairCoreAccessButton_Click" />
+                                </StackPanel>
                             </Grid>
                             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">

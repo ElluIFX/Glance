@@ -87,6 +87,7 @@
     <ClInclude Include="preview\syntax_theme.h" />
     <ClInclude Include="preview\text_highlighting.h" />
     <ClInclude Include="application\startup_registration.h" />
+    <ClInclude Include="application\core_task.h" />
     <ClInclude Include="preview\text_font_fallback.h" />
     <ClInclude Include="preferences\text_preferences.h" />
     <ClInclude Include="preferences\update_preferences.h" />
@@ -138,6 +139,7 @@
     <ClCompile Include="preview\shell_icon_provider.cpp" />
     <ClCompile Include="preview\syntax_theme.cpp" />
     <ClCompile Include="application\startup_registration.cpp" />
+    <ClCompile Include="application\core_task.cpp" />
     <ClCompile Include="preferences\text_preferences.cpp" />
     <ClCompile Include="preferences\update_preferences.cpp" />
     <ClCompile Include="application\tray_icon.cpp" />

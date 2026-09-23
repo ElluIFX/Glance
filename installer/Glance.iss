@@ -50,6 +50,7 @@ english.AdditionalTasks=Additional options:
 english.CreateStartMenuShortcut=Create a Start Menu shortcut
 english.CreateDesktopShortcut=Create a desktop shortcut
 english.StartAtSignIn=Start Glance when signing in to Windows
+english.CoreTaskSetupFailed=Glance was installed, but administrator access could not be configured. Use Enable / repair in Settings. Install in a protected folder such as Program Files.
 english.DeleteUserData=Also delete Glance settings, logs, crash dumps, and cached previews?
 english.FullInstallation=Full installation
 english.CoreInstallation=Core only
@@ -60,6 +61,7 @@ chinesesimplified.AdditionalTasks=其他选项：
 chinesesimplified.CreateStartMenuShortcut=创建开始菜单快捷方式
 chinesesimplified.CreateDesktopShortcut=创建桌面快捷方式
 chinesesimplified.StartAtSignIn=登录 Windows 时启动 Glance
+chinesesimplified.CoreTaskSetupFailed=Glance 已安装，但管理员权限配置失败。请在设置中点击“启用／修复”，并确认安装目录为 Program Files 等受保护位置。
 chinesesimplified.DeleteUserData=同时删除 Glance 设置、日志、崩溃转储和预览缓存吗？
 chinesesimplified.FullInstallation=完整安装
 chinesesimplified.CoreInstallation=仅核心程序
@@ -107,6 +109,7 @@ Filename: "{app}\Glance.exe"; Description: "{cm:LaunchProgram,Glance}"; Flags: n
 Filename: "{app}\Glance.exe"; Flags: runasoriginaluser runhidden nowait; Check: IsAutomaticUpdate
 
 [UninstallRun]
+Filename: "{app}\Glance.exe"; Parameters: "--remove-core-tasks"; RunOnceId: "RemoveGlanceCoreTasks"; Flags: runhidden skipifdoesntexist
 Filename: "{app}\Glance.exe"; Parameters: "--cleanup-startup"; RunOnceId: "CleanupGlanceStartup"; Flags: runhidden skipifdoesntexist
 
 [Code]
@@ -360,6 +363,22 @@ begin
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Glance');
   DeleteUserDataTree(ExpandConstant('{localappdata}\Glance'));
   DeleteUserDataTree(ExpandConstant('{localappdata}\Temp\Glance'));
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    if not Exec(ExpandConstant('{app}\Glance.exe'), '--register-core-task',
+      ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+    begin
+      Log(Format('Core task registration failed: %d', [ResultCode]));
+      if not WizardSilent then
+        SuppressibleMsgBox(CustomMessage('CoreTaskSetupFailed'), mbInformation, MB_OK, IDOK);
+    end;
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

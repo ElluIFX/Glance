@@ -7,6 +7,7 @@
 #include "resource.h"
 #include "SettingsWindow.xaml.h"
 #include "startup_registration.h"
+#include "core_task.h"
 #include "webview_availability.h"
 #include "glance/contracts/diagnostics.h"
 #include "../version.h"
@@ -255,6 +256,14 @@ namespace winrt::Glance::App::implementation
 #endif
         for (const auto& argument : command_line_arguments())
         {
+            if (argument == L"--register-core-task")
+            {
+                ExitProcess(static_cast<DWORD>(glance::app::register_core_task()));
+            }
+            if (argument == L"--remove-core-tasks")
+            {
+                ExitProcess(glance::app::remove_core_tasks() ? 0 : 1);
+            }
             if (argument == L"--set-startup=enabled")
             {
                 ExitProcess(glance::app::set_launch_at_sign_in(true) ? 0 : 1);
@@ -445,6 +454,7 @@ namespace winrt::Glance::App::implementation
 
     void App::ensure_core_started()
     {
+        if (core_launch_in_flight_ || core_access_repair_in_flight_ || shutting_down_.load()) return;
         refresh_core_process();
         if (core_process_ != nullptr && WaitForSingleObject(core_process_, 0) == WAIT_TIMEOUT)
         {
@@ -473,35 +483,106 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
-        const auto parameters = L"--app-pid=" + std::to_wstring(GetCurrentProcessId());
-        SHELLEXECUTEINFOW execute{ sizeof(SHELLEXECUTEINFOW) };
-        execute.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
-        execute.lpVerb = L"runas";
-        execute.lpFile = core_path.c_str();
-        execute.lpParameters = parameters.c_str();
-        execute.nShow = SW_HIDE;
-        if (ShellExecuteExW(&execute))
-        {
-            glance::contracts::log_event(L"Core process launch requested with elevation.");
-            if (execute.hProcess != nullptr)
-            {
-                core_process_ = execute.hProcess;
-                core_process_id_ = GetProcessId(execute.hProcess);
-                core_connection_grace_until_ms_ =
-                    now + glance::contracts::process_watchdog_connect_grace_ms;
-            }
-            return;
-        }
+        core_launch_in_flight_ = true;
+        launch_core_async();
+    }
 
-        execute.lpVerb = nullptr;
-        if (ShellExecuteExW(&execute) && execute.hProcess != nullptr)
+    fire_and_forget App::launch_core_async()
+    {
+        const auto lifetime = get_strong();
+        const apartment_context ui;
+        const bool try_task = !core_task_unavailable_;
+        const auto core_path = executable_directory() / L"Glance.Core.exe";
+        bool task_started{};
+        try
         {
-            glance::contracts::log_event(L"Core process launch requested without elevation.");
-            core_process_ = execute.hProcess;
-            core_process_id_ = GetProcessId(execute.hProcess);
-            core_connection_grace_until_ms_ =
-                now + glance::contracts::process_watchdog_connect_grace_ms;
+            co_await resume_background();
+            task_started = !shutting_down_.load() && try_task && glance::app::run_core_task();
+            co_await ui;
+            if (task_started)
+            {
+                const auto deadline = GetTickCount64() + glance::contracts::process_watchdog_connect_grace_ms;
+                while (!shutting_down_.load() && GetTickCount64() < deadline)
+                {
+                    refresh_core_process();
+                    if (core_process_ && pipe_client_.connected()) break;
+                    co_await resume_after(std::chrono::milliseconds(100));
+                    co_await ui;
+                }
+                refresh_core_process();
+                task_started = core_process_ && pipe_client_.connected();
+            }
+            if (!task_started) core_task_unavailable_ = true;
+            if (!shutting_down_.load() && !core_process_)
+            {
+                // A regular CreateProcess never requests consent, even if task setup failed.
+                std::wstring command = L"\"" + core_path.wstring() + L"\" --app-pid=" + std::to_wstring(GetCurrentProcessId());
+                STARTUPINFOW startup{ sizeof(startup) };
+                PROCESS_INFORMATION process{};
+                if (CreateProcessW(core_path.c_str(), command.data(), nullptr, nullptr, FALSE,
+                    CREATE_NO_WINDOW, nullptr, core_path.parent_path().c_str(), &startup, &process))
+                {
+                    CloseHandle(process.hThread);
+                    core_process_ = process.hProcess;
+                    core_process_id_ = process.dwProcessId;
+                    core_connection_grace_until_ms_ = GetTickCount64() + glance::contracts::process_watchdog_connect_grace_ms;
+                }
+            }
+            glance::contracts::log_event(task_started ? L"Core started through its scheduled task." : L"Core task unavailable; using ordinary process launch.");
         }
+        catch (...) {}
+        co_await ui;
+        core_launch_in_flight_ = false;
+    }
+
+    Windows::Foundation::IAsyncOperation<bool> App::RestartCoreAfterAccessRepair()
+    {
+        const auto lifetime = get_strong();
+        const apartment_context ui;
+        if (core_access_repair_in_flight_ || shutting_down_.load()) co_return false;
+        core_access_repair_in_flight_ = true;
+        while (core_launch_in_flight_)
+        {
+            co_await resume_after(std::chrono::milliseconds(100));
+            co_await ui;
+        }
+        refresh_core_process();
+        static_cast<void>(pipe_client_.send(glance::contracts::MessageType::shutdown));
+        const auto deadline = GetTickCount64() + 2000;
+        while (core_process_ && WaitForSingleObject(core_process_, 0) == WAIT_TIMEOUT && GetTickCount64() < deadline)
+        {
+            co_await resume_after(std::chrono::milliseconds(50));
+            co_await ui;
+        }
+        if (core_process_ && WaitForSingleObject(core_process_, 0) == WAIT_TIMEOUT)
+        {
+            static_cast<void>(pipe_client_.send(glance::contracts::MessageType::terminate_unresponsive));
+            static_cast<void>(TerminateProcess(core_process_, ERROR_PROCESS_ABORTED));
+            const auto force_deadline = GetTickCount64() + 2000;
+            while (WaitForSingleObject(core_process_, 0) == WAIT_TIMEOUT && GetTickCount64() < force_deadline)
+            {
+                co_await resume_after(std::chrono::milliseconds(50));
+                co_await ui;
+            }
+            if (WaitForSingleObject(core_process_, 0) != WAIT_OBJECT_0)
+            {
+                core_access_repair_in_flight_ = false;
+                co_return false;
+            }
+        }
+        close_core_process();
+        reset_core_health();
+        core_task_unavailable_ = false;
+        last_core_launch_attempt_ms_ = 0;
+        core_access_repair_in_flight_ = false;
+        ensure_core_started();
+        while (core_launch_in_flight_)
+        {
+            co_await resume_after(std::chrono::milliseconds(100));
+            co_await ui;
+        }
+        winrt::handle elevated(OpenMutexW(SYNCHRONIZE, FALSE, L"Local\\Glance.Core.Elevated"));
+        co_return elevated && pipe_client_.connected();
     }
 
     void App::start_core_watchdog()
@@ -530,6 +611,7 @@ namespace winrt::Glance::App::implementation
 
     void App::supervise_core()
     {
+        if (core_launch_in_flight_ || core_access_repair_in_flight_) return;
         refresh_core_process();
         if (core_process_ == nullptr)
         {

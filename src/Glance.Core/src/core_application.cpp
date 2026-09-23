@@ -400,8 +400,10 @@ namespace glance::core
         pipe_server_.stop();
     }
 
-    int CoreApplication::run(HINSTANCE instance, DWORD app_process_id)
+    int CoreApplication::run(HINSTANCE instance, DWORD app_process_id, bool scheduled)
     {
+        if (scheduled) scheduled_launch_deadline_ = GetTickCount64() +
+            glance::contracts::process_watchdog_connect_grace_ms;
         single_instance_mutex_.reset(CreateMutexW(nullptr, FALSE, L"Local\\Glance.Core"));
         if (!single_instance_mutex_ || GetLastError() == ERROR_ALREADY_EXISTS)
         {
@@ -594,6 +596,7 @@ namespace glance::core
             self->reset_app_health();
             if (wparam != 0)
             {
+                self->scheduled_launch_deadline_ = 0;
                 self->capture_app_process(static_cast<DWORD>(lparam));
                 self->app_connection_grace_until_ms_ = 0;
                 if (self->keyboard_hook_ != nullptr)
@@ -656,6 +659,16 @@ namespace glance::core
         const DWORD connected_process_id = pipe_server_.connected()
             ? pipe_server_.peer_process_id()
             : 0;
+        // A delayed task must not resurrect an App that exited before connecting.
+        if (scheduled_launch_deadline_ != 0 && connected_process_id == 0)
+        {
+            if (GetTickCount64() >= scheduled_launch_deadline_)
+            {
+                shutting_down_.store(true, std::memory_order_release);
+                PostMessageW(window_, WM_CLOSE, 0, 0);
+            }
+            return;
+        }
         if (connected_process_id != 0 && connected_process_id != app_process_id_)
         {
             capture_app_process(connected_process_id);

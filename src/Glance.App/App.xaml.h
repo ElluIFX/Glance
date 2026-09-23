@@ -27,9 +27,11 @@ namespace winrt::Glance::App::implementation
         ~App();
 
         void OnLaunched(Microsoft::UI::Xaml::LaunchActivatedEventArgs const&);
+        winrt::Windows::Foundation::IAsyncOperation<bool> RestartCoreAfterAccessRepair();
 
     private:
         void ensure_core_started();
+        winrt::fire_and_forget launch_core_async();
         void show_duplicate_instance_notice();
         void start_core_watchdog();
         void supervise_core();
@@ -75,6 +77,9 @@ namespace winrt::Glance::App::implementation
         std::atomic_uint32_t last_heartbeat_ack_{};
         std::uint64_t core_connection_grace_until_ms_{};
         std::uint64_t last_core_launch_attempt_ms_{};
+        bool core_launch_in_flight_{};
+        bool core_access_repair_in_flight_{};
+        bool core_task_unavailable_{};
         Glance::App::MainWindow active_window_{ nullptr };
         Glance::App::SettingsWindow settings_window_{ nullptr };
         std::vector<Glance::App::MainWindow> detached_windows_;
