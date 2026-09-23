@@ -4,6 +4,22 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.23] - 2026-09-23
+
+### Added
+
+- Added a lightweight native CLI for opening previews, controlling windows, managing public settings, checking updates, and quitting Glance, with JSON output and documented exit codes.
+
+### Improved
+
+- Preload adjacent PDF pages and cancel stale work when navigating quickly.
+- Reuse protected scheduled-task authorization for elevated Core startup to reduce repeated UAC prompts.
+- Remove unused Windows App SDK files from release packages and clean obsolete files during upgrades.
+
+### Fixed
+
+- Fixed adaptive window sizing for Office previews and restored remembered sizes for components excluded from adaptive sizing.
+
 ## [2026.09.20] - 2026-09-20
 
 ### Improved
