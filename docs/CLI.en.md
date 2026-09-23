@@ -1,6 +1,6 @@
 # Glance CLI
 
-[中文](README.md) · [Glance](../../README.en.md)
+[中文](CLI.md) · [Glance](../README.en.md)
 
 `Glance.CLI.exe` lets terminals, scripts, and file managers open previews, control windows, and manage settings. Both installer and portable distributions include it. Run it from the Glance directory or use its full path.
 

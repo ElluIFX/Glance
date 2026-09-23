@@ -1,6 +1,6 @@
 # Glance CLI
 
-[English](README.en.md) · [Glance](../../README.md)
+[English](CLI.en.md) · [Glance](../README.md)
 
 `Glance.CLI.exe` 供终端、脚本和文件管理器打开预览、控制窗口及管理设置。安装版和绿色版均包含该程序，请从 Glance 目录运行，或使用其完整路径。
 

@@ -17,7 +17,7 @@
   ·
   <a href="https://github.com/ElluIFX/Glance/issues">反馈问题</a>
   ·
-  <a href="src/Glance.CLI/README.md">命令行接口</a>
+  <a href="docs/CLI.md">命令行接口</a>
   ·
   <a href="LICENSE">GPL-3.0</a>
 </p>
