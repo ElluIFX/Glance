@@ -61,3 +61,4 @@ jobs:
           .\bin\Release\x64\Glance.Tests.exe
           if ($LASTEXITCODE -ne 0) { throw "Native regression tests failed" }
           .\scripts\test-office-preview.ps1 -Configuration Release
+          .\tests\Glance.Tests\cli_integration_tests.ps1 -BuildOutputDirectory .\bin\Release\x64

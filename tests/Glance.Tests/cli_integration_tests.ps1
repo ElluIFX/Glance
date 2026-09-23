@@ -11,11 +11,17 @@ New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 
 function Invoke-Cli {
     param([string[]] $Arguments, [int] $Expected = 0)
+    $boundedByRunner = $env:CI -and $Arguments[0] -in @('preview', 'window') -and '--timeout' -notin $Arguments
+    if ($env:CI) { Write-Host "CLI: $($Arguments -join ' ')" }
+    if ($boundedByRunner) { $Arguments += @('--timeout', '20') }
     $output = & $cli @Arguments --json
     $code = $LASTEXITCODE
     if ($code -ne $Expected) { throw "CLI exit $code (expected $Expected): $Arguments`n$output" }
     $result = ($output -join "`n") | ConvertFrom-Json
     if ($result.schema_version -ne 1 -or $result.ok -ne ($Expected -eq 0)) { throw 'Invalid CLI result envelope' }
+    if ($boundedByRunner -and $result.ok -and $result.data.PSObject.Properties['wait_completed'] -and -not $result.data.wait_completed) {
+        throw "CLI readiness timed out: $Arguments`n$output"
+    }
     return $result
 }
 function Assert-True([bool] $Condition, [string] $Message) {
@@ -159,7 +165,7 @@ try {
     }
 
     $info = [Diagnostics.ProcessStartInfo]::new($cli)
-    $info.Arguments = 'preview - --raw --name "binary sample.dat" --json'
+    $info.Arguments = 'preview - --raw --name "binary sample.dat" --timeout 20 --json'
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
     $info.RedirectStandardInput = $true
@@ -181,7 +187,7 @@ try {
         @{ Name = 'unicode.txt'; Raw = ''; Bytes = [Text.Encoding]::UTF8.GetBytes('中文内容') },
         @{ Name = 'pixel.gif'; Raw = '--raw'; Bytes = [Convert]::FromBase64String('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7') }
     )) {
-        $info.Arguments = "preview - $($sample.Raw) --name $($sample.Name) --json"
+        $info.Arguments = "preview - $($sample.Raw) --name $($sample.Name) --timeout 20 --json"
         $inputProcess = [Diagnostics.Process]::Start($info)
         $inputProcess.StandardInput.BaseStream.Write($sample.Bytes, 0, $sample.Bytes.Length)
         $inputProcess.StandardInput.Close()
