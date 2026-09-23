@@ -126,12 +126,6 @@ $windowId = $result.data.id
 
 All these commands accept `--id UUID`. UUIDs survive pinning and expire when Glance restarts. `windows` also lists the hidden dynamic window. Repeated `preview` commands reuse the ordinary preview window; after pinning, the next `preview` uses a new window.
 
-**Pinning makes the window topmost and creates a new dynamic preview window. Unpinning closes the original window. Pinned windows must remain topmost.**
-
-Content controls apply to the matching preview type. Out-of-range positions return errors. Volume and mute apply only to the current window.
-
-The eye button in the plain-text status bar controls file monitoring: left-click to enable or pause one-second checks, or right-click to refresh once. Each new file starts with monitoring off.
-
 ## Change settings
 
 Find the key and its allowed values before changing it. Keys are case-sensitive; copy them from `settings list`.
@@ -175,9 +169,6 @@ if ($LASTEXITCODE -ne 0) {
 | `data` | Success result; `null` on failure |
 | `error` | Failure details: `code`, `name`, `message`; `null` on success |
 
-Window IDs and preview generations are strings. Generic file information counts as ready content and is identified by `fallback: true`.
-
-Text mode prints complete key-value results; errors go to stderr. Window results include UUID, paths, state, bounds, pinning, and topmost state, plus available text-line, PDF-page, or media playback information.
 
 ### Common options and timeouts
 
@@ -193,8 +184,6 @@ Text mode prints complete key-value results; errors go to stderr. Window results
 By default, commands wait for content readiness or control completion. `--timeout 0` returns after the request is applied. A positive timeout returns current state with `wait_completed: false` when the wait expires; completion returns `wait_completed: true`. `--wait` waits for window closure, including a hidden dynamic preview. Combining it with `--timeout` applies one total waiting limit.
 
 Connection allows 15 seconds, ordinary request transport and execution allow 10 seconds, and update checks allow 60 seconds. Failures at these stages return errors. Reading stdin is separate from content waiting. Accepted previews and controls continue when the CLI exits or Ctrl+C interrupts its wait.
-
-`check-update` reports versions and release/download links; downloading and installation are separate user actions. `quit` waits for App and Core to exit and also succeeds when Glance is already stopped.
 
 ### Exit codes
 
