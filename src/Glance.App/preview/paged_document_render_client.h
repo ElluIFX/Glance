@@ -63,9 +63,27 @@ namespace glance::app
             std::uint32_t maximum_height,
             std::uint64_t generation = 0);
         [[nodiscard]] std::uint64_t cancel_document() noexcept;
+        [[nodiscard]] std::shared_ptr<const PagedDocumentRenderResult> render_cached(
+            std::uint32_t page_index,
+            std::uint32_t dimension,
+            std::uint64_t generation,
+            const std::atomic_bool& cancellation);
         void close_document(std::uint64_t generation = 0) noexcept;
 
     private:
+        struct CachedPage
+        {
+            std::uint32_t dimension{};
+            std::shared_ptr<const PagedDocumentRenderResult> result;
+        };
+        std::vector<CachedPage> page_cache_;
+        std::mutex cache_mutex_;
+        std::uint64_t cache_generation_{};
+        [[nodiscard]] PagedDocumentRenderResult render_locked(
+            std::uint32_t page_index,
+            std::uint32_t maximum_width,
+            std::uint32_t maximum_height,
+            std::uint64_t generation);
         static void CALLBACK idle_timeout_callback(
             PTP_CALLBACK_INSTANCE,
             void* context,

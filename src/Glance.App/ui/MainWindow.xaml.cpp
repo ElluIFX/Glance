@@ -3054,6 +3054,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::cancel_pdf_render() noexcept
     {
+        if (pdf_page_render_cancellation_) pdf_page_render_cancellation_->store(true);
         for (const auto& [page, cancellation] : pdf_thumbnail_cancellations_)
         {
             cancellation->store(true);
@@ -5143,6 +5144,9 @@ namespace winrt::Glance::App::implementation
         const auto dispatcher = DispatcherQueue();
         const auto session = pdf_render_client_;
         const auto request = pdf_render_request_.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (pdf_page_render_cancellation_) pdf_page_render_cancellation_->store(true);
+        const auto cancellation = std::make_shared<std::atomic_bool>(false);
+        pdf_page_render_cancellation_ = cancellation;
         if (session == nullptr || page_index >= pdf_page_count_)
         {
             co_return;
@@ -5165,11 +5169,11 @@ namespace winrt::Glance::App::implementation
         {
             co_return;
         }
-        auto rendered = session->render(
+        auto rendered = session->render_cached(
             page_index,
             render_dimension,
-            render_dimension,
-            document_generation);
+            document_generation,
+            *cancellation);
         static_cast<void>(dispatcher.TryEnqueue([
             lifetime,
             session,
@@ -5177,16 +5181,18 @@ namespace winrt::Glance::App::implementation
             page_index,
             request,
             generation,
+            render_dimension,
+            cancellation,
             dynamic_update]() mutable {
             using glance::contracts::document::Status;
-            if (generation != lifetime->content_generation_ ||
+            if (cancellation->load() || generation != lifetime->content_generation_ ||
                 session != lifetime->pdf_render_client_ ||
                 page_index != lifetime->pdf_page_index_ ||
                 request != lifetime->pdf_render_request_.load(std::memory_order_relaxed))
             {
                 return;
             }
-            if (rendered.status != Status::success)
+            if (!rendered || rendered->status != Status::success)
             {
                 lifetime->show_provider_error(
                     glance::app::localize(L"PdfRenderError"),
@@ -5195,16 +5201,17 @@ namespace winrt::Glance::App::implementation
             }
             try
             {
-                lifetime->PdfPageImage().Source(create_pdf_bitmap(rendered));
+                lifetime->PdfPageImage().Source(create_pdf_bitmap(*rendered));
                 lifetime->PdfLoadingOverlay().Visibility(Visibility::Collapsed);
                 lifetime->PdfPageText().Text(
                     std::to_wstring(page_index + 1) + L" / " +
                     std::to_wstring(lifetime->pdf_page_count_));
                 lifetime->sync_pdf_thumbnail_selection();
                 lifetime->auto_fit_window_to_content(
-                    rendered.page_width_points,
-                    rendered.page_height_points,
+                    rendered->page_width_points,
+                    rendered->page_height_points,
                     dynamic_update);
+                lifetime->preload_pdf_pages_async(page_index, render_dimension, cancellation);
                 if (!dynamic_update)
                 {
                     const auto weak = lifetime->get_weak();
@@ -5240,6 +5247,36 @@ namespace winrt::Glance::App::implementation
                     generation);
             }
         }));
+    }
+
+    fire_and_forget MainWindow::preload_pdf_pages_async(
+        std::uint32_t page, std::uint32_t dimension,
+        std::shared_ptr<std::atomic_bool> cancellation)
+    {
+        const auto lifetime = get_strong();
+        const auto session = pdf_render_client_;
+        const auto document_generation = pdf_document_generation_;
+        const auto count = pdf_page_count_;
+        // Avoid speculative bitmaps larger than the entire cache budget.
+        if (!session || static_cast<std::uint64_t>(dimension) * dimension * 4 > 192ULL * 1024 * 1024)
+            co_return;
+        try
+        {
+            co_await resume_after(std::chrono::milliseconds(100));
+            co_await resume_background();
+            for (const auto neighbor : { page + 1, page == 0 ? count : page - 1 })
+            {
+                if (cancellation->load()) co_return;
+                if (neighbor >= count) continue;
+                AtomicCounterGuard foreground_render(pdf_foreground_render_requests_);
+                static_cast<void>(session->render_cached(
+                    neighbor, dimension, document_generation, *cancellation));
+            }
+        }
+        catch (...)
+        {
+            // Speculative work must not interrupt the visible document.
+        }
     }
 
     fire_and_forget MainWindow::load_pdf_thumbnail_async(

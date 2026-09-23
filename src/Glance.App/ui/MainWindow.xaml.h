@@ -446,6 +446,9 @@ namespace winrt::Glance::App::implementation
             std::uint32_t page, std::uint64_t generation,
             winrt::weak_ref<Microsoft::UI::Xaml::Controls::Image> image,
             std::shared_ptr<std::atomic_bool> cancellation);
+        winrt::fire_and_forget preload_pdf_pages_async(
+            std::uint32_t page, std::uint32_t dimension,
+            std::shared_ptr<std::atomic_bool> cancellation);
         void apply_pdf_open_result(
             std::shared_ptr<glance::app::PagedDocumentRenderClient> session,
             glance::app::PagedDocumentOpenResult result,
@@ -819,6 +822,7 @@ namespace winrt::Glance::App::implementation
         std::wstring component_hover_cache_info_id_;
         std::shared_ptr<glance::app::PagedDocumentRenderClient> pdf_render_client_;
         std::uint64_t pdf_document_generation_{};
+        std::shared_ptr<std::atomic_bool> pdf_page_render_cancellation_;
         std::shared_ptr<glance::app::NativePreviewSurface> native_preview_surface_;
         std::wstring active_native_media_component_id_;
         std::atomic_uint64_t native_media_settings_generation_{};

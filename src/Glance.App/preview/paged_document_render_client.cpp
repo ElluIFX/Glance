@@ -449,6 +449,10 @@ namespace glance::app
         if (generation == 0) generation = cancel_document();
         std::scoped_lock lock(mutex_);
         if (generation != document_generation_.load(std::memory_order_acquire)) return;
+        {
+            std::scoped_lock cache_lock(cache_mutex_);
+            page_cache_.clear();
+        }
         if (process_ != nullptr && !send_control_command_locked(Command::close_document))
         {
             close_process_locked(false);
@@ -531,6 +535,11 @@ namespace glance::app
         }
         stop_idle_timer();
         cancelled_.store(false, std::memory_order_release);
+        {
+            std::scoped_lock cache_lock(cache_mutex_);
+            page_cache_.clear();
+            cache_generation_ = generation;
+        }
         PagedDocumentOpenResult result;
         if (generation != document_generation_.load(std::memory_order_acquire))
         {
@@ -598,6 +607,64 @@ namespace glance::app
         std::uint64_t generation)
     {
         std::scoped_lock lock(mutex_);
+        return render_locked(page_index, maximum_width, maximum_height, generation);
+    }
+
+    std::shared_ptr<const PagedDocumentRenderResult> PagedDocumentRenderClient::render_cached(
+        std::uint32_t page_index,
+        std::uint32_t dimension,
+        std::uint64_t generation,
+        const std::atomic_bool& cancellation)
+    {
+        constexpr std::size_t cache_budget = 192ULL * 1024ULL * 1024ULL;
+        if (cancellation.load() || cancelled_.load() ||
+            generation != document_generation_.load(std::memory_order_acquire)) return {};
+        const auto cached = [&]() -> std::shared_ptr<const PagedDocumentRenderResult> {
+            std::scoped_lock cache_lock(cache_mutex_);
+            if (cache_generation_ != generation) return {};
+            for (auto entry = page_cache_.begin(); entry != page_cache_.end(); ++entry)
+            {
+                if (entry->dimension == dimension && entry->result->page_index == page_index)
+                {
+                    auto result = entry->result;
+                    page_cache_.erase(entry);
+                    page_cache_.push_back({ dimension, result });
+                    return result;
+                }
+            }
+            return {};
+        };
+        // Cached pages remain available while the host renders another page.
+        if (auto result = cached()) return result;
+        std::scoped_lock lock(mutex_);
+        if (cancellation.load() || cancelled_.load() ||
+            generation != document_generation_.load(std::memory_order_acquire)) return {};
+        if (auto result = cached()) return result;
+        auto result = std::make_shared<PagedDocumentRenderResult>(
+            render_locked(page_index, dimension, dimension, generation));
+        if (result->status == Status::success && !cancelled_.load() &&
+            generation == document_generation_.load(std::memory_order_acquire) &&
+            result->pixels.size() <= cache_budget)
+        {
+            std::scoped_lock cache_lock(cache_mutex_);
+            std::size_t bytes = result->pixels.size();
+            for (const auto& entry : page_cache_) bytes += entry.result->pixels.size();
+            while (!page_cache_.empty() && (page_cache_.size() >= 3 || bytes > cache_budget))
+            {
+                bytes -= page_cache_.front().result->pixels.size();
+                page_cache_.erase(page_cache_.begin());
+            }
+            page_cache_.push_back({ dimension, result });
+        }
+        return result;
+    }
+
+    PagedDocumentRenderResult PagedDocumentRenderClient::render_locked(
+        std::uint32_t page_index,
+        std::uint32_t maximum_width,
+        std::uint32_t maximum_height,
+        std::uint64_t generation)
+    {
         if (generation != 0 &&
             generation != document_generation_.load(std::memory_order_acquire))
         {
