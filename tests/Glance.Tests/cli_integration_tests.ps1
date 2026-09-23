@@ -102,10 +102,11 @@ try {
     Invoke-Cli -Arguments @('window', 'topmost', 'off', '--id', $id) -Expected 8 | Out-Null
     $windows = (Invoke-Cli -Arguments @('windows')).data.windows
     Assert-True ($windows.Count -eq 2) 'Pin did not create a new dynamic window'
-    Invoke-Cli -Arguments @('window', 'resize', '--id', $id, '--size', '1100', '750') | Out-Null
+    $resized = (Invoke-Cli -Arguments @('window', 'resize', '--id', $id, '--size', '900', '650')).data
+    Assert-True ($resized.bounds.width -eq 900 -and $resized.bounds.height -eq 650) "Resize failed: $($resized | ConvertTo-Json -Depth 6 -Compress)"
     $replaced = (Invoke-Cli -Arguments @('window', 'set', $second)).data
     Assert-True ($replaced.id -eq $id -and $replaced.paths[0] -eq $second) 'Set changed the window ID or failed to replace the file'
-    Assert-True ($replaced.bounds.width -eq 1100 -and $replaced.bounds.height -eq 750 -and $replaced.pinned -and $replaced.topmost) 'Set changed geometry or pinning'
+    Assert-True ($replaced.bounds.width -eq $resized.bounds.width -and $replaced.bounds.height -eq $resized.bounds.height -and $replaced.pinned -and $replaced.topmost) "Set changed geometry or pinning: $($replaced | ConvertTo-Json -Depth 6 -Compress)"
     Invoke-Cli -Arguments @('window', 'set', (Join-Path $fixture 'missing.txt')) -Expected 3 | Out-Null
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.generation -eq $replaced.generation) 'Invalid set replaced content'
     $other = (Invoke-Cli -Arguments @('preview', $first, '--topmost')).data
