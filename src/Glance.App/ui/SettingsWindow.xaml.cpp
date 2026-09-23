@@ -21,6 +21,7 @@
 #endif
 
 #include <microsoft.ui.xaml.window.h>
+#include <winrt/Windows.ApplicationModel.DataTransfer.h>
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <algorithm>
@@ -806,6 +807,8 @@ namespace winrt::Glance::App::implementation
         set_text(MaintenancePageDescription(), L"MaintenancePageDescription.Text");
         set_text(RuntimeStatusGroupTitle(), L"RuntimeStatusGroupTitle.Text");
         set_text(MaintenanceActionsGroupTitle(), L"MaintenanceActionsGroupTitle.Text");
+        set_text(CliPathLabel(), L"CliPathLabel.Text");
+        set_content(CopyCliPathButton(), L"CopyCliPathButton.Content");
         set_text(InputCoreLabel(), L"InputCoreLabel.Text");
         set_text(WebViewAvailabilityLabel(), L"WebViewAvailabilityLabel.Text");
         set_content(WebViewDownloadLink(), L"WebViewDownloadLink.Content");
@@ -1884,6 +1887,28 @@ namespace winrt::Glance::App::implementation
             GallerySameExtensionOnlyToggle().IsOn();
         media_preview_preferences_.show_image_zoom_map = ImageZoomMapToggle().IsOn();
         glance::app::save_media_preview_preferences(media_preview_preferences_);
+    }
+
+    void SettingsWindow::CopyCliPathButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        try
+        {
+            std::wstring executable(32768, L'\0');
+            const auto length = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+            if (!length || length >= executable.size()) throw_last_error();
+            executable.resize(length);
+            const auto path = std::filesystem::path(executable).parent_path() / L"Glance.CLI.exe";
+            Windows::ApplicationModel::DataTransfer::DataPackage package;
+            package.SetText(L"\"" + path.wstring() + L"\"");
+            Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
+            Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
+            CopyCliPathButton().Content(box_value(glance::app::localize(L"CliPathCopied")));
+        }
+        catch (const hresult_error& error)
+        {
+            glance::contracts::log_event(L"Copy CLI path failed: " + std::wstring(error.message()));
+            CopyCliPathButton().Content(box_value(glance::app::localize(L"CliPathCopyFailed")));
+        }
     }
 
     fire_and_forget SettingsWindow::ExportDiagnosticBundleButton_Click(

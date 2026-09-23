@@ -431,4 +431,8 @@
   <data name="CoreAccessUnsafeLocation" xml:space="preserve"><value>请将 Glance 安装到 Program Files 等受保护目录，再启用管理员权限</value></data>
   <data name="CoreAccessAdministratorRequired" xml:space="preserve"><value>此功能需要使用 Windows 管理员账户</value></data>
   <data name="CoreAccessRepairFailed" xml:space="preserve"><value>启用管理员权限失败 · 请检查任务计划程序或修复安装</value></data>
+  <data name="CliPathLabel.Text" xml:space="preserve"><value>CLI 程序路径</value></data>
+  <data name="CopyCliPathButton.Content" xml:space="preserve"><value>复制路径</value></data>
+  <data name="CliPathCopied" xml:space="preserve"><value>已复制</value></data>
+  <data name="CliPathCopyFailed" xml:space="preserve"><value>复制失败，重试</value></data>
 </root>

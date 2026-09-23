@@ -431,4 +431,8 @@
   <data name="CoreAccessUnsafeLocation" xml:space="preserve"><value>Install Glance in a protected folder such as Program Files, then enable administrator access</value></data>
   <data name="CoreAccessAdministratorRequired" xml:space="preserve"><value>This feature requires a Windows administrator account</value></data>
   <data name="CoreAccessRepairFailed" xml:space="preserve"><value>Administrator access could not be enabled · Check Task Scheduler or repair the installation</value></data>
+  <data name="CliPathLabel.Text" xml:space="preserve"><value>CLI executable path</value></data>
+  <data name="CopyCliPathButton.Content" xml:space="preserve"><value>Copy path</value></data>
+  <data name="CliPathCopied" xml:space="preserve"><value>Copied</value></data>
+  <data name="CliPathCopyFailed" xml:space="preserve"><value>Copy failed, retry</value></data>
 </root>
