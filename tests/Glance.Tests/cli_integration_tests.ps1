@@ -219,16 +219,20 @@ try {
         $writer.Write([int]$dataSize)
         $writer.Write([byte[]]::new($dataSize))
     } finally { $writer.Dispose() }
-    Invoke-Cli -Arguments @('preview', $wave) | Out-Null
-    Invoke-Cli -Arguments @('window', 'pause') | Out-Null
-    $volume = (Invoke-Cli -Arguments @('window', 'volume', '37')).data
-    Assert-True ([Math]::Abs($volume.volume - 37) -lt 0.01) 'Media volume failed'
-    Assert-True ((Invoke-Cli -Arguments @('window', 'mute', 'on')).data.muted) 'Media mute failed'
-    $seek = (Invoke-Cli -Arguments @('window', 'seek', '00:00:02')).data
-    Assert-True ([Math]::Abs($seek.position - 2) -lt 0.2) 'Media seek failed'
-    Invoke-Cli -Arguments @('window', 'seek', '99999') -Expected 2 | Out-Null
-    Invoke-Cli -Arguments @('window', 'play') | Out-Null
-    Invoke-Cli -Arguments @('window', 'pause') | Out-Null
+    if ($env:GITHUB_ACTIONS) {
+        Write-Host 'Skipping media playback on the hosted runner; validated by local desktop regression'
+    } else {
+        Invoke-Cli -Arguments @('preview', $wave) | Out-Null
+        Invoke-Cli -Arguments @('window', 'pause') | Out-Null
+        $volume = (Invoke-Cli -Arguments @('window', 'volume', '37')).data
+        Assert-True ([Math]::Abs($volume.volume - 37) -lt 0.01) 'Media volume failed'
+        Assert-True ((Invoke-Cli -Arguments @('window', 'mute', 'on')).data.muted) 'Media mute failed'
+        $seek = (Invoke-Cli -Arguments @('window', 'seek', '00:00:02')).data
+        Assert-True ([Math]::Abs($seek.position - 2) -lt 0.2) 'Media seek failed'
+        Invoke-Cli -Arguments @('window', 'seek', '99999') -Expected 2 | Out-Null
+        Invoke-Cli -Arguments @('window', 'play') | Out-Null
+        Invoke-Cli -Arguments @('window', 'pause') | Out-Null
+    }
 
     $pdf = Join-Path $fixture 'pages.pdf'
     $objects = @('<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
