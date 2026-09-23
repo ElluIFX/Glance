@@ -222,6 +222,8 @@ namespace glance::cli
             result += "\ncommon options:\n"
                 "  -h, --help              Show this help message and exit\n"
                 "  --json                  Output one JSON result for scripts\n"
+                "  --quiet                 Suppress stdout; preserve stderr and exit codes\n"
+                "                          With --json, write errors to stderr\n"
                 "  --no-start              Require an already running Glance\n"
                 "  --version               Show version and exit\n";
             if (topic == "preview" || topic == "window" || topic.starts_with("window "))

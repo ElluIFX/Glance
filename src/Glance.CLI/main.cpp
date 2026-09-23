@@ -16,6 +16,7 @@ namespace
     using Json = rapidjson::Document;
     HANDLE interrupted{};
     HANDLE main_thread{};
+    bool quiet_output{};
     BOOL WINAPI interrupt(DWORD event)
     {
         if (event != CTRL_C_EVENT && event != CTRL_BREAK_EVENT) return FALSE;
@@ -47,6 +48,7 @@ namespace
     }
     void output(std::string value, bool error = false)
     {
+        if (quiet_output && !error) return;
         value += '\n';
         const auto handle = GetStdHandle(error ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
         DWORD mode{}, written{};
@@ -196,7 +198,10 @@ int wmain(int argc, wchar_t** argv)
     Handle thread(OpenThread(THREAD_TERMINATE, FALSE, GetCurrentThreadId()));
     main_thread = thread.value;
     for (int i = 1; i < argc && std::wstring_view(argv[i]) != L"--"; ++i)
+    {
         if (std::wstring_view(argv[i]) == L"--json") json = true;
+        if (std::wstring_view(argv[i]) == L"--quiet") quiet_output = true;
+    }
     try
     {
         Json request(rapidjson::kObjectType);
@@ -219,6 +224,7 @@ int wmain(int argc, wchar_t** argv)
                 return argv[i];
             };
             if (arg == L"--json") continue;
+            if (arg == L"--quiet") continue;
             if (arg == L"--no-start") { no_start = true; continue; }
             if (arg == L"--wait") { wait = true; continue; }
             if (arg == L"--name") { input_name = next(); continue; }
@@ -301,7 +307,7 @@ int wmain(int argc, wchar_t** argv)
             "window.line", "window.page", "window.seek", "window.next", "window.previous", "window.play", "window.pause", "window.volume", "window.mute",
             "window.topmost", "window.pin", "window.set", "windows", "status", "settings.list", "settings.get", "settings.set", "settings.reset", "check-update", "quit" };
         if (!known.contains(command)) throw Error(2, "unknown_command", "Unknown command: " + command);
-        std::set<std::wstring> allowed{ L"--json", L"--no-start" };
+        std::set<std::wstring> allowed{ L"--json", L"--quiet", L"--no-start" };
         if (command == "preview" || command.starts_with("window.")) allowed.insert(L"--timeout");
         if (command.starts_with("window.")) allowed.insert(L"--id");
         if (command.starts_with("window.") && command != "window.close") allowed.insert(L"--wait");
@@ -497,7 +503,7 @@ int wmain(int argc, wchar_t** argv)
                     throw Error(5, "shutdown_timeout", "Core did not exit");
             }
         }
-        if (json) output(response);
+        if (json) output(response, quiet_output && !ok);
         else if (!ok) output(std::string(result["error"]["name"].GetString()) + ": " + result["error"]["message"].GetString(), true);
         else if (result["data"].HasMember("text")) output(result["data"]["text"].GetString());
         else
@@ -527,7 +533,7 @@ int wmain(int argc, wchar_t** argv)
             string_member(error, "message", exception.what());
             rapidjson::Value copy(error, result.GetAllocator());
             result.AddMember("error", copy, result.GetAllocator());
-            output(serialize(result));
+            output(serialize(result), quiet_output);
         }
         else output(name + ": " + exception.what(), true);
         return code;

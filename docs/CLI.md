@@ -176,6 +176,7 @@ if ($LASTEXITCODE -ne 0) {
 | --- | --- |
 | `-h` / `--help` | 显示当前命令帮助；也支持 `help COMMAND` |
 | `--json` | 输出 JSON，适合脚本处理 |
+| `--quiet` | 静音 stdout，保留 stderr 和退出码；与 `--json` 同用时，错误 JSON 输出到 stderr |
 | `--no-start` | 只连接正在运行的 Glance |
 | `--timeout SECONDS` | 窗口命令等待上限，范围 0～86400 秒 |
 | `--wait` | `preview` 和保持窗口存在的 `window` 命令等待目标关闭 |

@@ -176,6 +176,7 @@ if ($LASTEXITCODE -ne 0) {
 | --- | --- |
 | `-h` / `--help` | Show help for the current command; `help COMMAND` also works |
 | `--json` | Output JSON for scripts |
+| `--quiet` | Suppress stdout, preserving stderr and exit codes; with `--json`, send error JSON to stderr |
 | `--no-start` | Connect only to a running Glance |
 | `--timeout SECONDS` | Bound a window command's wait to 0–86400 seconds |
 | `--wait` | Wait for the target to close with `preview` or a `window` command that keeps it open |
