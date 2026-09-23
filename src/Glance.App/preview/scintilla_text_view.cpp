@@ -18,6 +18,17 @@
 #include <uxtheme.h>
 
 #pragma comment(lib, "gdi32.lib")
+
+namespace glance::app
+{
+    std::int64_t ScintillaTextView::line_count() const noexcept { return call(SCI_GETLINECOUNT); }
+    std::int64_t ScintillaTextView::current_line() const noexcept { return call(SCI_LINEFROMPOSITION, call(SCI_GETCURRENTPOS)) + 1; }
+    void ScintillaTextView::go_to_line(std::int64_t line) noexcept
+    {
+        call(SCI_GOTOLINE, static_cast<WPARAM>(line - 1));
+        call(SCI_SCROLLCARET);
+    }
+}
 #pragma comment(lib, "uxtheme.lib")
 
 namespace

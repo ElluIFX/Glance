@@ -87,6 +87,8 @@ namespace winrt::Glance::App::implementation
         void HandleGalleryDisconnect();
         [[nodiscard]] std::uint64_t InstanceId() const noexcept { return instance_id_; }
         [[nodiscard]] const std::wstring& CliId() const noexcept { return cli_id_; }
+        bool CliControl(Windows::Data::Json::JsonObject const& request);
+        void CliExecuteControl(Windows::Data::Json::JsonObject const& request);
 
         void TopmostButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PreviewModeButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -264,6 +266,12 @@ namespace winrt::Glance::App::implementation
         void GenericAdvancedInfoButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
+        winrt::fire_and_forget cli_control_async(Windows::Data::Json::JsonObject request, std::uint64_t generation);
+        bool cli_control_pending_{};
+        std::uint64_t cli_control_generation_{};
+        int cli_control_error_{};
+        std::wstring cli_control_error_message_;
+        std::uint32_t native_media_controls_pending_{};
         enum class GalleryMode
         {
             inactive,

@@ -13,7 +13,7 @@ $cli = 'C:\Program Files\Glance\Glance.CLI.exe'
 & $cli preview 'C:\Documents\report.pdf'
 ```
 
-Glance opens the file and prints its window ID. The CLI connects to the running app or starts Glance from the same directory when needed.
+Glance waits for the preview to be ready and prints full window details. The CLI connects to the running app or starts Glance from the same directory when needed.
 
 Use `-h` at any level to see the relevant commands and options:
 
@@ -53,12 +53,13 @@ A file manager can invoke this command, replacing the final argument with the se
 & $cli preview 'C:\Documents\report.pdf' --size 1200 900 --center-offset 0 0 --pin
 
 # Wait for the first content, then close after 5 seconds
-& $cli preview 'C:\Documents\notes.txt' --wait --close-after 5
+& $cli preview 'C:\Documents\notes.txt' --close-after 5
 ```
 
 | Option | Effect |
 | --- | --- |
-| `--wait` | Wait for the first content; by default, return when the request is applied |
+| `--wait` | Wait until the preview window closes |
+| `--timeout SECONDS` | Bound the wait; 0 returns current state once the request is applied |
 | `--pin` | Keep a separate, topmost preview window |
 | `--topmost` | Keep this preview on top; defaults to off, enabled automatically by pinning |
 | `--close-after SECONDS` | Close 0.001–86400 seconds after the first content is ready |
@@ -75,15 +76,32 @@ Relative paths use your terminal's working directory. Quote paths containing spa
 
 The close timer belongs to the current content: switching files cancels it, while pinning preserves it.
 
+### Preview standard input
+
+`preview -` reads stdin to EOF, then previews a temporary file. Use `--name` to select a filename and extension; the default is `stdin.txt`.
+
+```powershell
+'{"name":"Glance","ready":true}' | & $cli preview - --name result.json
+```
+
+Use `--raw` for binary input. Bytes and line endings stay unchanged. The default filename is `stdin.bin`; specify an extension to select a previewer. Run this example in **cmd.exe** to preserve the source bytes:
+
+```bat
+"C:\Program Files\Glance\Glance.CLI.exe" preview - --raw --name photo.png < "C:\Pictures\photo.png"
+```
+
+Standard input occupies the entire preview request. `--name` accepts a filename. The temporary file remains available after the CLI returns and is cleaned up when the preview releases it.
+
 ## Control a window
 
 Each new window has a unique UUID. Omitting `--id` targets the window most recently returned by `preview`, including after pinning. A closed target returns an error. Use `--id UUID` to select another window; find its UUID with `windows`.
 
 ```powershell
-$windowId = & $cli preview 'C:\Documents\report.pdf' --pin
+$result = & $cli preview 'C:\Documents\report.pdf' --pin --json | ConvertFrom-Json
+$windowId = $result.data.id
 & $cli window move --id $windowId --position 100 100
 & $cli window resize --id $windowId --size 1200 900
-& $cli window set 'C:\Documents\notes.txt' --id $windowId --wait
+& $cli window set 'C:\Documents\notes.txt' --id $windowId
 & $cli window get --id $windowId
 & $cli window close --id $windowId
 ```
@@ -98,10 +116,21 @@ $windowId = & $cli preview 'C:\Documents\report.pdf' --pin
 | `window topmost on` / `window topmost off` | Change always-on-top state |
 | `window pin on` / `window pin off` | Pin a window / close a pinned window |
 | `window close` | Close the preview and leave Glance running |
+| `window line N` | Go to plain-text line N, starting at 1 |
+| `window page N` | Go to PDF page N, starting at 1 |
+| `window seek POSITION` | Seek media by seconds or `HH:MM:SS[.fff]` |
+| `window next` / `window previous` | Select an adjacent file in the sequence or gallery |
+| `window play` / `window pause` | Play or pause media |
+| `window volume N` | Set this window's volume, from 0 to 100 |
+| `window mute on` / `window mute off` | Set this window's mute state |
 
 All these commands accept `--id UUID`. UUIDs survive pinning and expire when Glance restarts. `windows` also lists the hidden dynamic window. Repeated `preview` commands reuse the ordinary preview window; after pinning, the next `preview` uses a new window.
 
 **Pinning makes the window topmost and creates a new dynamic preview window. Unpinning closes the original window. Pinned windows must remain topmost.**
+
+Content controls apply to the matching preview type. Out-of-range positions return errors. Volume and mute apply only to the current window.
+
+The eye button in the plain-text status bar controls file monitoring: left-click to enable or pause one-second checks, or right-click to refresh once. Each new file starts with monitoring off.
 
 ## Change settings
 
@@ -109,10 +138,10 @@ Find the key and its allowed values before changing it. Keys are case-sensitive;
 
 ```powershell
 & $cli settings list TextPreview
-& $cli settings get TextPreview/RefreshIntervalMs
-& $cli settings set TextPreview/MonitorFile true
-& $cli settings set TextPreview/RefreshIntervalMs 1000
-& $cli settings reset TextPreview/MonitorFile
+& $cli settings get TextPreview/FontSize
+& $cli settings set TextPreview/WordWrap true
+& $cli settings set TextPreview/FontSize 14
+& $cli settings reset TextPreview/WordWrap
 ```
 
 `settings list` returns all public settings; add a prefix to narrow the list. Each setting includes its current value, default, type, limits, and effect: `immediate` or `next_preview`. Settings from loaded components appear here too.
@@ -130,7 +159,7 @@ Booleans accept `true/false`, `on/off`, or `1/0`. Enumerations use the listed nu
 Add `--json` to receive one UTF-8 JSON object on stdout. Check the exit code before reading `data`:
 
 ```powershell
-$result = & $cli preview 'C:\Documents\report.pdf' --pin --wait --json |
+$result = & $cli preview 'C:\Documents\report.pdf' --pin --json |
     ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) {
     throw $result.error.message
@@ -148,7 +177,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Window IDs and preview generations are strings. Generic file information counts as ready content and is identified by `fallback: true`.
 
-In the default text mode, `preview` and `window pin` print only the window ID. Other commands print key-value results. Errors go to stderr.
+Text mode prints complete key-value results; errors go to stderr. Window results include UUID, paths, state, bounds, pinning, and topmost state, plus available text-line, PDF-page, or media playback information.
 
 ### Common options and timeouts
 
@@ -157,10 +186,13 @@ In the default text mode, `preview` and `window pin` print only the window ID. O
 | `-h` / `--help` | Show help for the current command; `help COMMAND` also works |
 | `--json` | Output JSON for scripts |
 | `--no-start` | Connect only to a running Glance |
-| `--timeout SECONDS` | Set each connection and command deadline to 0.001–86400 seconds |
+| `--timeout SECONDS` | Bound a window command's wait to 0–86400 seconds |
+| `--wait` | Wait for the target to close with `preview` or a `window` command that keeps it open |
 | `--version` | Show the version |
 
-The default connection timeout is 15 seconds. Ordinary commands allow 10 seconds, `preview --wait` allows 30, and `check-update` allows 60. After a timeout, query the state before retrying. Accepted previews and close timers continue when the CLI exits or Ctrl+C interrupts its wait.
+By default, commands wait for content readiness or control completion. `--timeout 0` returns after the request is applied. A positive timeout returns current state with `wait_completed: false` when the wait expires; completion returns `wait_completed: true`. `--wait` waits for window closure, including a hidden dynamic preview. Combining it with `--timeout` applies one total waiting limit.
+
+Connection allows 15 seconds, ordinary request transport and execution allow 10 seconds, and update checks allow 60 seconds. Failures at these stages return errors. Reading stdin is separate from content waiting. Accepted previews and controls continue when the CLI exits or Ctrl+C interrupts its wait.
 
 `check-update` reports versions and release/download links; downloading and installation are separate user actions. `quit` waits for App and Core to exit and also succeeds when Glance is already stopped.
 

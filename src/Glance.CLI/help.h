@@ -21,7 +21,7 @@ namespace glance::cli
               "commands:\n"
               "  preview                 Open one or more files or folders\n"
               "  windows                 List preview windows and their IDs\n"
-              "  window                  Inspect, move, resize, pin, or close a window\n"
+              "  window                  Control windows and preview content\n"
               "  settings                List, read, change, or reset public settings\n"
               "  status                  Show app version, connection, and monitors\n"
               "  check-update            Check for a newer release\n"
@@ -35,17 +35,21 @@ namespace glance::cli
               "arguments:\n"
               "  PATH                    File or folder; multiple paths form a sequence\n"
               "\npreview options:\n"
-              "  --wait                  Wait for the first preview to be ready\n"
+              "  --name NAME             Standard-input filename (default: stdin.txt)\n"
+              "  --raw                   Binary stdin; default filename: stdin.bin\n"
               "  --pin                   Keep a separate, topmost preview window\n"
               "  --topmost               Keep the window on top (default: off)\n"
-              "  --close-after SECONDS   Close after content is ready (0.001 to 86400)\n"
+              "  --close-after SECONDS    Close after content is ready (0.001 to 86400)\n"
               "  --size WIDTH HEIGHT     Outer window size in physical pixels\n"
               "  --position X Y          Absolute top-left position\n"
               "  --center-offset X Y     Offset from the monitor work-area center\n"
               "  --monitor INDEX         Monitor for centering (default: mouse monitor)\n"
               "  --                      Treat all remaining arguments as paths\n"
               "\nnotes:\n"
-              "  Prints the window ID. Multiple paths form one preview sequence.\n"
+              "  Waits for readiness and returns full window details.\n"
+              "  PATH '-' reads stdin to EOF into a temporary file.\n"
+              "  Use --raw --name image.png for binary input; bytes stay unchanged.\n"
+              "  Multiple paths form one preview sequence.\n"
               "  Relative paths use your current directory. Quote paths with spaces.\n"
               "  Position modes are exclusive; negative coordinates are allowed.\n"
               "  Centering defaults to the monitor containing the mouse pointer.\n"
@@ -65,10 +69,17 @@ namespace glance::cli
               "  close                   Close the preview\n"
               "  topmost                 Turn always-on-top on or off\n"
               "  pin                     Keep a preview open, or close a pinned preview\n"
+              "  line N                  Go to a plain-text line (1-based)\n"
+              "  page N                  Go to a PDF page (1-based)\n"
+              "  seek POSITION           Seek media by seconds or HH:MM:SS[.fff]\n"
+              "  next / previous         Select an adjacent file in the sequence\n"
+              "  play / pause            Control media playback\n"
+              "  volume N                Set window volume from 0 to 100\n"
+              "  mute {on,off}           Set window mute state\n"
               "\noptions:\n"
               "  --id UUID               Target window (default: last preview UUID)\n"
               "\nwindow IDs:\n"
-              "  Use 'windows' to list IDs or capture the ID printed by 'preview'.\n"
+              "  Use 'windows' to list IDs or read data.id from preview --json.\n"
               "  UUIDs survive pinning and expire when Glance restarts.\n"
               "  A closed default target returns an error.\n",
               "Glance.CLI.exe windows\n"
@@ -87,9 +98,8 @@ namespace glance::cli
               "arguments:\n  PATH                    File or folder; multiple paths form a sequence\n"
               "\noptions:\n"
               "  --id UUID               Target window (default: last preview UUID)\n"
-              "  --wait                  Wait for the new preview to be ready\n"
               "\n  Preserves pinning and topmost state; cancels the old close timer.\n",
-              "Glance.CLI.exe window set notes.txt --wait" },
+              "Glance.CLI.exe window set notes.txt" },
             { "window move", "Move a window using physical pixel coordinates.",
               "Glance.CLI.exe window move --position X Y [--id UUID]\n"
               "  Glance.CLI.exe window move --center-offset X Y [options]",
@@ -116,9 +126,34 @@ namespace glance::cli
               "Glance.CLI.exe window pin {on,off} [--id UUID]",
               "options:\n  --id UUID               Target window (default: last preview UUID)\n"
               "\n  'on' makes the window topmost and creates a new dynamic preview.\n"
-              "  'off' closes the pinned window. The command prints the target ID.\n",
+              "  'off' closes the pinned window. Returns full window details.\n",
               "Glance.CLI.exe window pin on\n"
               "  Glance.CLI.exe window pin off" },
+            { "window line", "Go to a plain-text line, loading more text as needed.",
+              "Glance.CLI.exe window line N [--id UUID] [options]",
+              "arguments:\n  N                       Line number starting at 1\n",
+              "Glance.CLI.exe window line 120" },
+            { "window page", "Go to a PDF page and wait for rendering.",
+              "Glance.CLI.exe window page N [--id UUID] [options]",
+              "arguments:\n  N                       Page number starting at 1\n",
+              "Glance.CLI.exe window page 8" },
+            { "window seek", "Seek within the current media file.",
+              "Glance.CLI.exe window seek POSITION [--id UUID] [options]",
+              "arguments:\n  POSITION                Seconds or HH:MM:SS[.fff]\n",
+              "Glance.CLI.exe window seek 00:01:30" },
+            { "window next", "Preview the next file in the sequence or gallery.",
+              "Glance.CLI.exe window next [--id UUID] [options]", "", "Glance.CLI.exe window next" },
+            { "window previous", "Preview the previous file in the sequence or gallery.",
+              "Glance.CLI.exe window previous [--id UUID] [options]", "", "Glance.CLI.exe window previous" },
+            { "window play", "Play the current media file.",
+              "Glance.CLI.exe window play [--id UUID] [options]", "", "Glance.CLI.exe window play" },
+            { "window pause", "Pause the current media file.",
+              "Glance.CLI.exe window pause [--id UUID] [options]", "", "Glance.CLI.exe window pause" },
+            { "window volume", "Set the current window's media volume.",
+              "Glance.CLI.exe window volume N [--id UUID] [options]",
+              "arguments:\n  N                       Volume from 0 to 100\n", "Glance.CLI.exe window volume 50" },
+            { "window mute", "Set the current window's media mute state.",
+              "Glance.CLI.exe window mute {on,off} [--id UUID] [options]", "", "Glance.CLI.exe window mute on" },
             { "windows", "List all preview windows, including the hidden dynamic window.",
               "Glance.CLI.exe windows [options]",
               "output:\n  Each window includes its ID, paths, state, and bounds.\n",
@@ -134,8 +169,8 @@ namespace glance::cli
               "  Copy exact keys from 'settings list'. Booleans accept true/false,\n"
               "  on/off, or 1/0. Each setting reports its type, limits, and effect.\n",
               "Glance.CLI.exe settings list TextPreview\n"
-              "  Glance.CLI.exe settings set TextPreview/MonitorFile true\n"
-              "  Glance.CLI.exe settings reset TextPreview/MonitorFile" },
+              "  Glance.CLI.exe settings set TextPreview/WordWrap true\n"
+              "  Glance.CLI.exe settings reset TextPreview/WordWrap" },
             { "settings list", "List settings with their values, defaults, and limits.",
               "Glance.CLI.exe settings list [PREFIX] [options]",
               "arguments:\n  PREFIX                  Key prefix (default: all public settings)\n",
@@ -143,7 +178,7 @@ namespace glance::cli
             { "settings get", "Read one setting, including its type and allowed values.",
               "Glance.CLI.exe settings get KEY [options]",
               "arguments:\n  KEY                     Exact key returned by 'settings list'\n",
-              "Glance.CLI.exe settings get TextPreview/RefreshIntervalMs" },
+              "Glance.CLI.exe settings get TextPreview/FontSize" },
             { "settings set", "Change a public setting.",
               "Glance.CLI.exe settings set KEY VALUE [options]",
               "arguments:\n"
@@ -152,12 +187,12 @@ namespace glance::cli
               "\n  Booleans: true/false, on/off, or 1/0. Enumerations use numeric IDs.\n"
               "  The result reports whether the setting applies immediately or\n"
               "  on the next preview. Use 'settings reset' to restore its default.\n",
-              "Glance.CLI.exe settings set TextPreview/MonitorFile true\n"
-              "  Glance.CLI.exe settings set TextPreview/RefreshIntervalMs 1000" },
+              "Glance.CLI.exe settings set TextPreview/WordWrap true\n"
+              "  Glance.CLI.exe settings set TextPreview/FontSize 14" },
             { "settings reset", "Restore one setting's default value.",
               "Glance.CLI.exe settings reset KEY [options]",
               "arguments:\n  KEY                     Exact key returned by 'settings list'\n",
-              "Glance.CLI.exe settings reset TextPreview/MonitorFile" },
+              "Glance.CLI.exe settings reset TextPreview/WordWrap" },
             { "status", "Show the app version, Core connection, and monitor work areas.",
               "Glance.CLI.exe status [options]",
               "output:\n  Monitor indices can be used with --center-offset and --monitor.\n",
@@ -188,10 +223,15 @@ namespace glance::cli
                 "  -h, --help              Show this help message and exit\n"
                 "  --json                  Output one JSON result for scripts\n"
                 "  --no-start              Require an already running Glance\n"
-                "  --timeout SECONDS       Override connection and command time limits\n"
                 "  --version               Show version and exit\n";
-            if (topic == "preview")
-                result += "\n  Timeouts: connection 15s; command 10s, or 30s with --wait.\n";
+            if (topic == "preview" || topic == "window" || topic.starts_with("window "))
+            {
+                result += "  --timeout SECONDS       Return current state after 0 to 86400 seconds\n";
+                if (topic != "window close") result += "  --wait                  Wait until the target window closes\n";
+                result += "\n  Default: wait for readiness and return full window details.\n"
+                    "  --timeout 0 returns immediately after applying the request.\n"
+                    "  A timed wait returns current state with wait_completed: false.\n";
+            }
             result += "\nexamples:\n  "; result += page.examples;
             if (topic.empty()) result += "\n\nRun 'Glance.CLI.exe COMMAND -h' for command-specific help.";
             result += "\n\nDocs: https://github.com/ElluIFX/Glance/blob/main/docs/CLI.en.md";

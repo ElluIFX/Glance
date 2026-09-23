@@ -7,6 +7,7 @@
 #include "appearance_preferences.h"
 #include "../version.h"
 #include "glance/contracts/cli_protocol.h"
+#include "glance/contracts/cli_input.h"
 #include <future>
 #include <set>
 
@@ -52,7 +53,7 @@ namespace winrt::Glance::App::implementation
                 return WaitForSingleObject(cancelled, 0) == WAIT_OBJECT_0 ||
                     !PeekNamedPipe(connection, nullptr, 0, nullptr, nullptr, nullptr) || GetTickCount64() >= deadline;
             };
-            const std::set<std::wstring> fields{ L"command", L"timeout_ms", L"paths", L"id", L"wait", L"size", L"position", L"center_offset", L"monitor", L"close_after", L"topmost", L"pin", L"enabled", L"key", L"value" };
+            const std::set<std::wstring> fields{ L"command", L"timeout_ms", L"paths", L"id", L"stdin_file", L"generation", L"size", L"position", L"center_offset", L"monitor", L"close_after", L"topmost", L"pin", L"enabled", L"key", L"value" };
             for (const auto& item : request) if (!fields.contains(std::wstring(item.Key()))) throw Error(2, "unknown_field", "Unknown request field");
             if (request.HasKey(L"position") && request.HasKey(L"center_offset")) throw Error(2, "position_conflict", "Position modes are mutually exclusive");
             std::vector<glance::app::PreviewFile> files;
@@ -66,6 +67,22 @@ namespace winrt::Glance::App::implementation
                     glance::app::PreviewFile file;
                     file.path = value.GetString();
                     if (file.path.find(L'\0') != std::wstring::npos || !std::filesystem::path(file.path).is_absolute()) throw Error(2, "invalid_path", "Expected absolute filesystem path");
+                    if (request.GetNamedBoolean(L"stdin_file", false))
+                    {
+                        const auto source = std::filesystem::path(file.path).lexically_normal();
+                        ULONG client_pid{};
+                        if (command != L"preview" || paths.Size() != 1 ||
+                            !GetNamedPipeClientProcessId(connection, &client_pid) ||
+                            source.parent_path().parent_path() != glance::cli::input_root() ||
+                            !source.parent_path().filename().wstring().starts_with(std::to_wstring(client_pid) + L"-"))
+                            throw Error(2, "invalid_input_file", "Invalid temporary input path");
+                        auto lease = glance::cli::create_input_lease();
+                        const auto target = lease->directory / source.filename();
+                        if (!MoveFileExW(source.c_str(), target.c_str(), MOVEFILE_WRITE_THROUGH))
+                            throw Error(7, "input_transfer", "Cannot take ownership of temporary input");
+                        file.path = target.wstring();
+                        file.materialized_lease = std::move(lease);
+                    }
                     WIN32_FILE_ATTRIBUTE_DATA info{};
                     if (!GetFileAttributesExW(file.path.c_str(), GetFileExInfoStandard, &info))
                         throw Error(GetLastError() == ERROR_ACCESS_DENIED ? 7 : 3, "path_unavailable", "Cannot access preview path");
@@ -117,25 +134,6 @@ namespace winrt::Glance::App::implementation
                 data.SetNamedValue(L"download_url", JsonValue::CreateStringValue(update.installer.download_url));
             }
             else data = on_ui(request, std::move(files));
-            if ((command == L"preview" || command == L"window.set") && request.GetNamedBoolean(L"wait", false))
-            {
-                const auto id = data.GetNamedString(L"id");
-                const auto generation = data.GetNamedString(L"generation");
-                JsonObject query;
-                query.SetNamedValue(L"command", JsonValue::CreateStringValue(L"window.get"));
-                query.SetNamedValue(L"id", JsonValue::CreateStringValue(id));
-                for (;;)
-                {
-                    if (data.GetNamedString(L"generation") != generation || data.GetNamedString(L"state") == L"hidden")
-                        throw Error(10, "preview_replaced", "Preview closed or replaced");
-                    if (data.GetNamedString(L"state") == L"failed") throw Error(9, "preview_failed", "Preview provider failed");
-                    if (data.GetNamedString(L"state") == L"ready") break;
-                    if (interrupted()) throw Error(5, "preview_timeout", "Preview wait ended before readiness");
-                    if (WaitForSingleObject(cancelled, 25) == WAIT_OBJECT_0) throw Error(10, "cancelled", "App is exiting");
-                    try { data = on_ui(query, {}); }
-                    catch (const Error& error) { if (error.code == 3) throw Error(10, "preview_closed", "Preview closed"); throw; }
-                }
-            }
             return to_string(response(command, data).Stringify());
         }
         catch (const Error& error) { return to_string(response(command, JsonObject(), &error).Stringify()); }
@@ -247,6 +245,8 @@ namespace winrt::Glance::App::implementation
         }
         if (!window) throw Error(3, "window_not_found", "Window ID not found");
         auto implementation = get_self<MainWindow>(window);
+        if (request.HasKey(L"generation") && implementation->CliSnapshot().GetNamedString(L"generation") != request.GetNamedString(L"generation"))
+            throw Error(10, "preview_replaced", "Preview content changed before command execution");
         if (command == L"preview")
         {
             implementation->CliConfigure(request, true);
@@ -262,19 +262,32 @@ namespace winrt::Glance::App::implementation
         }
         else if (command == L"window.close")
         {
-            result.SetNamedValue(L"id", JsonValue::CreateStringValue(implementation->CliId()));
+            result = implementation->CliSnapshot();
             if (window == active_window_) implementation->HidePreview(); else implementation->CloseForReplacement();
+            result.SetNamedValue(L"state", JsonValue::CreateStringValue(L"closed"));
+            result.SetNamedValue(L"visible", JsonValue::CreateBooleanValue(false));
             return result;
         }
         else if (command == L"window.pin")
         {
-            result.SetNamedValue(L"id", JsonValue::CreateStringValue(implementation->CliId()));
+            result = implementation->CliSnapshot();
             implementation->CliPin(request.GetNamedBoolean(L"enabled"));
+            if (result.GetNamedBoolean(L"pinned") && !request.GetNamedBoolean(L"enabled"))
+            {
+                result.SetNamedValue(L"state", JsonValue::CreateStringValue(L"closed"));
+                result.SetNamedValue(L"visible", JsonValue::CreateBooleanValue(false));
+            }
+            else result = implementation->CliSnapshot();
             return result;
         }
         else if (command == L"window.topmost") implementation->CliTopmost(request.GetNamedBoolean(L"enabled"));
         else if (command == L"window.move" || command == L"window.resize") implementation->CliConfigure(request);
-        else if (command != L"window.get") throw Error(2, "unknown_command", "Unknown command");
+        else if (command != L"window.get")
+        {
+            implementation->CliExecuteControl(request);
+            result = implementation->CliSnapshot();
+            return result;
+        }
         result = implementation->CliSnapshot();
         result.SetNamedValue(L"dynamic", JsonValue::CreateBooleanValue(window == active_window_));
         return result;

@@ -49,6 +49,9 @@ namespace glance::app
         void set_word_wrap(bool enabled) noexcept;
         void set_line_numbers(bool enabled) noexcept;
         void set_syntax_highlighting(bool enabled);
+        [[nodiscard]] std::int64_t line_count() const noexcept;
+        [[nodiscard]] std::int64_t current_line() const noexcept;
+        void go_to_line(std::int64_t line) noexcept;
 
     public:
         static LRESULT CALLBACK host_window_proc(

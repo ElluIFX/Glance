@@ -1,4 +1,5 @@
 #include "glance/contracts/cli_protocol.h"
+#include "glance/contracts/cli_input.h"
 #include "../version.h"
 #include "help.h"
 #include <rapidjson/document.h>
@@ -14,10 +15,12 @@ namespace
     using namespace glance::cli;
     using Json = rapidjson::Document;
     HANDLE interrupted{};
+    HANDLE main_thread{};
     BOOL WINAPI interrupt(DWORD event)
     {
         if (event != CTRL_C_EVENT && event != CTRL_BREAK_EVENT) return FALSE;
         SetEvent(interrupted);
+        if (main_thread) CancelSynchronousIo(main_thread);
         return TRUE;
     }
     std::string utf8(std::wstring_view value)
@@ -145,6 +148,41 @@ namespace
         }
         throw Error(5, "app_timeout", "App did not become available");
     }
+
+    Json query_window(const std::string& id, const std::string& generation = {})
+    {
+        Json query(rapidjson::kObjectType);
+        string_member(query, "command", "window.get");
+        string_member(query, "id", id);
+        if (!generation.empty()) string_member(query, "generation", generation);
+        Handle pipe(connect_or_start(true, false, 10000));
+        verify_server(pipe.value);
+        const auto deadline = GetTickCount64() + 10000;
+        const auto correlation = GetTickCount64();
+        if (!send(pipe.value, serialize(query), correlation, deadline, interrupted))
+            throw Error(5, "send_failed", "Cannot query preview state");
+        Header header;
+        const auto response = receive(pipe.value, header, deadline, interrupted);
+        unsigned char ack = 1;
+        transfer(pipe.value, &ack, 1, true, deadline, interrupted);
+        Json result;
+        result.Parse(response.c_str());
+        if (header.request != correlation || result.HasParseError() || !result.IsObject() ||
+            !result.HasMember("ok") || !result["ok"].IsBool() || !result.HasMember("data") || !result.HasMember("error"))
+            throw Error(6, "invalid_response", "Invalid preview state response");
+        if (!result["ok"].GetBool())
+        {
+            const auto& error = result["error"];
+            if (!error.IsObject() || !error.HasMember("code") || !error["code"].IsInt() ||
+                !error.HasMember("name") || !error["name"].IsString() ||
+                !error.HasMember("message") || !error["message"].IsString())
+                throw Error(6, "invalid_response", "Invalid preview state error");
+            throw Error(error["code"].GetInt(), error["name"].GetString(), error["message"].GetString());
+        }
+        if (!result["data"].IsObject() || !result["data"].HasMember("state") || !result["data"]["state"].IsString())
+            throw Error(6, "invalid_response", "Missing preview state");
+        return result;
+    }
 }
 
 int wmain(int argc, wchar_t** argv)
@@ -155,6 +193,8 @@ int wmain(int argc, wchar_t** argv)
     Handle cancelled(CreateEventW(nullptr, TRUE, FALSE, nullptr));
     interrupted = cancelled.value;
     SetConsoleCtrlHandler(interrupt, TRUE);
+    Handle thread(OpenThread(THREAD_TERMINATE, FALSE, GetCurrentThreadId()));
+    main_thread = thread.value;
     for (int i = 1; i < argc && std::wstring_view(argv[i]) != L"--"; ++i)
         if (std::wstring_view(argv[i]) == L"--json") json = true;
     try
@@ -163,6 +203,8 @@ int wmain(int argc, wchar_t** argv)
         auto& allocator = request.GetAllocator();
         bool no_start = false, wait = false, positional = false, custom_timeout = false;
         double timeout = 10;
+        std::wstring input_name = L"stdin.txt";
+        std::shared_ptr<InputLease> input_lease;
         std::vector<std::wstring> words;
         std::set<std::wstring> seen;
         for (int i = 1; i < argc; ++i)
@@ -178,11 +220,13 @@ int wmain(int argc, wchar_t** argv)
             };
             if (arg == L"--json") continue;
             if (arg == L"--no-start") { no_start = true; continue; }
-            if (arg == L"--wait") { wait = true; request.AddMember("wait", true, allocator); continue; }
+            if (arg == L"--wait") { wait = true; continue; }
+            if (arg == L"--name") { input_name = next(); continue; }
+            if (arg == L"--raw") continue;
             if (arg == L"--pin") { request.AddMember("pin", true, allocator); continue; }
             if (arg == L"--help") { command = "help"; continue; }
             if (arg == L"--version") { command = "version"; continue; }
-            if (arg == L"--timeout") { timeout = number(next(), 0.001, 86400, false); custom_timeout = true; continue; }
+            if (arg == L"--timeout") { timeout = number(next(), 0, 86400, false); custom_timeout = true; continue; }
             if (arg == L"--id")
             {
                 auto value = utf8(next());
@@ -254,11 +298,14 @@ int wmain(int argc, wchar_t** argv)
             words.erase(words.begin());
         }
         const std::set<std::string> known{ "preview", "window.get", "window.close", "window.move", "window.resize",
+            "window.line", "window.page", "window.seek", "window.next", "window.previous", "window.play", "window.pause", "window.volume", "window.mute",
             "window.topmost", "window.pin", "window.set", "windows", "status", "settings.list", "settings.get", "settings.set", "settings.reset", "check-update", "quit" };
         if (!known.contains(command)) throw Error(2, "unknown_command", "Unknown command: " + command);
-        std::set<std::wstring> allowed{ L"--json", L"--no-start", L"--timeout" };
+        std::set<std::wstring> allowed{ L"--json", L"--no-start" };
+        if (command == "preview" || command.starts_with("window.")) allowed.insert(L"--timeout");
         if (command.starts_with("window.")) allowed.insert(L"--id");
-        if (command == "preview") allowed.insert({ L"--size", L"--position", L"--center-offset", L"--monitor", L"--topmost", L"--pin", L"--close-after", L"--wait" });
+        if (command.starts_with("window.") && command != "window.close") allowed.insert(L"--wait");
+        if (command == "preview") allowed.insert({ L"--raw", L"--name", L"--size", L"--position", L"--center-offset", L"--monitor", L"--topmost", L"--pin", L"--close-after", L"--wait" });
         if (command == "window.move") allowed.insert({ L"--position", L"--center-offset", L"--monitor" });
         if (command == "window.resize") allowed.insert(L"--size");
         if (command == "window.set") allowed.insert(L"--wait");
@@ -273,6 +320,50 @@ int wmain(int argc, wchar_t** argv)
             if (words.empty()) throw Error(2, "missing_path", "At least one path is required");
             if (command == "preview" && !request.HasMember("topmost")) request.AddMember("topmost", request.HasMember("pin"), allocator);
             rapidjson::Value paths(rapidjson::kArrayType);
+            const bool from_stdin = command == "preview" && std::find(words.begin(), words.end(), L"-") != words.end();
+            if (seen.contains(L"--name") && !from_stdin) throw Error(2, "stdin_required", "--name requires preview -");
+            if (seen.contains(L"--raw") && !from_stdin) throw Error(2, "stdin_required", "--raw requires preview -");
+            if (seen.contains(L"--raw") && !seen.contains(L"--name")) input_name = L"stdin.bin";
+            if (from_stdin)
+            {
+                if (words.size() != 1) throw Error(2, "stdin_paths", "Standard input cannot be combined with other paths");
+                if (input_name.empty() || input_name == L"." || input_name == L".." ||
+                    input_name.find_first_of(L"\\/:*?\"<>|") != std::wstring::npos ||
+                    std::any_of(input_name.begin(), input_name.end(), [](wchar_t c) { return c < 32; }) ||
+                    input_name.back() == L'.' || input_name.back() == L' ')
+                    throw Error(2, "invalid_name", "--name must be a file name without directories");
+                auto stem = input_name.substr(0, input_name.find(L'.'));
+                std::transform(stem.begin(), stem.end(), stem.begin(), [](wchar_t c) { return static_cast<wchar_t>(towupper(c)); });
+                if (stem == L"CON" || stem == L"PRN" || stem == L"AUX" || stem == L"NUL" || stem == L"CONIN$" || stem == L"CONOUT$" ||
+                    (stem.size() == 4 && (stem.starts_with(L"COM") || stem.starts_with(L"LPT")) && stem[3] >= L'1' && stem[3] <= L'9'))
+                    throw Error(2, "invalid_name", "Reserved device names cannot be used for input files");
+                const auto input = GetStdHandle(STD_INPUT_HANDLE);
+                DWORD mode{};
+                if (!input || input == INVALID_HANDLE_VALUE || GetConsoleMode(input, &mode))
+                    throw Error(2, "stdin_required", "Redirect a file or pipe into preview -");
+                input_lease = create_input_lease();
+                const auto path = input_lease->directory / input_name;
+                Handle file(CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr));
+                if (file.value == INVALID_HANDLE_VALUE) throw Error(7, "input_file", "Cannot create temporary input file");
+                if (GetFileType(file.value) != FILE_TYPE_DISK) throw Error(2, "invalid_name", "Expected a regular input file");
+                std::vector<char> buffer(256 * 1024);
+                for (;;)
+                {
+                    if (WaitForSingleObject(interrupted, 0) == WAIT_OBJECT_0) throw Error(130, "interrupted", "Interrupted");
+                    DWORD read{};
+                    if (!ReadFile(input, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr))
+                    {
+                        if (GetLastError() == ERROR_BROKEN_PIPE) break;
+                        throw Error(1, "stdin_read", "Cannot read standard input");
+                    }
+                    if (!read) break;
+                    DWORD written{};
+                    if (!WriteFile(file.value, buffer.data(), read, &written, nullptr) || written != read)
+                        throw Error(1, "stdin_write", "Cannot write temporary input file");
+                }
+                words[0] = path.wstring();
+                request.AddMember("stdin_file", true, allocator);
+            }
             for (const auto& path : words)
             {
                 const auto absolute = utf8(std::filesystem::absolute(path).lexically_normal().wstring());
@@ -287,28 +378,47 @@ int wmain(int argc, wchar_t** argv)
             if (!words.empty()) string_member(request, "key", utf8(words[0]));
             if (words.size() == 2) string_member(request, "value", utf8(words[1]));
         }
-        else if (command == "window.pin" || command == "window.topmost")
+        else if (command == "window.line" || command == "window.page" || command == "window.seek" || command == "window.volume")
+        {
+            if (words.size() != 1) throw Error(2, "argument_count", "Expected one numeric value");
+            double value{};
+            if (command == "window.seek" && words[0].find(L':') != std::wstring::npos)
+            {
+                const auto first = words[0].find(L':');
+                const auto second = words[0].find(L':', first + 1);
+                if (second == std::wstring::npos || words[0].find(L':', second + 1) != std::wstring::npos)
+                    throw Error(2, "invalid_position", "Use seconds or HH:MM:SS[.fff]");
+                value = number(words[0].substr(0, first), 0, 100000, true) * 3600 +
+                    number(words[0].substr(first + 1, second - first - 1), 0, 59, true) * 60 +
+                    number(words[0].substr(second + 1), 0, 59.999999, false);
+            }
+            else value = number(words[0], command == "window.line" || command == "window.page" ? 1 : 0,
+                command == "window.volume" ? 100 : INT32_MAX, command != "window.seek" && command != "window.volume");
+            request.AddMember("value", value, allocator);
+        }
+        else if (command == "window.pin" || command == "window.topmost" || command == "window.mute")
         {
             if (words.size() != 1 || (words[0] != L"on" && words[0] != L"off")) throw Error(2, "invalid_boolean", "Expected on or off");
             request.AddMember("enabled", words[0] == L"on", allocator);
         }
         else if (!words.empty()) throw Error(2, "argument_count", "Unexpected positional arguments");
-        if (!custom_timeout) timeout = command == "check-update" ? 60 : wait ? 30 : 10;
-        request.AddMember("timeout_ms", static_cast<std::uint32_t>(timeout * 1000), allocator);
+        const DWORD transport_timeout = command == "check-update" ? 60000 : 10000;
+        request.AddMember("timeout_ms", static_cast<unsigned>(transport_timeout), allocator);
         string_member(request, "command", command);
         const auto payload = serialize(request);
         if (payload.size() > maximum_payload) throw Error(2, "request_too_large", "Request exceeds size limit");
-        Handle pipe(connect_or_start(no_start, command == "quit", static_cast<DWORD>(custom_timeout ? timeout * 1000 : 15000)));
+        Handle pipe(connect_or_start(no_start, command == "quit", 15000));
         if (pipe.value == INVALID_HANDLE_VALUE)
         {
             output(json ? "{\"schema_version\":1,\"ok\":true,\"command\":\"quit\",\"data\":{\"running\":false},\"error\":null}" : "OK"); return 0;
         }
         verify_server(pipe.value);
-        const auto deadline = GetTickCount64() + static_cast<ULONGLONG>(timeout * 1000);
+        const auto wait_started = GetTickCount64();
+        const auto deadline = wait_started + transport_timeout;
         const auto correlation = GetTickCount64() ^ (static_cast<std::uint64_t>(GetCurrentProcessId()) << 32);
         if (!send(pipe.value, payload, correlation, deadline, interrupted)) throw Error(5, "send_failed", "Request was not delivered");
         Header header;
-        const auto response = receive(pipe.value, header, deadline, interrupted);
+        auto response = receive(pipe.value, header, deadline, interrupted);
         unsigned char ack = 1;
         transfer(pipe.value, &ack, 1, true, deadline, interrupted);
         if (header.request != correlation) throw Error(6, "request_mismatch", "Unexpected response ID");
@@ -328,21 +438,67 @@ int wmain(int argc, wchar_t** argv)
             (!result["data"].HasMember("id") || !result["data"]["id"].IsString()))
             throw Error(6, "invalid_response", "App response lacks a window ID");
         int code = ok ? 0 : result["error"]["code"].GetInt();
+        if (ok && result["data"].HasMember("id") && result["data"].HasMember("state"))
+        {
+            const std::string id = result["data"]["id"].GetString();
+            const std::string generation = result["data"]["generation"].GetString();
+            bool completed = false;
+            for (;;)
+            {
+                if (result["data"].HasMember("command_error_code"))
+                    throw Error(result["data"]["command_error_code"].GetInt(), "content_control_failed", result["data"]["command_error_message"].GetString());
+                const std::string_view state = result["data"]["state"].GetString();
+                if (state == "failed") throw Error(9, "preview_failed", "Preview provider failed");
+                const bool closed = state == "hidden" || state == "closed";
+                completed = wait ? closed : state != "loading";
+                if (completed) break;
+                if (custom_timeout && GetTickCount64() - wait_started >= static_cast<ULONGLONG>(timeout * 1000)) break;
+                if (WaitForSingleObject(interrupted, 50) == WAIT_OBJECT_0) throw Error(130, "interrupted", "Interrupted");
+                try
+                {
+                    auto latest = query_window(id, wait || command == "window.next" || command == "window.previous" ? "" : generation);
+                    if (std::string_view(latest["data"]["state"].GetString()) == "hidden")
+                    {
+                        if (!wait) throw Error(10, "preview_closed", "Preview closed before completion");
+                        result["data"]["state"].SetString("closed", result.GetAllocator());
+                        result["data"]["visible"].SetBool(false);
+                        completed = true;
+                        break;
+                    }
+                    result["data"].CopyFrom(latest["data"], result.GetAllocator());
+                }
+                catch (const Error& error)
+                {
+                    if (error.code != 3) throw;
+                    if (!wait) throw Error(10, "preview_closed", "Preview closed before completion");
+                    result["data"]["state"].SetString("closed", result.GetAllocator());
+                    result["data"]["visible"].SetBool(false);
+                    completed = true;
+                    break;
+                }
+            }
+            if (wait && completed)
+            {
+                result["data"]["state"].SetString("closed", result.GetAllocator());
+                result["data"]["visible"].SetBool(false);
+            }
+            result["data"].AddMember("wait_completed", completed, result.GetAllocator());
+            response = serialize(result);
+        }
         if (command == "quit" && ok && result["data"].HasMember("process_id"))
         {
             Handle process(OpenProcess(SYNCHRONIZE, FALSE, result["data"]["process_id"].GetUint()));
-            if (process.value && WaitForSingleObject(process.value, static_cast<DWORD>(timeout * 1000)) == WAIT_TIMEOUT)
+            if (process.value && WaitForSingleObject(process.value, transport_timeout) == WAIT_TIMEOUT)
                 throw Error(5, "shutdown_timeout", "App did not exit");
             if (result["data"].HasMember("core_process_id"))
             {
                 Handle core(OpenProcess(SYNCHRONIZE, FALSE, result["data"]["core_process_id"].GetUint()));
-                if (core.value && WaitForSingleObject(core.value, static_cast<DWORD>(timeout * 1000)) == WAIT_TIMEOUT)
+                if (core.value && WaitForSingleObject(core.value, transport_timeout) == WAIT_TIMEOUT)
                     throw Error(5, "shutdown_timeout", "Core did not exit");
             }
         }
         if (json) output(response);
         else if (!ok) output(std::string(result["error"]["name"].GetString()) + ": " + result["error"]["message"].GetString(), true);
-        else if (command == "preview" || command == "window.pin") output(result["data"]["id"].GetString());
         else if (result["data"].HasMember("text")) output(result["data"]["text"].GetString());
         else
         {

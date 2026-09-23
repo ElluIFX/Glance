@@ -13,7 +13,7 @@ $cli = 'C:\Program Files\Glance\Glance.CLI.exe'
 & $cli preview 'C:\Documents\report.pdf'
 ```
 
-Glance 打开文件并输出窗口 ID。主程序尚未运行时，CLI 会启动同目录的 Glance；已运行时直接发送请求。
+Glance 等待预览就绪并输出完整窗口信息。主程序尚未运行时，CLI 会启动同目录的 Glance；已运行时直接发送请求。
 
 用 `-h` 查看当前命令的用法：
 
@@ -53,12 +53,13 @@ Glance 打开文件并输出窗口 ID。主程序尚未运行时，CLI 会启动
 & $cli preview 'C:\Documents\report.pdf' --size 1200 900 --center-offset 0 0 --pin
 
 # 等首屏就绪后返回，5 秒后自动关闭
-& $cli preview 'C:\Documents\notes.txt' --wait --close-after 5
+& $cli preview 'C:\Documents\notes.txt' --close-after 5
 ```
 
 | 选项 | 作用 |
 | --- | --- |
-| `--wait` | 等待首屏就绪；默认在预览请求应用后返回 |
+| `--wait` | 等待窗口关闭后返回 |
+| `--timeout SECONDS` | 限制等待时长；0 表示请求应用后立即返回当前状态 |
 | `--pin` | 钉住预览，保留为独立的置顶窗口 |
 | `--topmost` | 置顶本次预览；省略时默认关闭，钉住时自动开启 |
 | `--close-after SECONDS` | 首屏就绪后延时关闭，范围 0.001～86400 秒 |
@@ -75,15 +76,32 @@ Glance 打开文件并输出窗口 ID。主程序尚未运行时，CLI 会启动
 
 自动关闭计时绑定本次内容：切换文件会取消计时，钉住窗口会保留计时。
 
+### 预览管道输入
+
+`preview -` 读取标准输入直到结束，再预览生成的临时文件。`--name` 指定文件名和后缀，默认 `stdin.txt`。
+
+```powershell
+'{"name":"Glance","ready":true}' | & $cli preview - --name result.json
+```
+
+二进制使用 `--raw`，字节和换行保持原样。文件名默认 `stdin.bin`；通过后缀选择预览器。下面的例子在 **cmd.exe** 中运行，以保留输入文件的原始字节：
+
+```bat
+"C:\Program Files\Glance\Glance.CLI.exe" preview - --raw --name photo.png < "C:\Pictures\photo.png"
+```
+
+管道输入独占本次预览；`--name` 只接受文件名。临时文件在预览释放后清理，CLI 提前返回时仍可继续查看内容。
+
 ## 控制窗口
 
 每个新窗口都有独立 UUID。省略 `--id` 时操作最近一次 `preview` 返回的窗口，钉住后仍保持该目标；目标已关闭时返回错误。指定其他窗口时，使用 `--id UUID`，UUID 可从 `windows` 查询。
 
 ```powershell
-$windowId = & $cli preview 'C:\Documents\report.pdf' --pin
+$result = & $cli preview 'C:\Documents\report.pdf' --pin --json | ConvertFrom-Json
+$windowId = $result.data.id
 & $cli window move --id $windowId --position 100 100
 & $cli window resize --id $windowId --size 1200 900
-& $cli window set 'C:\Documents\notes.txt' --id $windowId --wait
+& $cli window set 'C:\Documents\notes.txt' --id $windowId
 & $cli window get --id $windowId
 & $cli window close --id $windowId
 ```
@@ -98,10 +116,21 @@ $windowId = & $cli preview 'C:\Documents\report.pdf' --pin
 | `window topmost on` / `window topmost off` | 切换置顶 |
 | `window pin on` / `window pin off` | 钉住窗口 / 关闭已钉住窗口 |
 | `window close` | 关闭预览，Glance 保持运行 |
+| `window line N` | 定位纯文本第 N 行，行号从 1 开始 |
+| `window page N` | 定位 PDF 第 N 页，页码从 1 开始 |
+| `window seek POSITION` | 定位媒体时间，接受秒数或 `HH:MM:SS[.fff]` |
+| `window next` / `window previous` | 切换文件序列或画廊中的相邻文件 |
+| `window play` / `window pause` | 播放或暂停媒体 |
+| `window volume N` | 当前窗口音量，范围 0～100 |
+| `window mute on` / `window mute off` | 当前窗口静音状态 |
 
 以上命令都接受 `--id UUID`。UUID 在钉住后保持不变，Glance 重启后失效。`windows` 也会列出隐藏的动态窗口。连续 `preview` 复用普通预览窗口；钉住后，下次 `preview` 使用新窗口。
 
 **钉住会同时置顶，并创建新的动态预览窗口。取消钉住会关闭原窗口；钉住期间必须保持置顶。**
+
+内容控制按当前预览类型执行，定位超出内容范围时返回错误。音量与静音仅作用于当前窗口。
+
+纯文本的文件监视由状态栏眼睛按钮控制：左键开启或暂停，每秒检查一次；右键刷新一次。新文件默认关闭监视。
 
 ## 修改设置
 
@@ -109,10 +138,10 @@ $windowId = & $cli preview 'C:\Documents\report.pdf' --pin
 
 ```powershell
 & $cli settings list TextPreview
-& $cli settings get TextPreview/RefreshIntervalMs
-& $cli settings set TextPreview/MonitorFile true
-& $cli settings set TextPreview/RefreshIntervalMs 1000
-& $cli settings reset TextPreview/MonitorFile
+& $cli settings get TextPreview/FontSize
+& $cli settings set TextPreview/WordWrap true
+& $cli settings set TextPreview/FontSize 14
+& $cli settings reset TextPreview/WordWrap
 ```
 
 `settings list` 列出全部公开设置；追加前缀可缩小范围。每项提供当前值、默认值、类型、允许范围和生效方式：`immediate` 为立即生效，`next_preview` 为下次预览生效。已加载组件的设置也会出现在列表中。
@@ -130,7 +159,7 @@ $windowId = & $cli preview 'C:\Documents\report.pdf' --pin
 加 `--json` 后，标准输出为单个 UTF-8 JSON 对象。用退出码判断成功，再读取 `data`：
 
 ```powershell
-$result = & $cli preview 'C:\Documents\report.pdf' --pin --wait --json |
+$result = & $cli preview 'C:\Documents\report.pdf' --pin --json |
     ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) {
     throw $result.error.message
@@ -148,7 +177,7 @@ if ($LASTEXITCODE -ne 0) {
 
 窗口 ID 和预览代次以字符串返回。通用文件信息预览也算就绪，结果中会标记 `fallback: true`。
 
-默认文本模式下，`preview` 和 `window pin` 只输出窗口 ID，其他命令以键值形式输出；错误写入标准错误。
+默认文本模式以键值形式输出完整结果，错误写入标准错误。窗口结果包含 UUID、路径、加载状态、位置、尺寸、置顶和钉住状态，并按内容类型提供行、页或媒体播放信息。
 
 ### 通用选项与等待时间
 
@@ -157,10 +186,13 @@ if ($LASTEXITCODE -ne 0) {
 | `-h` / `--help` | 显示当前命令帮助；也支持 `help COMMAND` |
 | `--json` | 输出 JSON，适合脚本处理 |
 | `--no-start` | 只连接正在运行的 Glance |
-| `--timeout SECONDS` | 分别设置连接和命令的等待上限，范围 0.001～86400 秒 |
+| `--timeout SECONDS` | 窗口命令等待上限，范围 0～86400 秒 |
+| `--wait` | `preview` 和保持窗口存在的 `window` 命令等待目标关闭 |
 | `--version` | 显示版本 |
 
-默认连接等待上限为 15 秒；普通命令为 10 秒，`preview --wait` 为 30 秒，`check-update` 为 60 秒。超时后先查询状态，再决定是否重试。CLI 退出或 Ctrl+C 中断等待后，已接受的预览及其关闭计时继续运行。
+默认等待内容就绪或控制操作完成。`--timeout 0` 在请求应用后返回，正数超时返回当前状态及 `wait_completed: false`；正常完成返回 `wait_completed: true`。`--wait` 等待窗口关闭，动态预览隐藏也算关闭；与 `--timeout` 组合时采用同一总等待上限。
+
+连接最多等待 15 秒，普通请求传输与执行最多 10 秒，更新检查最多 60 秒。这些故障会返回错误。管道输入收集时间独立于内容等待。CLI 退出或 Ctrl+C 中断等待后，已接受的预览和控制操作继续运行。
 
 `check-update` 检查版本并返回发布、下载链接；下载安装由用户另行操作。`quit` 等待 App 和 Core 退出，程序已关闭时也返回成功。
 

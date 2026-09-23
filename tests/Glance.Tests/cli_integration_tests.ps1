@@ -75,10 +75,19 @@ try {
     $second = Join-Path $fixture 'second.txt'
     Set-Content -LiteralPath $first -Value 'First preview' -Encoding utf8
     Set-Content -LiteralPath $second -Value 'Second preview' -Encoding utf8
-    $opened = (Invoke-Cli -Arguments @('preview', $first, $second, '--wait', '--timeout', '20', '--size', '1000', '700', '--position', '100', '100')).data
+    $opened = (Invoke-Cli -Arguments @('preview', $first, $second, '--timeout', '20', '--size', '1000', '700', '--position', '100', '100')).data
     Assert-True ($opened.state -eq 'ready' -and $opened.paths.Count -eq 2) 'Multi-path preview not ready'
     Assert-True ($opened.bounds.width -eq 1000 -and $opened.bounds.height -eq 700 -and $opened.bounds.x -eq 100) 'Explicit geometry not preserved'
     $id = $opened.id
+    Assert-True $opened.wait_completed 'Default preview did not wait for readiness'
+    $next = (Invoke-Cli -Arguments @('window', 'next')).data
+    Assert-True ($next.current_index -eq 1) 'Next file did not navigate'
+    Invoke-Cli -Arguments @('window', 'next') -Expected 3 | Out-Null
+    Invoke-Cli -Arguments @('window', 'previous') | Out-Null
+    $opened = (Invoke-Cli -Arguments @('window', 'get')).data
+    Invoke-Cli -Arguments @('window', 'line', '1') | Out-Null
+    Invoke-Cli -Arguments @('window', 'line', '1000000') -Expected 3 | Out-Null
+    Invoke-Cli -Arguments @('window', 'page', '1') -Expected 8 | Out-Null
     Assert-True ($id -match '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$') 'Window ID is not a UUID'
     Assert-True (-not $opened.topmost) 'Preview should default to non-topmost'
     Invoke-Cli -Arguments @('window', 'get', '--id', '0') -Expected 2 | Out-Null
@@ -94,40 +103,152 @@ try {
     $windows = (Invoke-Cli -Arguments @('windows')).data.windows
     Assert-True ($windows.Count -eq 2) 'Pin did not create a new dynamic window'
     Invoke-Cli -Arguments @('window', 'resize', '--id', $id, '--size', '1100', '750') | Out-Null
-    $replaced = (Invoke-Cli -Arguments @('window', 'set', $second, '--wait')).data
+    $replaced = (Invoke-Cli -Arguments @('window', 'set', $second)).data
     Assert-True ($replaced.id -eq $id -and $replaced.paths[0] -eq $second) 'Set changed the window ID or failed to replace the file'
     Assert-True ($replaced.bounds.width -eq 1100 -and $replaced.bounds.height -eq 750 -and $replaced.pinned -and $replaced.topmost) 'Set changed geometry or pinning'
     Invoke-Cli -Arguments @('window', 'set', (Join-Path $fixture 'missing.txt')) -Expected 3 | Out-Null
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.generation -eq $replaced.generation) 'Invalid set replaced content'
-    $other = (Invoke-Cli -Arguments @('preview', $first, '--topmost', '--wait')).data
+    $other = (Invoke-Cli -Arguments @('preview', $first, '--topmost')).data
     Assert-True ($other.id -ne $id -and $other.topmost) 'New window UUID or topmost flag failed'
-    $targeted = (Invoke-Cli -Arguments @('window', 'set', $first, $second, '--id', $id.ToUpperInvariant(), '--wait')).data
+    $targeted = (Invoke-Cli -Arguments @('window', 'set', $first, $second, '--id', $id.ToUpperInvariant())).data
     Assert-True ($targeted.id -eq $id -and $targeted.paths.Count -eq 2) 'Explicit UUID set failed'
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.id -eq $other.id) 'Explicit target changed the default UUID'
     Invoke-Cli -Arguments @('window', 'close') | Out-Null
     Invoke-Cli -Arguments @('window', 'resize', '--size', '1100', '750') -Expected 8 | Out-Null
     Invoke-Cli -Arguments @('window', 'pin', 'off', '--id', $id) | Out-Null
-    $defaultPinned = (Invoke-Cli -Arguments @('preview', $second, '--pin', '--wait')).data
+    $defaultPinned = (Invoke-Cli -Arguments @('preview', $second, '--pin')).data
     Invoke-Cli -Arguments @('window', 'pin', 'off') | Out-Null
     Invoke-Cli -Arguments @('window', 'get') -Expected 3 | Out-Null
     Invoke-Cli -Arguments @('window', 'get', '--id', $id) -Expected 3 | Out-Null
 
-    $delayed = (Invoke-Cli -Arguments @('preview', $first, '--pin', '--wait', '--close-after', '0.3')).data
+    $delayed = (Invoke-Cli -Arguments @('preview', $first, '--pin', '--close-after', '0.3')).data
     Start-Sleep -Milliseconds 700
     Invoke-Cli -Arguments @('window', 'get', '--id', $delayed.id) -Expected 3 | Out-Null
-    Invoke-Cli -Arguments @('preview', $first, '--wait', '--close-after', '0.4') | Out-Null
-    Invoke-Cli -Arguments @('preview', $second, '--wait') | Out-Null
+    Invoke-Cli -Arguments @('preview', $first, '--close-after', '0.4') | Out-Null
+    Invoke-Cli -Arguments @('preview', $second) | Out-Null
     Start-Sleep -Milliseconds 700
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.visible) 'Old close timer closed replacement preview'
     Invoke-Cli -Arguments @('preview', (Join-Path $fixture 'missing.txt')) -Expected 3 | Out-Null
-    Invoke-Cli -Arguments @('preview', $fixture, '--wait') | Out-Null
+    Invoke-Cli -Arguments @('preview', $fixture) | Out-Null
     $brokenImage = Join-Path $fixture 'broken.png'
     Set-Content -LiteralPath $brokenImage -Value 'invalid image'
-    Invoke-Cli -Arguments @('preview', $brokenImage, '--wait') -Expected 9 | Out-Null
+    Invoke-Cli -Arguments @('preview', $brokenImage) -Expected 9 | Out-Null
+
+    $closed = (Invoke-Cli -Arguments @('preview', $first, '--pin', '--wait', '--close-after', '0.2')).data
+    Assert-True ($closed.state -eq 'closed' -and $closed.wait_completed) 'Wait did not return the closed snapshot'
+    $bounded = (Invoke-Cli -Arguments @('preview', $first, '--wait', '--timeout', '0.1')).data
+    Assert-True ($bounded.visible -and -not $bounded.wait_completed) 'Bounded close wait did not return current state'
+    $immediate = (Invoke-Cli -Arguments @('preview', $first, '--wait', '--timeout', '0')).data
+    Assert-True (-not $immediate.wait_completed) 'Timeout zero waited for close'
+    $textOutput = & $cli window get
+    Assert-True (($textOutput -join "`n") -match 'bounds.width:') 'Text output is incomplete'
+
+    # Six concurrent waiters must leave the four App workers available.
+    $waiters = foreach ($index in 1..6) {
+        $process = Start-Process -FilePath $cli -ArgumentList "window get --id $($immediate.id) --wait --json" -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput (Join-Path $fixture "wait-$index.json")
+        $null = $process.Handle
+        $process
+    }
+    Start-Sleep -Milliseconds 500
+    Invoke-Cli -Arguments @('window', 'resize', '--size', '1000', '700') | Out-Null
+    Invoke-Cli -Arguments @('window', 'close') | Out-Null
+    foreach ($process in $waiters) {
+        Assert-True ($process.WaitForExit(10000) -and $process.ExitCode -eq 0) 'Concurrent close wait failed'
+    }
+
+    $info = [Diagnostics.ProcessStartInfo]::new($cli)
+    $info.Arguments = 'preview - --raw --name "binary sample.dat" --json'
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    $info.RedirectStandardInput = $true
+    $info.RedirectStandardOutput = $true
+    $inputProcess = [Diagnostics.Process]::Start($info)
+    $bytes = [byte[]](0..255) * 8192
+    $inputProcess.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+    $inputProcess.StandardInput.Close()
+    $pipeResult = $inputProcess.StandardOutput.ReadToEnd() | ConvertFrom-Json
+    Assert-True ($inputProcess.WaitForExit(15000) -and $inputProcess.ExitCode -eq 0) 'Raw pipe preview failed'
+    $temporary = $pipeResult.data.paths[0]
+    Assert-True ((Get-Item -LiteralPath $temporary).Length -eq $bytes.Length) 'Pipe bytes were changed'
+    $actualBytes = [IO.File]::ReadAllBytes($temporary)
+    Assert-True ([Convert]::ToBase64String($actualBytes) -eq [Convert]::ToBase64String($bytes)) 'Raw pipe content differs'
+    Invoke-Cli -Arguments @('window', 'close', '--id', $pipeResult.data.id) | Out-Null
+    Assert-True (-not (Test-Path -LiteralPath $temporary)) 'Temporary input was retained after close'
+    foreach ($sample in @(
+        @{ Name = 'empty.txt'; Raw = ''; Bytes = [byte[]]::new(0) },
+        @{ Name = 'unicode.txt'; Raw = ''; Bytes = [Text.Encoding]::UTF8.GetBytes('中文内容') },
+        @{ Name = 'pixel.gif'; Raw = '--raw'; Bytes = [Convert]::FromBase64String('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7') }
+    )) {
+        $info.Arguments = "preview - $($sample.Raw) --name $($sample.Name) --json"
+        $inputProcess = [Diagnostics.Process]::Start($info)
+        $inputProcess.StandardInput.BaseStream.Write($sample.Bytes, 0, $sample.Bytes.Length)
+        $inputProcess.StandardInput.Close()
+        $pipeResult = $inputProcess.StandardOutput.ReadToEnd() | ConvertFrom-Json
+        Assert-True ($inputProcess.WaitForExit(15000) -and $inputProcess.ExitCode -eq 0 -and -not $pipeResult.data.fallback) 'Typed stdin preview failed'
+        Invoke-Cli -Arguments @('window', 'close') | Out-Null
+        $inputProcess.Dispose()
+    }
+
+    $longText = Join-Path $fixture 'long.txt'
+    [IO.File]::WriteAllLines($longText, [string[]](1..40000 | ForEach-Object { "Line $_ with enough content to exceed one chunk" }))
+    Invoke-Cli -Arguments @('preview', $longText) | Out-Null
+    $located = (Invoke-Cli -Arguments @('window', 'line', '35000')).data
+    Assert-True ($located.line -eq 35000 -and $located.wait_completed) 'Incremental line navigation failed'
+    Invoke-Cli -Arguments @('window', 'line', '90000') -Expected 3 | Out-Null
+
+    $wave = Join-Path $fixture 'silence.wav'
+    $writer = [IO.BinaryWriter]::new([IO.File]::Create($wave))
+    try {
+        $dataSize = 8000 * 2 * 5
+        $writer.Write([Text.Encoding]::ASCII.GetBytes('RIFF'))
+        $writer.Write([int](36 + $dataSize))
+        $writer.Write([Text.Encoding]::ASCII.GetBytes('WAVEfmt '))
+        $writer.Write([int]16)
+        $writer.Write([short]1); $writer.Write([short]1)
+        $writer.Write([int]8000); $writer.Write([int]16000)
+        $writer.Write([short]2); $writer.Write([short]16)
+        $writer.Write([Text.Encoding]::ASCII.GetBytes('data'))
+        $writer.Write([int]$dataSize)
+        $writer.Write([byte[]]::new($dataSize))
+    } finally { $writer.Dispose() }
+    Invoke-Cli -Arguments @('preview', $wave) | Out-Null
+    Invoke-Cli -Arguments @('window', 'pause') | Out-Null
+    $volume = (Invoke-Cli -Arguments @('window', 'volume', '37')).data
+    Assert-True ([Math]::Abs($volume.volume - 37) -lt 0.01) 'Media volume failed'
+    Assert-True ((Invoke-Cli -Arguments @('window', 'mute', 'on')).data.muted) 'Media mute failed'
+    $seek = (Invoke-Cli -Arguments @('window', 'seek', '00:00:02')).data
+    Assert-True ([Math]::Abs($seek.position - 2) -lt 0.2) 'Media seek failed'
+    Invoke-Cli -Arguments @('window', 'seek', '99999') -Expected 2 | Out-Null
+    Invoke-Cli -Arguments @('window', 'play') | Out-Null
+    Invoke-Cli -Arguments @('window', 'pause') | Out-Null
+
+    $pdf = Join-Path $fixture 'pages.pdf'
+    $objects = @('<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Resources << >> >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Resources << >> >>')
+    $pdfText = "%PDF-1.4`n"
+    $offsets = @()
+    for ($i = 0; $i -lt $objects.Count; $i++) {
+        $offsets += $pdfText.Length
+        $pdfText += "$($i + 1) 0 obj`n$($objects[$i])`nendobj`n"
+    }
+    $xref = $pdfText.Length
+    $pdfText += "xref`n0 5`n0000000000 65535 f `n"
+    foreach ($offset in $offsets) { $pdfText += ('{0:D10} 00000 n ' -f $offset) + "`n" }
+    $pdfText += "trailer`n<< /Size 5 /Root 1 0 R >>`nstartxref`n$xref`n%%EOF`n"
+    [IO.File]::WriteAllText($pdf, $pdfText, [Text.Encoding]::ASCII)
+    $document = (Invoke-Cli -Arguments @('preview', $pdf)).data
+    if (-not $document.fallback) {
+        $page = (Invoke-Cli -Arguments @('window', 'page', '2')).data
+        Assert-True ($page.page -eq 2 -and $page.page_count -eq 2 -and $page.wait_completed) 'PDF page navigation failed'
+        Invoke-Cli -Arguments @('window', 'page', '3') -Expected 3 | Out-Null
+    }
 
     $allSettings = (Invoke-Cli -Arguments @('settings', 'list')).data.settings
     Assert-True ($allSettings.Count -ge 40) 'Public settings catalog is incomplete'
     Assert-True (@($allSettings | Where-Object key -Match 'LastSuccessfulCheck|RetryAfter|WindowSize').Count -eq 0) 'Private state exposed'
+    Assert-True (@($allSettings | Where-Object key -Match 'MonitorFile|RefreshIntervalMs').Count -eq 0) 'File monitoring was exposed as a global setting'
     $original = (Invoke-Cli -Arguments @('settings', 'get', $setting)).data.settings[0].value
     $rawKey = Get-Item 'HKCU:\Software\Glance\PathCopy' -ErrorAction SilentlyContinue
     $wasStored = $null -ne $rawKey -and $rawKey.GetValueNames() -contains 'QuotePath'

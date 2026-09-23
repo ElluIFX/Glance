@@ -2678,6 +2678,8 @@ namespace winrt::Glance::App::implementation
             return;
         }
         const bool replace_deferred_session = defer_auto_fit_show_;
+        ErrorText().Text(L"");
+        ErrorText().Visibility(Visibility::Collapsed);
         cli_explicit_geometry_ = preserve_window;
         if (preserve_window) component_placement_generation_ = 0;
         if (cli_close_timer_) cli_close_timer_.Stop();
@@ -3747,28 +3749,45 @@ namespace winrt::Glance::App::implementation
         {
             co_return;
         }
+        const auto lifetime = get_strong();
+        const apartment_context ui;
+        const auto generation = content_generation_;
+        ++native_media_controls_pending_;
         co_await resume_background();
+        bool success = false;
         switch (control)
         {
         case NativeMediaControl::play:
-            static_cast<void>(surface->media_play());
+            success = surface->media_play();
             break;
         case NativeMediaControl::pause:
-            static_cast<void>(surface->media_pause());
+            success = surface->media_pause();
             break;
         case NativeMediaControl::seek:
-            static_cast<void>(surface->media_seek(value));
+            success = surface->media_seek(value);
             break;
         case NativeMediaControl::volume:
-            static_cast<void>(surface->media_set_volume(
-                static_cast<std::uint32_t>(std::clamp<std::int64_t>(value, 0, 100))));
+            success = surface->media_set_volume(
+                static_cast<std::uint32_t>(std::clamp<std::int64_t>(value, 0, 100)));
             break;
         case NativeMediaControl::muted:
-            static_cast<void>(surface->media_set_muted(value != 0));
+            success = surface->media_set_muted(value != 0);
             break;
         case NativeMediaControl::view_mode:
-            static_cast<void>(surface->media_set_view_mode(value != 0));
+            success = surface->media_set_view_mode(value != 0);
             break;
+        }
+        const auto state = success ? surface->media_state() : std::nullopt;
+        co_await ui;
+        --native_media_controls_pending_;
+        if (generation == content_generation_ && surface == native_preview_surface_)
+        {
+            if (state) native_media_state_ = *state;
+            if (!success && cli_control_generation_ == generation)
+            {
+                cli_control_error_ = 8;
+                cli_control_error_message_ = L"Media control was rejected";
+            }
         }
     }
 
