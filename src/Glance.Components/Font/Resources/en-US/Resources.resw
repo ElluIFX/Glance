@@ -8,18 +8,16 @@
   <data name="Available" xml:space="preserve"><value>Preview OpenType, TrueType and web fonts</value></data>
   <data name="Loading" xml:space="preserve"><value>Loading font...</value></data>
   <data name="Sample" xml:space="preserve"><value>Sample</value></data>
-  <data name="PreviewMode" xml:space="preserve"><value>Preview mode</value></data>
+  <data name="EditSample" xml:space="preserve"><value>Click the sample to edit</value></data>
+  <data name="SampleHint" xml:space="preserve"><value>Enter text to preview</value></data>
+  <data name="EditingHint" xml:space="preserve"><value>Click elsewhere or press Esc to preview the font</value></data>
   <data name="Face" xml:space="preserve"><value>Font style</value></data>
-  <data name="Single" xml:space="preserve"><value>Character</value></data>
   <data name="Size" xml:space="preserve"><value>Size (pt)</value></data>
   <data name="Weight" xml:space="preserve"><value>Weight</value></data>
-  <data name="Character" xml:space="preserve"><value>Character</value></data>
-  <data name="CharacterHint" xml:space="preserve"><value>Enter one character</value></data>
   <data name="Metadata" xml:space="preserve"><value>Font information</value></data>
   <data name="Retry" xml:space="preserve"><value>Retry</value></data>
   <data name="Failed" xml:space="preserve"><value>Unable to preview this font</value></data>
-  <data name="Missing" xml:space="preserve"><value>The font does not support this character</value></data>
-  <data name="FirstCharacter" xml:space="preserve"><value>Showing the first character</value></data>
+  <data name="Missing" xml:space="preserve"><value>The font does not support some characters</value></data>
   <data name="Identity" xml:space="preserve"><value>Names and origin</value></data>
   <data name="Properties" xml:space="preserve"><value>Font properties</value></data>
   <data name="Legal" xml:space="preserve"><value>Copyright and license</value></data>

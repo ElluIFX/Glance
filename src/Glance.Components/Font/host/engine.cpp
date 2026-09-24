@@ -109,7 +109,8 @@ bool supports(IDWriteFontFace *face, std::wstring_view text)
     std::vector<UINT16> glyphs(points.size());
     check_hresult(face->GetGlyphIndices(points.data(), static_cast<UINT32>(points.size()), glyphs.data()));
     for (std::size_t i = 0; i < points.size(); ++i)
-        if (!glyphs[i] && points[i] != 0x20 && points[i] != 0x0a && points[i] != 0x200d &&
+        if (!glyphs[i] && points[i] != 0x20 && points[i] != 0x09 && points[i] != 0x0a &&
+            points[i] != 0x0d && points[i] != 0x200d &&
             !(points[i] >= 0xfe00 && points[i] <= 0xfe0f))
             return false;
     return true;
@@ -362,24 +363,19 @@ Raster Engine::render(const Request &request)
     winrt::com_ptr<IDWriteFontFallback> fallback;
     check_hresult(fallback_builder->CreateFontFallback(fallback.put()));
     check_hresult(variable->SetFontFallback(fallback.get()));
-    if (request.single)
-    {
-        format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-    }
     const std::wstring text =
-        request.single ? std::wstring(request.text, wcsnlen_s(request.text, std::size(request.text)))
+        request.custom_text ? std::wstring(request.text, wcsnlen_s(request.text, std::size(request.text)))
                        : s.info.sample;
     winrt::com_ptr<IDWriteTextLayout> layout;
     const float width = request.width / request.scale, height = request.height / request.scale;
     check_hresult(s.factory->CreateTextLayout(text.data(), static_cast<UINT32>(text.size()), format.get(),
-                                              width, request.single ? height : 100000.0f, layout.put()));
+                                              width, 100000.0f, layout.put()));
     DWRITE_TEXT_METRICS metrics{};
     check_hresult(layout->GetMetrics(&metrics));
     Raster raster;
     raster.info.width = request.width;
     raster.info.height = request.height;
-    raster.info.content_height = request.single ? height : std::max(height, metrics.height + 24);
+    raster.info.content_height = std::max(height, metrics.height + 24);
     raster.info.missing = !supports(s.face.get(), text);
     winrt::com_ptr<IWICBitmap> bitmap;
     check_hresult(s.imaging->CreateBitmap(request.width, request.height, GUID_WICPixelFormat32bppPBGRA,
@@ -395,7 +391,7 @@ Raster Engine::render(const Request &request)
     target->BeginDraw();
     target->Clear(D2D1::ColorF(0, 0.0f));
     target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-    target->DrawTextLayout(D2D1::Point2F(0, request.single ? 0 : -request.offset), layout.get(), brush.get(),
+    target->DrawTextLayout(D2D1::Point2F(0, -request.offset), layout.get(), brush.get(),
                            D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
     check_hresult(target->EndDraw());
     raster.pixels.resize(static_cast<std::size_t>(request.width) * request.height * 4);

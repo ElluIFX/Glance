@@ -1,15 +1,12 @@
 #include "view.h"
 #include "client.h"
-#include <icu.h>
 #include <robuffer.h>
 #undef GetCurrentTime
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
-#include <iomanip>
 #include <mutex>
-#include <sstream>
 #include <thread>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
@@ -17,6 +14,8 @@
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
+#include <winrt/Microsoft.UI.Xaml.Input.h>
+#include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.Windows.ApplicationModel.Resources.h>
@@ -41,10 +40,10 @@ struct View : std::enable_shared_from_this<View>
     Grid controls, choices, adjustments, size_group, weight_group;
     StackPanel information;
     TextBlock title, subtitle, status;
-    ComboBox faces, mode;
+    ComboBox faces;
     NumberBox size, weight;
-    Slider size_slider, weight_slider;
-    TextBox glyph;
+    Border adjustment_separator;
+    TextBox editor;
     TextBlock size_label, weight_label;
     Expander details;
     ScrollViewer scroll, metadata_scroll;
@@ -65,15 +64,13 @@ struct View : std::enable_shared_from_this<View>
     std::thread worker;
     std::mutex mutex;
     std::condition_variable condition;
-    bool stopped{}, pending{}, updating{}, composition{}, single{}, narrow{};
-    float sample_size{32}, glyph_size{192};
+    bool stopped{}, pending{}, updating{}, composition{}, narrow{}, text_initialized{}, editing{};
     Request next;
     std::uint64_t generation{};
     std::uint64_t serial{};
     std::uint64_t run{};
     unsigned desired_face{};
-    unsigned control_layout{}, toolbar_layout{};
-    bool first_character_only{};
+    unsigned toolbar_layout{};
     ~View()
     {
         close();
@@ -107,12 +104,20 @@ struct View : std::enable_shared_from_this<View>
         dispatcher = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
         root.Padding({24, 16, 24, 16});
         for (auto height : {GridLength{1, GridUnitType::Auto}, GridLength{1, GridUnitType::Auto},
-                            GridLength{1, GridUnitType::Star}, GridLength{1, GridUnitType::Auto}})
+                            GridLength{1, GridUnitType::Star}, GridLength{1, GridUnitType::Auto},
+                            GridLength{1, GridUnitType::Auto}})
         {
             RowDefinition row;
             row.Height(height);
             root.RowDefinitions().Append(row);
         }
+        ColumnDefinition content_column;
+        content_column.Width({1, GridUnitType::Star});
+        root.ColumnDefinitions().Append(content_column);
+        ColumnDefinition information_column;
+        information_column.Width({280, GridUnitType::Pixel});
+        root.ColumnDefinitions().Append(information_column);
+        root.ColumnSpacing(24);
         StackPanel heading;
         heading.Spacing(4);
         title.FontSize(24);
@@ -140,104 +145,78 @@ struct View : std::enable_shared_from_this<View>
             row.Height({1, GridUnitType::Auto});
             controls.RowDefinitions().Append(row);
         }
-        choices.ColumnSpacing(16);
-        for (unsigned i = 0; i < 3; ++i)
-        {
-            ColumnDefinition column;
-            column.Width({1, i == 2 ? GridUnitType::Star : GridUnitType::Auto});
-            choices.ColumnDefinitions().Append(column);
-        }
         controls.Children().Append(choices);
-        mode.Header(box_value(text(L"PreviewMode")));
-        mode.Items().Append(box_value(text(L"Sample")));
-        mode.Items().Append(box_value(text(L"Single")));
-        mode.SelectedIndex(0);
-        mode.Width(140);
-        mode.VerticalAlignment(VerticalAlignment::Bottom);
-        choices.Children().Append(mode);
         faces.Header(box_value(text(L"Face")));
         faces.Width(200);
         faces.VerticalAlignment(VerticalAlignment::Bottom);
         faces.Visibility(Visibility::Collapsed);
-        Grid::SetColumn(faces, 1);
         choices.Children().Append(faces);
-        glyph.Header(box_value(text(L"Character")));
-        glyph.PlaceholderText(text(L"CharacterHint"));
-        glyph.MaxLength(128);
-        glyph.MaxWidth(240);
-        glyph.HorizontalAlignment(HorizontalAlignment::Stretch);
-        glyph.VerticalAlignment(VerticalAlignment::Bottom);
-        glyph.Visibility(Visibility::Collapsed);
-        Grid::SetColumn(glyph, 2);
-        choices.Children().Append(glyph);
-        adjustments.ColumnSpacing(24);
-        adjustments.RowSpacing(12);
+        for (unsigned i = 0; i < 3; ++i)
+        {
+            ColumnDefinition column;
+            column.Width({1, GridUnitType::Auto});
+            adjustments.ColumnDefinitions().Append(column);
+        }
         Grid::SetRow(adjustments, 1);
         controls.Children().Append(adjustments);
-        const auto add_adjustment = [&](Grid group, TextBlock label, NumberBox number, Slider slider,
+        const auto add_adjustment = [&](Grid group, TextBlock label, NumberBox number,
                                         const wchar_t* key) {
-            group.ColumnSpacing(16);
-            group.RowSpacing(8);
+            group.ColumnSpacing(12);
             group.HorizontalAlignment(HorizontalAlignment::Stretch);
             group.VerticalAlignment(VerticalAlignment::Bottom);
             for (unsigned i = 0; i < 2; ++i)
             {
                 ColumnDefinition column;
-                column.Width({i == 0 ? 1.0 : 100.0, i == 0 ? GridUnitType::Star : GridUnitType::Pixel});
+                column.Width({i == 0 ? 1.0 : 100.0, i == 0 ? GridUnitType::Auto : GridUnitType::Pixel});
                 group.ColumnDefinitions().Append(column);
-                RowDefinition row;
-                row.Height({1, GridUnitType::Auto});
-                group.RowDefinitions().Append(row);
             }
             label.Text(text(key));
             label.FontSize(14);
-            Grid::SetColumnSpan(label, 2);
+            label.VerticalAlignment(VerticalAlignment::Center);
             group.Children().Append(label);
             number.HorizontalAlignment(HorizontalAlignment::Stretch);
             number.SpinButtonPlacementMode(NumberBoxSpinButtonPlacementMode::Compact);
             Grid::SetColumn(number, 1);
-            Grid::SetRow(number, 1);
             group.Children().Append(number);
-            slider.MinWidth(80);
-            slider.Height(32);
-            slider.VerticalAlignment(VerticalAlignment::Center);
-            ToolTipService::SetToolTip(slider, box_value(text(key)));
-            Grid::SetRow(slider, 1);
-            group.Children().Append(slider);
+            Automation::AutomationProperties::SetName(number, text(key));
             adjustments.Children().Append(group);
         };
-        add_adjustment(size_group, size_label, size, size_slider, L"Size");
-        add_adjustment(weight_group, weight_label, weight, weight_slider, L"Weight");
+        add_adjustment(size_group, size_label, size, L"Size");
+        add_adjustment(weight_group, weight_label, weight, L"Weight");
+        Grid::SetColumn(weight_group, 2);
+        adjustment_separator = Markup::XamlReader::Load(
+            LR"(<Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                Background="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Width="1" Height="24" Margin="20,0" VerticalAlignment="Center"/>)").as<Border>();
+        Grid::SetColumn(adjustment_separator, 1);
+        adjustments.Children().Append(adjustment_separator);
         size.Minimum(8);
-        size.Maximum(144);
+        size.Maximum(512);
         size.Value(32);
-        size_slider.Minimum(8);
-        size_slider.Maximum(144);
-        size_slider.Value(32);
         weight.Visibility(Visibility::Collapsed);
         weight_group.Visibility(Visibility::Collapsed);
         Grid::SetRow(body, 2);
         root.Children().Append(body);
-        body.ColumnSpacing(24);
-        body.RowSpacing(16);
-        ColumnDefinition main;
-        main.Width({1, GridUnitType::Star});
-        body.ColumnDefinitions().Append(main);
-        ColumnDefinition side;
-        side.Width({280, GridUnitType::Pixel});
-        body.ColumnDefinitions().Append(side);
-        RowDefinition primary;
-        primary.Height({1, GridUnitType::Star});
-        body.RowDefinitions().Append(primary);
-        RowDefinition secondary;
-        secondary.Height({0, GridUnitType::Pixel});
-        body.RowDefinitions().Append(secondary);
         scroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
         scroll.VerticalScrollBarVisibility(ScrollBarVisibility::Auto);
         scroll.Content(canvas);
         canvas.Children().Append(image);
         image.Stretch(Media::Stretch::Fill);
         body.Children().Append(scroll);
+        scroll.IsTabStop(true);
+        scroll.Background(Media::SolidColorBrush(Microsoft::UI::Colors::Transparent()));
+        ToolTipService::SetToolTip(scroll, box_value(text(L"EditSample")));
+        Automation::AutomationProperties::SetName(scroll, text(L"EditSample"));
+        editor.AcceptsReturn(true);
+        editor.TextWrapping(TextWrapping::Wrap);
+        editor.MaxLength(static_cast<int>(std::size(Request{}.text) - 1));
+        editor.FontSize(20);
+        editor.PlaceholderText(text(L"SampleHint"));
+        editor.VerticalAlignment(VerticalAlignment::Stretch);
+        editor.Visibility(Visibility::Collapsed);
+        ScrollViewer::SetVerticalScrollBarVisibility(editor, ScrollBarVisibility::Auto);
+        Automation::AutomationProperties::SetName(editor, text(L"Sample"));
+        body.Children().Append(editor);
         details.Header(box_value(text(L"Metadata")));
         details.IsExpanded(true);
         details.HorizontalAlignment(HorizontalAlignment::Stretch);
@@ -248,7 +227,8 @@ struct View : std::enable_shared_from_this<View>
         information.Margin({12, 0, 12, 12});
         details.Content(metadata_scroll);
         Grid::SetColumn(details, 1);
-        body.Children().Append(details);
+        Grid::SetRowSpan(details, 4);
+        root.Children().Append(details);
         StackPanel footer;
         footer.Orientation(Orientation::Horizontal);
         footer.Spacing(12);
@@ -298,10 +278,6 @@ struct View : std::enable_shared_from_this<View>
                 self->schedule();
             }
         });
-        mode.SelectionChanged([weak](auto &&, auto &&) {
-            if (auto self = weak.lock())
-                self->switch_mode();
-        });
         faces.SelectionChanged([weak](auto &&, auto &&) {
             if (auto self = weak.lock(); self && !self->updating && self->faces.SelectedIndex() >= 0)
             {
@@ -316,18 +292,12 @@ struct View : std::enable_shared_from_this<View>
                 self->updating = true;
                 auto value = self->size.Value();
                 if (!std::isfinite(value))
-                    value = self->single ? 192 : 32;
+                    value = 32;
                 value = std::clamp(value, self->size.Minimum(), self->size.Maximum());
                 self->size.Value(value);
-                self->size_slider.Value(value);
-                (self->single ? self->glyph_size : self->sample_size) = static_cast<float>(value);
                 self->updating = false;
                 self->schedule();
             }
-        });
-        size_slider.ValueChanged([weak](auto &&, auto &&) {
-            if (auto self = weak.lock(); self && !self->updating)
-                self->size.Value(self->size_slider.Value());
         });
         weight.ValueChanged([weak](auto &&, auto &&) {
             if (auto self = weak.lock(); self && !self->updating)
@@ -338,29 +308,79 @@ struct View : std::enable_shared_from_this<View>
                     value = self->metadata ? self->metadata->weight : 400;
                 value = std::clamp(value, self->weight.Minimum(), self->weight.Maximum());
                 self->weight.Value(value);
-                self->weight_slider.Value(value);
                 self->updating = false;
                 self->schedule();
             }
         });
-        weight_slider.ValueChanged([weak](auto &&, auto &&) {
-            if (auto self = weak.lock(); self && !self->updating)
-                self->weight.Value(self->weight_slider.Value());
-        });
-        glyph.TextCompositionStarted([weak](auto &&, auto &&) {
+        editor.TextCompositionStarted([weak](auto &&, auto &&) {
             if (auto self = weak.lock())
                 self->composition = true;
         });
-        glyph.TextCompositionEnded([weak](auto &&, auto &&) {
+        editor.TextCompositionEnded([weak](auto &&, auto &&) {
             if (auto self = weak.lock())
             {
                 self->composition = false;
-                self->input();
+                self->schedule();
             }
         });
-        glyph.TextChanged([weak](auto &&, auto &&) {
+        editor.TextChanged([weak](auto &&, auto &&) {
             if (auto self = weak.lock(); self && !self->composition)
-                self->input();
+                self->schedule();
+        });
+        scroll.Tapped([weak](auto&&, Input::TappedRoutedEventArgs const& args) {
+            if (auto self = weak.lock())
+            {
+                self->begin_edit();
+                args.Handled(true);
+            }
+        });
+        scroll.KeyDown([weak](auto&&, Input::KeyRoutedEventArgs const& args) {
+            if (args.Key() == winrt::Windows::System::VirtualKey::Enter ||
+                args.Key() == winrt::Windows::System::VirtualKey::F2)
+            {
+                if (auto self = weak.lock()) self->begin_edit();
+                args.Handled(true);
+            }
+        });
+        editor.LostFocus([weak](auto&&, auto&&) {
+            if (auto self = weak.lock(); self && self->root.XamlRoot())
+            {
+                auto focus = Input::FocusManager::GetFocusedElement(self->root.XamlRoot())
+                    .try_as<DependencyObject>();
+                while (focus)
+                {
+                    if (focus == self->editor) return;
+                    if (focus == self->root)
+                    {
+                        self->finish_edit();
+                        return;
+                    }
+                    focus = Media::VisualTreeHelper::GetParent(focus);
+                }
+            }
+        });
+        root.Tapped([weak](auto&&, Input::TappedRoutedEventArgs const& args) {
+            if (auto self = weak.lock(); self && self->editing)
+            {
+                auto source = args.OriginalSource().try_as<DependencyObject>();
+                while (source)
+                {
+                    if (source == self->editor) return;
+                    source = Media::VisualTreeHelper::GetParent(source);
+                }
+                self->finish_edit();
+            }
+        });
+        editor.KeyDown([weak](auto&&, Input::KeyRoutedEventArgs const& args) {
+            if (args.Key() == winrt::Windows::System::VirtualKey::Escape)
+            {
+                if (auto self = weak.lock(); self && !self->composition)
+                {
+                    self->finish_edit();
+                    self->scroll.Focus(FocusState::Programmatic);
+                    args.Handled(true);
+                }
+            }
         });
         scroll.ViewChanged([weak](auto &&, auto &&) {
             if (auto self = weak.lock())
@@ -381,13 +401,13 @@ struct View : std::enable_shared_from_this<View>
     }
     void layout()
     {
-        const bool compact_layout = root.ActualWidth() < 940;
-        const bool stacked = root.ActualWidth() < 650;
+        const bool compact_layout = root.ActualWidth() < 820;
+        const double content_width = root.ActualWidth() - 48 - (compact_layout ? 0 : 304);
         const bool variable = metadata && metadata->variable;
-        const double choices_width = 140 + (faces.Visibility() == Visibility::Visible ? 216 : 0) +
-            (single ? 196 : 0);
-        const bool inline_controls = root.ActualWidth() - 80 >= choices_width +
-            (variable ? 500 : 280) + 24;
+        const bool has_faces = faces.Visibility() == Visibility::Visible;
+        choices.Visibility(has_faces ? Visibility::Visible : Visibility::Collapsed);
+        const bool inline_controls = !has_faces || content_width - 32 >= 200 +
+            (variable ? 390 : 180) + 24;
         const auto toolbar_key = 1U + unsigned(inline_controls);
         if (toolbar_layout != toolbar_key)
         {
@@ -406,111 +426,48 @@ struct View : std::enable_shared_from_this<View>
                 column.Width({1, inline_controls && i == 0 ? GridUnitType::Auto : GridUnitType::Star});
                 controls.ColumnDefinitions().Append(column);
             }
-            controls.ColumnSpacing(24);
             Grid::SetRow(adjustments, inline_controls ? 0 : 1);
             Grid::SetColumn(adjustments, inline_controls ? 1 : 0);
-            glyph.Width(inline_controls ? 180 : NAN);
         }
+        controls.ColumnSpacing(has_faces && inline_controls ? 24 : 0);
         weight_group.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
-        const auto layout_key = 1U + unsigned(stacked) + 2U * unsigned(variable);
-        if (control_layout != layout_key)
-        {
-            control_layout = layout_key;
-            adjustments.ColumnDefinitions().Clear();
-            adjustments.RowDefinitions().Clear();
-            for (unsigned i = 0; i < (stacked || !variable ? 1U : 2U); ++i)
-            {
-                ColumnDefinition column;
-                column.Width({1, GridUnitType::Star});
-                adjustments.ColumnDefinitions().Append(column);
-            }
-            for (unsigned i = 0; i < (stacked && variable ? 2U : 1U); ++i)
-            {
-                RowDefinition row;
-                row.Height({1, GridUnitType::Auto});
-                adjustments.RowDefinitions().Append(row);
-            }
-            Grid::SetColumn(weight_group, stacked ? 0 : 1);
-            Grid::SetRow(weight_group, stacked ? 1 : 0);
-        }
-        const bool wrap_choices = single && root.ActualWidth() < 760 && faces.Visibility() == Visibility::Visible;
-        if (choices.RowDefinitions().Size() != (wrap_choices ? 2U : 1U))
-        {
-            choices.RowDefinitions().Clear();
-            for (unsigned i = 0; i < (wrap_choices ? 2U : 1U); ++i)
-            {
-                RowDefinition row;
-                row.Height({1, GridUnitType::Auto});
-                choices.RowDefinitions().Append(row);
-            }
-        }
-        choices.RowSpacing(12);
-        glyph.HorizontalAlignment(wrap_choices ? HorizontalAlignment::Left : HorizontalAlignment::Stretch);
-        glyph.Width(wrap_choices ? 240 : (inline_controls ? 180 : NAN));
-        Grid::SetRow(glyph, wrap_choices ? 1 : 0);
-        Grid::SetColumn(glyph, wrap_choices ? 0 : 2);
-        Grid::SetColumnSpan(glyph, wrap_choices ? 3 : 1);
+        adjustment_separator.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
         if (compact_layout != narrow)
         {
             narrow = compact_layout;
             details.IsExpanded(!compact_layout);
         }
-        body.ColumnSpacing(compact_layout ? 0 : 24);
-        body.ColumnDefinitions().GetAt(1).Width({compact_layout ? 0.0 : 280.0, GridUnitType::Pixel});
-        body.RowDefinitions().GetAt(1).Height(
-            {compact_layout ? 1.0 : 0.0, compact_layout ? GridUnitType::Auto : GridUnitType::Pixel});
+        root.ColumnSpacing(compact_layout ? 0 : 24);
+        root.ColumnDefinitions().GetAt(1).Width({compact_layout ? 0.0 : 280.0, GridUnitType::Pixel});
         Grid::SetColumn(details, compact_layout ? 0 : 1);
-        Grid::SetRow(details, compact_layout ? 1 : 0);
-        metadata_scroll.MaxHeight(compact_layout ? 180 : std::max(64.0, body.ActualHeight() - 72));
+        Grid::SetRow(details, compact_layout ? 4 : 0);
+        Grid::SetRowSpan(details, compact_layout ? 1 : 4);
+        details.Margin({0, compact_layout ? 12.0f : 0.0f, 0, 0});
+        metadata_scroll.MaxHeight(compact_layout ? 180 : std::max(64.0, root.ActualHeight() - 104));
     }
-    void switch_mode()
+    void begin_edit()
     {
-        if (updating)
-            return;
-        single = mode.SelectedIndex() == 1;
-        updating = true;
-        size.Minimum(single ? 24 : 8);
-        size.Maximum(single ? 512 : 144);
-        size_slider.Minimum(size.Minimum());
-        size_slider.Maximum(size.Maximum());
-        size.Value(single ? glyph_size : sample_size);
-        size_slider.Value(size.Value());
-        updating = false;
-        glyph.Visibility(single ? Visibility::Visible : Visibility::Collapsed);
-        layout();
+        if (!metadata || editing) return;
+        editing = true;
+        editor.Visibility(Visibility::Visible);
+        scroll.Opacity(0);
+        scroll.IsHitTestVisible(false);
+        status.Text(text(L"EditingHint"));
+        editor.Focus(FocusState::Programmatic);
+    }
+    void finish_edit()
+    {
+        if (!editing) return;
+        editing = false;
+        editor.Visibility(Visibility::Collapsed);
+        scroll.Opacity(1);
+        scroll.IsHitTestVisible(true);
         scroll.ChangeView(nullptr, 0.0, nullptr, true);
-        schedule();
-    }
-    void input()
-    {
-        if (updating)
-            return;
-        const std::wstring value(glyph.Text());
-        first_character_only = false;
-        UErrorCode error = U_ZERO_ERROR;
-        auto *iterator = ubrk_open(UBRK_CHARACTER, nullptr, reinterpret_cast<const UChar *>(value.data()),
-                                   static_cast<int32_t>(value.size()), &error);
-        if (U_SUCCESS(error) && iterator)
-        {
-            ubrk_first(iterator);
-            const auto end = ubrk_next(iterator);
-            if (end > 0 && static_cast<std::size_t>(end) < value.size())
-            {
-                updating = true;
-                glyph.Text(value.substr(0, end));
-                glyph.SelectionStart(end);
-                updating = false;
-                first_character_only = true;
-                status.Text(text(L"FirstCharacter"));
-            }
-        }
-        if (iterator)
-            ubrk_close(iterator);
         schedule();
     }
     void schedule()
     {
-        if (!updating && timer)
+        if (!updating && !composition && timer)
         {
             ++serial;
             if (!timer.IsRunning())
@@ -524,7 +481,7 @@ struct View : std::enable_shared_from_this<View>
         Request request;
         request.operation = Operation::render;
         request.face = desired_face;
-        request.single = single;
+        request.custom_text = text_initialized;
         request.size = static_cast<float>(size.Value());
         request.weight = metadata ? static_cast<float>(weight.Value()) : 400;
         request.scale = root.XamlRoot() ? static_cast<float>(root.XamlRoot().RasterizationScale()) : 1;
@@ -540,7 +497,7 @@ struct View : std::enable_shared_from_this<View>
                 winrt::Windows::UI::ViewManagement::UIElementType::WindowText);
             request.color = 0xff000000U | (unsigned(color.R) << 16) | (unsigned(color.G) << 8) | color.B;
         }
-        const auto text_value = glyph.Text();
+        const auto text_value = editor.Text();
         wcsncpy_s(request.text, text_value.c_str(), _TRUNCATE);
         {
             std::scoped_lock lock(mutex);
@@ -640,9 +597,6 @@ struct View : std::enable_shared_from_this<View>
         weight.Minimum(info->variable ? info->minimum : 1);
         weight.Maximum(info->variable ? info->maximum : 1000);
         weight.Value(info->weight);
-        weight_slider.Minimum(weight.Minimum());
-        weight_slider.Maximum(weight.Maximum());
-        weight_slider.Value(info->weight);
         weight.Visibility(info->variable ? Visibility::Visible : Visibility::Collapsed);
         information.Children().Clear();
         for (const auto group : {L"Identity", L"Properties", L"Legal"})
@@ -676,12 +630,10 @@ struct View : std::enable_shared_from_this<View>
                 information.Children().Append(value);
             }
         }
-        if (glyph.Text().empty() && info->sample[0])
+        if (!text_initialized)
         {
-            std::wstring first(info->sample, 1);
-            if (first[0] >= 0xd800 && first[0] <= 0xdbff)
-                first += info->sample[1];
-            glyph.Text(first);
+            editor.Text(info->sample);
+            text_initialized = true;
         }
         updating = false;
         layout();
@@ -700,29 +652,13 @@ struct View : std::enable_shared_from_this<View>
         image.Height(response.height / request.scale);
         canvas.Width(image.Width());
         canvas.Height(response.content_height);
-        Canvas::SetTop(image, request.single ? 0 : request.offset);
+        Canvas::SetTop(image, request.offset);
         retry.Visibility(Visibility::Collapsed);
         std::wstring message;
-        if (request.single)
-        {
-            std::wostringstream codes;
-            codes << std::uppercase << std::hex;
-            for (std::size_t i = 0; request.text[i]; ++i)
-            {
-                unsigned c = request.text[i];
-                if (c >= 0xd800 && c <= 0xdbff && request.text[i + 1])
-                    c = 0x10000 + ((c - 0xd800) << 10) + request.text[++i] - 0xdc00;
-                if (i)
-                    codes << L" ";
-                codes << L"U+" << std::setw(4) << std::setfill(L'0') << c;
-            }
-            message = codes.str();
-        }
         if (response.missing)
-            message += (message.empty() ? L"" : L" · ") + std::wstring(text(L"Missing"));
-        if (request.single && first_character_only)
-            message += (message.empty() ? L"" : L" · ") + std::wstring(text(L"FirstCharacter"));
-        status.Text(message);
+            message = text(L"Missing");
+        if (message.empty()) message = text(L"EditSample");
+        status.Text(editing ? text(L"EditingHint") : hstring(message));
         notify(contracts::components::ComponentViewState::ready);
     }
     void notify(contracts::components::ComponentViewState state) noexcept
@@ -769,16 +705,13 @@ struct View : std::enable_shared_from_this<View>
         language = tag;
         context.QualifierValues().Insert(L"Language", language);
         updating = true;
-        mode.Header(box_value(text(L"PreviewMode")));
         faces.Header(box_value(text(L"Face")));
-        const auto selected_mode = mode.SelectedIndex();
-        mode.Items().SetAt(0, box_value(text(L"Sample")));
-        mode.Items().SetAt(1, box_value(text(L"Single")));
-        mode.SelectedIndex(selected_mode);
         size_label.Text(text(L"Size"));
         weight_label.Text(text(L"Weight"));
-        glyph.Header(box_value(text(L"Character")));
-        glyph.PlaceholderText(text(L"CharacterHint"));
+        editor.PlaceholderText(text(L"SampleHint"));
+        Automation::AutomationProperties::SetName(editor, text(L"Sample"));
+        Automation::AutomationProperties::SetName(scroll, text(L"EditSample"));
+        ToolTipService::SetToolTip(scroll, box_value(text(L"EditSample")));
         details.Header(box_value(text(L"Metadata")));
         retry.Content(box_value(text(L"Retry")));
         updating = false;
@@ -788,11 +721,10 @@ struct View : std::enable_shared_from_this<View>
             show_metadata(metadata);
             updating = true;
             weight.Value(current_weight);
-            weight_slider.Value(current_weight);
             updating = false;
         }
-        ToolTipService::SetToolTip(size_slider, box_value(text(L"Size")));
-        ToolTipService::SetToolTip(weight_slider, box_value(text(L"Weight")));
+        Automation::AutomationProperties::SetName(size, text(L"Size"));
+        Automation::AutomationProperties::SetName(weight, text(L"Weight"));
         schedule();
     }
 };

@@ -63,11 +63,21 @@ int run_font_tests()
         request.size = 64;
         auto larger = font.render(request);
         expect(larger.first.content_height > normal.first.content_height, "font size changes layout");
-        request.single = TRUE;
+        request.custom_text = TRUE;
         request.size = 192;
         wcscpy_s(request.text, L"A");
         auto single = font.render(request);
         expect(!single.first.missing, "single character rendering");
+        request.text[0] = 0;
+        auto empty = font.render(request);
+        expect(std::all_of(empty.second.begin(), empty.second.end(),
+                           [](std::byte value) { return value == std::byte{}; }),
+               "empty custom text stays empty");
+        wcscpy_s(request.text, L"First line\r\nSecond\tline\r\nThird line");
+        auto multiline = font.render(request);
+        expect(!multiline.first.missing, "line breaks and tabs do not report missing glyphs");
+        expect(multiline.first.content_height > single.first.content_height,
+               "custom multiline text preserves line breaks");
         wcscpy_s(request.text, L"\U0010FFFF");
         expect(font.render(request).first.missing, "missing character is reported without font fallback");
         if (std::filesystem::exists(fonts / L"bahnschrift.ttf"))

@@ -8,18 +8,16 @@
   <data name="Available" xml:space="preserve"><value>预览 OpenType、TrueType 和网页字体</value></data>
   <data name="Loading" xml:space="preserve"><value>正在加载字体...</value></data>
   <data name="Sample" xml:space="preserve"><value>样文</value></data>
-  <data name="PreviewMode" xml:space="preserve"><value>预览模式</value></data>
+  <data name="EditSample" xml:space="preserve"><value>点击样文编辑</value></data>
+  <data name="SampleHint" xml:space="preserve"><value>输入要预览的文字</value></data>
+  <data name="EditingHint" xml:space="preserve"><value>点击其他区域或按 Esc 查看字体效果</value></data>
   <data name="Face" xml:space="preserve"><value>字体样式</value></data>
-  <data name="Single" xml:space="preserve"><value>单字</value></data>
   <data name="Size" xml:space="preserve"><value>字号 (pt)</value></data>
   <data name="Weight" xml:space="preserve"><value>字重</value></data>
-  <data name="Character" xml:space="preserve"><value>单字</value></data>
-  <data name="CharacterHint" xml:space="preserve"><value>输入一个字符</value></data>
   <data name="Metadata" xml:space="preserve"><value>字体信息</value></data>
   <data name="Retry" xml:space="preserve"><value>重试</value></data>
   <data name="Failed" xml:space="preserve"><value>无法预览此字体</value></data>
-  <data name="Missing" xml:space="preserve"><value>此字体不支持该字符</value></data>
-  <data name="FirstCharacter" xml:space="preserve"><value>已显示第一个字符</value></data>
+  <data name="Missing" xml:space="preserve"><value>此字体不支持部分字符</value></data>
   <data name="Identity" xml:space="preserve"><value>名称与来源</value></data>
   <data name="Properties" xml:space="preserve"><value>字体属性</value></data>
   <data name="Legal" xml:space="preserve"><value>版权与许可</value></data>
