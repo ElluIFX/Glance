@@ -100,6 +100,7 @@ namespace
         std::optional<PagedDocumentRendererApi> paged_document_renderer;
         std::optional<std::filesystem::path> paged_document_host;
         std::optional<NativePreviewRendererApi> native_preview_renderer;
+        std::optional<glance::contracts::components::ComponentViewApi> component_view;
         std::optional<std::filesystem::path> native_preview_host;
         std::optional<NativeMediaRendererApi> native_media_renderer;
         std::optional<std::filesystem::path> native_media_host;
@@ -313,7 +314,8 @@ namespace
             return format == PreviewContentFormat::media_file;
         case PreviewContentKind::document:
             return format == PreviewContentFormat::pdf ||
-                format == PreviewContentFormat::native_surface;
+                format == PreviewContentFormat::native_surface ||
+                format == PreviewContentFormat::component_view;
         case PreviewContentKind::web:
             return format == PreviewContentFormat::html;
         case PreviewContentKind::directory:
@@ -647,6 +649,16 @@ namespace
         }
         interface_pointer = nullptr;
         if (component->api.query_interface(
+                &glance::contracts::components::component_view_api_id,
+                glance::contracts::components::component_view_api_version, &interface_pointer) && interface_pointer)
+        {
+            const auto* api = static_cast<const glance::contracts::components::ComponentViewApi*>(interface_pointer);
+            if (api->size >= sizeof(*api) && api->version == glance::contracts::components::component_view_api_version &&
+                api->create && api->close && api->set_language)
+                component->component_view = *api;
+        }
+        interface_pointer = nullptr;
+        if (component->api.query_interface(
                 &glance::contracts::components::native_media_renderer_api_id,
                 glance::contracts::components::native_media_renderer_api_version,
                 &interface_pointer) &&
@@ -826,6 +838,9 @@ namespace
             return {};
         }
         if (std::ranges::any_of(component->renderers, [&component](const auto& renderer) {
+                if (IsEqualGUID(renderer.interface_id, glance::contracts::components::component_view_api_id))
+                    return !component->component_view || renderer.interface_version !=
+                        glance::contracts::components::component_view_api_version;
                 if (IsEqualGUID(
                         renderer.interface_id,
                         glance::contracts::components::paged_document_renderer_api_id))
@@ -1228,6 +1243,17 @@ namespace
         result.kind = preview.kind;
         result.format = preview.format;
         result.output_path = output.wstring();
+        if (preview.format == PreviewContentFormat::component_view)
+        {
+            if (!component->component_view)
+            {
+                component->api.release_preview(preview.lease_token);
+                result.status = glance::contracts::components::PrepareStatus::failed;
+                return result;
+            }
+            result.component_view = std::make_shared<glance::app::ComponentViewRegistration>(
+                glance::app::ComponentViewRegistration{*component->component_view, component});
+        }
         result.lease = std::make_shared<PreviewLease>(
             component,
             preview.lease_token);

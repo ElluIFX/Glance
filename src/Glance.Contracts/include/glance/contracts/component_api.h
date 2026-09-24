@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windows.h>
+#include <unknwn.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -22,6 +23,9 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t web_preview_api_version = 2;
     inline constexpr std::uint32_t paged_document_renderer_api_version = 1;
     inline constexpr std::uint32_t native_preview_renderer_api_version = 1;
+    inline constexpr std::uint32_t component_view_api_version = 1;
+    inline constexpr GUID component_view_api_id{
+        0xdd72b6a1, 0xf3a9, 0x42f2, {0xa6, 0x35, 0x73, 0x60, 0x36, 0xab, 0x90, 0x51}};
     inline constexpr std::uint32_t native_media_renderer_api_version = 1;
     inline constexpr std::uint32_t settings_contribution_api_version = 3;
     inline constexpr std::uint32_t file_directory_preview_api_version = 2;
@@ -155,6 +159,7 @@ namespace glance::contracts::components
         html = 6,
         file_directory = 7,
         native_surface = 8,
+        component_view = 9,
     };
 
     enum class PrepareStatus : std::uint32_t
@@ -758,6 +763,20 @@ namespace glance::contracts::components
         std::uint32_t size{ sizeof(PagedDocumentRendererApi) };
         std::uint32_t version{ paged_document_renderer_api_version };
         QueryPagedDocumentHostFunction query_host{};
+    };
+
+    // All calls run on the application's XAML UI thread. The returned object is an
+    // AddRef'd Microsoft.UI.Xaml.FrameworkElement using the application's WinUI version.
+    // Detach and release the element before closing its session. Components own all
+    // background work and must cancel it when close is called.
+    struct ComponentViewApi
+    {
+        std::uint32_t size{sizeof(ComponentViewApi)};
+        std::uint32_t version{component_view_api_version};
+        HRESULT (WINAPI* create)(const wchar_t* path, const wchar_t* language,
+                             IUnknown** element, std::uint64_t* session) noexcept{};
+        void (WINAPI* set_language)(std::uint64_t session, const wchar_t* language) noexcept{};
+        void (WINAPI* close)(std::uint64_t session) noexcept{};
     };
 
     struct NativePreviewRendererApi

@@ -1952,6 +1952,9 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::ApplyLocalizedResources()
     {
+        if (component_view_registration_ && component_view_session_)
+            component_view_registration_->api.set_language(component_view_session_,
+                glance::app::current_ui_language().c_str());
         const auto set_tooltip = [](const auto& control, wchar_t const* key) {
             ToolTipService::SetToolTip(control, box_value(glance::app::localize(key)));
         };
@@ -2887,6 +2890,11 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::clear_preview_content()
     {
+        ComponentViewPresenter().Content(nullptr);
+        ComponentViewPresenter().Visibility(Visibility::Collapsed);
+        active_component_view_.reset();
+        component_view_registration_.reset();
+        component_view_session_ = 0;
         text_monitor_enabled_ = false;
         text_refresh_requested_ = false;
         ++text_monitor_epoch_;
@@ -3307,7 +3315,8 @@ namespace winrt::Glance::App::implementation
             : current_kind_ == glance::app::PreviewKind::media
                 ? MediaPanel().as<FrameworkElement>()
                 : current_kind_ == glance::app::PreviewKind::native_document
-                    ? NativeDocumentPanel().as<FrameworkElement>()
+                    ? (active_component_view_ ? ComponentViewPresenter().as<FrameworkElement>()
+                                              : NativeDocumentPanel().as<FrameworkElement>())
                     : PdfPanel().as<FrameworkElement>();
         const double layout_scale = GetDpiForWindow(window_) / 96.0;
         const int current_width = bounds.right - bounds.left;
@@ -6285,7 +6294,8 @@ namespace winrt::Glance::App::implementation
             kind = glance::app::PreviewKind::document;
         }
         else if (result.kind == PreviewContentKind::document &&
-                 result.format == PreviewContentFormat::native_surface)
+                 (result.format == PreviewContentFormat::native_surface ||
+                  result.format == PreviewContentFormat::component_view))
         {
             kind = glance::app::PreviewKind::native_document;
         }
@@ -6463,6 +6473,38 @@ namespace winrt::Glance::App::implementation
         }
         if (kind == glance::app::PreviewKind::native_document)
         {
+            if (result.component_view)
+            {
+                auto registration = result.component_view;
+                winrt::com_ptr<IUnknown> element;
+                std::uint64_t session{};
+                const auto created = registration->api.create(result.output_path.c_str(),
+                    glance::app::current_ui_language().c_str(), element.put(), &session);
+                if (FAILED(created) || !element || !session)
+                {
+                    glance::contracts::log_event(L"Component view creation failed: " + std::to_wstring(created));
+                    if (session) registration->api.close(session);
+                    present_generic(files_[current_index_]);
+                    return;
+                }
+                active_component_view_ = std::shared_ptr<void>(reinterpret_cast<void*>(session),
+                    [registration](void* token) { registration->api.close(reinterpret_cast<std::uint64_t>(token)); });
+                component_view_registration_ = registration;
+                component_view_session_ = session;
+                active_component_preview_ = std::move(result.lease);
+                content_preview_kind_ = current_kind_ = kind;
+                update_preview_mode_button();
+                show_content_panel(kind);
+                NativeDocumentPanel().Visibility(Visibility::Collapsed);
+                ComponentViewPresenter().Content(element.as<FrameworkElement>());
+                ComponentViewPresenter().Visibility(Visibility::Visible);
+                NativeDocumentLoadingOverlay().Visibility(Visibility::Collapsed);
+                ComponentLoadingText().Visibility(Visibility::Collapsed);
+                native_preview_ready_ = true;
+                restore_component_window_placement(generation);
+                reveal_deferred_preview();
+                return;
+            }
             if (result.native_renderer == nullptr)
             {
                 present_generic(files_[current_index_]);
@@ -8168,7 +8210,11 @@ namespace winrt::Glance::App::implementation
         MediaPanel().Visibility(kind == glance::app::PreviewKind::media ? Visibility::Visible : Visibility::Collapsed);
         PdfPanel().Visibility(kind == glance::app::PreviewKind::document ? Visibility::Visible : Visibility::Collapsed);
         NativeDocumentPanel().Visibility(
-            kind == glance::app::PreviewKind::native_document
+            kind == glance::app::PreviewKind::native_document && !active_component_view_
+                ? Visibility::Visible
+                : Visibility::Collapsed);
+        ComponentViewPresenter().Visibility(
+            kind == glance::app::PreviewKind::native_document && active_component_view_
                 ? Visibility::Visible
                 : Visibility::Collapsed);
         ArchivePanel().Visibility(kind == glance::app::PreviewKind::archive ? Visibility::Visible : Visibility::Collapsed);
@@ -8314,7 +8360,7 @@ namespace winrt::Glance::App::implementation
             break;
         case glance::app::PreviewKind::native_document:
             kind = PreviewContentKind::document;
-            format = PreviewContentFormat::native_surface;
+            format = active_component_view_ ? PreviewContentFormat::component_view : PreviewContentFormat::native_surface;
             break;
         case glance::app::PreviewKind::web:
             kind = PreviewContentKind::web;

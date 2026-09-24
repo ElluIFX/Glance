@@ -130,6 +130,11 @@ namespace glance::app
 
     struct NativePreviewRendererRegistration;
     struct NativeMediaRendererRegistration;
+    struct ComponentViewRegistration
+    {
+        glance::contracts::components::ComponentViewApi api;
+        std::shared_ptr<void> lease;
+    };
 
     struct ComponentPreviewResult
     {
@@ -146,6 +151,7 @@ namespace glance::app
         std::shared_ptr<ComponentWebPreview> web_preview;
         std::shared_ptr<void> file_directory;
         std::shared_ptr<NativePreviewRendererRegistration> native_renderer;
+        std::shared_ptr<ComponentViewRegistration> component_view;
         std::shared_ptr<NativeMediaRendererRegistration> native_media_renderer;
         std::wstring refinement_text;
         bool refinement_on_zoom{};

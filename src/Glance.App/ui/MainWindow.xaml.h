@@ -853,6 +853,9 @@ namespace winrt::Glance::App::implementation
         bool native_preview_ready_{};
         bool xaml_modal_overlay_active_{};
         std::shared_ptr<void> active_component_preview_;
+        std::shared_ptr<void> active_component_view_;
+        std::shared_ptr<glance::app::ComponentViewRegistration> component_view_registration_;
+        std::uint64_t component_view_session_{};
         std::shared_ptr<void> active_component_file_directory_;
         glance::app::FileDirectoryDescriptor active_file_directory_descriptor_;
         std::vector<std::uint32_t> active_file_directory_columns_;

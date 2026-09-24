@@ -784,6 +784,11 @@
                     </StackPanel>
                 </Grid>
 
+                <ContentPresenter
+                    x:Name="ComponentViewPresenter"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Stretch"
+                    Visibility="Collapsed" />
                 <Grid
                     x:Name="NativeDocumentPanel"
                     Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
