@@ -4,6 +4,28 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.24.2] - 2026-09-24
+
+### Added
+
+- Preview fonts with transparent samples, adjustable size and supported variable weights, font metadata, and Windows installation actions for the current user or all users.
+- Preview EXE and DLL summaries with file icons, dependencies and resource counts, plus detailed tables for imports, exports, PE structure and .NET members.
+- Added CLI `--quiet`, the `main` window alias, window activation and full-window controls, and text-loading completeness reporting.
+
+### Improved
+
+- Keep font controls in one row and metadata in a separate scrollable column; fixed styles and weights remain visible as disabled controls.
+- Use equal-width, wrapping columns for executable details and keep the detail toggle in the preview header.
+- Allow the CLI to run from a separate directory when Glance is already running.
+- Apply the window backdrop to structured JSON previews.
+
+### Fixed
+
+- Separate remembered window sizes and positions by preview provider, including components that share a rendering surface.
+- Prevent preview buttons from capturing keyboard focus and consuming Space.
+- Refresh update-frequency labels when changing the interface language.
+- Release component views when switching files and cancel font rendering without blocking the preview window.
+
 ## [2026.09.23] - 2026-09-23
 
 ### Added
