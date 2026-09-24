@@ -91,17 +91,11 @@ namespace
     }
     void verify_server(HANDLE pipe)
     {
-        ULONG pid{};
-        if (!GetNamedPipeServerProcessId(pipe, &pid)) throw Error(4, "server_unavailable", "Cannot identify App");
-        Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid));
-        std::wstring actual(32768, L'\0');
-        DWORD count = static_cast<DWORD>(actual.size());
-        if (!QueryFullProcessImageNameW(process.value, 0, actual.data(), &count))
-            throw Error(7, "server_identity", "Cannot validate App identity");
-        actual.resize(count);
-        const auto expected = (std::filesystem::path(executable_path()).parent_path() / L"Glance.exe").wstring();
-        if (_wcsicmp(expected.c_str(), actual.c_str()) != 0)
-            throw Error(8, "installation_mismatch", "An App from another installation is running");
+        ULONG server_session{};
+        DWORD own_session{};
+        if (!GetNamedPipeServerSessionId(pipe, &server_session) ||
+            !ProcessIdToSessionId(GetCurrentProcessId(), &own_session) || server_session != own_session)
+            throw Error(7, "session_mismatch", "Cannot validate App login session");
     }
     HANDLE connect()
     {
@@ -138,7 +132,12 @@ namespace
             PROCESS_INFORMATION info{};
             if (!CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr,
                 std::filesystem::path(exe).parent_path().c_str(), &startup, &info))
+            {
+                const auto error = GetLastError();
+                if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND)
+                    throw Error(4, "app_not_found", "Glance.exe was not found beside CLI; start Glance first or place CLI beside Glance.exe");
                 throw Error(4, "start_failed", "Cannot start Glance.exe beside CLI");
+            }
             CloseHandle(info.hThread);
             CloseHandle(info.hProcess);
         }
