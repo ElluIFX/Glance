@@ -14,6 +14,8 @@
             <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="Transparent" />
             <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPressed" Color="Transparent" />
             <Style x:Key="IconButtonStyle" TargetType="Button">
+                <Setter Property="IsTabStop" Value="False" />
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
                 <Setter Property="Width" Value="36" />
                 <Setter Property="Height" Value="32" />
                 <Setter Property="MinWidth" Value="36" />
@@ -27,6 +29,8 @@
                 <Setter Property="VerticalContentAlignment" Value="Center" />
             </Style>
             <Style x:Key="IconToggleButtonStyle" TargetType="ToggleButton">
+                <Setter Property="IsTabStop" Value="False" />
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
                 <Setter Property="Width" Value="36" />
                 <Setter Property="Height" Value="32" />
                 <Setter Property="MinWidth" Value="36" />

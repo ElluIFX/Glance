@@ -246,6 +246,8 @@
                             ColumnSpacing="12">
                             <Grid.Resources>
                                 <Style x:Key="JsonDepthButtonStyle" TargetType="Button">
+                                    <Setter Property="IsTabStop" Value="False" />
+                                    <Setter Property="AllowFocusOnInteraction" Value="False" />
                                     <Setter Property="Height" Value="24" />
                                     <Setter Property="MinWidth" Value="28" />
                                     <Setter Property="Padding" Value="7,0" />
@@ -828,6 +830,8 @@
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                         <Grid.Resources>
                             <Style x:Key="ArchiveHeaderButtonStyle" TargetType="Button">
+                                <Setter Property="IsTabStop" Value="False" />
+                                <Setter Property="AllowFocusOnInteraction" Value="False" />
                                 <Setter Property="MinWidth" Value="0" />
                                 <Setter Property="MinHeight" Value="0" />
                                 <Setter Property="Padding" Value="8,0" />

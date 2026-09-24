@@ -58,6 +58,18 @@ using namespace Microsoft::UI::Xaml::Input;
 
 namespace
 {
+    bool is_editable_xaml_source(Windows::Foundation::IInspectable const& source)
+    {
+        auto current = source.try_as<DependencyObject>();
+        while (current)
+        {
+            if (const auto text = current.try_as<TextBox>()) return !text.IsReadOnly();
+            if (const auto text = current.try_as<RichEditBox>()) return !text.IsReadOnly();
+            if (current.try_as<PasswordBox>()) return true;
+            current = Media::VisualTreeHelper::GetParent(current);
+        }
+        return false;
+    }
     glance::contracts::native_preview::PreviewVisuals native_preview_visuals(
         ElementTheme theme) noexcept
     {
@@ -1142,6 +1154,36 @@ namespace winrt::Glance::App::implementation
         media_timer_ = DispatcherTimer();
         media_timer_.Interval(std::chrono::milliseconds(250));
         const auto weak = get_weak();
+        RootGrid().AddHandler(UIElement::PointerPressedEvent(), box_value<PointerEventHandler>([weak](IInspectable const&, PointerRoutedEventArgs const& args) {
+            if (const auto self = weak.get(); self && self->active_component_view_)
+            {
+                self->component_input_active_ = is_editable_xaml_source(args.OriginalSource());
+                self->update_input_activation();
+                if (self->component_input_active_) SetForegroundWindow(self->window_);
+                self->update_state();
+            }
+        }), true);
+        RootGrid().PreviewKeyDown([weak](IInspectable const&, KeyRoutedEventArgs const& args) {
+            if (const auto self = weak.get(); self && self->visible_ && !self->detached_ &&
+                !self->component_input_active_ && self->password_prompt_target_ == PasswordPromptTarget::none &&
+                !self->xaml_modal_overlay_active_ && args.Key() == Windows::System::VirtualKey::Space &&
+                !(GetKeyState(VK_CONTROL) & 0x8000) && !(GetKeyState(VK_MENU) & 0x8000) &&
+                !(GetKeyState(VK_SHIFT) & 0x8000) && !(GetKeyState(VK_LWIN) & 0x8000) && !(GetKeyState(VK_RWIN) & 0x8000))
+            {
+                args.Handled(true);
+                self->HidePreview();
+            }
+        });
+        RootGrid().GotFocus([weak](IInspectable const&, RoutedEventArgs const&) {
+            if (const auto self = weak.get(); self && self->active_component_view_ && self->RootGrid().XamlRoot())
+            {
+                self->component_input_active_ = is_editable_xaml_source(
+                    Input::FocusManager::GetFocusedElement(self->RootGrid().XamlRoot()));
+                self->update_input_activation();
+                if (self->component_input_active_) SetForegroundWindow(self->window_);
+                self->update_state();
+            }
+        });
         Closed([weak](IInspectable const&, WindowEventArgs const&) {
             if (const auto self = weak.get())
             {
@@ -2161,7 +2203,8 @@ namespace winrt::Glance::App::implementation
             const bool interactive =
                 archive_preview_is_directory_ && button.Visibility() == Visibility::Visible;
             button.IsHitTestVisible(interactive);
-            button.IsTabStop(interactive);
+            button.IsTabStop(false);
+            button.AllowFocusOnInteraction(false);
         }
         for (const auto& glyph : glyphs)
         {
@@ -2896,6 +2939,7 @@ namespace winrt::Glance::App::implementation
         ComponentViewPresenter().Content(nullptr);
         ComponentViewPresenter().Visibility(Visibility::Collapsed);
         active_component_view_.reset();
+        component_input_active_ = false;
         update_input_activation();
         component_view_registration_.reset();
         component_view_session_ = 0;
@@ -3285,7 +3329,7 @@ namespace winrt::Glance::App::implementation
         }
         return current_kind_ == glance::app::PreviewKind::image ||
             current_kind_ == glance::app::PreviewKind::document ||
-            current_kind_ == glance::app::PreviewKind::native_document ||
+            (current_kind_ == glance::app::PreviewKind::native_document && native_preview_has_content_size_) ||
             (current_kind_ == glance::app::PreviewKind::media && !media_is_audio_);
     }
 
@@ -3477,6 +3521,7 @@ namespace winrt::Glance::App::implementation
         ++native_preview_resize_request_;
         const bool cancel = native_media_active_ || !native_preview_ready_;
         native_preview_ready_ = false;
+        native_preview_has_content_size_ = false;
         native_media_active_ = false;
         native_media_query_in_flight_ = false;
         native_media_dimensions_applied_ = false;
@@ -3513,10 +3558,9 @@ namespace winrt::Glance::App::implementation
         const auto dispatcher = DispatcherQueue();
         const auto visuals = native_preview_visuals(RootGrid().ActualTheme());
         const auto dpi = GetDpiForWindow(window_);
-        const bool request_size = auto_fit_applies();
         co_await resume_background();
         const auto status = surface->open(path, visuals, dpi, glance::app::current_ui_language());
-        const auto content_size = status == glance::contracts::native_preview::Status::success && request_size
+        const auto content_size = status == glance::contracts::native_preview::Status::success
             ? surface->content_size()
             : std::optional<glance::contracts::native_preview::ContentSize>{};
         static_cast<void>(dispatcher.TryEnqueue([
@@ -3548,11 +3592,12 @@ namespace winrt::Glance::App::implementation
             }
             lifetime->native_preview_ready_ = true;
             lifetime->NativeDocumentLoadingOverlay().Visibility(Visibility::Collapsed);
-            const auto preferences = glance::app::load_window_preferences();
-            const double scale = GetDpiForWindow(lifetime->window_) / 96.0;
-            lifetime->auto_fit_window_to_content(
-                (content_size ? content_size->width : preferences.default_width) * scale,
-                (content_size ? content_size->height : preferences.default_height) * scale);
+            lifetime->native_preview_has_content_size_ = content_size && content_size->width > 0 && content_size->height > 0;
+            if (lifetime->native_preview_has_content_size_)
+            {
+                const double scale = GetDpiForWindow(lifetime->window_) / 96.0;
+                lifetime->auto_fit_window_to_content(content_size->width * scale, content_size->height * scale);
+            }
             lifetime->update_native_preview_bounds();
             surface->set_visible(
                 lifetime->visible_ && !lifetime->xaml_modal_overlay_active_);
@@ -3711,7 +3756,10 @@ namespace winrt::Glance::App::implementation
                             std::to_wstring(state->video_height);
                     }
                     lifetime->update_media_footer();
-                    lifetime->auto_fit_window_to_content(1920.0, 1080.0);
+                    if (state->video_width != 0 && state->video_height != 0)
+                    {
+                        lifetime->auto_fit_window_to_content(state->video_width, state->video_height);
+                    }
                     lifetime->reveal_deferred_preview();
                 }
             }
@@ -10940,7 +10988,8 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_input_activation() noexcept
     {
-        const bool enabled = password_prompt_target_ != PasswordPromptTarget::none || active_component_view_ != nullptr;
+        const bool enabled = password_prompt_target_ != PasswordPromptTarget::none ||
+            (active_component_view_ && component_input_active_);
         if (window_ == nullptr || input_activation_enabled_ == enabled)
         {
             return;
@@ -11144,7 +11193,7 @@ namespace winrt::Glance::App::implementation
             state_ = glance::contracts::PreviewWindowState::hidden;
         }
         else if (((password_prompt_target_ != PasswordPromptTarget::none && password_prompt_focused_) ||
-                  (active_component_view_ && GetForegroundWindow() == window_)) &&
+                  (active_component_view_ && component_input_active_ && GetForegroundWindow() == window_)) &&
                  !detached_)
         {
             state_ = glance::contracts::PreviewWindowState::active_interactive;

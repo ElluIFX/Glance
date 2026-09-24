@@ -32,6 +32,11 @@ const progressValue = document.getElementById("progress-value");
 const fitButton = document.getElementById("fit");
 const gridButton = document.getElementById("grid");
 const wireframeButton = document.getElementById("wireframe");
+for (const button of [fitButton, gridButton, wireframeButton]) {
+    button.tabIndex = -1;
+    button.addEventListener("pointerdown", event => event.preventDefault());
+    button.addEventListener("focus", () => button.blur());
+}
 
 fitButton.title = labels.fit;
 fitButton.setAttribute("aria-label", labels.fit);

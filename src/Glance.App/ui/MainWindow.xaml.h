@@ -826,6 +826,7 @@ namespace winrt::Glance::App::implementation
         bool archive_entry_compressed_size_available_{};
         PasswordPromptTarget password_prompt_target_{ PasswordPromptTarget::none };
         bool input_activation_enabled_{};
+        bool component_input_active_{};
         bool password_prompt_focused_{};
         std::wstring footer_access_mode_;
         bool footer_access_loaded_{};
@@ -852,6 +853,7 @@ namespace winrt::Glance::App::implementation
         std::atomic_uint64_t native_media_settings_generation_{};
         std::atomic_uint64_t native_preview_resize_request_{};
         bool native_preview_ready_{};
+        bool native_preview_has_content_size_{};
         bool xaml_modal_overlay_active_{};
         std::shared_ptr<void> active_component_preview_;
         std::shared_ptr<void> active_component_view_;

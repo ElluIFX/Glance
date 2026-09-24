@@ -213,6 +213,14 @@ namespace winrt::Glance::App::implementation
               [this](auto type, auto payload) { return pipe_client_.send(type, payload); },
               [this](auto result) { handle_automatic_update_result(std::move(result)); })
     {
+        Input::FocusManager::GettingFocus([](IInspectable const&, Input::GettingFocusEventArgs const& args) {
+            if (const auto button = args.NewFocusedElement().try_as<Controls::Primitives::ButtonBase>())
+            {
+                button.IsTabStop(false);
+                button.AllowFocusOnInteraction(false);
+                static_cast<void>(args.TryCancel());
+            }
+        });
         UnhandledException([](IInspectable const&, UnhandledExceptionEventArgs const& event)
         {
             glance::contracts::log_event(
@@ -407,7 +415,8 @@ namespace winrt::Glance::App::implementation
                 Microsoft::UI::Xaml::Application::Current().Exit();
             });
             duplicate_instance_window_.Activate();
-            static_cast<void>(confirm.Focus(FocusState::Programmatic));
+            confirm.IsTabStop(false);
+            confirm.AllowFocusOnInteraction(false);
         }
         catch (const hresult_error& error)
         {

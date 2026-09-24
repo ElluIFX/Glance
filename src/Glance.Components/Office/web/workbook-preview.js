@@ -340,6 +340,9 @@ export async function renderWorkbookPreview(bytes, container, { signal, onFirstR
                     if (sheet.hidden) return [];
                     const button = document.createElement('button');
                     button.type = 'button';
+                    button.tabIndex = -1;
+                    button.onpointerdown = event => event.preventDefault();
+                    button.onfocus = () => button.blur();
                     button.role = 'tab';
                     button.textContent = sheet.name;
                     button.setAttribute('aria-selected', String(index === data.index));
