@@ -633,10 +633,16 @@ namespace winrt::Glance::App::implementation
             AutomaticUpdateCheckDescription(),
             L"AutomaticUpdateCheckDisabledDescription.Text");
         set_text(UpdateCheckFrequencyLabel(), L"UpdateCheckFrequencyLabel.Text");
+        const int selected_frequency = UpdateCheckFrequencyComboBox().SelectedIndex();
+        initializing_ = true;
+        // Re-select after localization to refresh the collapsed selection text.
+        UpdateCheckFrequencyComboBox().SelectedIndex(-1);
         set_content(UpdateFrequencyHourlyItem(), L"UpdateFrequencyHourlyItem.Content");
         set_content(UpdateFrequencyDailyItem(), L"UpdateFrequencyDailyItem.Content");
         set_content(UpdateFrequencyWeeklyItem(), L"UpdateFrequencyWeeklyItem.Content");
         set_content(UpdateFrequencyMonthlyItem(), L"UpdateFrequencyMonthlyItem.Content");
+        UpdateCheckFrequencyComboBox().SelectedIndex(selected_frequency);
+        initializing_ = was_initializing;
         set_text(FooterPageTitle(), L"FooterPageTitle.Text");
         set_text(FooterPageDescription(), L"FooterPageDescription.Text");
         set_text(FooterFieldsLabel(), L"FooterFieldsLabel.Text");
