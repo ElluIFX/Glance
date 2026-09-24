@@ -15,7 +15,7 @@ struct Request
 {
     Operation operation{};
     unsigned face{};
-    float size{32}, weight{400}, scale{1}, offset{};
+    float size{16}, weight{400}, scale{1}, offset{};
     unsigned width{640}, height{480}, color{0xff202020};
     BOOL custom_text{};
     wchar_t text[4096]{};

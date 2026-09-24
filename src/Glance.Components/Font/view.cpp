@@ -71,7 +71,6 @@ struct View : std::enable_shared_from_this<View>
     ComboBox faces;
     NumberBox size, weight;
     Border adjustment_separator;
-    TextBox editor;
     TextBlock size_label, weight_label;
     Border details;
     TextBlock metadata_title;
@@ -90,7 +89,7 @@ struct View : std::enable_shared_from_this<View>
     std::wstring path, language;
     std::shared_ptr<Metadata> metadata;
     std::shared_ptr<Worker> worker;
-    bool updating{}, composition{}, text_initialized{}, editing{};
+    bool updating{};
     std::uint64_t serial{};
     std::uint64_t run{};
     unsigned desired_face{};
@@ -216,7 +215,8 @@ struct View : std::enable_shared_from_this<View>
         adjustments.Children().Append(adjustment_separator);
         size.Minimum(8);
         size.Maximum(512);
-        size.Value(32);
+        size.Value(16);
+        retry.IsTabStop(false); retry.AllowFocusOnInteraction(false);
         weight.Visibility(Visibility::Collapsed);
         weight_group.Visibility(Visibility::Collapsed);
         Grid::SetRow(body, 2);
@@ -227,20 +227,7 @@ struct View : std::enable_shared_from_this<View>
         canvas.Children().Append(image);
         image.Stretch(Media::Stretch::Fill);
         body.Children().Append(scroll);
-        scroll.IsTabStop(true);
         scroll.Background(Media::SolidColorBrush(Microsoft::UI::Colors::Transparent()));
-        ToolTipService::SetToolTip(scroll, box_value(text(L"EditSample")));
-        Automation::AutomationProperties::SetName(scroll, text(L"EditSample"));
-        editor.AcceptsReturn(true);
-        editor.TextWrapping(TextWrapping::Wrap);
-        editor.MaxLength(static_cast<int>(std::size(Request{}.text) - 1));
-        editor.FontSize(20);
-        editor.PlaceholderText(text(L"SampleHint"));
-        editor.VerticalAlignment(VerticalAlignment::Stretch);
-        editor.Visibility(Visibility::Collapsed);
-        ScrollViewer::SetVerticalScrollBarVisibility(editor, ScrollBarVisibility::Auto);
-        Automation::AutomationProperties::SetName(editor, text(L"Sample"));
-        body.Children().Append(editor);
         details = Markup::XamlReader::Load(
             LR"(<Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -325,7 +312,7 @@ struct View : std::enable_shared_from_this<View>
                 self->updating = true;
                 auto value = self->size.Value();
                 if (!std::isfinite(value))
-                    value = 32;
+                    value = 16;
                 value = std::clamp(value, self->size.Minimum(), self->size.Maximum());
                 self->size.Value(value);
                 self->updating = false;
@@ -343,76 +330,6 @@ struct View : std::enable_shared_from_this<View>
                 self->weight.Value(value);
                 self->updating = false;
                 self->schedule();
-            }
-        });
-        editor.TextCompositionStarted([weak](auto &&, auto &&) {
-            if (auto self = weak.lock())
-                self->composition = true;
-        });
-        editor.TextCompositionEnded([weak](auto &&, auto &&) {
-            if (auto self = weak.lock())
-            {
-                self->composition = false;
-                self->schedule();
-            }
-        });
-        editor.TextChanged([weak](auto &&, auto &&) {
-            if (auto self = weak.lock(); self && !self->composition)
-                self->schedule();
-        });
-        scroll.Tapped([weak](auto&&, Input::TappedRoutedEventArgs const& args) {
-            if (auto self = weak.lock())
-            {
-                self->begin_edit();
-                args.Handled(true);
-            }
-        });
-        scroll.KeyDown([weak](auto&&, Input::KeyRoutedEventArgs const& args) {
-            if (args.Key() == winrt::Windows::System::VirtualKey::Enter ||
-                args.Key() == winrt::Windows::System::VirtualKey::F2)
-            {
-                if (auto self = weak.lock()) self->begin_edit();
-                args.Handled(true);
-            }
-        });
-        editor.LostFocus([weak](auto&&, auto&&) {
-            if (auto self = weak.lock(); self && self->root.XamlRoot())
-            {
-                auto focus = Input::FocusManager::GetFocusedElement(self->root.XamlRoot())
-                    .try_as<DependencyObject>();
-                while (focus)
-                {
-                    if (focus == self->editor) return;
-                    if (focus == self->root)
-                    {
-                        self->finish_edit();
-                        return;
-                    }
-                    focus = Media::VisualTreeHelper::GetParent(focus);
-                }
-            }
-        });
-        root.Tapped([weak](auto&&, Input::TappedRoutedEventArgs const& args) {
-            if (auto self = weak.lock(); self && self->editing)
-            {
-                auto source = args.OriginalSource().try_as<DependencyObject>();
-                while (source)
-                {
-                    if (source == self->editor) return;
-                    source = Media::VisualTreeHelper::GetParent(source);
-                }
-                self->finish_edit();
-            }
-        });
-        editor.KeyDown([weak](auto&&, Input::KeyRoutedEventArgs const& args) {
-            if (args.Key() == winrt::Windows::System::VirtualKey::Escape)
-            {
-                if (auto self = weak.lock(); self && !self->composition)
-                {
-                    self->finish_edit();
-                    self->scroll.Focus(FocusState::Programmatic);
-                    args.Handled(true);
-                }
             }
         });
         scroll.ViewChanged([weak](auto &&, auto &&) {
@@ -434,8 +351,7 @@ struct View : std::enable_shared_from_this<View>
     }
     void layout()
     {
-        const bool compact_layout = root.ActualWidth() < 820;
-        const double content_width = root.ActualWidth() - 48 - (compact_layout ? 0 : 304);
+        const double content_width = root.ActualWidth() - 48 - 304;
         const bool variable = metadata && metadata->variable;
         const bool has_faces = faces.Visibility() == Visibility::Visible;
         choices.Visibility(has_faces ? Visibility::Visible : Visibility::Collapsed);
@@ -465,38 +381,11 @@ struct View : std::enable_shared_from_this<View>
         controls.ColumnSpacing(has_faces && inline_controls ? 24 : 0);
         weight_group.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
         adjustment_separator.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
-        root.ColumnSpacing(compact_layout ? 0 : 24);
-        root.ColumnDefinitions().GetAt(1).Width({compact_layout ? 0.0 : 280.0, GridUnitType::Pixel});
-        Grid::SetColumn(details, compact_layout ? 0 : 1);
-        Grid::SetRow(details, compact_layout ? 4 : 0);
-        Grid::SetRowSpan(details, compact_layout ? 1 : 4);
-        details.Margin({0, compact_layout ? 12.0f : 0.0f, 0, 0});
-        metadata_scroll.MaxHeight(compact_layout ? 180 : std::max(64.0, root.ActualHeight() - 104));
-    }
-    void begin_edit()
-    {
-        if (!metadata || editing) return;
-        editing = true;
-        editor.Visibility(Visibility::Visible);
-        scroll.Opacity(0);
-        scroll.IsHitTestVisible(false);
-        status.Text(text(L"EditingHint"));
-        status.Opacity(1);
-        editor.Focus(FocusState::Programmatic);
-    }
-    void finish_edit()
-    {
-        if (!editing) return;
-        editing = false;
-        editor.Visibility(Visibility::Collapsed);
-        scroll.Opacity(1);
-        scroll.IsHitTestVisible(true);
-        scroll.ChangeView(nullptr, 0.0, nullptr, true);
-        schedule();
+        metadata_scroll.MaxHeight(std::max(64.0, root.ActualHeight() - 104));
     }
     void schedule()
     {
-        if (!updating && !composition && timer)
+        if (!updating && timer)
         {
             ++serial;
             if (!timer.IsRunning())
@@ -510,7 +399,6 @@ struct View : std::enable_shared_from_this<View>
         Request request;
         request.operation = Operation::render;
         request.face = desired_face;
-        request.custom_text = text_initialized;
         request.size = static_cast<float>(size.Value());
         request.weight = metadata ? static_cast<float>(weight.Value()) : 400;
         request.scale = root.XamlRoot() ? static_cast<float>(root.XamlRoot().RasterizationScale()) : 1;
@@ -526,8 +414,6 @@ struct View : std::enable_shared_from_this<View>
                 winrt::Windows::UI::ViewManagement::UIElementType::WindowText);
             request.color = 0xff000000U | (unsigned(color.R) << 16) | (unsigned(color.G) << 8) | color.B;
         }
-        const auto text_value = editor.Text();
-        wcsncpy_s(request.text, text_value.c_str(), _TRUNCATE);
         {
             if (!worker) return;
             std::scoped_lock lock(worker->mutex);
@@ -673,11 +559,6 @@ struct View : std::enable_shared_from_this<View>
                 information.Children().Append(value);
             }
         }
-        if (!text_initialized)
-        {
-            editor.Text(info->sample);
-            text_initialized = true;
-        }
         updating = false;
         layout();
     }
@@ -700,9 +581,8 @@ struct View : std::enable_shared_from_this<View>
         std::wstring message;
         if (response.missing)
             message = text(L"Missing");
-        if (message.empty()) message = text(L"EditSample");
-        status.Text(editing ? text(L"EditingHint") : hstring(message));
-        status.Opacity(editing || response.missing || accessibility.HighContrast() ? 1 : 0.5);
+        status.Text(message);
+        status.Opacity(1);
         notify(contracts::components::ComponentViewState::ready);
     }
     void notify(contracts::components::ComponentViewState state) noexcept
@@ -745,10 +625,6 @@ struct View : std::enable_shared_from_this<View>
         Automation::AutomationProperties::SetName(faces, text(L"Face"));
         size_label.Text(text(L"Size"));
         weight_label.Text(text(L"Weight"));
-        editor.PlaceholderText(text(L"SampleHint"));
-        Automation::AutomationProperties::SetName(editor, text(L"Sample"));
-        Automation::AutomationProperties::SetName(scroll, text(L"EditSample"));
-        ToolTipService::SetToolTip(scroll, box_value(text(L"EditSample")));
         metadata_title.Text(text(L"Metadata"));
         retry.Content(box_value(text(L"Retry")));
         updating = false;
