@@ -229,7 +229,7 @@
                         Visibility="Collapsed" />
                     <Grid
                         x:Name="JsonTreeHost"
-                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                        Background="Transparent"
                         Visibility="Collapsed">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
