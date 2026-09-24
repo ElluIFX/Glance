@@ -200,6 +200,10 @@ int wmain(int argc, wchar_t** argv)
     {
         if (std::wstring_view(argv[i]) == L"--json") json = true;
         if (std::wstring_view(argv[i]) == L"--quiet") quiet_output = true;
+        const std::wstring_view option(argv[i]);
+        if (option == L"--size" || option == L"--position" || option == L"--center-offset") i += 2;
+        else if (option == L"--name" || option == L"--timeout" || option == L"--id" ||
+            option == L"--monitor" || option == L"--close-after") ++i;
     }
     try
     {

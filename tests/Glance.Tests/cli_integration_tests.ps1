@@ -36,6 +36,10 @@ try {
     Invoke-Cli -Arguments @('status', '--no-start') -Expected 4 | Out-Null
     $help = (& $cli --help --json | ConvertFrom-Json)
     Assert-True ($help.ok -and $help.command -eq 'help') 'JSON help is invalid'
+    foreach ($literalName in @('--json', '--quiet')) {
+        $literalHelp = (& $cli preview --name $literalName --help) -join "`n"
+        Assert-True ($LASTEXITCODE -eq 0 -and $literalHelp.StartsWith('usage:')) 'An option value changed the output mode'
+    }
     foreach ($topic in @(@('preview', '-h'), @('window', 'set', '-h'), @('help', 'window', 'resize'))) {
         $page = (& $cli @topic --json | ConvertFrom-Json)
         Assert-True ($page.ok -and $page.data.text.StartsWith('usage:')) 'Command help is invalid'
