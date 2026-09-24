@@ -4,6 +4,21 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.25] - 2026-09-25
+
+### Added
+
+- Add an option to disable adaptive window sizing in gallery mode, off by default.
+
+### Improved
+
+- Group executable details into independently collapsible sections with continuous backgrounds, synchronized visibility and virtualized rows; only Overview is expanded by default.
+- Remove redundant executable information tooltips and unused footer spacing.
+
+### Fixed
+
+- Preserve window geometry while resolving new preview content and apply the final size without an intermediate default-size reset or hiding an already visible window.
+
 ## [2026.09.24.2] - 2026-09-24
 
 ### Added
