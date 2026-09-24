@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "window_size_store.h"
-
 #include <cstdint>
 
 namespace
@@ -8,164 +7,58 @@ namespace
     constexpr wchar_t size_registry_path[] = L"Software\\Glance\\WindowSizes";
     constexpr wchar_t position_registry_path[] = L"Software\\Glance\\WindowPositions";
 
-    const wchar_t* value_name(glance::app::PreviewKind kind, bool media_is_audio) noexcept
+    std::optional<std::uint64_t> read(const wchar_t* path, const std::wstring& name)
     {
-        using glance::app::PreviewKind;
-        switch (kind)
-        {
-        case PreviewKind::text:
-            return L"Text";
-        case PreviewKind::markdown:
-            return L"Markdown";
-        case PreviewKind::web:
-            return L"Web";
-        case PreviewKind::image:
-            return L"Image";
-        case PreviewKind::media:
-            return media_is_audio ? L"Audio" : L"Video";
-        case PreviewKind::document:
-            return L"Pdf";
-        case PreviewKind::native_document:
-            return L"Document";
-        case PreviewKind::archive:
-            return L"Archive";
-        case PreviewKind::component:
-            return L"Component";
-        default:
-            return L"Generic";
-        }
+        std::uint64_t value{};
+        DWORD bytes = sizeof(value);
+        if (RegGetValueW(HKEY_CURRENT_USER, path, name.c_str(), RRF_RT_REG_QWORD,
+            nullptr, &value, &bytes) != ERROR_SUCCESS) return std::nullopt;
+        return value;
     }
-
-    std::wstring position_value_name(glance::app::PreviewKind kind, bool media_is_audio)
+    void write(const wchar_t* path, const std::wstring& name, LONG x, LONG y) noexcept
     {
-        return L"CenterOffset." + std::wstring(value_name(kind, media_is_audio));
+        HKEY key{};
+        if (RegCreateKeyExW(HKEY_CURRENT_USER, path, 0, nullptr, 0, KEY_SET_VALUE,
+            nullptr, &key, nullptr) != ERROR_SUCCESS) return;
+        const std::uint64_t value = (std::uint64_t(static_cast<std::uint32_t>(x)) << 32U) |
+            static_cast<std::uint32_t>(y);
+        RegSetValueExW(key, name.c_str(), 0, REG_QWORD,
+            reinterpret_cast<const BYTE*>(&value), sizeof(value));
+        RegCloseKey(key);
+    }
+    bool clear(const wchar_t* path) noexcept
+    {
+        const auto result = RegDeleteTreeW(HKEY_CURRENT_USER, path);
+        return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
     }
 }
 
 namespace glance::app
 {
-    std::optional<SIZE> load_window_size(PreviewKind kind, bool media_is_audio)
+    WindowPlacementMemory load_window_placement(const WindowPlacementIdentity& identity)
     {
-        std::uint64_t packed{};
-        DWORD size = sizeof(packed);
-        if (RegGetValueW(
-                HKEY_CURRENT_USER,
-                size_registry_path,
-                value_name(kind, media_is_audio),
-                RRF_RT_REG_QWORD,
-                nullptr,
-                &packed,
-                &size) != ERROR_SUCCESS)
+        WindowPlacementMemory memory;
+        if (identity.key.empty()) return memory;
+        if (const auto value = read(size_registry_path, identity.key))
         {
-            return std::nullopt;
+            const SIZE size{static_cast<LONG>(*value >> 32U), static_cast<LONG>(*value & 0xffffffffU)};
+            if (size.cx > 0 && size.cy > 0) memory.size = size;
         }
-
-        SIZE result{
-            static_cast<LONG>(packed >> 32U),
-            static_cast<LONG>(packed & 0xFFFFFFFFU) };
-        if (result.cx <= 0 || result.cy <= 0)
-        {
-            return std::nullopt;
-        }
-        return result;
+        if (const auto value = read(position_registry_path, L"CenterOffset." + identity.key))
+            memory.center_offset = POINT{
+                static_cast<LONG>(static_cast<std::int32_t>(*value >> 32U)),
+                static_cast<LONG>(static_cast<std::int32_t>(*value & 0xffffffffU))};
+        return memory;
     }
-
-    void save_window_size(PreviewKind kind, SIZE size, bool media_is_audio) noexcept
+    void save_window_placement(const WindowPlacementIdentity& identity, const WindowPlacementMemory& memory) noexcept
     {
-        if (size.cx <= 0 || size.cy <= 0)
-        {
-            return;
-        }
-
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                size_registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
-
-        const std::uint64_t packed =
-            (static_cast<std::uint64_t>(static_cast<std::uint32_t>(size.cx)) << 32U) |
-            static_cast<std::uint32_t>(size.cy);
-        RegSetValueExW(
-            key,
-            value_name(kind, media_is_audio),
-            0,
-            REG_QWORD,
-            reinterpret_cast<const BYTE*>(&packed),
-            sizeof(packed));
-        RegCloseKey(key);
+        if (identity.key.empty()) return;
+        if (memory.size && memory.size->cx > 0 && memory.size->cy > 0)
+            write(size_registry_path, identity.key, memory.size->cx, memory.size->cy);
+        if (memory.center_offset)
+            write(position_registry_path, L"CenterOffset." + identity.key,
+                memory.center_offset->x, memory.center_offset->y);
     }
-
-    bool clear_window_sizes() noexcept
-    {
-        const LSTATUS result = RegDeleteTreeW(HKEY_CURRENT_USER, size_registry_path);
-        return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
-    }
-
-    std::optional<POINT> load_window_center_offset(PreviewKind kind, bool media_is_audio)
-    {
-        std::uint64_t packed{};
-        DWORD size = sizeof(packed);
-        const auto name = position_value_name(kind, media_is_audio);
-        if (RegGetValueW(
-            HKEY_CURRENT_USER,
-            position_registry_path,
-            name.c_str(),
-            RRF_RT_REG_QWORD,
-            nullptr,
-            &packed,
-            &size) != ERROR_SUCCESS)
-        {
-            return std::nullopt;
-        }
-        return POINT{
-            static_cast<LONG>(static_cast<std::int32_t>(packed >> 32U)),
-            static_cast<LONG>(static_cast<std::int32_t>(packed & 0xFFFFFFFFU)) };
-    }
-
-    void save_window_center_offset(PreviewKind kind, POINT offset, bool media_is_audio) noexcept
-    {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                position_registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
-
-        const std::uint64_t packed =
-            (static_cast<std::uint64_t>(static_cast<std::uint32_t>(offset.x)) << 32U) |
-            static_cast<std::uint32_t>(offset.y);
-        const auto name = position_value_name(kind, media_is_audio);
-        RegSetValueExW(
-            key,
-            name.c_str(),
-            0,
-            REG_QWORD,
-            reinterpret_cast<const BYTE*>(&packed),
-            sizeof(packed));
-        RegCloseKey(key);
-    }
-
-    bool clear_window_positions() noexcept
-    {
-        const LSTATUS result = RegDeleteTreeW(HKEY_CURRENT_USER, position_registry_path);
-        return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
-    }
+    bool clear_window_sizes() noexcept { return clear(size_registry_path); }
+    bool clear_window_positions() noexcept { return clear(position_registry_path); }
 }

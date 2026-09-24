@@ -2730,7 +2730,7 @@ namespace winrt::Glance::App::implementation
         ErrorText().Text(L"");
         ErrorText().Visibility(Visibility::Collapsed);
         cli_explicit_geometry_ = preserve_window;
-        if (preserve_window) component_placement_generation_ = 0;
+        if (preserve_window) placement_restore_generation_ = 0;
         if (cli_close_timer_) cli_close_timer_.Stop();
         leave_gallery(false);
         stop_detached_focus_monitor();
@@ -2779,8 +2779,8 @@ namespace winrt::Glance::App::implementation
         if (position_window)
         {
             position_initial_window();
-            component_placement_generation_ =
-                current_kind_ == glance::app::PreviewKind::component
+            placement_restore_generation_ =
+                (current_kind_ == glance::app::PreviewKind::component || current_kind_ == glance::app::PreviewKind::generic)
                 ? content_generation_
                 : 0;
         }
@@ -2948,6 +2948,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::clear_preview_content()
     {
+        window_placement_identity_ = {};
         release_component_view();
         text_monitor_enabled_ = false;
         text_refresh_requested_ = false;
@@ -3195,7 +3196,7 @@ namespace winrt::Glance::App::implementation
             return;
         }
         const auto preferences = glance::app::load_window_preferences();
-        const auto storage_kind = basic_info_mode_ ? content_preview_kind_ : current_kind_;
+        const auto memory = glance::app::load_window_placement(window_placement_identity_);
         const HWND reference_window = source_window_ != nullptr
             ? source_window_
             : GetForegroundWindow();
@@ -3205,7 +3206,7 @@ namespace winrt::Glance::App::implementation
 
         const UINT dpi = reference_window != nullptr ? GetDpiForWindow(reference_window) : 96;
         const POINT saved_center_offset = preferences.remember_position
-            ? glance::app::load_window_center_offset(storage_kind, media_is_audio_).value_or(POINT{})
+            ? memory.center_offset.value_or(POINT{})
             : POINT{};
         const POINT center_offset{
             MulDiv(saved_center_offset.x, static_cast<int>(dpi), 96),
@@ -3214,7 +3215,7 @@ namespace winrt::Glance::App::implementation
         int desired_height = MulDiv(static_cast<int>(preferences.default_height), static_cast<int>(dpi), 96);
         if (preferences.remember_size && !ignore_saved_size && !auto_fit_applies())
         {
-            if (const auto saved_size = glance::app::load_window_size(storage_kind, media_is_audio_))
+            if (const auto& saved_size = memory.size)
             {
                 desired_width = MulDiv(saved_size->cx, static_cast<int>(dpi), 96);
                 desired_height = MulDiv(saved_size->cy, static_cast<int>(dpi), 96);
@@ -3429,9 +3430,9 @@ namespace winrt::Glance::App::implementation
             static_cast<int>(std::lround(content_height * scale)) + vertical_chrome,
             minimum_height,
             maximum_height);
-        const auto storage_kind = basic_info_mode_ ? content_preview_kind_ : current_kind_;
+        const auto memory = glance::app::load_window_placement(window_placement_identity_);
         const POINT saved_center_offset = preferences.remember_position
-            ? glance::app::load_window_center_offset(storage_kind, media_is_audio_).value_or(POINT{})
+            ? memory.center_offset.value_or(POINT{})
             : POINT{};
         const POINT center_offset{
             MulDiv(saved_center_offset.x, static_cast<int>(dpi), 96),
@@ -3481,16 +3482,13 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
-        const auto storage_kind = basic_info_mode_ ? content_preview_kind_ : current_kind_;
+        glance::app::WindowPlacementMemory memory;
         if (preferences.remember_size && user_sized_)
         {
             const UINT dpi = GetDpiForWindow(window_);
-            glance::app::save_window_size(
-                storage_kind,
-                SIZE{
+            memory.size = SIZE{
                     MulDiv(bounds.right - bounds.left, 96, static_cast<int>(dpi)),
-                    MulDiv(bounds.bottom - bounds.top, 96, static_cast<int>(dpi)) },
-                media_is_audio_);
+                    MulDiv(bounds.bottom - bounds.top, 96, static_cast<int>(dpi)) };
         }
         if (preferences.remember_position)
         {
@@ -3507,13 +3505,11 @@ namespace winrt::Glance::App::implementation
             const int monitor_center_y =
                 info.rcMonitor.top + (info.rcMonitor.bottom - info.rcMonitor.top) / 2;
             const UINT dpi = GetDpiForWindow(window_);
-            glance::app::save_window_center_offset(
-                storage_kind,
-                POINT{
+            memory.center_offset = POINT{
                     MulDiv(window_center_x - monitor_center_x, 96, static_cast<int>(dpi)),
-                    MulDiv(window_center_y - monitor_center_y, 96, static_cast<int>(dpi)) },
-                media_is_audio_);
+                    MulDiv(window_center_y - monitor_center_y, 96, static_cast<int>(dpi)) };
         }
+        glance::app::save_window_placement(window_placement_identity_, memory);
     }
 
     void MainWindow::release_native_preview_surface() noexcept
@@ -4000,6 +3996,7 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
+        window_placement_identity_ = {};
         if (index != current_index_ || current_text_path_ != files_[index].path)
         {
             text_monitor_enabled_ = false;
@@ -4134,6 +4131,7 @@ namespace winrt::Glance::App::implementation
 
         if ((file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
         {
+            window_placement_identity_ = glance::app::WindowPlacementIdentity::builtin(glance::app::PreviewKind::archive);
             folder_preview_preferences_ = glance::app::load_folder_preview_preferences();
             archive_preview_is_directory_ = true;
             update_archive_header_state();
@@ -4154,6 +4152,7 @@ namespace winrt::Glance::App::implementation
         if (kind == glance::app::PreviewKind::component)
         {
             present_generic(file, false, false);
+            window_placement_identity_ = {};
             content_preview_kind_ = kind;
             current_kind_ = kind;
             update_preview_mode_button();
@@ -4190,6 +4189,7 @@ namespace winrt::Glance::App::implementation
                         return;
                     }
                     self->present_resolved_file(file, kind, generation);
+                    self->restore_resolved_window_placement(generation);
                 }));
         }
         catch (...)
@@ -4203,6 +4203,9 @@ namespace winrt::Glance::App::implementation
         glance::app::PreviewKind kind,
         std::uint64_t generation)
     {
+        if (!active_component_preview_)
+            window_placement_identity_ = glance::app::WindowPlacementIdentity::builtin(kind,
+                glance::app::gallery_media_kind(file.path) == glance::contracts::components::GalleryMediaKind::audio);
         content_preview_kind_ = kind;
         update_preview_mode_button();
         current_kind_ = kind;
@@ -4325,6 +4328,8 @@ namespace winrt::Glance::App::implementation
         bool allow_text_preview,
         bool allow_advanced_info)
     {
+        if (!basic_info_mode_)
+            window_placement_identity_ = glance::app::WindowPlacementIdentity::builtin(glance::app::PreviewKind::generic);
         auto previous_component_preview = std::move(active_component_preview_);
         auto previous_component_file_directory =
             std::move(active_component_file_directory_);
@@ -4375,7 +4380,7 @@ namespace winrt::Glance::App::implementation
         update_footer_metadata();
         if (allow_text_preview || allow_advanced_info)
         {
-            restore_component_window_placement(content_generation_);
+            restore_resolved_window_placement(content_generation_);
         }
     }
 
@@ -6305,13 +6310,13 @@ namespace winrt::Glance::App::implementation
         }));
     }
 
-    void MainWindow::restore_component_window_placement(std::uint64_t generation)
+    void MainWindow::restore_resolved_window_placement(std::uint64_t generation)
     {
-        const bool restore = generation == component_placement_generation_;
-        component_placement_generation_ = 0;
+        const bool restore = generation == placement_restore_generation_;
+        placement_restore_generation_ = 0;
         if (!auto_fit_applies())
         {
-            if (restore && !topmost_ && !user_sized_)
+            if (restore && !cli_explicit_geometry_ && !topmost_ && !user_sized_)
             {
                 position_initial_window();
             }
@@ -6383,6 +6388,7 @@ namespace winrt::Glance::App::implementation
             present_generic(files_[current_index_]);
             return;
         }
+        window_placement_identity_ = glance::app::WindowPlacementIdentity::component(result.component_id);
         const auto show_component_notice = [&] {
             if (result.notice.empty())
             {
@@ -6516,7 +6522,7 @@ namespace winrt::Glance::App::implementation
             native_preview_surface_ = surface;
             native_preview_ready_ = false;
             surface->set_double_click_enabled(double_click_fullscreen_enabled_);
-            restore_component_window_placement(generation);
+            restore_resolved_window_placement(generation);
             update_native_preview_bounds();
             load_native_media_async(
                 std::move(surface),
@@ -6587,7 +6593,7 @@ namespace winrt::Glance::App::implementation
                 ComponentLoadingText().Visibility(Visibility::Collapsed);
                 native_preview_ready_ = false;
                 component_view_failed_ = false;
-                restore_component_window_placement(generation);
+                restore_resolved_window_placement(generation);
                 reveal_deferred_preview();
                 return;
             }
@@ -6625,7 +6631,7 @@ namespace winrt::Glance::App::implementation
             }
             native_preview_surface_ = surface;
             surface->set_double_click_enabled(double_click_fullscreen_enabled_);
-            restore_component_window_placement(generation);
+            restore_resolved_window_placement(generation);
             update_native_preview_bounds();
             // Show the loading state while the native document host prepares its content.
             reveal_deferred_preview();
@@ -6657,7 +6663,7 @@ namespace winrt::Glance::App::implementation
             ArchiveEntryTree().RootNodes().Clear();
             FolderEntryList().Items().Clear();
             ComponentLoadingText().Visibility(Visibility::Collapsed);
-            restore_component_window_placement(generation);
+            restore_resolved_window_placement(generation);
             load_component_file_directory_async(
                 active_component_file_directory_,
                 {},
@@ -6682,7 +6688,7 @@ namespace winrt::Glance::App::implementation
         prepared_file.is_filesystem = true;
         prepared_file.is_cloud_placeholder = false;
         present_resolved_file(prepared_file, kind, generation);
-        restore_component_window_placement(generation);
+        restore_resolved_window_placement(generation);
         show_component_notice();
     }
 

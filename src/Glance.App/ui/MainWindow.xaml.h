@@ -18,6 +18,7 @@
 #include "shell_icon_provider.h"
 #include "text_preferences.h"
 #include "window_acrylic_backdrop.h"
+#include "window_size_store.h"
 
 #include "glance/contracts/preview_state.h"
 
@@ -314,7 +315,7 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool is_interactive_preview_source(
             IInspectable const& source);
         void position_initial_window(bool ignore_saved_size = false);
-        void restore_component_window_placement(std::uint64_t generation);
+        void restore_resolved_window_placement(std::uint64_t generation);
         [[nodiscard]] bool should_defer_auto_fit_show(
             glance::app::PreviewKind kind) const noexcept;
         void show_prepared_window() noexcept;
@@ -784,7 +785,7 @@ namespace winrt::Glance::App::implementation
         std::uint64_t content_generation_{};
         std::shared_ptr<std::atomic_bool> shell_file_cancellation_;
         std::shared_ptr<std::atomic_bool> component_preparation_cancellation_;
-        std::uint64_t component_placement_generation_{};
+        std::uint64_t placement_restore_generation_{};
         std::wstring current_text_;
         std::wstring current_text_path_;
         bool current_text_markdown_{};
@@ -858,6 +859,7 @@ namespace winrt::Glance::App::implementation
         std::shared_ptr<void> active_component_preview_;
         std::shared_ptr<void> active_component_view_;
         std::shared_ptr<glance::app::ComponentViewRegistration> component_view_registration_;
+        glance::app::WindowPlacementIdentity window_placement_identity_;
         std::uint64_t component_view_session_{};
         bool component_view_failed_{};
         std::shared_ptr<void> active_component_file_directory_;

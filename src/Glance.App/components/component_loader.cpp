@@ -1065,6 +1065,7 @@ namespace
         }
 
         result.kind = preview.kind;
+        result.component_id = component->id;
         result.format = preview.format;
         result.output_path = output.wstring();
         if (preview.format == PreviewContentFormat::component_view)

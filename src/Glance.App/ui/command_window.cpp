@@ -336,7 +336,7 @@ namespace winrt::Glance::App::implementation
             if (!SetWindowPos(window_, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE))
                 throw Error(1, "placement_failed", "Cannot set window placement");
             cli_explicit_geometry_ = true;
-            component_placement_generation_ = 0;
+            placement_restore_generation_ = 0;
             reveal_deferred_preview();
         }
         if (options.HasKey(L"topmost")) CliTopmost(options.GetNamedBoolean(L"topmost"));

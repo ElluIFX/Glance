@@ -32,6 +32,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="input_decision_tests.cpp" />
+    <ClCompile Include="window_memory_tests.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preferences\window_size_store.cpp" />
     <ClCompile Include="executable_tests.cpp" />
     <ClCompile Include="font_tests.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Font\client.cpp" />

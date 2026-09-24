@@ -139,6 +139,7 @@ namespace glance::app
 
     struct ComponentPreviewResult
     {
+        std::wstring component_id;
         glance::contracts::components::PrepareStatus status{
             glance::contracts::components::PrepareStatus::unavailable };
         glance::contracts::components::PreviewContentKind kind{

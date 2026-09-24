@@ -946,9 +946,13 @@ int run_text_monitor_tests();
 int run_office_package_tests();
 int run_executable_tests();
 int run_font_tests();
+int run_window_memory_tests();
 
 int wmain(int argument_count, wchar_t* arguments[])
 {
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--window-memory-tests")
+        return run_window_memory_tests();
+    if (argument_count == 1 && run_window_memory_tests() != 0) return 1;
     if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--font-tests")
         return run_font_tests();
     if (argument_count == 1 && run_font_tests() != 0)
