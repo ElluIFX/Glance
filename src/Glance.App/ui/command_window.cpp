@@ -44,6 +44,7 @@ namespace winrt::Glance::App::implementation
         result.SetNamedValue(L"id", JsonValue::CreateStringValue(cli_id_));
         result.SetNamedValue(L"generation", JsonValue::CreateStringValue(std::to_wstring(content_generation_)));
         result.SetNamedValue(L"main", JsonValue::CreateBooleanValue(!detached_));
+        result.SetNamedValue(L"fullwindow", JsonValue::CreateBooleanValue(fullscreen_));
         result.SetNamedValue(L"pinned", JsonValue::CreateBooleanValue(pinned_));
         result.SetNamedValue(L"topmost", JsonValue::CreateBooleanValue(topmost_));
         result.SetNamedValue(L"state", JsonValue::CreateStringValue(CliLoadState()));
@@ -74,7 +75,8 @@ namespace winrt::Glance::App::implementation
         {
             result.SetNamedValue(L"line", JsonValue::CreateNumberValue(static_cast<double>(text_editor_->current_line())));
             result.SetNamedValue(L"line_count", JsonValue::CreateNumberValue(static_cast<double>(text_editor_->line_count())));
-            result.SetNamedValue(L"has_more", JsonValue::CreateBooleanValue(current_text_has_more_));
+            result.SetNamedValue(L"content_complete", JsonValue::CreateBooleanValue(
+                !text_loading_ && !text_chunk_loading_ && !current_text_has_more_ && CliLoadState() == L"ready"));
         }
         if (current_kind_ == glance::app::PreviewKind::document)
         {
@@ -231,6 +233,22 @@ namespace winrt::Glance::App::implementation
                 self->cli_control_error_message_ = L"Content control failed";
             }
         }
+    }
+
+    void MainWindow::CliActivate()
+    {
+        if (!visible_) throw glance::cli::Error(3, "window_not_found", "Window is closed");
+        SetForegroundWindow(window_);
+        if (GetForegroundWindow() != window_)
+            throw glance::cli::Error(8, "activation_denied", "Windows did not allow the preview to become foreground");
+    }
+
+    void MainWindow::CliFullwindow(bool enabled)
+    {
+        if (!visible_) throw glance::cli::Error(3, "window_not_found", "Window is closed");
+        set_fullscreen(enabled);
+        if (fullscreen_ != enabled)
+            throw glance::cli::Error(8, "fullwindow_failed", "Cannot change full-window mode");
     }
 
     void MainWindow::CliTopmost(bool enabled)

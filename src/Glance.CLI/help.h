@@ -66,6 +66,8 @@ namespace glance::cli
               "  set                     Switch the previewed file or sequence\n"
               "  move                    Set position or center offset\n"
               "  resize                  Set the outer window size\n"
+              "  activate                Bring the window to the foreground\n"
+              "  fullwindow {on,off}     Enter or exit full-screen mode\n"
               "  close                   Close the preview\n"
               "  topmost                 Turn always-on-top on or off\n"
               "  pin                     Keep a preview open, or close a pinned preview\n"
@@ -77,34 +79,43 @@ namespace glance::cli
               "  volume N                Set window volume from 0 to 100\n"
               "  mute {on,off}           Set window mute state\n"
               "\noptions:\n"
-              "  --id UUID               Target window (default: last preview UUID)\n"
+              "  --id UUID|main          Target window (default: last preview UUID)\n"
               "\nwindow IDs:\n"
               "  Use 'windows' to list IDs or read data.id from preview --json.\n"
               "  UUIDs survive pinning and expire when Glance restarts.\n"
+              "  Use --id main to target the currently open main window.\n"
               "  A closed default target returns an error.\n",
               "Glance.CLI.exe windows\n"
               "  Glance.CLI.exe window close\n"
               "  Glance.CLI.exe window move --help" },
+            { "window activate", "Bring an open preview window to the foreground.",
+              "Glance.CLI.exe window activate [--id UUID|main] [options]",
+              "Windows may deny foreground activation; a denied request returns exit code 8.\n",
+              "Glance.CLI.exe window activate --id main" },
+            { "window fullwindow", "Enter or exit full-screen preview mode.",
+              "Glance.CLI.exe window fullwindow {on,off} [--id UUID|main] [options]",
+              "Exiting restores the previous window placement. Results include fullwindow.\n",
+              "Glance.CLI.exe window fullwindow on --id main" },
             { "window get", "Show a window's paths, loading state, and bounds.",
-              "Glance.CLI.exe window get [--id UUID]",
-              "options:\n  --id UUID               Target window (default: last preview UUID)\n",
+              "Glance.CLI.exe window get [--id UUID|main]",
+              "options:\n  --id UUID|main          Target window (default: last preview UUID)\n",
               "Glance.CLI.exe window get --json" },
             { "window close", "Close a preview; Glance remains running.",
-              "Glance.CLI.exe window close [--id UUID]",
-              "options:\n  --id UUID               Target window (default: last preview UUID)\n",
+              "Glance.CLI.exe window close [--id UUID|main]",
+              "options:\n  --id UUID|main          Target window (default: last preview UUID)\n",
               "Glance.CLI.exe window close" },
             { "window set", "Switch files in an existing window, preserving its UUID and geometry.",
-              "Glance.CLI.exe window set PATH [PATH ...] [--id UUID] [--wait]",
+              "Glance.CLI.exe window set PATH [PATH ...] [--id UUID|main] [--wait]",
               "arguments:\n  PATH                    File or folder; multiple paths form a sequence\n"
               "\noptions:\n"
-              "  --id UUID               Target window (default: last preview UUID)\n"
+              "  --id UUID|main          Target window (default: last preview UUID)\n"
               "\n  Preserves pinning and topmost state; cancels the old close timer.\n",
               "Glance.CLI.exe window set notes.txt" },
             { "window move", "Move a window using physical pixel coordinates.",
-              "Glance.CLI.exe window move --position X Y [--id UUID]\n"
+              "Glance.CLI.exe window move --position X Y [--id UUID|main]\n"
               "  Glance.CLI.exe window move --center-offset X Y [options]",
               "options:\n"
-              "  --id UUID               Target window (default: last preview UUID)\n"
+              "  --id UUID|main          Target window (default: last preview UUID)\n"
               "  --position X Y          Absolute top-left corner; negatives allowed\n"
               "  --center-offset X Y     Offset from the work-area center\n"
               "  --monitor INDEX         Monitor for centering (default: current)\n"
@@ -112,48 +123,48 @@ namespace glance::cli
               "Glance.CLI.exe window move --position -1200 100\n"
               "  Glance.CLI.exe window move --center-offset 0 0 --monitor 0" },
             { "window resize", "Resize the outer window frame in physical pixels.",
-              "Glance.CLI.exe window resize --size WIDTH HEIGHT [--id UUID]",
+              "Glance.CLI.exe window resize --size WIDTH HEIGHT [--id UUID|main]",
               "options:\n"
-              "  --id UUID               Target window (default: last preview UUID)\n"
+              "  --id UUID|main          Target window (default: last preview UUID)\n"
               "  --size WIDTH HEIGHT     Minimum: DPI-scaled 480 x 320; max: 32767\n",
               "Glance.CLI.exe window resize --size 1200 900" },
             { "window topmost", "Set whether a preview stays above other windows.",
-              "Glance.CLI.exe window topmost {on,off} [--id UUID]",
-              "options:\n  --id UUID               Target window (default: last preview UUID)\n"
+              "Glance.CLI.exe window topmost {on,off} [--id UUID|main]",
+              "options:\n  --id UUID|main          Target window (default: last preview UUID)\n"
               "\n  Pinned windows must remain topmost.\n",
               "Glance.CLI.exe window topmost on" },
             { "window pin", "Keep the current preview in a separate window.",
-              "Glance.CLI.exe window pin {on,off} [--id UUID]",
-              "options:\n  --id UUID               Target window (default: last preview UUID)\n"
+              "Glance.CLI.exe window pin {on,off} [--id UUID|main]",
+              "options:\n  --id UUID|main          Target window (default: last preview UUID)\n"
               "\n  'on' makes the window topmost and keeps it as a separate preview.\n"
               "  'off' closes the pinned window. Returns full window details.\n",
               "Glance.CLI.exe window pin on\n"
               "  Glance.CLI.exe window pin off" },
             { "window line", "Go to a plain-text line, loading more text as needed.",
-              "Glance.CLI.exe window line N [--id UUID] [options]",
+              "Glance.CLI.exe window line N [--id UUID|main] [options]",
               "arguments:\n  N                       Line number starting at 1\n",
               "Glance.CLI.exe window line 120" },
             { "window page", "Go to a PDF page and wait for rendering.",
-              "Glance.CLI.exe window page N [--id UUID] [options]",
+              "Glance.CLI.exe window page N [--id UUID|main] [options]",
               "arguments:\n  N                       Page number starting at 1\n",
               "Glance.CLI.exe window page 8" },
             { "window seek", "Seek within the current media file.",
-              "Glance.CLI.exe window seek POSITION [--id UUID] [options]",
+              "Glance.CLI.exe window seek POSITION [--id UUID|main] [options]",
               "arguments:\n  POSITION                Seconds or HH:MM:SS[.fff]\n",
               "Glance.CLI.exe window seek 00:01:30" },
             { "window next", "Preview the next file in the sequence or gallery.",
-              "Glance.CLI.exe window next [--id UUID] [options]", "", "Glance.CLI.exe window next" },
+              "Glance.CLI.exe window next [--id UUID|main] [options]", "", "Glance.CLI.exe window next" },
             { "window previous", "Preview the previous file in the sequence or gallery.",
-              "Glance.CLI.exe window previous [--id UUID] [options]", "", "Glance.CLI.exe window previous" },
+              "Glance.CLI.exe window previous [--id UUID|main] [options]", "", "Glance.CLI.exe window previous" },
             { "window play", "Play the current media file.",
-              "Glance.CLI.exe window play [--id UUID] [options]", "", "Glance.CLI.exe window play" },
+              "Glance.CLI.exe window play [--id UUID|main] [options]", "", "Glance.CLI.exe window play" },
             { "window pause", "Pause the current media file.",
-              "Glance.CLI.exe window pause [--id UUID] [options]", "", "Glance.CLI.exe window pause" },
+              "Glance.CLI.exe window pause [--id UUID|main] [options]", "", "Glance.CLI.exe window pause" },
             { "window volume", "Set the current window's media volume.",
-              "Glance.CLI.exe window volume N [--id UUID] [options]",
+              "Glance.CLI.exe window volume N [--id UUID|main] [options]",
               "arguments:\n  N                       Volume from 0 to 100\n", "Glance.CLI.exe window volume 50" },
             { "window mute", "Set the current window's media mute state.",
-              "Glance.CLI.exe window mute {on,off} [--id UUID] [options]", "", "Glance.CLI.exe window mute on" },
+              "Glance.CLI.exe window mute {on,off} [--id UUID|main] [options]", "", "Glance.CLI.exe window mute on" },
             { "windows", "List open preview windows; main identifies the main preview window.",
               "Glance.CLI.exe windows [options]",
               "output:\n  Each window includes its ID, paths, state, and bounds.\n",

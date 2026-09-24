@@ -241,6 +241,7 @@ namespace winrt::Glance::App::implementation
             for (const auto& item : detached_windows_)
                 if (get_self<MainWindow>(item)->CliId() == id_text) window = item;
             if (active_window_ && get_self<MainWindow>(active_window_)->CliId() == id_text) window = active_window_;
+            if (id_text == L"main") window = active_window_;
         }
         if (!window) throw Error(3, "window_not_found", "Window ID not found");
         auto implementation = get_self<MainWindow>(window);
@@ -278,6 +279,8 @@ namespace winrt::Glance::App::implementation
             return result;
         }
         else if (command == L"window.topmost") implementation->CliTopmost(request.GetNamedBoolean(L"enabled"));
+        else if (command == L"window.activate") implementation->CliActivate();
+        else if (command == L"window.fullwindow") implementation->CliFullwindow(request.GetNamedBoolean(L"enabled"));
         else if (command == L"window.move" || command == L"window.resize") implementation->CliConfigure(request);
         else if (command != L"window.get")
         {

@@ -55,6 +55,8 @@ namespace winrt::Glance::App::implementation
         void CliConfigure(Windows::Data::Json::JsonObject const& options, bool validate_only = false);
         void CliPin(bool enabled);
         void CliTopmost(bool enabled);
+        void CliActivate();
+        void CliFullwindow(bool enabled);
         std::wstring CliLoadState();
 
         void InitializeSession(

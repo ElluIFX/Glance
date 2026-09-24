@@ -96,6 +96,8 @@ Standard input occupies the entire preview request. `--name` accepts a filename.
 
 Each new window has a unique UUID. Omitting `--id` targets the window most recently returned by `preview`, including after pinning. A closed target returns an error. Use `--id UUID` to select another window; find its UUID with `windows`.
 
+Use `--id main` to target the currently open main preview window. Results contain its actual UUID. A closed main window returns exit code `3`.
+
 ```powershell
 $result = & $cli preview 'C:\Documents\report.pdf' --pin --json | ConvertFrom-Json
 $windowId = $result.data.id
@@ -113,6 +115,8 @@ $windowId = $result.data.id
 | `window move --position X Y` | Move to absolute coordinates |
 | `window move --center-offset X Y` | Position relative to a monitor center; accepts `--monitor INDEX` |
 | `window resize --size WIDTH HEIGHT` | Change the outer window size |
+| `window activate` | Bring the window to the foreground and activate it; a denied request returns exit code `8` |
+| `window fullwindow on` / `window fullwindow off` | Enter or exit full-screen preview; exiting restores the previous window position and size |
 | `window topmost on` / `window topmost off` | Change always-on-top state |
 | `window pin on` / `window pin off` | Pin a window / close a pinned window |
 | `window close` | Close the preview and leave Glance running |
@@ -171,6 +175,8 @@ if ($LASTEXITCODE -ne 0) {
 
 
 ### Common options and timeouts
+
+Window results include `fullwindow` to indicate full-screen mode. For plain text, `line_count` counts loaded lines and `content_complete` indicates whether the entire file has been loaded.
 
 | Option | Effect |
 | --- | --- |

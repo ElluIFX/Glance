@@ -89,6 +89,14 @@ try {
     Assert-True ($opened.state -eq 'ready' -and $opened.paths.Count -eq 2) 'Multi-path preview not ready'
     Assert-True ($opened.bounds.width -eq 1000 -and $opened.bounds.height -eq 700 -and $opened.bounds.x -eq 100) 'Explicit geometry not preserved'
     $id = $opened.id
+    Assert-True ((Invoke-Cli -Arguments @('window', 'get', '--id', 'main')).data.id -eq $id) 'Main alias did not resolve to the preview UUID'
+    Assert-True ($opened.content_complete -and $opened.line_count -gt 0) 'Complete text state is invalid'
+    Assert-True (-not $opened.PSObject.Properties['has_more']) 'Internal text loading field was exposed'
+    $full = (Invoke-Cli -Arguments @('window', 'fullwindow', 'on', '--id', 'main')).data
+    Assert-True $full.fullwindow 'Full-window mode was not enabled'
+    Assert-True ((Invoke-Cli -Arguments @('window', 'fullwindow', 'on', '--id', 'main')).data.fullwindow) 'Full-window on was not idempotent'
+    $restored = (Invoke-Cli -Arguments @('window', 'fullwindow', 'off', '--id', 'main')).data
+    Assert-True (-not $restored.fullwindow -and $restored.bounds.width -eq $opened.bounds.width -and $restored.bounds.height -eq $opened.bounds.height) 'Full-window exit did not restore geometry'
     Assert-True $opened.wait_completed 'Default preview did not wait for readiness'
     $next = (Invoke-Cli -Arguments @('window', 'next')).data
     Assert-True ($next.current_index -eq 1) 'Next file did not navigate'
@@ -112,6 +120,8 @@ try {
     Invoke-Cli -Arguments @('window', 'topmost', 'off', '--id', $id) -Expected 8 | Out-Null
     $windows = (Invoke-Cli -Arguments @('windows')).data.windows
     Assert-True ($windows.Count -eq 1 -and -not $windows[0].main) 'Closed main window was listed or pinned window was marked main'
+    Invoke-Cli -Arguments @('window', 'get', '--id', 'main') -Expected 3 | Out-Null
+    Invoke-Cli -Arguments @('window', 'activate', '--id', 'main') -Expected 3 | Out-Null
     $resized = (Invoke-Cli -Arguments @('window', 'resize', '--id', $id, '--size', '900', '650')).data
     Assert-True ($resized.bounds.width -eq 900 -and $resized.bounds.height -eq 650) "Resize failed: $($resized | ConvertTo-Json -Depth 6 -Compress)"
     $replaced = (Invoke-Cli -Arguments @('window', 'set', $second)).data
@@ -121,6 +131,7 @@ try {
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.generation -eq $replaced.generation) 'Invalid set replaced content'
     $other = (Invoke-Cli -Arguments @('preview', $first, '--topmost')).data
     Assert-True ($other.id -ne $id -and $other.topmost) 'New window UUID or topmost flag failed'
+    Assert-True ((Invoke-Cli -Arguments @('window', 'get', '--id', 'main')).data.id -eq $other.id) 'Main alias did not follow the new main window'
     $targeted = (Invoke-Cli -Arguments @('window', 'set', $first, $second, '--id', $id.ToUpperInvariant())).data
     Assert-True ($targeted.id -eq $id -and $targeted.paths.Count -eq 2) 'Explicit UUID set failed'
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.id -eq $other.id) 'Explicit target changed the default UUID'
@@ -203,10 +214,12 @@ try {
 
     $longText = Join-Path $fixture 'long.txt'
     [IO.File]::WriteAllLines($longText, [string[]](1..40000 | ForEach-Object { "Line $_ with enough content to exceed one chunk" }))
-    Invoke-Cli -Arguments @('preview', $longText) | Out-Null
+    $partial = (Invoke-Cli -Arguments @('preview', $longText)).data
+    Assert-True (-not $partial.content_complete -and $partial.line_count -lt 40000) 'Partial text was marked complete'
     $located = (Invoke-Cli -Arguments @('window', 'line', '35000')).data
     Assert-True ($located.line -eq 35000 -and $located.wait_completed) 'Incremental line navigation failed'
     Invoke-Cli -Arguments @('window', 'line', '90000') -Expected 3 | Out-Null
+    Assert-True ((Invoke-Cli -Arguments @('window', 'line', '40000')).data.content_complete) 'Fully read text was marked incomplete'
 
     $wave = Join-Path $fixture 'silence.wav'
     $writer = [IO.BinaryWriter]::new([IO.File]::Create($wave))

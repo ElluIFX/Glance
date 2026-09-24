@@ -96,6 +96,8 @@ Glance 等待预览就绪并输出完整窗口信息。主程序尚未运行时�
 
 每个新窗口都有独立 UUID。省略 `--id` 时操作最近一次 `preview` 返回的窗口，钉住后仍保持该目标；目标已关闭时返回错误。指定其他窗口时，使用 `--id UUID`，UUID 可从 `windows` 查询。
 
+`--id main` 指定当前打开的主预览窗口，结果返回其真实 UUID。主窗口已关闭时返回退出码 `3`。
+
 ```powershell
 $result = & $cli preview 'C:\Documents\report.pdf' --pin --json | ConvertFrom-Json
 $windowId = $result.data.id
@@ -113,6 +115,8 @@ $windowId = $result.data.id
 | `window move --position X Y` | 移到绝对坐标 |
 | `window move --center-offset X Y` | 相对屏幕中心定位，可配合 `--monitor INDEX` |
 | `window resize --size WIDTH HEIGHT` | 修改窗口外框尺寸 |
+| `window activate` | 将窗口带到前台并激活；系统拒绝时返回退出码 `8` |
+| `window fullwindow on` / `window fullwindow off` | 进入或退出全屏预览，退出后恢复原窗口位置和尺寸 |
 | `window topmost on` / `window topmost off` | 切换置顶 |
 | `window pin on` / `window pin off` | 钉住窗口 / 关闭已钉住窗口 |
 | `window close` | 关闭预览，Glance 保持运行 |
@@ -171,6 +175,8 @@ if ($LASTEXITCODE -ne 0) {
 
 
 ### 通用选项与等待时间
+
+窗口结果中的 `fullwindow` 表示是否全屏。纯文本结果中的 `line_count` 为已加载文本的行数，`content_complete` 表示全文是否已加载完成。
 
 | 选项 | 作用 |
 | --- | --- |

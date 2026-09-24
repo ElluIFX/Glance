@@ -239,14 +239,15 @@ int wmain(int argc, wchar_t** argv)
             if (arg == L"--id")
             {
                 auto value = utf8(next());
-                if (value.size() != 36) throw Error(2, "invalid_id", "Window ID must be a UUID from 'preview' or 'windows'");
+                if (value == "main") { string_member(request, "id", value); continue; }
+                if (value.size() != 36) throw Error(2, "invalid_id", "Window ID must be 'main' or a UUID from 'preview' or 'windows'");
                 for (std::size_t position = 0; position < value.size(); ++position)
                 {
                     auto& character = value[position];
                     if (character >= 'A' && character <= 'F') character += 'a' - 'A';
                     const bool separator = position == 8 || position == 13 || position == 18 || position == 23;
                     if (separator ? character != '-' : !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')))
-                        throw Error(2, "invalid_id", "Window ID must be a UUID from 'preview' or 'windows'");
+                        throw Error(2, "invalid_id", "Window ID must be 'main' or a UUID from 'preview' or 'windows'");
                 }
                 string_member(request, "id", value); continue;
             }
@@ -308,7 +309,7 @@ int wmain(int argc, wchar_t** argv)
         }
         const std::set<std::string> known{ "preview", "window.get", "window.close", "window.move", "window.resize",
             "window.line", "window.page", "window.seek", "window.next", "window.previous", "window.play", "window.pause", "window.volume", "window.mute",
-            "window.topmost", "window.pin", "window.set", "windows", "status", "settings.list", "settings.get", "settings.set", "settings.reset", "check-update", "quit" };
+            "window.topmost", "window.pin", "window.set", "window.activate", "window.fullwindow", "windows", "status", "settings.list", "settings.get", "settings.set", "settings.reset", "check-update", "quit" };
         if (!known.contains(command)) throw Error(2, "unknown_command", "Unknown command: " + command);
         std::set<std::wstring> allowed{ L"--json", L"--quiet", L"--no-start" };
         if (command == "preview" || command.starts_with("window.")) allowed.insert(L"--timeout");
@@ -405,7 +406,7 @@ int wmain(int argc, wchar_t** argv)
                 command == "window.volume" ? 100 : INT32_MAX, command != "window.seek" && command != "window.volume");
             request.AddMember("value", value, allocator);
         }
-        else if (command == "window.pin" || command == "window.topmost" || command == "window.mute")
+        else if (command == "window.pin" || command == "window.topmost" || command == "window.mute" || command == "window.fullwindow")
         {
             if (words.size() != 1 || (words[0] != L"on" && words[0] != L"off")) throw Error(2, "invalid_boolean", "Expected on or off");
             request.AddMember("enabled", words[0] == L"on", allocator);
@@ -422,6 +423,11 @@ int wmain(int argc, wchar_t** argv)
             output(json ? "{\"schema_version\":1,\"ok\":true,\"command\":\"quit\",\"data\":{\"running\":false},\"error\":null}" : "OK"); return 0;
         }
         verify_server(pipe.value);
+        if (command == "window.activate")
+        {
+            ULONG server_pid{};
+            if (GetNamedPipeServerProcessId(pipe.value, &server_pid)) AllowSetForegroundWindow(server_pid);
+        }
         const auto wait_started = GetTickCount64();
         const auto deadline = wait_started + transport_timeout;
         const auto correlation = GetTickCount64() ^ (static_cast<std::uint64_t>(GetCurrentProcessId()) << 32);
