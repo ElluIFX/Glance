@@ -488,7 +488,7 @@ namespace winrt::Glance::App::implementation
         };
         void show_password_prompt(PasswordPromptTarget target, bool invalid_password);
         void hide_password_prompt();
-        void set_password_prompt_activation(bool enabled) noexcept;
+        void update_input_activation() noexcept;
         void submit_password();
         void cancel_archive_icon_load() noexcept;
         winrt::fire_and_forget load_directory_async(std::wstring path, std::uint64_t generation);
@@ -824,7 +824,7 @@ namespace winrt::Glance::App::implementation
         bool archive_preview_is_directory_{};
         bool archive_entry_compressed_size_available_{};
         PasswordPromptTarget password_prompt_target_{ PasswordPromptTarget::none };
-        bool password_prompt_activation_enabled_{};
+        bool input_activation_enabled_{};
         bool password_prompt_focused_{};
         std::wstring footer_access_mode_;
         bool footer_access_loaded_{};

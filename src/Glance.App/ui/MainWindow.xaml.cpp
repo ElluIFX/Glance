@@ -2565,25 +2565,28 @@ namespace winrt::Glance::App::implementation
         auto* self = reinterpret_cast<MainWindow*>(reference_data);
         if (message == WM_MOUSEACTIVATE)
         {
-            if (self == nullptr || !self->password_prompt_activation_enabled_)
+            if (self == nullptr || !self->input_activation_enabled_)
             {
                 return MA_NOACTIVATE;
             }
-            if (!self->password_prompt_focused_)
+            if (self->password_prompt_target_ != PasswordPromptTarget::none && !self->password_prompt_focused_)
             {
                 self->password_prompt_focused_ = true;
                 self->update_state();
             }
+            return MA_ACTIVATE;
         }
         if (message == WM_ACTIVATE && self != nullptr &&
-            self->password_prompt_activation_enabled_)
+            self->input_activation_enabled_)
         {
             const bool focused = LOWORD(wparam) != WA_INACTIVE;
-            if (self->password_prompt_focused_ != focused)
+            if (self->password_prompt_target_ != PasswordPromptTarget::none &&
+                self->password_prompt_focused_ != focused)
             {
                 self->password_prompt_focused_ = focused;
                 self->update_state();
             }
+            if (self->active_component_view_) self->update_state();
         }
         if (message == WM_GETMINMAXINFO)
         {
@@ -2893,6 +2896,7 @@ namespace winrt::Glance::App::implementation
         ComponentViewPresenter().Content(nullptr);
         ComponentViewPresenter().Visibility(Visibility::Collapsed);
         active_component_view_.reset();
+        update_input_activation();
         component_view_registration_.reset();
         component_view_session_ = 0;
         component_view_failed_ = false;
@@ -6517,6 +6521,7 @@ namespace winrt::Glance::App::implementation
                     [registration](void* token) { registration->api.close(reinterpret_cast<std::uint64_t>(token)); });
                 component_view_registration_ = registration;
                 component_view_session_ = session;
+                update_input_activation();
                 active_component_preview_ = std::move(result.lease);
                 content_preview_kind_ = current_kind_ = kind;
                 update_preview_mode_button();
@@ -10897,7 +10902,7 @@ namespace winrt::Glance::App::implementation
         PasswordPromptError().Visibility(
             invalid_password ? Visibility::Visible : Visibility::Collapsed);
         PasswordPromptInput().Password(L"");
-        set_password_prompt_activation(true);
+        update_input_activation();
         PasswordPromptOverlay().Visibility(Visibility::Visible);
         if (GetForegroundWindow() == window_)
         {
@@ -10916,16 +10921,17 @@ namespace winrt::Glance::App::implementation
         PasswordPromptError().Text(L"");
         PasswordPromptError().Visibility(Visibility::Collapsed);
         PasswordPromptOverlay().Visibility(Visibility::Collapsed);
-        set_password_prompt_activation(false);
+        update_input_activation();
         if (was_focused)
         {
             update_state();
         }
     }
 
-    void MainWindow::set_password_prompt_activation(bool enabled) noexcept
+    void MainWindow::update_input_activation() noexcept
     {
-        if (window_ == nullptr || password_prompt_activation_enabled_ == enabled)
+        const bool enabled = password_prompt_target_ != PasswordPromptTarget::none || active_component_view_ != nullptr;
+        if (window_ == nullptr || input_activation_enabled_ == enabled)
         {
             return;
         }
@@ -10948,7 +10954,7 @@ namespace winrt::Glance::App::implementation
             0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER |
                 SWP_NOACTIVATE | SWP_FRAMECHANGED);
-        password_prompt_activation_enabled_ = enabled;
+        input_activation_enabled_ = enabled;
     }
 
     void MainWindow::submit_password()
@@ -11127,8 +11133,8 @@ namespace winrt::Glance::App::implementation
         {
             state_ = glance::contracts::PreviewWindowState::hidden;
         }
-        else if (password_prompt_target_ != PasswordPromptTarget::none &&
-                 password_prompt_focused_ &&
+        else if (((password_prompt_target_ != PasswordPromptTarget::none && password_prompt_focused_) ||
+                  (active_component_view_ && GetForegroundWindow() == window_)) &&
                  !detached_)
         {
             state_ = glance::contracts::PreviewWindowState::active_interactive;
