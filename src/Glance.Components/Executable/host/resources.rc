@@ -1,0 +1,5 @@
+#include <windows.h>
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+101 RCDATA "../Resources/en-US/Resources.resw"
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+101 RCDATA "../Resources/zh-CN/Resources.resw"

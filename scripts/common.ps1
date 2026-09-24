@@ -76,7 +76,7 @@ function Remove-GlanceWorkspaceItem {
 }
 
 function Stop-GlanceProcesses {
-    $processes = Get-Process Glance, Glance.Core, Glance.DialogBroker32, Glance.OfficeHost, Glance.PdfHost, Glance.AdobeHost, Glance.ArchiveHost, Glance.HeicHost, Glance.AvifHost, Glance.RawHost -ErrorAction SilentlyContinue
+    $processes = Get-Process Glance, Glance.Core, Glance.DialogBroker32, Glance.OfficeHost, Glance.PdfHost, Glance.AdobeHost, Glance.ArchiveHost, Glance.HeicHost, Glance.AvifHost, Glance.RawHost, Glance.ExecutableHost -ErrorAction SilentlyContinue
     if (-not $processes) {
         return
     }

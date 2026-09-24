@@ -1,0 +1,9 @@
+{
+  "schema_version": 3,
+  "id": "executable",
+  "architecture": "x64",
+  "entry_point": "Glance.ExecutableComponent.dll",
+  "dependencies": [],
+  "payload_files": ["resources.pri", "Glance.ExecutableHost.exe"],
+  "installer_names": {"en-US": "Executable file information", "zh-CN": "可执行文件信息"}
+}

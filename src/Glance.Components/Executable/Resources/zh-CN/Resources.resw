@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Component.DisplayName" xml:space="preserve"><value>可执行文件信息</value></data>
+  <data name="Status.Available" xml:space="preserve"><value>静态查看 PE 文件信息</value></data>
+  <data name="Preview.Loading" xml:space="preserve"><value>正在读取可执行文件信息...</value></data>
+  <data name="Overview" xml:space="preserve"><value>概要</value></data>
+  <data name="Signatures" xml:space="preserve"><value>签名</value></data>
+  <data name="Imports" xml:space="preserve"><value>依赖</value></data>
+  <data name="Exports" xml:space="preserve"><value>导出</value></data>
+  <data name="Resources" xml:space="preserve"><value>资源</value></data>
+  <data name="Managed" xml:space="preserve"><value> .NET</value></data>
+  <data name="Structure" xml:space="preserve"><value>PE 结构</value></data>
+  <data name="Search" xml:space="preserve"><value>搜索当前分类</value></data>
+  <data name="Copy" xml:space="preserve"><value>复制</value></data>
+  <data name="Report" xml:space="preserve"><value>导出报告</value></data>
+  <data name="SaveResource" xml:space="preserve"><value>导出资源</value></data>
+  <data name="Hash" xml:space="preserve"><value>计算 SHA-256</value></data>
+  <data name="Verify" xml:space="preserve"><value>验证签名</value></data>
+  <data name="Reload" xml:space="preserve"><value>重新加载</value></data>
+  <data name="Basic" xml:space="preserve"><value>基本信息</value></data>
+  <data name="Runtime" xml:space="preserve"><value>运行与权限</value></data>
+  <data name="File" xml:space="preserve"><value>文件</value></data>
+  <data name="Description" xml:space="preserve"><value>描述</value></data>
+  <data name="Product" xml:space="preserve"><value>产品</value></data>
+  <data name="FileVersion" xml:space="preserve"><value>文件版本</value></data>
+  <data name="ProductVersion" xml:space="preserve"><value>产品版本</value></data>
+  <data name="Company" xml:space="preserve"><value>公司（文件声明）</value></data>
+  <data name="Original" xml:space="preserve"><value>原始文件名</value></data>
+  <data name="Copyright" xml:space="preserve"><value>版权</value></data>
+  <data name="Architecture" xml:space="preserve"><value>架构</value></data>
+  <data name="Type" xml:space="preserve"><value>类型</value></data>
+  <data name="Subsystem" xml:space="preserve"><value>子系统</value></data>
+  <data name="Size" xml:space="preserve"><value>大小</value></data>
+  <data name="Name" xml:space="preserve"><value>名称</value></data>
+  <data name="Value" xml:space="preserve"><value>值</value></data>
+  <data name="Ordinal" xml:space="preserve"><value>序号</value></data>
+  <data name="Address" xml:space="preserve"><value>RVA</value></data>
+  <data name="Forwarder" xml:space="preserve"><value>转发目标</value></data>
+  <data name="Delay" xml:space="preserve"><value>延迟加载</value></data>
+  <data name="Direct" xml:space="preserve"><value>直接导入</value></data>
+  <data name="Language" xml:space="preserve"><value>语言</value></data>
+  <data name="Offset" xml:space="preserve"><value>文件偏移</value></data>
+  <data name="VirtualSize" xml:space="preserve"><value>虚拟大小</value></data>
+  <data name="Flags" xml:space="preserve"><value>标志</value></data>
+  <data name="Entry" xml:space="preserve"><value>入口点</value></data>
+  <data name="Base" xml:space="preserve"><value>映像基址</value></data>
+  <data name="Timestamp" xml:space="preserve"><value>PE 时间戳</value></data>
+  <data name="Linker" xml:space="preserve"><value>链接器版本</value></data>
+  <data name="Alignment" xml:space="preserve"><value>文件 / 节区对齐</value></data>
+  <data name="Native" xml:space="preserve"><value>原生</value></data>
+  <data name="Assembly" xml:space="preserve"><value>程序集</value></data>
+  <data name="References" xml:space="preserve"><value>程序集引用</value></data>
+  <data name="Version" xml:space="preserve"><value>版本</value></data>
+  <data name="Culture" xml:space="preserve"><value>区域性</value></data>
+  <data name="Token" xml:space="preserve"><value>公钥标记</value></data>
+  <data name="Framework" xml:space="preserve"><value>目标框架</value></data>
+  <data name="Metadata" xml:space="preserve"><value>元数据版本</value></data>
+  <data name="None" xml:space="preserve"><value>无</value></data>
+  <data name="Unknown" xml:space="preserve"><value>未知</value></data>
+  <data name="Loading" xml:space="preserve"><value>正在加载...</value></data>
+  <data name="Empty" xml:space="preserve"><value>无条目</value></data>
+  <data name="Error" xml:space="preserve"><value>无法读取此分类</value></data>
+  <data name="Partial" xml:space="preserve"><value>部分结果：已达到解析限制</value></data>
+  <data name="Changed" xml:space="preserve"><value>文件已变化，请重新加载</value></data>
+  <data name="Invalid" xml:space="preserve"><value>无效或不支持的 PE 文件</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>已取消</value></data>
+  <data name="NotLoaded" xml:space="preserve"><value>未加载</value></data>
+  <data name="Complete" xml:space="preserve"><value>完整</value></data>
+  <data name="Unsigned" xml:space="preserve"><value>未找到签名</value></data>
+  <data name="Offline" xml:space="preserve"><value>离线验证</value></data>
+  <data name="Trusted" xml:space="preserve"><value>已通过本机信任验证</value></data>
+  <data name="Unverified" xml:space="preserve"><value>离线验证未完成</value></data>
+  <data name="InvalidSignature" xml:space="preserve"><value>签名验证失败</value></data>
+  <data name="Signer" xml:space="preserve"><value>签名者</value></data>
+  <data name="Issuer" xml:space="preserve"><value>颁发者</value></data>
+  <data name="Subject" xml:space="preserve"><value>主体</value></data>
+  <data name="ValidFrom" xml:space="preserve"><value>有效期起始</value></data>
+  <data name="ValidUntil" xml:space="preserve"><value>有效期截止</value></data>
+  <data name="Integrity" xml:space="preserve"><value>完整性与信任</value></data>
+  <data name="Revocation" xml:space="preserve"><value>吊销状态</value></data>
+  <data name="CacheOnly" xml:space="preserve"><value>仅使用本机缓存</value></data>
+  <data name="Embedded" xml:space="preserve"><value>内嵌签名</value></data>
+  <data name="Catalog" xml:space="preserve"><value>目录签名</value></data>
+  <data name="Algorithm" xml:space="preserve"><value>摘要算法</value></data>
+  <data name="Permission" xml:space="preserve"><value>执行权限</value></data>
+  <data name="Dpi" xml:space="preserve"><value>DPI 感知</value></data>
+  <data name="LongPath" xml:space="preserve"><value>长路径支持</value></data>
+  <data name="Compatibility" xml:space="preserve"><value>兼容性声明</value></data>
+  <data name="Yes" xml:space="preserve"><value>是</value></data>
+  <data name="No" xml:space="preserve"><value>否</value></data>
+  <data name="PreviewLimit" xml:space="preserve"><value>预览长度受限，可导出完整数据</value></data>
+  <data name="ReportTitle" xml:space="preserve"><value>可执行文件信息</value></data>
+  <data name="SaveFailed" xml:space="preserve"><value>无法保存文件</value></data>
+  <data name="Copied" xml:space="preserve"><value>已复制</value></data>
+  <data name="HashPending" xml:space="preserve"><value>未计算</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>所有文件</value></data>
+  <data name="RawResource" xml:space="preserve"><value>原始资源</value></data>
+  <data name="Section" xml:space="preserve"><value>分类</value></data>
+  <data name="State" xml:space="preserve"><value>状态</value></data>
+  <data name="Count" xml:space="preserve"><value>条目</value></data>
+  <data name="ResourceHint" xml:space="preserve"><value>选择资源查看内容</value></data>
+  <data name="Security" xml:space="preserve"><value>安全声明标志</value></data>
+  <data name="Certificate" xml:space="preserve"><value>证书</value></data>
+  <data name="FileSummary" xml:space="preserve"><value>文件摘要</value></data>
+  <data name="AllEntries" xml:space="preserve"><value>全部条目</value></data>
+  <data name="SigningTime" xml:space="preserve"><value>签名时间</value></data>
+  <data name="Cursor" xml:space="preserve"><value>光标</value></data>
+  <data name="Bitmap" xml:space="preserve"><value>位图</value></data>
+  <data name="Icon" xml:space="preserve"><value>图标</value></data>
+  <data name="StringTable" xml:space="preserve"><value>字符串表</value></data>
+  <data name="CursorGroup" xml:space="preserve"><value>光标组</value></data>
+  <data name="IconGroup" xml:space="preserve"><value>图标组</value></data>
+  <data name="VersionResource" xml:space="preserve"><value>版本资源</value></data>
+  <data name="CopyReport" xml:space="preserve"><value>复制完整报告</value></data>
+  <data name="Cancel" xml:space="preserve"><value>取消</value></data>
+</root>

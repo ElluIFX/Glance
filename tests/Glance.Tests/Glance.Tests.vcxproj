@@ -27,11 +27,15 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>icu.lib;Comctl32.lib;Ole32.lib;OleAut32.lib;Urlmon.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>icu.lib;Comctl32.lib;Ole32.lib;OleAut32.lib;Urlmon.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;Bcrypt.lib;Version.lib;XmlLite.lib;Wintrust.lib;Crypt32.lib;Gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="input_decision_tests.cpp" />
+    <ClCompile Include="executable_tests.cpp" />
+    <ClCompile Include="..\..\src\Glance.Components\Executable\host\pe_reader.cpp" />
+    <ClCompile Include="..\..\src\Glance.Components\Executable\host\signature.cpp" />
+    <ClCompile Include="..\..\src\Glance.Components\Executable\host\resource_image.cpp" />
     <ClCompile Include="office_preview_benchmark.cpp" />
     <ClCompile Include="office_package_tests.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Office\host\src\presentation_package.cpp" />

@@ -978,9 +978,16 @@ namespace
 
 int run_text_monitor_tests();
 int run_office_package_tests();
+int run_executable_tests(bool layout);
 
 int wmain(int argument_count, wchar_t* arguments[])
 {
+    if (argument_count == 1 && run_executable_tests(false) != 0)
+        return 1;
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--executable-tests")
+        return run_executable_tests(false);
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--executable-layout")
+        return run_executable_tests(true);
     if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--office-package-tests")
     {
         return run_office_package_tests();

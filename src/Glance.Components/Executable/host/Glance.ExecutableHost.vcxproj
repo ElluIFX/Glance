@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals"><ProjectGuid>{42CF64A4-6D5D-40F7-89AF-F43026B789AB}</ProjectGuid><ProjectName>Glance.ExecutableHost</ProjectName></PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType><CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries><UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <OutDir>$(GlanceOutputRoot)components\executable\</OutDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup>
+    <ClCompile><AdditionalIncludeDirectories>$(ProjectDir)..\..\..\Glance.Contracts\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+    <Link><SubSystem>Windows</SubSystem><AdditionalDependencies>Comctl32.lib;Comdlg32.lib;Ole32.lib;Shell32.lib;Shlwapi.lib;Uxtheme.lib;XmlLite.lib;Bcrypt.lib;Crypt32.lib;Wintrust.lib;Version.lib;Gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup><ClCompile Include="main.cpp" /><ClCompile Include="pe_reader.cpp" /><ClCompile Include="viewer.cpp" /><ClCompile Include="resources.cpp" /><ClCompile Include="signature.cpp" /><ClCompile Include="resource_image.cpp" /></ItemGroup>
+  <ItemGroup><Manifest Include="app.manifest" /><ResourceCompile Include="resources.rc" /></ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
