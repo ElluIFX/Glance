@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ComponentName" xml:space="preserve"><value>Font preview</value></data>
+  <data name="Available" xml:space="preserve"><value>Preview OpenType, TrueType and web fonts</value></data>
+  <data name="Loading" xml:space="preserve"><value>Loading font...</value></data>
+  <data name="Sample" xml:space="preserve"><value>Sample</value></data>
+  <data name="Single" xml:space="preserve"><value>Character</value></data>
+  <data name="Size" xml:space="preserve"><value>Size (pt)</value></data>
+  <data name="Weight" xml:space="preserve"><value>Weight</value></data>
+  <data name="Character" xml:space="preserve"><value>Character</value></data>
+  <data name="CharacterHint" xml:space="preserve"><value>Enter one character</value></data>
+  <data name="Metadata" xml:space="preserve"><value>Font information</value></data>
+  <data name="Retry" xml:space="preserve"><value>Retry</value></data>
+  <data name="Failed" xml:space="preserve"><value>Unable to preview this font</value></data>
+  <data name="Missing" xml:space="preserve"><value>The font does not support this character</value></data>
+  <data name="FirstCharacter" xml:space="preserve"><value>Showing the first character</value></data>
+  <data name="Identity" xml:space="preserve"><value>Names and origin</value></data>
+  <data name="Properties" xml:space="preserve"><value>Font properties</value></data>
+  <data name="Legal" xml:space="preserve"><value>Copyright and license</value></data>
+  <data name="FullName" xml:space="preserve"><value>Full name</value></data>
+  <data name="PostScript" xml:space="preserve"><value>PostScript name</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Designer" xml:space="preserve"><value>Designer</value></data>
+  <data name="Manufacturer" xml:space="preserve"><value>Manufacturer</value></data>
+  <data name="Copyright" xml:space="preserve"><value>Copyright</value></data>
+  <data name="License" xml:space="preserve"><value>Declared license</value></data>
+  <data name="Stretch" xml:space="preserve"><value>Width class</value></data>
+  <data name="Glyphs" xml:space="preserve"><value>Glyph count</value></data>
+  <data name="Axes" xml:space="preserve"><value>Variable axes (default)</value></data>
+</root>

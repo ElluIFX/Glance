@@ -66,12 +66,24 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.ExecutableComponent"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.ExecutableHost", "src\Glance.Components\Executable\host\Glance.ExecutableHost.vcxproj", "{42CF64A4-6D5D-40F7-89AF-F43026B789AB}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.FontComponent", "src\Glance.Components\Font\Glance.FontComponent.vcxproj", "{52741F19-5393-448A-9FB0-56A9AE3C3A61}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.FontHost", "src\Glance.Components\Font\host\Glance.FontHost.vcxproj", "{4A5E65AF-A6D3-479A-B8AB-06A142F17DBC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{52741F19-5393-448A-9FB0-56A9AE3C3A61}.Debug|x64.ActiveCfg = Debug|x64
+		{52741F19-5393-448A-9FB0-56A9AE3C3A61}.Debug|x64.Build.0 = Debug|x64
+		{52741F19-5393-448A-9FB0-56A9AE3C3A61}.Release|x64.ActiveCfg = Release|x64
+		{52741F19-5393-448A-9FB0-56A9AE3C3A61}.Release|x64.Build.0 = Release|x64
+		{4A5E65AF-A6D3-479A-B8AB-06A142F17DBC}.Debug|x64.ActiveCfg = Debug|x64
+		{4A5E65AF-A6D3-479A-B8AB-06A142F17DBC}.Debug|x64.Build.0 = Debug|x64
+		{4A5E65AF-A6D3-479A-B8AB-06A142F17DBC}.Release|x64.ActiveCfg = Release|x64
+		{4A5E65AF-A6D3-479A-B8AB-06A142F17DBC}.Release|x64.Build.0 = Release|x64
 		{F4398C50-1715-4419-BF80-20F9EBB889F1}.Debug|x64.ActiveCfg = Debug|x64
 		{F4398C50-1715-4419-BF80-20F9EBB889F1}.Debug|x64.Build.0 = Debug|x64
 		{F4398C50-1715-4419-BF80-20F9EBB889F1}.Release|x64.ActiveCfg = Release|x64

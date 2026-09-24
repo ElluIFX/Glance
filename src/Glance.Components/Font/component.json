@@ -1,0 +1,9 @@
+{
+  "schema_version": 3,
+  "id": "font",
+  "architecture": "x64",
+  "entry_point": "Glance.FontComponent.dll",
+  "dependencies": [],
+  "payload_files": ["resources.pri", "Glance.FontHost.exe"],
+  "installer_names": {"en-US": "Font preview", "zh-CN": "字体预览"}
+}

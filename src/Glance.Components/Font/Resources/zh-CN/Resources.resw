@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ComponentName" xml:space="preserve"><value>字体预览</value></data>
+  <data name="Available" xml:space="preserve"><value>预览 OpenType、TrueType 和网页字体</value></data>
+  <data name="Loading" xml:space="preserve"><value>正在加载字体...</value></data>
+  <data name="Sample" xml:space="preserve"><value>样文</value></data>
+  <data name="Single" xml:space="preserve"><value>单字</value></data>
+  <data name="Size" xml:space="preserve"><value>字号 (pt)</value></data>
+  <data name="Weight" xml:space="preserve"><value>字重</value></data>
+  <data name="Character" xml:space="preserve"><value>单字</value></data>
+  <data name="CharacterHint" xml:space="preserve"><value>输入一个字符</value></data>
+  <data name="Metadata" xml:space="preserve"><value>字体信息</value></data>
+  <data name="Retry" xml:space="preserve"><value>重试</value></data>
+  <data name="Failed" xml:space="preserve"><value>无法预览此字体</value></data>
+  <data name="Missing" xml:space="preserve"><value>此字体不支持该字符</value></data>
+  <data name="FirstCharacter" xml:space="preserve"><value>已显示第一个字符</value></data>
+  <data name="Identity" xml:space="preserve"><value>名称与来源</value></data>
+  <data name="Properties" xml:space="preserve"><value>字体属性</value></data>
+  <data name="Legal" xml:space="preserve"><value>版权与许可</value></data>
+  <data name="FullName" xml:space="preserve"><value>完整名称</value></data>
+  <data name="PostScript" xml:space="preserve"><value>PostScript 名称</value></data>
+  <data name="Version" xml:space="preserve"><value>版本</value></data>
+  <data name="Designer" xml:space="preserve"><value>设计者</value></data>
+  <data name="Manufacturer" xml:space="preserve"><value>厂商</value></data>
+  <data name="Copyright" xml:space="preserve"><value>版权</value></data>
+  <data name="License" xml:space="preserve"><value>字体声明的许可</value></data>
+  <data name="Stretch" xml:space="preserve"><value>字宽等级</value></data>
+  <data name="Glyphs" xml:space="preserve"><value>字形数</value></data>
+  <data name="Axes" xml:space="preserve"><value>可变轴（默认值）</value></data>
+</root>

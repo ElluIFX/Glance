@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" TreatAsLocalProperty="WindowsAppSDKSelfContained" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{52741F19-5393-448A-9FB0-56A9AE3C3A61}</ProjectGuid><ProjectName>Glance.FontComponent</ProjectName>
+    <CppWinRTOptimized>true</CppWinRTOptimized><CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained><DefaultLanguage>en-US</DefaultLanguage>
+    <AppxPackage>false</AppxPackage><WindowsPackageType>None</WindowsPackageType><EnableMsixTooling>false</EnableMsixTooling>
+    <PrependPriInitialPath>false</PrependPriInitialPath><ProjectPriFileName>resources.pri</ProjectPriFileName>
+    <WindowsAppSDKBootstrapInitialize>false</WindowsAppSDKBootstrapInitialize>
+    <WindowsAppSDKDeploymentManagerInitialize>false</WindowsAppSDKDeploymentManagerInitialize>
+    <WebView2UseWinRT>true</WebView2UseWinRT>
+    <WebView2LoaderPreference>None</WebView2LoaderPreference>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType><CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <OutDir>$(GlanceOutputRoot)components\font\</OutDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup>
+    <ClCompile><AdditionalIncludeDirectories>$(ProjectDir)..\..\Glance.Contracts\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+    <Link><AdditionalDependencies>icu.lib;Ole32.lib;RuntimeObject.lib;WindowsApp.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup><ClCompile Include="component.cpp" /><ClCompile Include="client.cpp" /><ClCompile Include="view.cpp" /></ItemGroup>
+  <ItemGroup><PRIResource Include="Resources\en-US\Resources.resw" /><PRIResource Include="Resources\zh-CN\Resources.resw" /></ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.0" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.5" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.3" />
+    <PackageReference Include="Microsoft.Windows.CppWinRT" Version="3.0.260715.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3719.77" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.251221100" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="host\Glance.FontHost.vcxproj"><Project>{4A5E65AF-A6D3-479A-B8AB-06A142F17DBC}</Project><LinkLibraryDependencies>false</LinkLibraryDependencies></ProjectReference></ItemGroup>
+  <Target Name="CopyComponentManifest" AfterTargets="Build"><Copy SourceFiles="$(ProjectDir)component.json" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" /></Target>
+  <Target Name="ValidateComponentResources" BeforeTargets="_GenerateProjectPriFile"><Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)..\Common\validate-resources.ps1&quot; -ResourceRoot &quot;$(ProjectDir)Resources&quot;" /></Target>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
