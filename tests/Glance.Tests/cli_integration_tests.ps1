@@ -107,7 +107,7 @@ try {
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.id -eq $id) 'Pin changed the default target'
     Invoke-Cli -Arguments @('window', 'topmost', 'off', '--id', $id) -Expected 8 | Out-Null
     $windows = (Invoke-Cli -Arguments @('windows')).data.windows
-    Assert-True ($windows.Count -eq 2) 'Pin did not create a new dynamic window'
+    Assert-True ($windows.Count -eq 1 -and -not $windows[0].main) 'Closed main window was listed or pinned window was marked main'
     $resized = (Invoke-Cli -Arguments @('window', 'resize', '--id', $id, '--size', '900', '650')).data
     Assert-True ($resized.bounds.width -eq 900 -and $resized.bounds.height -eq 650) "Resize failed: $($resized | ConvertTo-Json -Depth 6 -Compress)"
     $replaced = (Invoke-Cli -Arguments @('window', 'set', $second)).data
@@ -121,7 +121,7 @@ try {
     Assert-True ($targeted.id -eq $id -and $targeted.paths.Count -eq 2) 'Explicit UUID set failed'
     Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.id -eq $other.id) 'Explicit target changed the default UUID'
     Invoke-Cli -Arguments @('window', 'close') | Out-Null
-    Invoke-Cli -Arguments @('window', 'resize', '--size', '1100', '750') -Expected 8 | Out-Null
+    Invoke-Cli -Arguments @('window', 'resize', '--size', '1100', '750') -Expected 3 | Out-Null
     Invoke-Cli -Arguments @('window', 'pin', 'off', '--id', $id) | Out-Null
     $defaultPinned = (Invoke-Cli -Arguments @('preview', $second, '--pin')).data
     Invoke-Cli -Arguments @('window', 'pin', 'off') | Out-Null
@@ -134,7 +134,7 @@ try {
     Invoke-Cli -Arguments @('preview', $first, '--close-after', '0.4') | Out-Null
     Invoke-Cli -Arguments @('preview', $second) | Out-Null
     Start-Sleep -Milliseconds 700
-    Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.visible) 'Old close timer closed replacement preview'
+    Assert-True ((Invoke-Cli -Arguments @('window', 'get')).data.state -eq 'ready') 'Old close timer closed replacement preview'
     Invoke-Cli -Arguments @('preview', (Join-Path $fixture 'missing.txt')) -Expected 3 | Out-Null
     Invoke-Cli -Arguments @('preview', $fixture) | Out-Null
     $brokenImage = Join-Path $fixture 'broken.png'
@@ -144,7 +144,7 @@ try {
     $closed = (Invoke-Cli -Arguments @('preview', $first, '--pin', '--wait', '--close-after', '0.2')).data
     Assert-True ($closed.state -eq 'closed' -and $closed.wait_completed) 'Wait did not return the closed snapshot'
     $bounded = (Invoke-Cli -Arguments @('preview', $first, '--wait', '--timeout', '0.1')).data
-    Assert-True ($bounded.visible -and -not $bounded.wait_completed) 'Bounded close wait did not return current state'
+    Assert-True ($bounded.state -ne 'closed' -and -not $bounded.wait_completed) 'Bounded close wait did not return current state'
     $immediate = (Invoke-Cli -Arguments @('preview', $first, '--wait', '--timeout', '0')).data
     Assert-True (-not $immediate.wait_completed) 'Timeout zero waited for close'
     $textOutput = & $cli window get

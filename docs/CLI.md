@@ -124,7 +124,7 @@ $windowId = $result.data.id
 | `window volume N` | 当前窗口音量，范围 0～100 |
 | `window mute on` / `window mute off` | 当前窗口静音状态 |
 
-以上命令都接受 `--id UUID`。UUID 在钉住后保持不变，Glance 重启后失效。`windows` 也会列出隐藏的动态窗口。连续 `preview` 复用普通预览窗口；钉住后，下次 `preview` 使用新窗口。
+以上命令都接受 `--id UUID`。UUID 在钉住后保持不变，Glance 重启后失效。`windows` 只列出正在显示的预览窗口，`main: true` 表示主预览窗口，独立窗口为 `main: false`。连续 `preview` 复用主预览窗口；钉住后，下次 `preview` 使用新窗口。关闭的窗口无法查询或控制，再次打开时可能复用原 UUID。
 
 ## 修改设置
 
@@ -182,7 +182,7 @@ if ($LASTEXITCODE -ne 0) {
 | `--wait` | `preview` 和保持窗口存在的 `window` 命令等待目标关闭 |
 | `--version` | 显示版本 |
 
-默认等待内容就绪或控制操作完成。`--timeout 0` 在请求应用后返回，正数超时返回当前状态及 `wait_completed: false`；正常完成返回 `wait_completed: true`。`--wait` 等待窗口关闭，动态预览隐藏也算关闭；与 `--timeout` 组合时采用同一总等待上限。
+默认等待内容就绪或控制操作完成。`--timeout 0` 在请求应用后返回，正数超时返回当前状态及 `wait_completed: false`；正常完成返回 `wait_completed: true`。`--wait` 等待窗口关闭；与 `--timeout` 组合时采用同一总等待上限。
 
 连接最多等待 15 秒，普通请求传输与执行最多 10 秒，更新检查最多 60 秒。这些故障会返回错误。管道输入收集时间独立于内容等待。CLI 退出或 Ctrl+C 中断等待后，已接受的预览和控制操作继续运行。
 

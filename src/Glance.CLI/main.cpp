@@ -454,7 +454,7 @@ int wmain(int argc, wchar_t** argv)
                     throw Error(result["data"]["command_error_code"].GetInt(), "content_control_failed", result["data"]["command_error_message"].GetString());
                 const std::string_view state = result["data"]["state"].GetString();
                 if (state == "failed") throw Error(9, "preview_failed", "Preview provider failed");
-                const bool closed = state == "hidden" || state == "closed";
+                const bool closed = state == "closed";
                 completed = wait ? closed : state != "loading";
                 if (completed) break;
                 if (custom_timeout && GetTickCount64() - wait_started >= static_cast<ULONGLONG>(timeout * 1000)) break;
@@ -462,14 +462,6 @@ int wmain(int argc, wchar_t** argv)
                 try
                 {
                     auto latest = query_window(id, wait || command == "window.next" || command == "window.previous" ? "" : generation);
-                    if (std::string_view(latest["data"]["state"].GetString()) == "hidden")
-                    {
-                        if (!wait) throw Error(10, "preview_closed", "Preview closed before completion");
-                        result["data"]["state"].SetString("closed", result.GetAllocator());
-                        result["data"]["visible"].SetBool(false);
-                        completed = true;
-                        break;
-                    }
                     result["data"].CopyFrom(latest["data"], result.GetAllocator());
                 }
                 catch (const Error& error)
@@ -477,7 +469,6 @@ int wmain(int argc, wchar_t** argv)
                     if (error.code != 3) throw;
                     if (!wait) throw Error(10, "preview_closed", "Preview closed before completion");
                     result["data"]["state"].SetString("closed", result.GetAllocator());
-                    result["data"]["visible"].SetBool(false);
                     completed = true;
                     break;
                 }
@@ -485,7 +476,6 @@ int wmain(int argc, wchar_t** argv)
             if (wait && completed)
             {
                 result["data"]["state"].SetString("closed", result.GetAllocator());
-                result["data"]["visible"].SetBool(false);
             }
             result["data"].AddMember("wait_completed", completed, result.GetAllocator());
             response = serialize(result);

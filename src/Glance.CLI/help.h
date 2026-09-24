@@ -125,7 +125,7 @@ namespace glance::cli
             { "window pin", "Keep the current preview in a separate window.",
               "Glance.CLI.exe window pin {on,off} [--id UUID]",
               "options:\n  --id UUID               Target window (default: last preview UUID)\n"
-              "\n  'on' makes the window topmost and creates a new dynamic preview.\n"
+              "\n  'on' makes the window topmost and keeps it as a separate preview.\n"
               "  'off' closes the pinned window. Returns full window details.\n",
               "Glance.CLI.exe window pin on\n"
               "  Glance.CLI.exe window pin off" },
@@ -154,7 +154,7 @@ namespace glance::cli
               "arguments:\n  N                       Volume from 0 to 100\n", "Glance.CLI.exe window volume 50" },
             { "window mute", "Set the current window's media mute state.",
               "Glance.CLI.exe window mute {on,off} [--id UUID] [options]", "", "Glance.CLI.exe window mute on" },
-            { "windows", "List all preview windows, including the hidden dynamic window.",
+            { "windows", "List open preview windows; main identifies the main preview window.",
               "Glance.CLI.exe windows [options]",
               "output:\n  Each window includes its ID, paths, state, and bounds.\n",
               "Glance.CLI.exe windows --json" },

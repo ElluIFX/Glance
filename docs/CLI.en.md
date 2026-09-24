@@ -124,7 +124,7 @@ $windowId = $result.data.id
 | `window volume N` | Set this window's volume, from 0 to 100 |
 | `window mute on` / `window mute off` | Set this window's mute state |
 
-All these commands accept `--id UUID`. UUIDs survive pinning and expire when Glance restarts. `windows` also lists the hidden dynamic window. Repeated `preview` commands reuse the ordinary preview window; after pinning, the next `preview` uses a new window.
+All these commands accept `--id UUID`. UUIDs survive pinning and expire when Glance restarts. `windows` lists open preview windows: `main: true` identifies the main preview window, and separate windows return `main: false`. Repeated `preview` commands reuse the main preview window; after pinning, the next `preview` uses a new window. Closed windows are unavailable for queries and controls; reopening may reuse the same UUID.
 
 ## Change settings
 
@@ -182,7 +182,7 @@ if ($LASTEXITCODE -ne 0) {
 | `--wait` | Wait for the target to close with `preview` or a `window` command that keeps it open |
 | `--version` | Show the version |
 
-By default, commands wait for content readiness or control completion. `--timeout 0` returns after the request is applied. A positive timeout returns current state with `wait_completed: false` when the wait expires; completion returns `wait_completed: true`. `--wait` waits for window closure, including a hidden dynamic preview. Combining it with `--timeout` applies one total waiting limit.
+By default, commands wait for content readiness or control completion. `--timeout 0` returns after the request is applied. A positive timeout returns current state with `wait_completed: false` when the wait expires; completion returns `wait_completed: true`. `--wait` waits for window closure. Combining it with `--timeout` applies one total waiting limit.
 
 Connection allows 15 seconds, ordinary request transport and execution allow 10 seconds, and update checks allow 60 seconds. Failures at these stages return errors. Reading stdin is separate from content waiting. Accepted previews and controls continue when the CLI exits or Ctrl+C interrupts its wait.
 

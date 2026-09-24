@@ -11,7 +11,7 @@ namespace winrt::Glance::App::implementation
 {
     std::wstring MainWindow::CliLoadState()
     {
-        if (!visible_) return L"hidden";
+        if (!visible_) return L"closed";
         if (native_media_controls_pending_ || gallery_pending_navigation_steps_) return L"loading";
         if (ErrorText().Visibility() == Visibility::Visible && !ErrorText().Text().empty()) return L"failed";
         using Kind = glance::app::PreviewKind;
@@ -43,7 +43,7 @@ namespace winrt::Glance::App::implementation
         JsonObject result;
         result.SetNamedValue(L"id", JsonValue::CreateStringValue(cli_id_));
         result.SetNamedValue(L"generation", JsonValue::CreateStringValue(std::to_wstring(content_generation_)));
-        result.SetNamedValue(L"visible", JsonValue::CreateBooleanValue(visible_));
+        result.SetNamedValue(L"main", JsonValue::CreateBooleanValue(!detached_));
         result.SetNamedValue(L"pinned", JsonValue::CreateBooleanValue(pinned_));
         result.SetNamedValue(L"topmost", JsonValue::CreateBooleanValue(topmost_));
         result.SetNamedValue(L"state", JsonValue::CreateStringValue(CliLoadState()));
@@ -108,7 +108,7 @@ namespace winrt::Glance::App::implementation
     {
         using glance::cli::Error;
         using Kind = glance::app::PreviewKind;
-        if (!visible_) throw Error(8, "window_hidden", "Window has no active preview");
+        if (!visible_) throw Error(3, "window_not_found", "Window is closed");
         const auto state = CliLoadState();
         if (state == L"failed") throw Error(9, "preview_failed", "Preview provider failed");
         if (state == L"loading") return false;
@@ -236,7 +236,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::CliTopmost(bool enabled)
     {
         if (pinned_ && !enabled) throw glance::cli::Error(8, "pinned_topmost", "Pinned windows must be topmost");
-        if (!visible_) throw glance::cli::Error(8, "window_hidden", "Target window has no active preview; use 'windows' to find the visible window, then pass --id ID");
+        if (!visible_) throw glance::cli::Error(3, "window_not_found", "Window is closed");
         topmost_ = enabled;
         TopmostButton().IsChecked(enabled);
         set_topmost(enabled);
@@ -245,7 +245,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::CliPin(bool enabled)
     {
-        if (!visible_) throw glance::cli::Error(8, "window_hidden", "Target window has no active preview; use 'windows' to find the visible window, then pass --id ID");
+        if (!visible_) throw glance::cli::Error(3, "window_not_found", "Window is closed");
         if (pinned_ == enabled) return;
         PinButton().IsChecked(enabled);
         PinButton_Click(nullptr, nullptr);
@@ -263,7 +263,7 @@ namespace winrt::Glance::App::implementation
         }
         const bool geometry = options.HasKey(L"size") || options.HasKey(L"position") || options.HasKey(L"center_offset");
         if (geometry && !validate_only && !visible_)
-            throw Error(8, "window_hidden", "Target window has no active preview; use 'windows' to find the visible window, then pass --id ID");
+            throw Error(3, "window_not_found", "Window is closed");
         RECT bounds{};
         GetWindowRect(window_, &bounds);
         int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;

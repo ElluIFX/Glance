@@ -222,13 +222,12 @@ namespace winrt::Glance::App::implementation
             for (const auto& window : detached_windows_)
             {
                 auto item = get_self<MainWindow>(window)->CliSnapshot();
-                item.SetNamedValue(L"dynamic", JsonValue::CreateBooleanValue(false));
+                if (item.GetNamedString(L"state") == L"closed") continue;
                 windows.Append(item);
             }
-            if (active_window_)
+            if (active_window_ && get_self<MainWindow>(active_window_)->CliLoadState() != L"closed")
             {
                 auto item = get_self<MainWindow>(active_window_)->CliSnapshot();
-                item.SetNamedValue(L"dynamic", JsonValue::CreateBooleanValue(true));
                 windows.Append(item);
             }
             result.SetNamedValue(L"windows", windows);
@@ -245,6 +244,8 @@ namespace winrt::Glance::App::implementation
         }
         if (!window) throw Error(3, "window_not_found", "Window ID not found");
         auto implementation = get_self<MainWindow>(window);
+        if (command != L"preview" && implementation->CliLoadState() == L"closed")
+            throw Error(3, "window_not_found", "Window is closed");
         if (request.HasKey(L"generation") && implementation->CliSnapshot().GetNamedString(L"generation") != request.GetNamedString(L"generation"))
             throw Error(10, "preview_replaced", "Preview content changed before command execution");
         if (command == L"preview")
@@ -256,8 +257,6 @@ namespace winrt::Glance::App::implementation
         }
         else if (command == L"window.set")
         {
-            if (!implementation->CliSnapshot().GetNamedBoolean(L"visible"))
-                throw Error(8, "window_hidden", "Target window has no active preview");
             implementation->ShowPreview(std::move(files), 0, 0, nullptr, {}, 0, true);
         }
         else if (command == L"window.close")
@@ -265,7 +264,6 @@ namespace winrt::Glance::App::implementation
             result = implementation->CliSnapshot();
             if (window == active_window_) implementation->HidePreview(); else implementation->CloseForReplacement();
             result.SetNamedValue(L"state", JsonValue::CreateStringValue(L"closed"));
-            result.SetNamedValue(L"visible", JsonValue::CreateBooleanValue(false));
             return result;
         }
         else if (command == L"window.pin")
@@ -275,7 +273,6 @@ namespace winrt::Glance::App::implementation
             if (result.GetNamedBoolean(L"pinned") && !request.GetNamedBoolean(L"enabled"))
             {
                 result.SetNamedValue(L"state", JsonValue::CreateStringValue(L"closed"));
-                result.SetNamedValue(L"visible", JsonValue::CreateBooleanValue(false));
             }
             else result = implementation->CliSnapshot();
             return result;
@@ -289,7 +286,6 @@ namespace winrt::Glance::App::implementation
             return result;
         }
         result = implementation->CliSnapshot();
-        result.SetNamedValue(L"dynamic", JsonValue::CreateBooleanValue(window == active_window_));
         return result;
     }
 }
