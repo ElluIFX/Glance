@@ -20,7 +20,7 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t progressive_preview_api_version = 3;
     inline constexpr std::uint32_t web_preview_api_version = 2;
     inline constexpr std::uint32_t host_renderer_api_version = 2;
-    inline constexpr std::uint32_t component_view_api_version = 1;
+    inline constexpr std::uint32_t component_view_api_version = 2;
     inline constexpr GUID component_view_api_id{
         0xdd72b6a1, 0xf3a9, 0x42f2, {0xa6, 0x35, 0x73, 0x60, 0x36, 0xab, 0x90, 0x51}};
     inline constexpr std::uint32_t settings_contribution_api_version = 3;
@@ -689,7 +689,27 @@ namespace glance::contracts::components
         QueryRendererHostFunction query_host{};
     };
 
-    // All calls run on the application's XAML UI thread. The returned object is an
+    enum class ComponentViewState : std::uint32_t
+    {
+        loading,
+        ready,
+        failed,
+    };
+
+    struct ComponentViewHost
+    {
+        std::uint32_t size{sizeof(ComponentViewHost)};
+        HWND owner{};
+        std::uint64_t preview_token{};
+        std::uint64_t generation{};
+        void* context{};
+        void (WINAPI* state_changed)(void* context, std::uint64_t generation,
+            ComponentViewState state) noexcept{};
+    };
+
+    // All calls and state notifications run on the application's XAML UI thread.
+    // Copy the host context during create; never notify after close returns.
+    // The returned object is an
     // AddRef'd Microsoft.UI.Xaml.FrameworkElement using the application's WinUI version.
     // Detach and release the element before closing its session. Components own all
     // background work and must cancel it when close is called.
@@ -697,7 +717,7 @@ namespace glance::contracts::components
     {
         std::uint32_t size{sizeof(ComponentViewApi)};
         std::uint32_t version{component_view_api_version};
-        HRESULT (WINAPI* create)(const wchar_t* path, const wchar_t* language,
+        HRESULT (WINAPI* create)(const wchar_t* path, const wchar_t* language, const ComponentViewHost* host,
                              IUnknown** element, std::uint64_t* session) noexcept{};
         void (WINAPI* set_language)(std::uint64_t session, const wchar_t* language) noexcept{};
         void (WINAPI* close)(std::uint64_t session) noexcept{};

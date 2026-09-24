@@ -856,6 +856,7 @@ namespace winrt::Glance::App::implementation
         std::shared_ptr<void> active_component_view_;
         std::shared_ptr<glance::app::ComponentViewRegistration> component_view_registration_;
         std::uint64_t component_view_session_{};
+        bool component_view_failed_{};
         std::shared_ptr<void> active_component_file_directory_;
         glance::app::FileDirectoryDescriptor active_file_directory_descriptor_;
         std::vector<std::uint32_t> active_file_directory_columns_;

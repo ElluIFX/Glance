@@ -134,6 +134,7 @@ namespace glance::app
     {
         glance::contracts::components::ComponentViewApi api;
         std::shared_ptr<void> lease;
+        std::uint64_t preview_token{};
     };
 
     struct ComponentPreviewResult

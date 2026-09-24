@@ -1076,7 +1076,7 @@ namespace
                 return result;
             }
             result.component_view = std::make_shared<glance::app::ComponentViewRegistration>(
-                glance::app::ComponentViewRegistration{*component->component_view, component});
+                glance::app::ComponentViewRegistration{*component->component_view, component, preview.lease_token});
         }
         result.lease = std::make_shared<PreviewLease>(
             component,

@@ -8,6 +8,8 @@
   <data name="Available" xml:space="preserve"><value>Preview OpenType, TrueType and web fonts</value></data>
   <data name="Loading" xml:space="preserve"><value>Loading font...</value></data>
   <data name="Sample" xml:space="preserve"><value>Sample</value></data>
+  <data name="PreviewMode" xml:space="preserve"><value>Preview mode</value></data>
+  <data name="Face" xml:space="preserve"><value>Font style</value></data>
   <data name="Single" xml:space="preserve"><value>Character</value></data>
   <data name="Size" xml:space="preserve"><value>Size (pt)</value></data>
   <data name="Weight" xml:space="preserve"><value>Weight</value></data>

@@ -273,6 +273,21 @@ try {
         Invoke-Cli -Arguments @('window', 'page', '3') -Expected 3 | Out-Null
     }
 
+    if (Test-Path (Join-Path $BuildOutputDirectory 'components/font/Glance.FontComponent.dll')) {
+        $fontPath = Join-Path $env:WINDIR 'Fonts/segoeui.ttf'
+        $font = (Invoke-Cli -Arguments @('preview', $fontPath, '--timeout', '20')).data
+        Assert-True ($font.state -eq 'ready' -and $font.wait_completed -and -not $font.fallback) 'Font view did not report readiness'
+        $invalidFont = Join-Path $fixture 'invalid.ttf'
+        [IO.File]::WriteAllText($invalidFont, 'invalid font data')
+        Invoke-Cli -Arguments @('window', 'set', $invalidFont, '--timeout', '20') -Expected 9 | Out-Null
+        foreach ($iteration in 1..4) {
+            Invoke-Cli -Arguments @('window', 'set', $fontPath, '--timeout', '0') | Out-Null
+            Invoke-Cli -Arguments @('window', 'set', $first, '--timeout', '0') | Out-Null
+        }
+        $recovered = (Invoke-Cli -Arguments @('window', 'set', $fontPath, '--timeout', '20')).data
+        Assert-True ($recovered.state -eq 'ready' -and $recovered.wait_completed -and -not $recovered.fallback) 'Font view failed after cancelled and invalid previews'
+    }
+
     $allSettings = (Invoke-Cli -Arguments @('settings', 'list')).data.settings
     Assert-True ($allSettings.Count -ge 40) 'Public settings catalog is incomplete'
     Assert-True (@($allSettings | Where-Object key -Match 'LastSuccessfulCheck|RetryAfter|WindowSize').Count -eq 0) 'Private state exposed'

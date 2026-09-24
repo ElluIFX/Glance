@@ -2895,6 +2895,7 @@ namespace winrt::Glance::App::implementation
         active_component_view_.reset();
         component_view_registration_.reset();
         component_view_session_ = 0;
+        component_view_failed_ = false;
         text_monitor_enabled_ = false;
         text_refresh_requested_ = false;
         ++text_monitor_epoch_;
@@ -6478,8 +6479,33 @@ namespace winrt::Glance::App::implementation
                 auto registration = result.component_view;
                 winrt::com_ptr<IUnknown> element;
                 std::uint64_t session{};
+                const glance::contracts::components::ComponentViewHost host{
+                    .owner = window_,
+                    .preview_token = registration->preview_token,
+                    .generation = generation,
+                    .context = this,
+                    .state_changed = [](void* context, std::uint64_t expected_generation,
+                        glance::contracts::components::ComponentViewState state) noexcept {
+                        try
+                        {
+                            const auto self = static_cast<MainWindow*>(context);
+                            const auto weak = self->get_weak();
+                            self->DispatcherQueue().TryEnqueue([weak, expected_generation, state] {
+                                const auto target = weak.get();
+                                if (!target || target->content_generation_ != expected_generation ||
+                                    !target->active_component_view_) return;
+                                using State = glance::contracts::components::ComponentViewState;
+                                target->native_preview_ready_ = state == State::ready;
+                                target->component_view_failed_ = state == State::failed;
+                                target->reveal_deferred_preview();
+                            });
+                        }
+                        catch (...)
+                        {
+                        }
+                    } };
                 const auto created = registration->api.create(result.output_path.c_str(),
-                    glance::app::current_ui_language().c_str(), element.put(), &session);
+                    glance::app::current_ui_language().c_str(), &host, element.put(), &session);
                 if (FAILED(created) || !element || !session)
                 {
                     glance::contracts::log_event(L"Component view creation failed: " + std::to_wstring(created));
@@ -6500,7 +6526,8 @@ namespace winrt::Glance::App::implementation
                 ComponentViewPresenter().Visibility(Visibility::Visible);
                 NativeDocumentLoadingOverlay().Visibility(Visibility::Collapsed);
                 ComponentLoadingText().Visibility(Visibility::Collapsed);
-                native_preview_ready_ = true;
+                native_preview_ready_ = false;
+                component_view_failed_ = false;
                 restore_component_window_placement(generation);
                 reveal_deferred_preview();
                 return;

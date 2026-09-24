@@ -16,6 +16,7 @@
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.Windows.ApplicationModel.Resources.h>
@@ -35,17 +36,18 @@ namespace
 {
 struct View : std::enable_shared_from_this<View>
 {
+    contracts::components::ComponentViewHost view_host;
     Grid root, body;
-    Grid controls;
+    Grid controls, choices, adjustments, size_group, weight_group;
     StackPanel information;
     TextBlock title, subtitle, status;
     ComboBox faces, mode;
     NumberBox size, weight;
     Slider size_slider, weight_slider;
     TextBox glyph;
-    TextBlock weight_label;
+    TextBlock size_label, weight_label;
     Expander details;
-    ScrollViewer scroll;
+    ScrollViewer scroll, metadata_scroll;
     Canvas canvas;
     Image image;
     Button retry;
@@ -70,7 +72,7 @@ struct View : std::enable_shared_from_this<View>
     std::uint64_t serial{};
     std::uint64_t run{};
     unsigned desired_face{};
-    unsigned control_layout{};
+    unsigned control_layout{}, toolbar_layout{};
     bool first_character_only{};
     ~View()
     {
@@ -122,49 +124,98 @@ struct View : std::enable_shared_from_this<View>
         heading.Children().Append(title);
         heading.Children().Append(subtitle);
         root.Children().Append(heading);
-        controls.ColumnSpacing(12);
+        auto toolbar = Markup::XamlReader::Load(
+            LR"(<Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="16"/>)").as<Border>();
+        toolbar.Margin({0, 16, 0, 20});
+        toolbar.Child(controls);
+        Grid::SetRow(toolbar, 1);
+        root.Children().Append(toolbar);
         controls.RowSpacing(12);
-        controls.Margin({0, 16, 0, 16});
-        Grid::SetRow(controls, 1);
-        root.Children().Append(controls);
+        for (unsigned i = 0; i < 2; ++i)
+        {
+            RowDefinition row;
+            row.Height({1, GridUnitType::Auto});
+            controls.RowDefinitions().Append(row);
+        }
+        choices.ColumnSpacing(16);
+        for (unsigned i = 0; i < 3; ++i)
+        {
+            ColumnDefinition column;
+            column.Width({1, i == 2 ? GridUnitType::Star : GridUnitType::Auto});
+            choices.ColumnDefinitions().Append(column);
+        }
+        controls.Children().Append(choices);
+        mode.Header(box_value(text(L"PreviewMode")));
         mode.Items().Append(box_value(text(L"Sample")));
         mode.Items().Append(box_value(text(L"Single")));
         mode.SelectedIndex(0);
-        mode.MinWidth(100);
-        controls.Children().Append(mode);
-        faces.MaxWidth(180);
+        mode.Width(140);
+        mode.VerticalAlignment(VerticalAlignment::Bottom);
+        choices.Children().Append(mode);
+        faces.Header(box_value(text(L"Face")));
+        faces.Width(200);
+        faces.VerticalAlignment(VerticalAlignment::Bottom);
         faces.Visibility(Visibility::Collapsed);
-        controls.Children().Append(faces);
-        size.Header(box_value(text(L"Size")));
-        size.Minimum(8);
-        size.Maximum(144);
-        size.Value(32);
-        size.Width(100);
-        size.SpinButtonPlacementMode(NumberBoxSpinButtonPlacementMode::Compact);
-        controls.Children().Append(size);
-        size_slider.Minimum(8);
-        size_slider.Maximum(144);
-        size_slider.Value(32);
-        size_slider.Width(140);
-        size_slider.VerticalAlignment(VerticalAlignment::Bottom);
-        ToolTipService::SetToolTip(size_slider, box_value(text(L"Size")));
-        controls.Children().Append(size_slider);
-        weight.Header(box_value(text(L"Weight")));
-        weight.Width(100);
-        weight.SpinButtonPlacementMode(NumberBoxSpinButtonPlacementMode::Compact);
-        weight.Visibility(Visibility::Collapsed);
-        controls.Children().Append(weight);
-        weight_slider.Width(140);
-        weight_slider.VerticalAlignment(VerticalAlignment::Bottom);
-        weight_slider.Visibility(Visibility::Collapsed);
-        ToolTipService::SetToolTip(weight_slider, box_value(text(L"Weight")));
-        controls.Children().Append(weight_slider);
+        Grid::SetColumn(faces, 1);
+        choices.Children().Append(faces);
         glyph.Header(box_value(text(L"Character")));
         glyph.PlaceholderText(text(L"CharacterHint"));
         glyph.MaxLength(128);
-        glyph.Width(180);
+        glyph.MaxWidth(240);
+        glyph.HorizontalAlignment(HorizontalAlignment::Stretch);
+        glyph.VerticalAlignment(VerticalAlignment::Bottom);
         glyph.Visibility(Visibility::Collapsed);
-        controls.Children().Append(glyph);
+        Grid::SetColumn(glyph, 2);
+        choices.Children().Append(glyph);
+        adjustments.ColumnSpacing(24);
+        adjustments.RowSpacing(12);
+        Grid::SetRow(adjustments, 1);
+        controls.Children().Append(adjustments);
+        const auto add_adjustment = [&](Grid group, TextBlock label, NumberBox number, Slider slider,
+                                        const wchar_t* key) {
+            group.ColumnSpacing(16);
+            group.RowSpacing(8);
+            group.HorizontalAlignment(HorizontalAlignment::Stretch);
+            group.VerticalAlignment(VerticalAlignment::Bottom);
+            for (unsigned i = 0; i < 2; ++i)
+            {
+                ColumnDefinition column;
+                column.Width({i == 0 ? 1.0 : 100.0, i == 0 ? GridUnitType::Star : GridUnitType::Pixel});
+                group.ColumnDefinitions().Append(column);
+                RowDefinition row;
+                row.Height({1, GridUnitType::Auto});
+                group.RowDefinitions().Append(row);
+            }
+            label.Text(text(key));
+            label.FontSize(14);
+            Grid::SetColumnSpan(label, 2);
+            group.Children().Append(label);
+            number.HorizontalAlignment(HorizontalAlignment::Stretch);
+            number.SpinButtonPlacementMode(NumberBoxSpinButtonPlacementMode::Compact);
+            Grid::SetColumn(number, 1);
+            Grid::SetRow(number, 1);
+            group.Children().Append(number);
+            slider.MinWidth(80);
+            slider.Height(32);
+            slider.VerticalAlignment(VerticalAlignment::Center);
+            ToolTipService::SetToolTip(slider, box_value(text(key)));
+            Grid::SetRow(slider, 1);
+            group.Children().Append(slider);
+            adjustments.Children().Append(group);
+        };
+        add_adjustment(size_group, size_label, size, size_slider, L"Size");
+        add_adjustment(weight_group, weight_label, weight, weight_slider, L"Weight");
+        size.Minimum(8);
+        size.Maximum(144);
+        size.Value(32);
+        size_slider.Minimum(8);
+        size_slider.Maximum(144);
+        size_slider.Value(32);
+        weight.Visibility(Visibility::Collapsed);
+        weight_group.Visibility(Visibility::Collapsed);
         Grid::SetRow(body, 2);
         root.Children().Append(body);
         body.ColumnSpacing(24);
@@ -190,7 +241,7 @@ struct View : std::enable_shared_from_this<View>
         details.Header(box_value(text(L"Metadata")));
         details.IsExpanded(true);
         details.HorizontalAlignment(HorizontalAlignment::Stretch);
-        ScrollViewer metadata_scroll;
+        details.VerticalAlignment(VerticalAlignment::Top);
         metadata_scroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
         metadata_scroll.Content(information);
         information.Spacing(6);
@@ -331,58 +382,86 @@ struct View : std::enable_shared_from_this<View>
     void layout()
     {
         const bool compact_layout = root.ActualWidth() < 940;
-        const bool very_small = root.ActualWidth() < 650;
-        size_slider.Visibility(very_small ? Visibility::Collapsed : Visibility::Visible);
-        weight_slider.Visibility(!very_small && metadata && metadata->variable ? Visibility::Visible
-                                                                               : Visibility::Collapsed);
-        const auto columns = static_cast<unsigned>(std::clamp((root.ActualWidth() - 48) / 200, 1.0, 4.0));
-        unsigned mask{}, bit = 1;
-        for (const auto &child : controls.Children())
+        const bool stacked = root.ActualWidth() < 650;
+        const bool variable = metadata && metadata->variable;
+        const double choices_width = 140 + (faces.Visibility() == Visibility::Visible ? 216 : 0) +
+            (single ? 196 : 0);
+        const bool inline_controls = root.ActualWidth() - 80 >= choices_width +
+            (variable ? 500 : 280) + 24;
+        const auto toolbar_key = 1U + unsigned(inline_controls);
+        if (toolbar_layout != toolbar_key)
         {
-            if (child.Visibility() == Visibility::Visible)
-                mask |= bit;
-            bit <<= 1;
+            toolbar_layout = toolbar_key;
+            controls.ColumnDefinitions().Clear();
+            controls.RowDefinitions().Clear();
+            for (unsigned i = 0; i < (inline_controls ? 1U : 2U); ++i)
+            {
+                RowDefinition row;
+                row.Height({1, GridUnitType::Auto});
+                controls.RowDefinitions().Append(row);
+            }
+            for (unsigned i = 0; i < (inline_controls ? 2U : 1U); ++i)
+            {
+                ColumnDefinition column;
+                column.Width({1, inline_controls && i == 0 ? GridUnitType::Auto : GridUnitType::Star});
+                controls.ColumnDefinitions().Append(column);
+            }
+            controls.ColumnSpacing(24);
+            Grid::SetRow(adjustments, inline_controls ? 0 : 1);
+            Grid::SetColumn(adjustments, inline_controls ? 1 : 0);
+            glyph.Width(inline_controls ? 180 : NAN);
         }
-        const auto layout_key = mask | (columns << 16);
+        weight_group.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
+        const auto layout_key = 1U + unsigned(stacked) + 2U * unsigned(variable);
         if (control_layout != layout_key)
         {
             control_layout = layout_key;
-            controls.ColumnDefinitions().Clear();
-            controls.RowDefinitions().Clear();
-            for (unsigned i = 0; i < columns; ++i)
+            adjustments.ColumnDefinitions().Clear();
+            adjustments.RowDefinitions().Clear();
+            for (unsigned i = 0; i < (stacked || !variable ? 1U : 2U); ++i)
             {
                 ColumnDefinition column;
                 column.Width({1, GridUnitType::Star});
-                controls.ColumnDefinitions().Append(column);
+                adjustments.ColumnDefinitions().Append(column);
             }
-            unsigned index{};
-            for (const auto &child : controls.Children())
+            for (unsigned i = 0; i < (stacked && variable ? 2U : 1U); ++i)
             {
-                if (child.Visibility() != Visibility::Visible)
-                    continue;
-                if (index % columns == 0)
-                {
-                    RowDefinition row;
-                    row.Height({1, GridUnitType::Auto});
-                    controls.RowDefinitions().Append(row);
-                }
-                Grid::SetColumn(child.as<FrameworkElement>(), static_cast<int>(index % columns));
-                Grid::SetRow(child.as<FrameworkElement>(), static_cast<int>(index / columns));
-                child.as<FrameworkElement>().HorizontalAlignment(HorizontalAlignment::Left);
-                ++index;
+                RowDefinition row;
+                row.Height({1, GridUnitType::Auto});
+                adjustments.RowDefinitions().Append(row);
+            }
+            Grid::SetColumn(weight_group, stacked ? 0 : 1);
+            Grid::SetRow(weight_group, stacked ? 1 : 0);
+        }
+        const bool wrap_choices = single && root.ActualWidth() < 760 && faces.Visibility() == Visibility::Visible;
+        if (choices.RowDefinitions().Size() != (wrap_choices ? 2U : 1U))
+        {
+            choices.RowDefinitions().Clear();
+            for (unsigned i = 0; i < (wrap_choices ? 2U : 1U); ++i)
+            {
+                RowDefinition row;
+                row.Height({1, GridUnitType::Auto});
+                choices.RowDefinitions().Append(row);
             }
         }
+        choices.RowSpacing(12);
+        glyph.HorizontalAlignment(wrap_choices ? HorizontalAlignment::Left : HorizontalAlignment::Stretch);
+        glyph.Width(wrap_choices ? 240 : (inline_controls ? 180 : NAN));
+        Grid::SetRow(glyph, wrap_choices ? 1 : 0);
+        Grid::SetColumn(glyph, wrap_choices ? 0 : 2);
+        Grid::SetColumnSpan(glyph, wrap_choices ? 3 : 1);
         if (compact_layout != narrow)
         {
             narrow = compact_layout;
             details.IsExpanded(!compact_layout);
         }
+        body.ColumnSpacing(compact_layout ? 0 : 24);
         body.ColumnDefinitions().GetAt(1).Width({compact_layout ? 0.0 : 280.0, GridUnitType::Pixel});
         body.RowDefinitions().GetAt(1).Height(
             {compact_layout ? 1.0 : 0.0, compact_layout ? GridUnitType::Auto : GridUnitType::Pixel});
         Grid::SetColumn(details, compact_layout ? 0 : 1);
         Grid::SetRow(details, compact_layout ? 1 : 0);
-        details.MaxHeight(compact_layout ? 240 : std::max(120.0, body.ActualHeight()));
+        metadata_scroll.MaxHeight(compact_layout ? 180 : std::max(64.0, body.ActualHeight() - 72));
     }
     void switch_mode()
     {
@@ -476,6 +555,7 @@ struct View : std::enable_shared_from_this<View>
     void restart()
     {
         close_worker();
+        notify(contracts::components::ComponentViewState::loading);
         metadata.reset();
         status.Text(text(L"Loading"));
         retry.Visibility(Visibility::Collapsed);
@@ -643,11 +723,18 @@ struct View : std::enable_shared_from_this<View>
         if (request.single && first_character_only)
             message += (message.empty() ? L"" : L" · ") + std::wstring(text(L"FirstCharacter"));
         status.Text(message);
+        notify(contracts::components::ComponentViewState::ready);
+    }
+    void notify(contracts::components::ComponentViewState state) noexcept
+    {
+        if (view_host.state_changed)
+            view_host.state_changed(view_host.context, view_host.generation, state);
     }
     void failure()
     {
         status.Text(text(L"Failed"));
         retry.Visibility(Visibility::Visible);
+        notify(contracts::components::ComponentViewState::failed);
     }
     void close_worker()
     {
@@ -666,6 +753,7 @@ struct View : std::enable_shared_from_this<View>
     }
     void close()
     {
+        view_host.state_changed = nullptr;
         scale_changed.revoke();
         if (contrast_token.value)
         {
@@ -681,12 +769,14 @@ struct View : std::enable_shared_from_this<View>
         language = tag;
         context.QualifierValues().Insert(L"Language", language);
         updating = true;
+        mode.Header(box_value(text(L"PreviewMode")));
+        faces.Header(box_value(text(L"Face")));
         const auto selected_mode = mode.SelectedIndex();
         mode.Items().SetAt(0, box_value(text(L"Sample")));
         mode.Items().SetAt(1, box_value(text(L"Single")));
         mode.SelectedIndex(selected_mode);
-        size.Header(box_value(text(L"Size")));
-        weight.Header(box_value(text(L"Weight")));
+        size_label.Text(text(L"Size"));
+        weight_label.Text(text(L"Weight"));
         glyph.Header(box_value(text(L"Character")));
         glyph.PlaceholderText(text(L"CharacterHint"));
         details.Header(box_value(text(L"Metadata")));
@@ -707,16 +797,18 @@ struct View : std::enable_shared_from_this<View>
     }
 };
 using Session = std::shared_ptr<View>;
-HRESULT WINAPI create(const wchar_t *path, const wchar_t *language, IUnknown **element,
+HRESULT WINAPI create(const wchar_t *path, const wchar_t *language,
+                      const contracts::components::ComponentViewHost* host, IUnknown **element,
                       std::uint64_t *token) noexcept
 {
-    if (!path || !language || !element || !token)
+    if (!path || !language || !host || host->size < sizeof(*host) || !element || !token)
         return E_INVALIDARG;
     *element = nullptr;
     *token = 0;
     try
     {
         auto view = std::make_shared<View>();
+        view->view_host = *host;
         view->initialize(path, language);
         auto session = std::make_unique<Session>(view);
         view->root.as<IUnknown>().copy_to(element);

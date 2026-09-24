@@ -22,7 +22,10 @@ namespace winrt::Glance::App::implementation
         case Kind::component: break;
         case Kind::image: ready = image_pixel_width_ > 0 && ImagePreview().Source() != nullptr; break;
         case Kind::document: ready = PdfPageImage().Source() != nullptr && pdf_foreground_render_requests_.load() == 0; break;
-        case Kind::native_document: ready = native_preview_ready_; break;
+        case Kind::native_document:
+            if (active_component_view_ && component_view_failed_) return L"failed";
+            ready = native_preview_ready_;
+            break;
         case Kind::archive: ready = archive_render_state_ != nullptr; break;
         case Kind::text: ready = !text_loading_; break;
         case Kind::markdown:
