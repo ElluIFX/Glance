@@ -77,7 +77,10 @@ struct View : std::enable_shared_from_this<View>
     ScrollViewer scroll, metadata_scroll;
     Canvas canvas;
     Image image;
-    Button retry;
+    Button retry, install_user, install_system;
+    TextBlock install_status;
+    bool installing{}, install_supported{}, closed{};
+    const wchar_t* install_message{};
     Resources::ResourceManager resources{nullptr};
     Resources::ResourceContext context{nullptr};
     Microsoft::UI::Dispatching::DispatcherQueue dispatcher{nullptr};
@@ -93,7 +96,6 @@ struct View : std::enable_shared_from_this<View>
     std::uint64_t serial{};
     std::uint64_t run{};
     unsigned desired_face{};
-    unsigned toolbar_layout{};
     ~View()
     {
         close();
@@ -152,6 +154,30 @@ struct View : std::enable_shared_from_this<View>
         heading.Children().Append(title);
         heading.Children().Append(subtitle);
         root.Children().Append(heading);
+        Grid installation;
+        installation.ColumnSpacing(12);
+        installation.VerticalAlignment(VerticalAlignment::Center);
+        for (unsigned i = 0; i < 2; ++i)
+        {
+            ColumnDefinition column; column.Width({1, GridUnitType::Star});
+            installation.ColumnDefinitions().Append(column);
+        }
+        install_user.Content(box_value(text(L"InstallUser")));
+        install_system.Content(box_value(text(L"InstallSystem")));
+        for (auto button : {install_user, install_system})
+        {
+            button.IsTabStop(false); button.AllowFocusOnInteraction(false);
+            button.HorizontalAlignment(HorizontalAlignment::Stretch);
+            button.IsEnabled(false);
+            installation.Children().Append(button);
+        }
+        Grid::SetColumn(install_system, 1);
+        Grid::SetColumn(installation, 1); root.Children().Append(installation);
+        const auto extension = std::filesystem::path(path).extension().wstring();
+        install_supported = _wcsicmp(extension.c_str(), L".ttf") == 0 ||
+            _wcsicmp(extension.c_str(), L".otf") == 0 || _wcsicmp(extension.c_str(), L".ttc") == 0 ||
+            _wcsicmp(extension.c_str(), L".otc") == 0;
+        refresh_installation();
         auto toolbar = Markup::XamlReader::Load(
             LR"(<Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -162,17 +188,18 @@ struct View : std::enable_shared_from_this<View>
         Grid::SetRow(toolbar, 1);
         root.Children().Append(toolbar);
         controls.RowSpacing(12);
-        for (unsigned i = 0; i < 2; ++i)
+        for (unsigned i = 0; i < 3; ++i)
         {
-            RowDefinition row;
-            row.Height({1, GridUnitType::Auto});
-            controls.RowDefinitions().Append(row);
+            ColumnDefinition column;
+            column.Width({1, i == 0 ? GridUnitType::Star : GridUnitType::Auto});
+            controls.ColumnDefinitions().Append(column);
         }
         controls.Children().Append(choices);
         Automation::AutomationProperties::SetName(faces, text(L"Face"));
-        faces.Width(200);
+        faces.MinWidth(60);
+        faces.HorizontalAlignment(HorizontalAlignment::Stretch);
         faces.VerticalAlignment(VerticalAlignment::Bottom);
-        faces.Visibility(Visibility::Collapsed);
+        faces.IsEnabled(false);
         choices.Children().Append(faces);
         for (unsigned i = 0; i < 3; ++i)
         {
@@ -180,7 +207,12 @@ struct View : std::enable_shared_from_this<View>
             column.Width({1, GridUnitType::Auto});
             adjustments.ColumnDefinitions().Append(column);
         }
-        Grid::SetRow(adjustments, 1);
+        auto face_separator = Markup::XamlReader::Load(
+            LR"(<Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                Background="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Width="1" Height="24" Margin="16,0" VerticalAlignment="Center"/>)").as<Border>();
+        Grid::SetColumn(face_separator, 1); controls.Children().Append(face_separator);
+        Grid::SetColumn(adjustments, 2);
         controls.Children().Append(adjustments);
         const auto add_adjustment = [&](Grid group, TextBlock label, NumberBox number,
                                         const wchar_t* key) {
@@ -190,7 +222,7 @@ struct View : std::enable_shared_from_this<View>
             for (unsigned i = 0; i < 2; ++i)
             {
                 ColumnDefinition column;
-                column.Width({i == 0 ? 1.0 : 100.0, i == 0 ? GridUnitType::Auto : GridUnitType::Pixel});
+                column.Width({i == 0 ? 1.0 : 88.0, i == 0 ? GridUnitType::Auto : GridUnitType::Pixel});
                 group.ColumnDefinitions().Append(column);
             }
             label.Text(text(key));
@@ -210,15 +242,14 @@ struct View : std::enable_shared_from_this<View>
         adjustment_separator = Markup::XamlReader::Load(
             LR"(<Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                 Background="{ThemeResource DividerStrokeColorDefaultBrush}"
-                Width="1" Height="24" Margin="20,0" VerticalAlignment="Center"/>)").as<Border>();
+                Width="1" Height="24" Margin="16,0" VerticalAlignment="Center"/>)").as<Border>();
         Grid::SetColumn(adjustment_separator, 1);
         adjustments.Children().Append(adjustment_separator);
         size.Minimum(8);
         size.Maximum(512);
         size.Value(16);
         retry.IsTabStop(false); retry.AllowFocusOnInteraction(false);
-        weight.Visibility(Visibility::Collapsed);
-        weight_group.Visibility(Visibility::Collapsed);
+        weight.IsEnabled(false);
         Grid::SetRow(body, 2);
         root.Children().Append(body);
         scroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
@@ -233,21 +264,34 @@ struct View : std::enable_shared_from_this<View>
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                 CornerRadius="8"/>)").as<Border>();
-        StackPanel metadata_panel;
+        Grid metadata_panel;
+        RowDefinition metadata_heading; metadata_heading.Height({1, GridUnitType::Auto});
+        RowDefinition metadata_body; metadata_body.Height({1, GridUnitType::Star});
+        RowDefinition metadata_feedback; metadata_feedback.Height({1, GridUnitType::Auto});
+        metadata_panel.RowDefinitions().Append(metadata_heading);
+        metadata_panel.RowDefinitions().Append(metadata_body);
+        metadata_panel.RowDefinitions().Append(metadata_feedback);
         metadata_title.Text(text(L"Metadata"));
         metadata_title.FontWeight(winrt::Windows::UI::Text::FontWeight{600});
         metadata_title.Margin({16, 16, 16, 12});
         metadata_panel.Children().Append(metadata_title);
         details.HorizontalAlignment(HorizontalAlignment::Stretch);
-        details.VerticalAlignment(VerticalAlignment::Top);
+        details.VerticalAlignment(VerticalAlignment::Stretch);
+        details.Margin({0, 16, 0, 0});
         metadata_scroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
         metadata_scroll.Content(information);
         information.Spacing(6);
         information.Margin({12, 0, 12, 12});
+        Grid::SetRow(metadata_scroll, 1);
         metadata_panel.Children().Append(metadata_scroll);
+        install_status.TextWrapping(TextWrapping::Wrap);
+        install_status.Margin({12, 0, 12, 12});
+        install_status.Visibility(Visibility::Collapsed);
+        Grid::SetRow(install_status, 2); metadata_panel.Children().Append(install_status);
         details.Child(metadata_panel);
         Grid::SetColumn(details, 1);
-        Grid::SetRowSpan(details, 4);
+        Grid::SetRow(details, 1);
+        Grid::SetRowSpan(details, 3);
         root.Children().Append(details);
         StackPanel footer;
         footer.Orientation(Orientation::Horizontal);
@@ -262,10 +306,11 @@ struct View : std::enable_shared_from_this<View>
         footer.Children().Append(retry);
         root.Children().Append(footer);
         auto weak = weak_from_this();
+        install_user.Click([weak](auto&&, auto&&) { if (auto self = weak.lock()) self->install(false); });
+        install_system.Click([weak](auto&&, auto&&) { if (auto self = weak.lock()) self->install(true); });
         root.SizeChanged([weak](auto &&, auto &&) {
             if (auto self = weak.lock())
             {
-                self->layout();
                 self->schedule();
             }
         });
@@ -280,7 +325,6 @@ struct View : std::enable_shared_from_this<View>
                     if (auto target = weak.lock())
                         target->schedule();
                 });
-                self->layout();
                 self->schedule();
             }
         });
@@ -294,7 +338,6 @@ struct View : std::enable_shared_from_this<View>
         body.SizeChanged([weak](auto &&, auto &&) {
             if (auto self = weak.lock())
             {
-                self->layout();
                 self->schedule();
             }
         });
@@ -349,39 +392,57 @@ struct View : std::enable_shared_from_this<View>
         });
         restart();
     }
-    void layout()
+    void refresh_installation()
     {
-        const double content_width = root.ActualWidth() - 48 - 304;
-        const bool variable = metadata && metadata->variable;
-        const bool has_faces = faces.Visibility() == Visibility::Visible;
-        choices.Visibility(has_faces ? Visibility::Visible : Visibility::Collapsed);
-        const bool inline_controls = !has_faces || content_width - 32 >= 200 +
-            (variable ? 390 : 180) + 24;
-        const auto toolbar_key = 1U + unsigned(inline_controls);
-        if (toolbar_layout != toolbar_key)
+        install_user.Content(box_value(text(L"InstallUser")));
+        install_system.Content(box_value(text(L"InstallSystem")));
+        for (auto button : {install_user, install_system})
         {
-            toolbar_layout = toolbar_key;
-            controls.ColumnDefinitions().Clear();
-            controls.RowDefinitions().Clear();
-            for (unsigned i = 0; i < (inline_controls ? 1U : 2U); ++i)
-            {
-                RowDefinition row;
-                row.Height({1, GridUnitType::Auto});
-                controls.RowDefinitions().Append(row);
-            }
-            for (unsigned i = 0; i < (inline_controls ? 2U : 1U); ++i)
-            {
-                ColumnDefinition column;
-                column.Width({1, inline_controls && i == 0 ? GridUnitType::Auto : GridUnitType::Star});
-                controls.ColumnDefinitions().Append(column);
-            }
-            Grid::SetRow(adjustments, inline_controls ? 0 : 1);
-            Grid::SetColumn(adjustments, inline_controls ? 1 : 0);
+            button.IsEnabled(install_supported && metadata && !installing);
+            ToolTipService::SetToolTip(button, install_supported ? nullptr : box_value(text(L"InstallUnsupported")));
         }
-        controls.ColumnSpacing(has_faces && inline_controls ? 24 : 0);
-        weight_group.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
-        adjustment_separator.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
-        metadata_scroll.MaxHeight(std::max(64.0, root.ActualHeight() - 104));
+        if (install_message) install_status.Text(text(install_message));
+    }
+    static fire_and_forget run_install(std::weak_ptr<View> weak, std::wstring file, HWND owner, bool system)
+    {
+        DWORD result = ERROR_FUNCTION_FAILED;
+        try
+        {
+            const auto executable = (directory() / L"Glance.FontHost.exe").wstring();
+            auto command = L"\"" + executable + L"\" " + (system ? L"--install-system" : L"--install-user") +
+                L" \"" + file + L"\" " + std::to_wstring(reinterpret_cast<std::uintptr_t>(owner));
+            STARTUPINFOW startup{sizeof(startup)};
+            PROCESS_INFORMATION process{};
+            if (CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE,
+                CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
+            {
+                handle process_handle(process.hProcess), thread_handle(process.hThread);
+                co_await resume_on_signal(process_handle.get());
+                if (!GetExitCodeProcess(process_handle.get(), &result)) result = GetLastError();
+            }
+            else result = GetLastError();
+        }
+        catch (...) { result = ERROR_FUNCTION_FAILED; }
+        if (auto self = weak.lock())
+        {
+            self->dispatcher.TryEnqueue([weak, result] {
+                if (auto view = weak.lock(); view && !view->closed)
+                {
+                    view->installing = false;
+                    view->install_message = result == ERROR_SUCCESS ? L"InstallRequested" :
+                        result == ERROR_CANCELLED ? L"InstallCancelled" : L"InstallFailed";
+                    view->refresh_installation();
+                }
+            });
+        }
+    }
+    void install(bool system)
+    {
+        if (installing || !install_supported || !metadata || closed) return;
+        installing = true; install_message = L"Installing";
+        install_status.Visibility(Visibility::Visible);
+        refresh_installation();
+        run_install(weak_from_this(), path, view_host.owner, system);
     }
     void schedule()
     {
@@ -522,11 +583,12 @@ struct View : std::enable_shared_from_this<View>
         for (unsigned i = 0; i < info->count; ++i)
             faces.Items().Append(box_value(info->faces[i]));
         faces.SelectedIndex(static_cast<int>(info->selected));
-        faces.Visibility(info->count > 1 ? Visibility::Visible : Visibility::Collapsed);
+        faces.IsEnabled(info->count > 1);
         weight.Minimum(info->variable ? info->minimum : 1);
         weight.Maximum(info->variable ? info->maximum : 1000);
         weight.Value(info->weight);
-        weight.Visibility(info->variable ? Visibility::Visible : Visibility::Collapsed);
+        weight.IsEnabled(info->variable && info->maximum > info->minimum);
+        refresh_installation();
         information.Children().Clear();
         for (const auto group : {L"Identity", L"Properties", L"Legal"})
         {
@@ -560,7 +622,6 @@ struct View : std::enable_shared_from_this<View>
             }
         }
         updating = false;
-        layout();
     }
     void show(const Request &request, const Response &response, const std::vector<std::byte> &pixels)
     {
@@ -606,6 +667,7 @@ struct View : std::enable_shared_from_this<View>
     }
     void close()
     {
+        closed = true;
         view_host.state_changed = nullptr;
         scale_changed.revoke();
         if (contrast_token.value)
@@ -626,6 +688,7 @@ struct View : std::enable_shared_from_this<View>
         size_label.Text(text(L"Size"));
         weight_label.Text(text(L"Weight"));
         metadata_title.Text(text(L"Metadata"));
+        refresh_installation();
         retry.Content(box_value(text(L"Retry")));
         updating = false;
         if (metadata)

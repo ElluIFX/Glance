@@ -26,6 +26,26 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     int count{};
     auto arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    if (arguments && count == 4 &&
+        (wcscmp(arguments[1], L"--install-user") == 0 || wcscmp(arguments[1], L"--install-system") == 0))
+    {
+        const bool system = wcscmp(arguments[1], L"--install-system") == 0;
+        const std::wstring file = arguments[2];
+        const auto owner = reinterpret_cast<HWND>(_wcstoui64(arguments[3], nullptr, 10));
+        LocalFree(arguments);
+        try
+        {
+            winrt::init_apartment(winrt::apartment_type::single_threaded);
+            SHELLEXECUTEINFOW execute{sizeof(execute)};
+            execute.fMask = SEE_MASK_INVOKEIDLIST | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+            execute.hwnd = IsWindow(owner) ? owner : nullptr;
+            execute.lpVerb = system ? L"installAllUsers" : L"install";
+            execute.lpFile = file.c_str();
+            execute.nShow = SW_SHOWNORMAL;
+            return ShellExecuteExW(&execute) ? 0 : static_cast<int>(GetLastError());
+        }
+        catch (...) { return ERROR_FUNCTION_FAILED; }
+    }
     if (!arguments || count != 4)
     {
         if (arguments)

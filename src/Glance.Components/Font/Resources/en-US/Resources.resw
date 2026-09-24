@@ -31,4 +31,11 @@
   <data name="Stretch" xml:space="preserve"><value>Width class</value></data>
   <data name="Glyphs" xml:space="preserve"><value>Glyph count</value></data>
   <data name="Axes" xml:space="preserve"><value>Variable axes (default)</value></data>
+  <data name="InstallUser" xml:space="preserve"><value>Install (user)</value></data>
+  <data name="InstallSystem" xml:space="preserve"><value>Install (system)</value></data>
+  <data name="InstallUnsupported" xml:space="preserve"><value>Windows cannot install this font format directly</value></data>
+  <data name="Installing" xml:space="preserve"><value>Installing font...</value></data>
+  <data name="InstallRequested" xml:space="preserve"><value>Font installation handed to Windows</value></data>
+  <data name="InstallCancelled" xml:space="preserve"><value>Font installation cancelled</value></data>
+  <data name="InstallFailed" xml:space="preserve"><value>Unable to install this font</value></data>
 </root>

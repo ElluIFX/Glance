@@ -31,4 +31,11 @@
   <data name="Stretch" xml:space="preserve"><value>字宽等级</value></data>
   <data name="Glyphs" xml:space="preserve"><value>字形数</value></data>
   <data name="Axes" xml:space="preserve"><value>可变轴（默认值）</value></data>
+  <data name="InstallUser" xml:space="preserve"><value>安装（用户）</value></data>
+  <data name="InstallSystem" xml:space="preserve"><value>安装（系统）</value></data>
+  <data name="InstallUnsupported" xml:space="preserve"><value>Windows 无法直接安装此字体格式</value></data>
+  <data name="Installing" xml:space="preserve"><value>正在安装字体...</value></data>
+  <data name="InstallRequested" xml:space="preserve"><value>已交由 Windows 安装字体</value></data>
+  <data name="InstallCancelled" xml:space="preserve"><value>已取消字体安装</value></data>
+  <data name="InstallFailed" xml:space="preserve"><value>无法安装此字体</value></data>
 </root>
