@@ -31,7 +31,7 @@ namespace
     using glance::contracts::components::GalleryMediaApi;
     using glance::contracts::components::GalleryMediaKind;
     using glance::contracts::components::HealthSeverity;
-    using glance::contracts::components::HoverInfoLayerApi;
+    using glance::contracts::components::InformationProviderApi;
     using glance::contracts::components::ImageMetadataApi;
     using glance::contracts::components::ImageMetadataEntry;
     using glance::contracts::components::ImageMetadataSink;
@@ -50,7 +50,6 @@ namespace
     using glance::contracts::components::ProgressivePreviewApi;
     using glance::contracts::components::SettingsContributionApi;
     using glance::contracts::components::StatusBarShortcutApi;
-    using glance::contracts::components::StatusBarShortcutDataApi;
     using glance::contracts::components::WebPreviewApi;
     using glance::contracts::components::WebPreviewDescriptor;
     using glance::contracts::components::WebPreviewOptions;
@@ -108,9 +107,8 @@ namespace
         std::optional<FileDirectoryPreviewApi> file_directory_preview;
         std::optional<GalleryMediaApi> gallery_media;
         std::optional<ImageMetadataApi> image_metadata;
-        std::optional<HoverInfoLayerApi> hover_info_layer;
+        std::optional<InformationProviderApi> information_provider;
         std::optional<StatusBarShortcutApi> status_bar_shortcut;
-        std::optional<StatusBarShortcutDataApi> status_bar_shortcut_data;
         std::optional<ComponentManagementActionApi> component_management_action;
         std::vector<std::wstring> extensions;
         std::vector<std::wstring> dependencies;
@@ -745,19 +743,19 @@ namespace
         }
         interface_pointer = nullptr;
         if (component->api.query_interface(
-                &glance::contracts::components::hover_info_layer_api_id,
-                glance::contracts::components::hover_info_layer_api_version,
+                &glance::contracts::components::information_provider_api_id,
+                glance::contracts::components::information_provider_api_version,
                 &interface_pointer) &&
             interface_pointer != nullptr)
         {
             const auto* interface_api =
-                static_cast<const HoverInfoLayerApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(HoverInfoLayerApi) &&
+                static_cast<const InformationProviderApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(InformationProviderApi) &&
                 interface_api->version ==
-                    glance::contracts::components::hover_info_layer_api_version &&
-                interface_api->query_info != nullptr)
+                    glance::contracts::components::information_provider_api_version &&
+                (interface_api->query_info != nullptr || interface_api->query_json != nullptr))
             {
-                component->hover_info_layer = *interface_api;
+                component->information_provider = *interface_api;
             }
         }
         interface_pointer = nullptr;
@@ -777,23 +775,6 @@ namespace
                 interface_api->activate != nullptr)
             {
                 component->status_bar_shortcut = *interface_api;
-            }
-        }
-        interface_pointer = nullptr;
-        if (component->api.query_interface(
-                &glance::contracts::components::status_bar_shortcut_data_api_id,
-                glance::contracts::components::status_bar_shortcut_data_api_version,
-                &interface_pointer) &&
-            interface_pointer != nullptr)
-        {
-            const auto* interface_api =
-                static_cast<const StatusBarShortcutDataApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(StatusBarShortcutDataApi) &&
-                interface_api->version ==
-                    glance::contracts::components::status_bar_shortcut_data_api_version &&
-                interface_api->query_json != nullptr)
-            {
-                component->status_bar_shortcut_data = *interface_api;
             }
         }
         interface_pointer = nullptr;
@@ -2492,7 +2473,8 @@ namespace glance::app
                         .initially_checked = descriptor.initially_checked != FALSE,
                         .supports_data_copy =
                             state == glance::contracts::components::StatusBarShortcutState::ready &&
-                            component->status_bar_shortcut_data.has_value(),
+                            component->information_provider.has_value() &&
+                            component->information_provider->query_json != nullptr,
                         .lease = std::static_pointer_cast<void>(component) });
                 }
             }
@@ -2547,7 +2529,8 @@ namespace glance::app
             if (result.activation ==
                     glance::contracts::components::StatusBarShortcutActivation::toggle_hover_info &&
                 result.checked && valid_setting_id(*hover_info_id) &&
-                component->hover_info_layer.has_value())
+                component->information_provider.has_value() &&
+                component->information_provider->query_info != nullptr)
             {
                 activation.kind = ComponentStatusBarActivationKind::toggle_hover_info;
                 activation.checked = true;
@@ -2597,7 +2580,8 @@ namespace glance::app
                 std::static_pointer_cast<LoadedComponent>(activation.lease);
             if (component == nullptr || !component->active ||
                 component->id != activation.component_id ||
-                !component->hover_info_layer.has_value() ||
+                !component->information_provider.has_value() ||
+                component->information_provider->query_info == nullptr ||
                 !valid_setting_id(activation.hover_info_id))
             {
                 return {};
@@ -2611,7 +2595,7 @@ namespace glance::app
                 .append = append_information_panel_entry,
                 .is_cancelled = information_panel_cancelled };
             const std::wstring source(path);
-            const auto status = component->hover_info_layer->query_info(
+            const auto status = component->information_provider->query_info(
                 activation.hover_info_id.c_str(),
                 source.c_str(),
                 &sink);
@@ -2638,7 +2622,8 @@ namespace glance::app
             if (component == nullptr || !component->active ||
                 component->id != shortcut.component_id ||
                 !shortcut.supports_data_copy ||
-                !component->status_bar_shortcut_data.has_value() ||
+                !component->information_provider.has_value() ||
+                component->information_provider->query_json == nullptr ||
                 !valid_setting_id(shortcut.shortcut_id))
             {
                 return {};
@@ -2649,7 +2634,7 @@ namespace glance::app
                 .append = append_hover_info,
                 .is_cancelled = hover_info_cancelled };
             const std::wstring source(path);
-            const auto status = component->status_bar_shortcut_data->query_json(
+            const auto status = component->information_provider->query_json(
                 shortcut.shortcut_id.c_str(),
                 source.c_str(),
                 &sink);

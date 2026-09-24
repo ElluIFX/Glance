@@ -355,14 +355,13 @@ namespace
         return TRUE;
     }
 
-    const HoverInfoLayerApi hover_info_api{
-        .query_info = query_hover_info };
+    const InformationProviderApi information_api{
+        .query_info = query_hover_info,
+        .query_json = query_shortcut_data };
     const StatusBarShortcutApi shortcut_api{
         .enumerate_shortcuts = enumerate_shortcuts,
         .query_state = query_shortcut_state,
         .activate = activate_shortcut };
-    const StatusBarShortcutDataApi shortcut_data_api{
-        .query_json = query_shortcut_data };
     const ComponentManagementActionApi management_action_api{
         .enumerate_actions = enumerate_actions,
         .prepare_action = prepare_action,
@@ -378,23 +377,16 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
-        if (IsEqualGUID(*interface_id, hover_info_layer_api_id) &&
-            minimum_version <= hover_info_layer_api_version)
+        if (IsEqualGUID(*interface_id, information_provider_api_id) &&
+            minimum_version <= information_provider_api_version)
         {
-            *interface_pointer = const_cast<HoverInfoLayerApi*>(&hover_info_api);
+            *interface_pointer = const_cast<InformationProviderApi*>(&information_api);
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, status_bar_shortcut_api_id) &&
             minimum_version <= status_bar_shortcut_api_version)
         {
             *interface_pointer = const_cast<StatusBarShortcutApi*>(&shortcut_api);
-            return TRUE;
-        }
-        if (IsEqualGUID(*interface_id, status_bar_shortcut_data_api_id) &&
-            minimum_version <= status_bar_shortcut_data_api_version)
-        {
-            *interface_pointer =
-                const_cast<StatusBarShortcutDataApi*>(&shortcut_data_api);
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, component_management_action_api_id) &&

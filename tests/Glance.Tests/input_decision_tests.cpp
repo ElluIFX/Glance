@@ -827,25 +827,21 @@ namespace
                 name);
             return pointer;
         };
-        const auto hover = static_cast<const HoverInfoLayerApi*>(query_interface(
-            hover_info_layer_api_id,
-            hover_info_layer_api_version,
-            "MediaInfo component hover interface"));
+        const auto information = static_cast<const InformationProviderApi*>(query_interface(
+            information_provider_api_id,
+            information_provider_api_version,
+            "MediaInfo component information interface"));
         const auto shortcuts = static_cast<const StatusBarShortcutApi*>(query_interface(
             status_bar_shortcut_api_id,
             status_bar_shortcut_api_version,
             "MediaInfo component shortcut interface"));
-        const auto shortcut_data = static_cast<const StatusBarShortcutDataApi*>(query_interface(
-            status_bar_shortcut_data_api_id,
-            status_bar_shortcut_data_api_version,
-            "MediaInfo component shortcut data interface"));
         const auto actions = static_cast<const ComponentManagementActionApi*>(query_interface(
             component_management_action_api_id,
             component_management_action_api_version,
             "MediaInfo component management interface"));
         expect(
-            hover != nullptr && hover->query_info != nullptr &&
-                shortcut_data != nullptr && shortcut_data->query_json != nullptr,
+            information != nullptr && information->query_info != nullptr &&
+                information->query_json != nullptr,
             "MediaInfo component information callbacks");
 
         if (shortcuts != nullptr)

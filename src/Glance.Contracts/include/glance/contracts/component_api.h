@@ -31,9 +31,8 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t file_directory_preview_api_version = 2;
     inline constexpr std::uint32_t gallery_media_api_version = 1;
     inline constexpr std::uint32_t image_metadata_api_version = 1;
-    inline constexpr std::uint32_t hover_info_layer_api_version = 2;
+    inline constexpr std::uint32_t information_provider_api_version = 3;
     inline constexpr std::uint32_t status_bar_shortcut_api_version = 3;
-    inline constexpr std::uint32_t status_bar_shortcut_data_api_version = 1;
     inline constexpr std::uint32_t component_management_action_api_version = 2;
     inline constexpr std::size_t component_resource_path_capacity = 260;
     inline constexpr std::size_t resource_key_capacity = 256;
@@ -116,7 +115,7 @@ namespace glance::contracts::components
         0xdc6c,
         0x4dcc,
         { 0x81, 0x4b, 0x67, 0xe8, 0x3e, 0xf4, 0x36, 0x1b } };
-    inline constexpr GUID hover_info_layer_api_id{
+    inline constexpr GUID information_provider_api_id{
         0x422e5648,
         0x8724,
         0x49a5,
@@ -126,11 +125,6 @@ namespace glance::contracts::components
         0x38fc,
         0x43c3,
         { 0x89, 0xd5, 0x24, 0x71, 0x19, 0xb1, 0xdf, 0x79 } };
-    inline constexpr GUID status_bar_shortcut_data_api_id{
-        0xd32a7c73,
-        0xc6e6,
-        0x472b,
-        { 0xa7, 0xc0, 0x69, 0x95, 0xfd, 0x74, 0x68, 0xd1 } };
     inline constexpr GUID component_management_action_api_id{
         0xa41f0c2d,
         0x3002,
@@ -822,11 +816,12 @@ namespace glance::contracts::components
         QueryImageMetadataFunction query_metadata{};
     };
 
-    struct HoverInfoLayerApi
+    struct InformationProviderApi
     {
-        std::uint32_t size{ sizeof(HoverInfoLayerApi) };
-        std::uint32_t version{ hover_info_layer_api_version };
+        std::uint32_t size{ sizeof(InformationProviderApi) };
+        std::uint32_t version{ information_provider_api_version };
         QueryHoverInfoFunction query_info{};
+        QueryStatusBarShortcutDataFunction query_json{};
     };
 
     struct StatusBarShortcutApi
@@ -837,14 +832,6 @@ namespace glance::contracts::components
         QueryStatusBarShortcutStateFunction query_state{};
         ActivateStatusBarShortcutFunction activate{};
     };
-
-    struct StatusBarShortcutDataApi
-    {
-        std::uint32_t size{ sizeof(StatusBarShortcutDataApi) };
-        std::uint32_t version{ status_bar_shortcut_data_api_version };
-        QueryStatusBarShortcutDataFunction query_json{};
-    };
-
     struct ComponentManagementActionApi
     {
         std::uint32_t size{ sizeof(ComponentManagementActionApi) };
