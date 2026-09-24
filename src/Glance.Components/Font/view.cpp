@@ -45,7 +45,8 @@ struct View : std::enable_shared_from_this<View>
     Border adjustment_separator;
     TextBox editor;
     TextBlock size_label, weight_label;
-    Expander details;
+    Border details;
+    TextBlock metadata_title;
     ScrollViewer scroll, metadata_scroll;
     Canvas canvas;
     Image image;
@@ -64,7 +65,7 @@ struct View : std::enable_shared_from_this<View>
     std::thread worker;
     std::mutex mutex;
     std::condition_variable condition;
-    bool stopped{}, pending{}, updating{}, composition{}, narrow{}, text_initialized{}, editing{};
+    bool stopped{}, pending{}, updating{}, composition{}, text_initialized{}, editing{};
     Request next;
     std::uint64_t generation{};
     std::uint64_t serial{};
@@ -146,7 +147,7 @@ struct View : std::enable_shared_from_this<View>
             controls.RowDefinitions().Append(row);
         }
         controls.Children().Append(choices);
-        faces.Header(box_value(text(L"Face")));
+        Automation::AutomationProperties::SetName(faces, text(L"Face"));
         faces.Width(200);
         faces.VerticalAlignment(VerticalAlignment::Bottom);
         faces.Visibility(Visibility::Collapsed);
@@ -217,15 +218,24 @@ struct View : std::enable_shared_from_this<View>
         ScrollViewer::SetVerticalScrollBarVisibility(editor, ScrollBarVisibility::Auto);
         Automation::AutomationProperties::SetName(editor, text(L"Sample"));
         body.Children().Append(editor);
-        details.Header(box_value(text(L"Metadata")));
-        details.IsExpanded(true);
+        details = Markup::XamlReader::Load(
+            LR"(<Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                CornerRadius="8"/>)").as<Border>();
+        StackPanel metadata_panel;
+        metadata_title.Text(text(L"Metadata"));
+        metadata_title.FontWeight(winrt::Windows::UI::Text::FontWeight{600});
+        metadata_title.Margin({16, 16, 16, 12});
+        metadata_panel.Children().Append(metadata_title);
         details.HorizontalAlignment(HorizontalAlignment::Stretch);
         details.VerticalAlignment(VerticalAlignment::Top);
         metadata_scroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
         metadata_scroll.Content(information);
         information.Spacing(6);
         information.Margin({12, 0, 12, 12});
-        details.Content(metadata_scroll);
+        metadata_panel.Children().Append(metadata_scroll);
+        details.Child(metadata_panel);
         Grid::SetColumn(details, 1);
         Grid::SetRowSpan(details, 4);
         root.Children().Append(details);
@@ -432,11 +442,6 @@ struct View : std::enable_shared_from_this<View>
         controls.ColumnSpacing(has_faces && inline_controls ? 24 : 0);
         weight_group.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
         adjustment_separator.Visibility(variable ? Visibility::Visible : Visibility::Collapsed);
-        if (compact_layout != narrow)
-        {
-            narrow = compact_layout;
-            details.IsExpanded(!compact_layout);
-        }
         root.ColumnSpacing(compact_layout ? 0 : 24);
         root.ColumnDefinitions().GetAt(1).Width({compact_layout ? 0.0 : 280.0, GridUnitType::Pixel});
         Grid::SetColumn(details, compact_layout ? 0 : 1);
@@ -705,14 +710,14 @@ struct View : std::enable_shared_from_this<View>
         language = tag;
         context.QualifierValues().Insert(L"Language", language);
         updating = true;
-        faces.Header(box_value(text(L"Face")));
+        Automation::AutomationProperties::SetName(faces, text(L"Face"));
         size_label.Text(text(L"Size"));
         weight_label.Text(text(L"Weight"));
         editor.PlaceholderText(text(L"SampleHint"));
         Automation::AutomationProperties::SetName(editor, text(L"Sample"));
         Automation::AutomationProperties::SetName(scroll, text(L"EditSample"));
         ToolTipService::SetToolTip(scroll, box_value(text(L"EditSample")));
-        details.Header(box_value(text(L"Metadata")));
+        metadata_title.Text(text(L"Metadata"));
         retry.Content(box_value(text(L"Retry")));
         updating = false;
         if (metadata)
