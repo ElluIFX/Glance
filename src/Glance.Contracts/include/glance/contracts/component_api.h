@@ -21,12 +21,10 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t progressive_preview_api_version = 2;
     inline constexpr std::uint32_t preview_notice_api_version = 2;
     inline constexpr std::uint32_t web_preview_api_version = 2;
-    inline constexpr std::uint32_t paged_document_renderer_api_version = 1;
-    inline constexpr std::uint32_t native_preview_renderer_api_version = 1;
+    inline constexpr std::uint32_t host_renderer_api_version = 2;
     inline constexpr std::uint32_t component_view_api_version = 1;
     inline constexpr GUID component_view_api_id{
         0xdd72b6a1, 0xf3a9, 0x42f2, {0xa6, 0x35, 0x73, 0x60, 0x36, 0xab, 0x90, 0x51}};
-    inline constexpr std::uint32_t native_media_renderer_api_version = 1;
     inline constexpr std::uint32_t settings_contribution_api_version = 3;
     inline constexpr std::uint32_t file_directory_preview_api_version = 2;
     inline constexpr std::uint32_t gallery_media_api_version = 1;
@@ -80,21 +78,11 @@ namespace glance::contracts::components
         0x840d,
         0x49f5,
         { 0xa7, 0xbc, 0x77, 0xe0, 0x2d, 0x49, 0xd6, 0x28 } };
-    inline constexpr GUID paged_document_renderer_api_id{
+    inline constexpr GUID host_renderer_api_id{
         0x3ce11f55,
         0x620e,
         0x4fc2,
         { 0x89, 0x41, 0x19, 0xd2, 0x39, 0x29, 0xe2, 0x66 } };
-    inline constexpr GUID native_preview_renderer_api_id{
-        0x8d72ce55,
-        0x479f,
-        0x4fa5,
-        { 0x95, 0x12, 0x70, 0x68, 0xa1, 0x77, 0x63, 0x8b } };
-    inline constexpr GUID native_media_renderer_api_id{
-        0x8ebbf167,
-        0xa97c,
-        0x4349,
-        { 0xab, 0x2c, 0xe6, 0x05, 0x66, 0x52, 0x66, 0xb6 } };
     inline constexpr GUID settings_contribution_api_id{
         0xd1ef7371,
         0x3b06,
@@ -373,21 +361,16 @@ namespace glance::contracts::components
         WebLocalizedParameter localized_parameters[maximum_web_localized_parameters]{};
     };
 
-    struct PagedDocumentHostDescriptor
+    enum class PreviewHostProtocol : std::uint32_t
     {
-        std::uint32_t size{ sizeof(PagedDocumentHostDescriptor) };
-        wchar_t host_executable[renderer_host_capacity]{};
+        paged_document = 1,
+        native_document = 2,
+        native_media = 3,
     };
 
-    struct NativePreviewHostDescriptor
+    struct RendererHostDescriptor
     {
-        std::uint32_t size{ sizeof(NativePreviewHostDescriptor) };
-        wchar_t host_executable[renderer_host_capacity]{};
-    };
-
-    struct NativeMediaHostDescriptor
-    {
-        std::uint32_t size{ sizeof(NativeMediaHostDescriptor) };
+        std::uint32_t size{ sizeof(RendererHostDescriptor) };
         wchar_t host_executable[renderer_host_capacity]{};
     };
 
@@ -632,12 +615,9 @@ namespace glance::contracts::components
         std::uint64_t lease_token,
         const WebPreviewOptions* options,
         WebPreviewDescriptor* descriptor) noexcept;
-    using QueryPagedDocumentHostFunction = BOOL(WINAPI*)(
-        PagedDocumentHostDescriptor* descriptor) noexcept;
-    using QueryNativePreviewHostFunction = BOOL(WINAPI*)(
-        NativePreviewHostDescriptor* descriptor) noexcept;
-    using QueryNativeMediaHostFunction = BOOL(WINAPI*)(
-        NativeMediaHostDescriptor* descriptor) noexcept;
+    using QueryRendererHostFunction = BOOL(WINAPI*)(
+        PreviewHostProtocol protocol,
+        RendererHostDescriptor* descriptor) noexcept;
     using EnumerateComponentSettingsFunction = BOOL(WINAPI*)(
         ComponentSettingDescriptor* descriptors,
         std::uint32_t capacity,
@@ -752,11 +732,11 @@ namespace glance::contracts::components
         QueryWebPreviewFunction query_preview{};
     };
 
-    struct PagedDocumentRendererApi
+    struct HostRendererApi
     {
-        std::uint32_t size{ sizeof(PagedDocumentRendererApi) };
-        std::uint32_t version{ paged_document_renderer_api_version };
-        QueryPagedDocumentHostFunction query_host{};
+        std::uint32_t size{ sizeof(HostRendererApi) };
+        std::uint32_t version{ host_renderer_api_version };
+        QueryRendererHostFunction query_host{};
     };
 
     // All calls run on the application's XAML UI thread. The returned object is an
@@ -771,20 +751,6 @@ namespace glance::contracts::components
                              IUnknown** element, std::uint64_t* session) noexcept{};
         void (WINAPI* set_language)(std::uint64_t session, const wchar_t* language) noexcept{};
         void (WINAPI* close)(std::uint64_t session) noexcept{};
-    };
-
-    struct NativePreviewRendererApi
-    {
-        std::uint32_t size{ sizeof(NativePreviewRendererApi) };
-        std::uint32_t version{ native_preview_renderer_api_version };
-        QueryNativePreviewHostFunction query_host{};
-    };
-
-    struct NativeMediaRendererApi
-    {
-        std::uint32_t size{ sizeof(NativeMediaRendererApi) };
-        std::uint32_t version{ native_media_renderer_api_version };
-        QueryNativeMediaHostFunction query_host{};
     };
 
     struct SettingsContributionApi

@@ -190,8 +190,8 @@ namespace
         return kind == PreviewContentKind::document &&
             format == PreviewContentFormat::native_surface &&
             interface_id != nullptr &&
-            IsEqualGUID(*interface_id, native_preview_renderer_api_id) &&
-            interface_version == native_preview_renderer_api_version;
+            IsEqualGUID(*interface_id, host_renderer_api_id) &&
+            interface_version == host_renderer_api_version;
     }
 
     template <typename Function>
@@ -442,8 +442,8 @@ namespace glance::tests
             api.query_interface == nullptr || api.shutdown == nullptr ||
             api.initialize(&registrar, &registration) == FALSE ||
             api.query_interface(
-                &native_preview_renderer_api_id,
-                native_preview_renderer_api_version,
+                &host_renderer_api_id,
+                host_renderer_api_version,
                 &renderer_pointer) == FALSE || renderer_pointer == nullptr)
         {
             FreeLibrary(module);

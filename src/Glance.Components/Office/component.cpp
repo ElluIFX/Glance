@@ -57,10 +57,12 @@ namespace
         return std::filesystem::path(path).parent_path();
     }
 
-    BOOL WINAPI query_host(NativePreviewHostDescriptor* descriptor) noexcept
+    BOOL WINAPI query_host(PreviewHostProtocol protocol, RendererHostDescriptor* descriptor) noexcept
     {
+        if (protocol != PreviewHostProtocol::native_document)
+            return FALSE;
         if (descriptor == nullptr ||
-            descriptor->size < sizeof(NativePreviewHostDescriptor))
+            descriptor->size < sizeof(RendererHostDescriptor))
         {
             return FALSE;
         }
@@ -71,13 +73,13 @@ namespace
         {
             return FALSE;
         }
-        NativePreviewHostDescriptor result;
+        RendererHostDescriptor result;
         wcscpy_s(result.host_executable, L"Glance.OfficeHost.exe");
         *descriptor = result;
         return TRUE;
     }
 
-    const NativePreviewRendererApi native_preview_api{
+    const HostRendererApi native_preview_api{
         .query_host = query_host };
 
     bool is_protected_source(const std::filesystem::path& source) noexcept
@@ -157,8 +159,8 @@ namespace
                 registrar->context,
                 PreviewContentKind::document,
                 PreviewContentFormat::native_surface,
-                &native_preview_renderer_api_id,
-                native_preview_renderer_api_version))
+                &host_renderer_api_id,
+                host_renderer_api_version))
         {
             return FALSE;
         }
@@ -368,10 +370,10 @@ namespace
             *interface_pointer = &api;
             return TRUE;
         }
-        if (IsEqualGUID(*interface_id, native_preview_renderer_api_id) &&
-            minimum_version <= native_preview_renderer_api_version)
+        if (IsEqualGUID(*interface_id, host_renderer_api_id) &&
+            minimum_version <= host_renderer_api_version)
         {
-            *interface_pointer = const_cast<NativePreviewRendererApi*>(
+            *interface_pointer = const_cast<HostRendererApi*>(
                 &native_preview_api);
             return TRUE;
         }

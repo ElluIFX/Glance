@@ -156,8 +156,10 @@ namespace
         return SUCCEEDED(media_status) && count != 0;
     }
 
-    BOOL WINAPI query_host(NativeMediaHostDescriptor* descriptor) noexcept
+    BOOL WINAPI query_host(PreviewHostProtocol protocol, RendererHostDescriptor* descriptor) noexcept
     {
+        if (protocol != PreviewHostProtocol::native_media)
+            return FALSE;
         if (descriptor == nullptr || descriptor->size < sizeof(*descriptor))
         {
             return FALSE;
@@ -169,7 +171,7 @@ namespace
         {
             return FALSE;
         }
-        NativeMediaHostDescriptor result;
+        RendererHostDescriptor result;
         wcscpy_s(result.host_executable, L"Glance.PanoramaVideoHost.exe");
         *descriptor = result;
         return TRUE;
@@ -189,7 +191,7 @@ namespace
             : GalleryMediaKind::none;
     }
 
-    const NativeMediaRendererApi native_media_api{ .query_host = query_host };
+    const HostRendererApi native_media_api{ .query_host = query_host };
     const GalleryMediaApi gallery_media_api{
         .classify_extension = classify_gallery_extension };
 
@@ -341,8 +343,8 @@ namespace
                 registrar->context,
                 PreviewContentKind::media,
                 PreviewContentFormat::media_file,
-                &native_media_renderer_api_id,
-                native_media_renderer_api_version))
+                &host_renderer_api_id,
+                host_renderer_api_version))
         {
             return FALSE;
         }
@@ -450,10 +452,10 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
-        if (IsEqualGUID(*interface_id, native_media_renderer_api_id) &&
-            minimum_version <= native_media_renderer_api_version)
+        if (IsEqualGUID(*interface_id, host_renderer_api_id) &&
+            minimum_version <= host_renderer_api_version)
         {
-            *interface_pointer = const_cast<NativeMediaRendererApi*>(&native_media_api);
+            *interface_pointer = const_cast<HostRendererApi*>(&native_media_api);
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, gallery_media_api_id) &&

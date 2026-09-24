@@ -68,8 +68,8 @@ namespace
                 registrar->context,
                 PreviewContentKind::document,
                 PreviewContentFormat::pdf,
-                &paged_document_renderer_api_id,
-                paged_document_renderer_api_version))
+                &host_renderer_api_id,
+                host_renderer_api_version))
         {
             return FALSE;
         }
@@ -172,9 +172,11 @@ namespace
     {
     }
 
-    BOOL WINAPI query_host(PagedDocumentHostDescriptor* descriptor) noexcept
+    BOOL WINAPI query_host(PreviewHostProtocol protocol, RendererHostDescriptor* descriptor) noexcept
     {
-        if (descriptor == nullptr || descriptor->size < sizeof(PagedDocumentHostDescriptor))
+        if (protocol != PreviewHostProtocol::paged_document)
+            return FALSE;
+        if (descriptor == nullptr || descriptor->size < sizeof(RendererHostDescriptor))
         {
             return FALSE;
         }
@@ -185,7 +187,7 @@ namespace
         {
             return FALSE;
         }
-        PagedDocumentHostDescriptor result;
+        RendererHostDescriptor result;
         wcscpy_s(result.host_executable, L"Glance.PdfHost.exe");
         *descriptor = result;
         return TRUE;
@@ -241,7 +243,7 @@ namespace
         return TRUE;
     }
 
-    const PagedDocumentRendererApi paged_document_api{
+    const HostRendererApi paged_document_api{
         .query_host = query_host };
     const SettingsContributionApi settings_api{
         .enumerate_settings = enumerate_settings };
@@ -256,10 +258,10 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
-        if (IsEqualGUID(*interface_id, paged_document_renderer_api_id) &&
-            minimum_version <= paged_document_renderer_api_version)
+        if (IsEqualGUID(*interface_id, host_renderer_api_id) &&
+            minimum_version <= host_renderer_api_version)
         {
-            *interface_pointer = const_cast<PagedDocumentRendererApi*>(&paged_document_api);
+            *interface_pointer = const_cast<HostRendererApi*>(&paged_document_api);
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, settings_contribution_api_id) &&

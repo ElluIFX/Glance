@@ -37,12 +37,9 @@ namespace
     using glance::contracts::components::ImageMetadataSink;
     using glance::contracts::components::FileDirectoryPreviewApi;
     using glance::contracts::components::PreparedPreview;
-    using glance::contracts::components::PagedDocumentHostDescriptor;
-    using glance::contracts::components::PagedDocumentRendererApi;
-    using glance::contracts::components::NativePreviewHostDescriptor;
-    using glance::contracts::components::NativePreviewRendererApi;
-    using glance::contracts::components::NativeMediaHostDescriptor;
-    using glance::contracts::components::NativeMediaRendererApi;
+    using glance::contracts::components::RendererHostDescriptor;
+    using glance::contracts::components::PreviewHostProtocol;
+    using glance::contracts::components::HostRendererApi;
     using glance::contracts::components::PreviewContentFormat;
     using glance::contracts::components::PreviewContentKind;
     using glance::contracts::components::PreviewNoticeApi;
@@ -96,12 +93,10 @@ namespace
         std::optional<ProgressivePreviewApi> progressive_preview;
         std::optional<PreviewNoticeApi> preview_notice;
         std::optional<WebPreviewApi> web_preview;
-        std::optional<PagedDocumentRendererApi> paged_document_renderer;
+        std::optional<HostRendererApi> host_renderer;
         std::optional<std::filesystem::path> paged_document_host;
-        std::optional<NativePreviewRendererApi> native_preview_renderer;
         std::optional<glance::contracts::components::ComponentViewApi> component_view;
         std::optional<std::filesystem::path> native_preview_host;
-        std::optional<NativeMediaRendererApi> native_media_renderer;
         std::optional<std::filesystem::path> native_media_host;
         std::optional<SettingsContributionApi> settings_contribution;
         std::optional<FileDirectoryPreviewApi> file_directory_preview;
@@ -613,36 +608,19 @@ namespace
         }
         interface_pointer = nullptr;
         if (component->api.query_interface(
-                &glance::contracts::components::paged_document_renderer_api_id,
-                glance::contracts::components::paged_document_renderer_api_version,
+                &glance::contracts::components::host_renderer_api_id,
+                glance::contracts::components::host_renderer_api_version,
                 &interface_pointer) &&
             interface_pointer != nullptr)
         {
             const auto* interface_api =
-                static_cast<const PagedDocumentRendererApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(PagedDocumentRendererApi) &&
+                static_cast<const HostRendererApi*>(interface_pointer);
+            if (interface_api->size >= sizeof(HostRendererApi) &&
                 interface_api->version ==
-                    glance::contracts::components::paged_document_renderer_api_version &&
+                    glance::contracts::components::host_renderer_api_version &&
                 interface_api->query_host != nullptr)
             {
-                component->paged_document_renderer = *interface_api;
-            }
-        }
-        interface_pointer = nullptr;
-        if (component->api.query_interface(
-                &glance::contracts::components::native_preview_renderer_api_id,
-                glance::contracts::components::native_preview_renderer_api_version,
-                &interface_pointer) &&
-            interface_pointer != nullptr)
-        {
-            const auto* interface_api =
-                static_cast<const NativePreviewRendererApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(NativePreviewRendererApi) &&
-                interface_api->version ==
-                    glance::contracts::components::native_preview_renderer_api_version &&
-                interface_api->query_host != nullptr)
-            {
-                component->native_preview_renderer = *interface_api;
+                component->host_renderer = *interface_api;
             }
         }
         interface_pointer = nullptr;
@@ -654,23 +632,6 @@ namespace
             if (api->size >= sizeof(*api) && api->version == glance::contracts::components::component_view_api_version &&
                 api->create && api->close && api->set_language)
                 component->component_view = *api;
-        }
-        interface_pointer = nullptr;
-        if (component->api.query_interface(
-                &glance::contracts::components::native_media_renderer_api_id,
-                glance::contracts::components::native_media_renderer_api_version,
-                &interface_pointer) &&
-            interface_pointer != nullptr)
-        {
-            const auto* interface_api =
-                static_cast<const NativeMediaRendererApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(NativeMediaRendererApi) &&
-                interface_api->version ==
-                    glance::contracts::components::native_media_renderer_api_version &&
-                interface_api->query_host != nullptr)
-            {
-                component->native_media_renderer = *interface_api;
-            }
         }
         interface_pointer = nullptr;
         if (component->api.query_interface(
@@ -824,11 +785,11 @@ namespace
                         glance::contracts::components::component_view_api_version;
                 if (IsEqualGUID(
                         renderer.interface_id,
-                        glance::contracts::components::paged_document_renderer_api_id))
+                        glance::contracts::components::host_renderer_api_id))
                 {
-                    return !component->paged_document_renderer.has_value() ||
+                    return !component->host_renderer.has_value() ||
                         renderer.interface_version !=
-                            glance::contracts::components::paged_document_renderer_api_version;
+                            glance::contracts::components::host_renderer_api_version;
                 }
                 if (IsEqualGUID(
                         renderer.interface_id,
@@ -838,94 +799,48 @@ namespace
                         renderer.interface_version !=
                             glance::contracts::components::file_directory_preview_api_version;
                 }
-                if (IsEqualGUID(
-                        renderer.interface_id,
-                        glance::contracts::components::native_preview_renderer_api_id))
-                {
-                    return !component->native_preview_renderer.has_value() ||
-                        renderer.interface_version !=
-                            glance::contracts::components::native_preview_renderer_api_version;
-                }
-                if (IsEqualGUID(
-                        renderer.interface_id,
-                        glance::contracts::components::native_media_renderer_api_id))
-                {
-                    return !component->native_media_renderer.has_value() ||
-                        renderer.interface_version !=
-                            glance::contracts::components::native_media_renderer_api_version;
-                }
                 return true;
             }))
         {
             return {};
         }
-        if (component->paged_document_renderer.has_value())
+        for (const auto& renderer : component->renderers)
         {
-            PagedDocumentHostDescriptor descriptor;
-            const bool described =
-                component->paged_document_renderer->query_host(&descriptor) != FALSE &&
-                descriptor.size >= sizeof(PagedDocumentHostDescriptor);
-            const auto executable = described
-                ? bounded_string(descriptor.host_executable)
-                : std::nullopt;
-            const std::filesystem::path relative = executable.has_value()
-                ? std::filesystem::path(*executable)
-                : std::filesystem::path{};
-            std::error_code error;
-            component->activation_ready = executable.has_value() &&
-                !relative.empty() && relative == relative.filename() &&
-                _wcsicmp(relative.extension().c_str(), L".exe") == 0 &&
-                std::filesystem::is_regular_file(directory / relative, error);
-            if (component->activation_ready)
+            if (!IsEqualGUID(renderer.interface_id, glance::contracts::components::host_renderer_api_id))
+                continue;
+            PreviewHostProtocol protocol;
+            std::optional<std::filesystem::path>* target = nullptr;
+            if (renderer.kind == PreviewContentKind::document && renderer.format == PreviewContentFormat::pdf)
             {
-                component->paged_document_host = directory / relative;
+                protocol = PreviewHostProtocol::paged_document;
+                target = &component->paged_document_host;
             }
-        }
-        if (component->native_preview_renderer.has_value())
-        {
-            NativePreviewHostDescriptor descriptor;
-            const bool described =
-                component->native_preview_renderer->query_host(&descriptor) != FALSE &&
-                descriptor.size >= sizeof(NativePreviewHostDescriptor);
-            const auto executable = described
-                ? bounded_string(descriptor.host_executable)
-                : std::nullopt;
+            else if (renderer.kind == PreviewContentKind::document && renderer.format == PreviewContentFormat::native_surface)
+            {
+                protocol = PreviewHostProtocol::native_document;
+                target = &component->native_preview_host;
+            }
+            else if (renderer.kind == PreviewContentKind::media && renderer.format == PreviewContentFormat::media_file)
+            {
+                protocol = PreviewHostProtocol::native_media;
+                target = &component->native_media_host;
+            }
+            else
+                return {};
+            RendererHostDescriptor descriptor;
+            const bool described = component->host_renderer->query_host(protocol, &descriptor) != FALSE &&
+                descriptor.size >= sizeof(descriptor);
+            const auto executable = described ? bounded_string(descriptor.host_executable) : std::nullopt;
             const std::filesystem::path relative = executable.has_value()
-                ? std::filesystem::path(*executable)
-                : std::filesystem::path{};
+                ? std::filesystem::path(*executable) : std::filesystem::path{};
             std::error_code error;
-            component->activation_ready = component->activation_ready &&
-                executable.has_value() && !relative.empty() &&
+            const bool available = executable.has_value() && !relative.empty() &&
                 relative == relative.filename() &&
                 _wcsicmp(relative.extension().c_str(), L".exe") == 0 &&
                 std::filesystem::is_regular_file(directory / relative, error);
-            if (component->activation_ready)
-            {
-                component->native_preview_host = directory / relative;
-            }
-        }
-        if (component->native_media_renderer.has_value())
-        {
-            NativeMediaHostDescriptor descriptor;
-            const bool described =
-                component->native_media_renderer->query_host(&descriptor) != FALSE &&
-                descriptor.size >= sizeof(NativeMediaHostDescriptor);
-            const auto executable = described
-                ? bounded_string(descriptor.host_executable)
-                : std::nullopt;
-            const std::filesystem::path relative = executable.has_value()
-                ? std::filesystem::path(*executable)
-                : std::filesystem::path{};
-            std::error_code error;
-            component->activation_ready = component->activation_ready &&
-                executable.has_value() && !relative.empty() &&
-                relative == relative.filename() &&
-                _wcsicmp(relative.extension().c_str(), L".exe") == 0 &&
-                std::filesystem::is_regular_file(directory / relative, error);
-            if (component->activation_ready)
-            {
-                component->native_media_host = directory / relative;
-            }
+            component->activation_ready = component->activation_ready && available;
+            if (available)
+                *target = directory / relative;
         }
         std::ranges::sort(component->extensions);
         return component;
@@ -1255,7 +1170,7 @@ namespace
         }
         if (preview.kind == PreviewContentKind::media &&
             preview.format == PreviewContentFormat::media_file &&
-            component->native_media_renderer.has_value())
+            component->native_media_host.has_value())
         {
             if (!component->native_media_host.has_value())
             {

@@ -68,16 +68,16 @@ namespace
                 format == glance::contracts::components::PreviewContentFormat::pdf &&
                 IsEqualGUID(
                     *interface_id,
-                    glance::contracts::components::paged_document_renderer_api_id) &&
+                    glance::contracts::components::host_renderer_api_id) &&
                 interface_version ==
-                    glance::contracts::components::paged_document_renderer_api_version) ||
+                    glance::contracts::components::host_renderer_api_version) ||
             (kind == glance::contracts::components::PreviewContentKind::document &&
              format == glance::contracts::components::PreviewContentFormat::native_surface &&
              IsEqualGUID(
                  *interface_id,
-                 glance::contracts::components::native_preview_renderer_api_id) &&
+                 glance::contracts::components::host_renderer_api_id) &&
              interface_version ==
-                 glance::contracts::components::native_preview_renderer_api_version) ||
+                 glance::contracts::components::host_renderer_api_version) ||
             (kind == glance::contracts::components::PreviewContentKind::directory &&
              format ==
                  glance::contracts::components::PreviewContentFormat::file_directory &&
@@ -1550,17 +1550,17 @@ int wmain(int argument_count, wchar_t* arguments[])
                 void* renderer_pointer{};
                 expect(
                     api.query_interface(
-                        &native_preview_renderer_api_id,
-                        native_preview_renderer_api_version,
+                        &host_renderer_api_id,
+                        host_renderer_api_version,
                         &renderer_pointer) != FALSE && renderer_pointer != nullptr,
                     "Office component native renderer interface");
                 if (renderer_pointer != nullptr)
                 {
-                    NativePreviewHostDescriptor host_descriptor;
-                    const auto renderer = static_cast<const NativePreviewRendererApi*>(
+                    RendererHostDescriptor host_descriptor;
+                    const auto renderer = static_cast<const HostRendererApi*>(
                         renderer_pointer);
                     expect(
-                        renderer->query_host(&host_descriptor) != FALSE &&
+                        renderer->query_host(PreviewHostProtocol::native_document, &host_descriptor) != FALSE &&
                             std::wstring_view(host_descriptor.host_executable) ==
                                 L"Glance.OfficeHost.exe",
                         "Office component native host descriptor");
@@ -2024,18 +2024,18 @@ int wmain(int argument_count, wchar_t* arguments[])
                     void* interface_pointer{};
                     expect(
                         api.query_interface(
-                            &paged_document_renderer_api_id,
-                            paged_document_renderer_api_version,
+                            &host_renderer_api_id,
+                            host_renderer_api_version,
                             &interface_pointer) != FALSE &&
                             interface_pointer != nullptr,
                         "PDF component paged document interface");
                     if (interface_pointer != nullptr)
                     {
-                        PagedDocumentHostDescriptor host;
+                        RendererHostDescriptor host;
                         const auto renderer =
-                            static_cast<const PagedDocumentRendererApi*>(interface_pointer);
+                            static_cast<const HostRendererApi*>(interface_pointer);
                         expect(
-                            renderer->query_host(&host) != FALSE &&
+                            renderer->query_host(PreviewHostProtocol::paged_document, &host) != FALSE &&
                                 std::wstring_view(host.host_executable) ==
                                     L"Glance.PdfHost.exe",
                             "PDF component host descriptor");

@@ -12,15 +12,17 @@ namespace
     constexpr std::array extensions{L".exe", L".dll", L".sys", L".ocx", L".cpl",
                                     L".scr", L".pyd", L".efi", L".mui"};
 
-    BOOL WINAPI host(NativePreviewHostDescriptor* result) noexcept
+    BOOL WINAPI host(PreviewHostProtocol protocol, RendererHostDescriptor* result) noexcept
     {
+        if (protocol != PreviewHostProtocol::native_document)
+            return FALSE;
         if (!result || result->size < sizeof(*result))
             return FALSE;
-        *result = NativePreviewHostDescriptor{};
+        *result = RendererHostDescriptor{};
         wcscpy_s(result->host_executable, L"Glance.ExecutableHost.exe");
         return TRUE;
     }
-    NativePreviewRendererApi renderer{.query_host = host};
+    HostRendererApi renderer{.query_host = host};
     BOOL WINAPI initialize(const ComponentRegistrar* registrar, ComponentRegistration* result) noexcept
     {
         if (!registrar || !result || registrar->size < sizeof(*registrar) || result->size < sizeof(*result) ||
@@ -31,7 +33,7 @@ namespace
                 return FALSE;
         if (!registrar->register_renderer(
                 registrar->context, PreviewContentKind::document, PreviewContentFormat::native_surface,
-                &native_preview_renderer_api_id, native_preview_renderer_api_version))
+                &host_renderer_api_id, host_renderer_api_version))
             return FALSE;
         *result = ComponentRegistration{};
         wcscpy_s(result->component_id, L"executable");
@@ -115,8 +117,8 @@ namespace
         if (!output)
             return FALSE;
         *output = nullptr;
-        if (id && IsEqualGUID(*id, native_preview_renderer_api_id) &&
-            version <= native_preview_renderer_api_version)
+        if (id && IsEqualGUID(*id, host_renderer_api_id) &&
+            version <= host_renderer_api_version)
         {
             *output = &renderer;
             return TRUE;
