@@ -458,6 +458,7 @@ struct View : std::enable_shared_from_this<View>
         scroll.Opacity(0);
         scroll.IsHitTestVisible(false);
         status.Text(text(L"EditingHint"));
+        status.Opacity(1);
         editor.Focus(FocusState::Programmatic);
     }
     void finish_edit()
@@ -520,6 +521,7 @@ struct View : std::enable_shared_from_this<View>
         notify(contracts::components::ComponentViewState::loading);
         metadata.reset();
         status.Text(text(L"Loading"));
+        status.Opacity(1);
         retry.Visibility(Visibility::Collapsed);
         {
             std::scoped_lock lock(mutex);
@@ -664,6 +666,7 @@ struct View : std::enable_shared_from_this<View>
             message = text(L"Missing");
         if (message.empty()) message = text(L"EditSample");
         status.Text(editing ? text(L"EditingHint") : hstring(message));
+        status.Opacity(editing || response.missing || accessibility.HighContrast() ? 1 : 0.5);
         notify(contracts::components::ComponentViewState::ready);
     }
     void notify(contracts::components::ComponentViewState state) noexcept
@@ -674,6 +677,7 @@ struct View : std::enable_shared_from_this<View>
     void failure()
     {
         status.Text(text(L"Failed"));
+        status.Opacity(1);
         retry.Visibility(Visibility::Visible);
         notify(contracts::components::ComponentViewState::failed);
     }

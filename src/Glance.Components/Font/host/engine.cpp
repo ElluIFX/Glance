@@ -133,6 +133,8 @@ std::wstring sample(IDWriteFontFace1 *face)
             result = text;
             break;
         }
+    if (result == samples[0])
+        result += L"\n" + std::wstring(samples[1]);
     if (result.empty())
     {
         UINT32 count{};

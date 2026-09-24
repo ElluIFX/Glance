@@ -102,6 +102,10 @@ int run_font_tests()
             collection.open(host, (fonts / L"msyh.ttc").wstring());
             auto collection_info = collection.metadata(0);
             expect(collection_info->count > 1, "font collection enumerates faces");
+            const std::wstring_view sample(collection_info->sample);
+            expect(sample.find(L"清风徐来") != std::wstring_view::npos &&
+                       sample.find(L"The quick brown fox") != std::wstring_view::npos,
+                   "Chinese font sample includes both Chinese and English");
             auto second = collection.metadata(1);
             expect(second->selected == 1 && second->family[0], "font collection selects another face");
         }
