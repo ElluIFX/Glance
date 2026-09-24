@@ -151,17 +151,6 @@ namespace
             preview);
     }
 
-    PrepareStatus WINAPI prepare_preview(
-        const wchar_t* path,
-        PreparedPreview* preview) noexcept
-    {
-        PreviewPreparationOptions options;
-        return prepare_preview_with_options(
-            path,
-            &options,
-            preview);
-    }
-
     BOOL WINAPI can_refine(std::uint64_t lease_token) noexcept
     {
         return glance::components::adobe::can_refine(lease_token);
@@ -218,16 +207,10 @@ namespace
         glance::components::adobe::release_preview(lease_token);
     }
 
-    ConfigurablePreviewApi configurable_preview_api{
-        .prepare_preview = prepare_preview_with_options };
     ProgressivePreviewApi progressive_preview_api{
         .can_refine = can_refine,
         .query_refinement_text = query_refinement_text,
-        .prepare_refined_preview = prepare_refined_preview };
-
-
-
-
+        .prepare_refined_preview = glance::components::prepare_refined_preview_callback<prepare_refined_preview> };
 
     BOOL WINAPI query_interface(
         const GUID* interface_id,
@@ -239,22 +222,9 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
-        if (interface_id != nullptr && IsEqualGUID(*interface_id, cancellable_preview_api_id))
-        {
-            if (minimum_version > cancellable_preview_api_version) return FALSE;
-            static auto api = glance::components::cancellable_preview_api<prepare_preview_with_options, prepare_refined_preview>();
-            *interface_pointer = &api;
-            return TRUE;
-        }
         if (interface_id == nullptr)
         {
             return FALSE;
-        }
-        if (IsEqualGUID(*interface_id, configurable_preview_api_id))
-        {
-            if (minimum_version > configurable_preview_api_version) return FALSE;
-            *interface_pointer = &configurable_preview_api;
-            return TRUE;
         }
         if (IsEqualGUID(*interface_id, progressive_preview_api_id))
         {
@@ -287,7 +257,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     result.query_status = query_status;
     result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
-    result.prepare_preview = prepare_preview;
+    result.prepare_preview = glance::components::prepare_preview_callback<prepare_preview_with_options>;
     result.release_preview = release_preview;
     result.query_interface = query_interface;
     result.shutdown = shutdown;

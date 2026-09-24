@@ -336,34 +336,29 @@ namespace
             check(collected_gallery_kinds.at(extension) == GalleryMediaKind::image, "gallery classification");
 
         void* image_metadata_pointer{};
-        void* cancellation_pointer{};
         void* progressive_pointer{};
         check(api.query_interface(&progressive_preview_api_id, progressive_preview_api_version,
             &progressive_pointer) && progressive_pointer != nullptr, "progressive image interface");
-        check(api.query_interface(&cancellable_preview_api_id, 1, &cancellation_pointer) &&
-            cancellation_pointer != nullptr, "cancellation interface");
-        if (cancellation_pointer != nullptr)
+        if (progressive_pointer != nullptr)
         {
-            check(static_cast<const CancellablePreviewApi*>(cancellation_pointer)->refine_on_zoom &&
-                static_cast<const CancellablePreviewApi*>(cancellation_pointer)->prepare_refined_preview != nullptr,
+            const auto progressive = static_cast<const ProgressivePreviewApi*>(progressive_pointer);
+            check(progressive->refine_on_zoom && progressive->prepare_refined_preview != nullptr,
                 "image refinement is requested on zoom");
             PreviewCancellation cancellation{
                 .is_cancelled = [](void*) noexcept -> BOOL { return TRUE; } };
             PreviewPreparationOptions options;
             PreparedPreview preview;
-            check(static_cast<const CancellablePreviewApi*>(cancellation_pointer)->prepare_preview(
+            check(api.prepare_preview(
                 preview_path.c_str(), &options, &cancellation, &preview) == PrepareStatus::cancelled &&
                 preview.lease_token == 0, "cancelled preparation creates no preview lease");
             std::array<wchar_t, 32768> fixture{};
             if (id == L"avif" && GetEnvironmentVariableW(
                 L"GLANCE_AVIF_TEST_FILE", fixture.data(), static_cast<DWORD>(fixture.size())) != 0)
             {
-                const auto cancellable = static_cast<const CancellablePreviewApi*>(cancellation_pointer);
-                const auto progressive = static_cast<const ProgressivePreviewApi*>(progressive_pointer);
                 options.maximum_dimension = 1024;
                 const auto initial_storage = std::make_unique<PreparedPreview>();
                 auto& initial = *initial_storage;
-                check(cancellable->prepare_preview(fixture.data(), &options, nullptr, &initial) ==
+                check(api.prepare_preview(fixture.data(), &options, nullptr, &initial) ==
                     PrepareStatus::success && initial.lease_token != 0,
                     "AVIF viewport preview decodes fixture");
                 if (initial.lease_token != 0 && progressive != nullptr)
@@ -371,7 +366,7 @@ namespace
                     check(progressive->can_refine(initial.lease_token), "AVIF viewport preview can refine");
                     const auto refined_storage = std::make_unique<PreparedPreview>();
                     auto& refined = *refined_storage;
-                    check(cancellable->prepare_refined_preview(initial.lease_token, &options, nullptr,
+                    check(progressive->prepare_refined_preview(initial.lease_token, &options, nullptr,
                         &refined) == PrepareStatus::success && refined.lease_token != 0,
                         "AVIF on-demand refinement decodes fixture");
                     check(std::filesystem::is_regular_file(initial.path) &&
@@ -393,16 +388,6 @@ namespace
                 static_cast<const ImageMetadataApi*>(image_metadata_pointer)->query_metadata !=
                     nullptr,
             "image metadata interface");
-
-        void* configurable_pointer = reinterpret_cast<void*>(1);
-        check(
-            api.query_interface != nullptr &&
-                api.query_interface(
-                    &configurable_preview_api_id,
-                    configurable_preview_api_version,
-                    &configurable_pointer) == FALSE &&
-                configurable_pointer == nullptr,
-            "rejects document configuration");
 
         if (api.shutdown != nullptr)
         {
@@ -688,7 +673,7 @@ namespace
             auto preview = std::make_unique<PreparedPreview>();
             expect(
                 api.can_preview(model_path.c_str()) != FALSE &&
-                    api.prepare_preview(model_path.c_str(), preview.get()) ==
+                    api.prepare_preview(model_path.c_str(), nullptr, nullptr, preview.get()) ==
                         PrepareStatus::success &&
                     preview->kind == PreviewContentKind::web &&
                     preview->format == PreviewContentFormat::html &&
@@ -1574,7 +1559,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                         PreparedPreview protected_preview;
                         expect(
                             api.prepare_preview(
-                                protected_path.c_str(),
+                                protected_path.c_str(), nullptr, nullptr,
                                 &protected_preview) == PrepareStatus::success &&
                                 protected_preview.lease_token != 0 &&
                                 std::filesystem::path(protected_preview.path) !=
@@ -1708,16 +1693,6 @@ int wmain(int argument_count, wchar_t* arguments[])
                     std::wstring_view(loading.key) == L"Preview.Loading",
                 "Adobe component loading text resource key");
 
-            void* configurable_pointer{};
-            expect(
-                api.query_interface(
-                    &configurable_preview_api_id,
-                    configurable_preview_api_version,
-                    &configurable_pointer) != FALSE &&
-                    configurable_pointer != nullptr,
-                "Adobe configurable preview interface");
-            const auto configurable =
-                static_cast<ConfigurablePreviewApi*>(configurable_pointer);
             void* progressive_pointer{};
             expect(
                 api.query_interface(
@@ -1755,10 +1730,10 @@ int wmain(int argument_count, wchar_t* arguments[])
             PreviewPreparationOptions preview_options{
                 .maximum_dimension = 1024 };
             expect(
-                configurable != nullptr &&
-                    configurable->prepare_preview(
+                api.prepare_preview != nullptr &&
+                    api.prepare_preview(
                     psd_path.c_str(),
-                    &preview_options,
+                    &preview_options, nullptr,
                     &psd_preview) == PrepareStatus::success &&
                     psd_preview.kind == PreviewContentKind::image &&
                     psd_preview.format == PreviewContentFormat::image_file &&
@@ -1782,7 +1757,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                 progressive != nullptr &&
                     progressive->prepare_refined_preview(
                         psd_preview.lease_token,
-                        &preview_options,
+                        &preview_options, nullptr,
                         &refined_preview) == PrepareStatus::success &&
                     refined_preview.kind == PreviewContentKind::image &&
                     refined_preview.format == PreviewContentFormat::image_file &&
@@ -1810,10 +1785,10 @@ int wmain(int argument_count, wchar_t* arguments[])
                 "Adobe component releases extracted preview");
             PreparedPreview cached_preview;
             expect(
-                configurable != nullptr &&
-                    configurable->prepare_preview(
+                api.prepare_preview != nullptr &&
+                    api.prepare_preview(
                         psd_path.c_str(),
-                        &preview_options,
+                        &preview_options, nullptr,
                         &cached_preview) == PrepareStatus::success &&
                     cached_preview.lease_token == 0 &&
                     std::filesystem::path(cached_preview.path) ==
@@ -1832,8 +1807,8 @@ int wmain(int argument_count, wchar_t* arguments[])
             PreparedPreview oversized_preview;
             expect(
                 write_bytes(oversized_path, oversized_fixture) &&
-                    configurable->prepare_preview(
-                        oversized_path.c_str(), &preview_options, &oversized_preview) ==
+                    api.prepare_preview(
+                        oversized_path.c_str(), &preview_options, nullptr, &oversized_preview) ==
                         PrepareStatus::success,
                 "Oversized PSD retains its embedded thumbnail");
             if (oversized_preview.lease_token != 0)
@@ -1841,7 +1816,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                 PreparedPreview oversized_refined;
                 expect(
                     progressive->prepare_refined_preview(
-                        oversized_preview.lease_token, &preview_options, &oversized_refined) !=
+                        oversized_preview.lease_token, &preview_options, nullptr, &oversized_refined) !=
                         PrepareStatus::success &&
                         std::filesystem::is_regular_file(oversized_preview.path),
                     "Oversized PSD refinement fails without discarding the thumbnail");
@@ -1858,7 +1833,7 @@ int wmain(int argument_count, wchar_t* arguments[])
             PreparedPreview psb_preview;
             expect(
                 api.prepare_preview(
-                    psb_path.c_str(),
+                    psb_path.c_str(), nullptr, nullptr,
                     &psb_preview) == PrepareStatus::success &&
                     psb_preview.lease_token != 0 &&
                     progressive->can_refine(psb_preview.lease_token) == FALSE,
@@ -1882,7 +1857,7 @@ int wmain(int argument_count, wchar_t* arguments[])
             PreparedPreview ai_preview;
             expect(
                 api.prepare_preview(
-                    ai_path.c_str(),
+                    ai_path.c_str(), nullptr, nullptr,
                     &ai_preview) == PrepareStatus::success &&
                     ai_preview.kind == PreviewContentKind::document &&
                     ai_preview.format == PreviewContentFormat::pdf &&
@@ -2024,7 +1999,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                     expect(
                         api.can_preview(pdf_path.c_str()) != FALSE &&
                             api.prepare_preview(
-                                pdf_path.c_str(), &preview) ==
+                                pdf_path.c_str(), nullptr, nullptr, &preview) ==
                                 PrepareStatus::success &&
                             preview.kind == PreviewContentKind::document &&
                             preview.format == PreviewContentFormat::pdf &&
@@ -2166,7 +2141,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                     expect(
                         api.can_preview(archive_path.c_str()) != FALSE &&
                             api.prepare_preview(
-                                archive_path.c_str(),
+                                archive_path.c_str(), nullptr, nullptr,
                                 &preview) == PrepareStatus::success &&
                             preview.kind == PreviewContentKind::directory &&
                             preview.format == PreviewContentFormat::file_directory &&
@@ -2234,7 +2209,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                     {
                         const auto large_preview = std::make_unique<PreparedPreview>();
                         const auto large_descriptor = std::make_unique<FileDirectoryDescriptor>();
-                        expect(api.prepare_preview(large_fixture->data(), large_preview.get()) ==
+                        expect(api.prepare_preview(large_fixture->data(), nullptr, nullptr, large_preview.get()) ==
                             PrepareStatus::success, "Large ZIP fixture preparation");
                         if (large_preview->lease_token != 0)
                         {

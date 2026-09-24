@@ -308,7 +308,6 @@ namespace
         return prepare_preview_impl(path, preview);
     }
 
-
     void WINAPI release_preview(std::uint64_t token) noexcept
     {
         std::filesystem::path directory;
@@ -328,7 +327,6 @@ namespace
         }
     }
 
-
     BOOL WINAPI query_interface(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -339,13 +337,6 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
-        if (interface_id != nullptr && IsEqualGUID(*interface_id, cancellable_preview_api_id))
-        {
-            if (minimum_version > cancellable_preview_api_version) return FALSE;
-            static auto api = glance::components::cancellable_preview_api<prepare_preview>();
-            *interface_pointer = &api;
-            return TRUE;
-        }
         if (IsEqualGUID(*interface_id, host_renderer_api_id) &&
             minimum_version <= host_renderer_api_version)
         {
@@ -391,7 +382,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     result.query_status = query_status;
     result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
-    result.prepare_preview = prepare_preview;
+    result.prepare_preview = glance::components::prepare_preview_callback<prepare_preview>;
     result.release_preview = release_preview;
     result.query_interface = query_interface;
     result.shutdown = shutdown;

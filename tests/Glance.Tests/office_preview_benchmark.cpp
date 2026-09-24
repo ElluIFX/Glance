@@ -223,7 +223,7 @@ namespace
         auto& preview = lease.preview;
         const auto total_start = steady_clock::now();
         const auto prepare_start = steady_clock::now();
-        result.prepare_status = api.prepare_preview(source.c_str(), &preview);
+        result.prepare_status = api.prepare_preview(source.c_str(), nullptr, nullptr, &preview);
         result.component_prepare_ms = duration_cast<milliseconds>(
             steady_clock::now() - prepare_start).count();
         std::error_code path_error;

@@ -44,33 +44,37 @@ namespace glance::components
         bool acquired_{};
     };
 
-    template <auto Prepare, auto Refine = nullptr>
-    contracts::components::CancellablePreviewApi cancellable_preview_api()
+    template <auto Prepare>
+    contracts::components::PrepareStatus WINAPI prepare_preview_callback(
+        const wchar_t* path, const contracts::components::PreviewPreparationOptions* options,
+        const contracts::components::PreviewCancellation* cancellation,
+        contracts::components::PreparedPreview* preview) noexcept
     {
         using namespace contracts::components;
-        CancellablePreviewApi api;
-        api.prepare_preview = [](const wchar_t* path, const PreviewPreparationOptions* options,
-            const PreviewCancellation* cancellation, PreparedPreview* preview) noexcept -> PrepareStatus {
-            PreparationScope scope(cancellation);
-            if (preview_cancelled()) return PrepareStatus::cancelled;
-            if constexpr (std::is_invocable_v<decltype(Prepare), const wchar_t*,
-                const PreviewPreparationOptions*, PreparedPreview*>)
-                return Prepare(path, options, preview);
-            else
-            {
-                static_cast<void>(options);
-                return Prepare(path, preview);
-            }
-        };
-        if constexpr (!std::is_same_v<decltype(Refine), std::nullptr_t>)
-        {
-            api.prepare_refined_preview = [](std::uint64_t token, const PreviewPreparationOptions* options,
-                const PreviewCancellation* cancellation, PreparedPreview* preview) noexcept -> PrepareStatus {
-                PreparationScope scope(cancellation);
-                if (preview_cancelled()) return PrepareStatus::cancelled;
-                return Refine(token, options, preview);
-            };
-        }
-        return api;
+        PreparationScope scope(cancellation);
+        if (preview_cancelled()) return PrepareStatus::cancelled;
+        const PreviewPreparationOptions defaults;
+        if (options == nullptr) options = &defaults;
+        if (options->size < sizeof(*options)) return PrepareStatus::failed;
+        if constexpr (std::is_invocable_v<decltype(Prepare), const wchar_t*,
+            const PreviewPreparationOptions*, PreparedPreview*>)
+            return Prepare(path, options, preview);
+        else
+            return Prepare(path, preview);
+    }
+
+    template <auto Refine>
+    contracts::components::PrepareStatus WINAPI prepare_refined_preview_callback(
+        std::uint64_t token, const contracts::components::PreviewPreparationOptions* options,
+        const contracts::components::PreviewCancellation* cancellation,
+        contracts::components::PreparedPreview* preview) noexcept
+    {
+        using namespace contracts::components;
+        PreparationScope scope(cancellation);
+        if (preview_cancelled()) return PrepareStatus::cancelled;
+        const PreviewPreparationOptions defaults;
+        if (options == nullptr) options = &defaults;
+        if (options->size < sizeof(*options)) return PrepareStatus::failed;
+        return Refine(token, options, preview);
     }
 }

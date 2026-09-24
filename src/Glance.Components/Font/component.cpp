@@ -1,3 +1,4 @@
+#include "../Common/preview_cancellation.h"
 #include "../../version.h"
 #include "view.h"
 #include <array>
@@ -98,7 +99,7 @@ GlanceComponentGetApi(std::uint32_t abi, glance::contracts::components::Componen
                            .query_status = status,
                            .query_loading_text = loading,
                            .can_preview = accepts,
-                           .prepare_preview = prepare,
+                           .prepare_preview = glance::components::prepare_preview_callback<prepare>,
                            .release_preview = release,
                            .query_interface = query,
                            .shutdown = shutdown};

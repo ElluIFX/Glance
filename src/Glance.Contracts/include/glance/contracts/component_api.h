@@ -8,7 +8,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 11;
+    inline constexpr std::uint32_t abi_version = 12;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -17,8 +17,7 @@ namespace glance::contracts::components
     inline constexpr std::size_t loading_text_capacity = 256;
     inline constexpr std::size_t preview_path_capacity = 32768;
     inline constexpr std::size_t preview_error_capacity = 256;
-    inline constexpr std::uint32_t configurable_preview_api_version = 2;
-    inline constexpr std::uint32_t progressive_preview_api_version = 2;
+    inline constexpr std::uint32_t progressive_preview_api_version = 3;
     inline constexpr std::uint32_t web_preview_api_version = 2;
     inline constexpr std::uint32_t host_renderer_api_version = 2;
     inline constexpr std::uint32_t component_view_api_version = 1;
@@ -56,11 +55,6 @@ namespace glance::contracts::components
     inline constexpr std::size_t image_metadata_text_capacity = 512;
     inline constexpr std::size_t information_panel_value_capacity = 1024;
     inline constexpr std::size_t maximum_information_panel_arguments = 2;
-    inline constexpr GUID configurable_preview_api_id{
-        0x950742e7,
-        0x0af2,
-        0x49a1,
-        { 0xa0, 0xb3, 0xe5, 0x76, 0xe4, 0x23, 0x24, 0xc5 } };
     inline constexpr GUID progressive_preview_api_id{
         0xf9037d7d,
         0xe9e8,
@@ -581,14 +575,18 @@ namespace glance::contracts::components
         const wchar_t* path,
         ComponentLoadingTextResult* result) noexcept;
     using CanPreviewFunction = BOOL(WINAPI*)(const wchar_t* path) noexcept;
+    struct PreviewCancellation
+    {
+        void* context{};
+        BOOL(WINAPI* is_cancelled)(void* context) noexcept {};
+    };
+
     using PreparePreviewFunction = PrepareStatus(WINAPI*)(
         const wchar_t* path,
+        const PreviewPreparationOptions* options,
+        const PreviewCancellation* cancellation,
         PreparedPreview* preview) noexcept;
     using ReleasePreviewFunction = void(WINAPI*)(std::uint64_t lease_token) noexcept;
-    using PreparePreviewWithOptionsFunction = PrepareStatus(WINAPI*)(
-        const wchar_t* path,
-        const PreviewPreparationOptions* options,
-        PreparedPreview* preview) noexcept;
     using CanRefinePreviewFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token) noexcept;
     using QueryRefinementTextFunction = BOOL(WINAPI*)(
@@ -597,6 +595,7 @@ namespace glance::contracts::components
     using PrepareRefinedPreviewFunction = PrepareStatus(WINAPI*)(
         std::uint64_t lease_token,
         const PreviewPreparationOptions* options,
+        const PreviewCancellation* cancellation,
         PreparedPreview* preview) noexcept;
     using QueryWebPreviewFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token,
@@ -664,35 +663,7 @@ namespace glance::contracts::components
         void** interface_pointer) noexcept;
     using ShutdownFunction = void(WINAPI*)() noexcept;
 
-    struct ConfigurablePreviewApi
-    {
-        std::uint32_t size{ sizeof(ConfigurablePreviewApi) };
-        std::uint32_t version{ configurable_preview_api_version };
-        PreparePreviewWithOptionsFunction prepare_preview{};
-    };
 
-    inline constexpr GUID cancellable_preview_api_id{
-        0x27cc9ee3, 0x178c, 0x4a7f, { 0x83, 0x3f, 0xb2, 0x20, 0x29, 0x54, 0x14, 0x68 } };
-    inline constexpr std::uint32_t cancellable_preview_api_version = 1;
-
-    struct PreviewCancellation
-    {
-        void* context{};
-        BOOL(WINAPI* is_cancelled)(void* context) noexcept {};
-    };
-
-    struct CancellablePreviewApi
-    {
-        std::uint32_t size{ sizeof(CancellablePreviewApi) };
-        std::uint32_t version{ cancellable_preview_api_version };
-        PrepareStatus(WINAPI* prepare_preview)(
-            const wchar_t*, const PreviewPreparationOptions*,
-            const PreviewCancellation*, PreparedPreview*) noexcept {};
-        PrepareStatus(WINAPI* prepare_refined_preview)(
-            std::uint64_t, const PreviewPreparationOptions*,
-            const PreviewCancellation*, PreparedPreview*) noexcept {};
-        BOOL refine_on_zoom{};
-    };
 
     struct ProgressivePreviewApi
     {
@@ -701,6 +672,7 @@ namespace glance::contracts::components
         CanRefinePreviewFunction can_refine{};
         QueryRefinementTextFunction query_refinement_text{};
         PrepareRefinedPreviewFunction prepare_refined_preview{};
+        BOOL refine_on_zoom{};
     };
 
     struct WebPreviewApi

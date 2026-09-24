@@ -130,21 +130,6 @@ namespace
         return PrepareStatus::success;
     }
 
-    PrepareStatus WINAPI prepare_preview(
-        const wchar_t* path,
-        PreparedPreview* preview) noexcept
-    {
-        if (path == nullptr ||
-            preview == nullptr ||
-            preview->size < sizeof(PreparedPreview))
-        {
-            return PrepareStatus::failed;
-        }
-        return copy_preview_result(
-            glance::components::raw::prepare_preview(path, preview_dimension),
-            preview);
-    }
-
     void WINAPI release_preview(std::uint64_t lease_token) noexcept
     {
         glance::components::raw::release_preview(lease_token);
@@ -187,9 +172,8 @@ namespace
     ProgressivePreviewApi progressive_api{
         .can_refine = can_refine,
         .query_refinement_text = query_refinement_text,
-        .prepare_refined_preview = prepare_refined_preview };
-
-
+        .prepare_refined_preview = glance::components::prepare_refined_preview_callback<prepare_refined_preview>,
+        .refine_on_zoom = TRUE };
 
     BOOL WINAPI query_image_metadata(
         std::uint64_t lease_token,
@@ -211,18 +195,6 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
-        if (interface_id != nullptr && IsEqualGUID(*interface_id, cancellable_preview_api_id))
-        {
-            if (minimum_version > cancellable_preview_api_version) return FALSE;
-            static auto api = [] {
-                auto result = glance::components::cancellable_preview_api<
-                    prepare_preview_with_options, prepare_refined_preview>();
-                result.refine_on_zoom = TRUE;
-                return result;
-            }();
-            *interface_pointer = &api;
-            return TRUE;
-        }
         if (interface_id != nullptr && IsEqualGUID(*interface_id, progressive_preview_api_id))
         {
             if (minimum_version > progressive_preview_api_version) return FALSE;
@@ -263,7 +235,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     result.query_status = query_status;
     result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
-    result.prepare_preview = prepare_preview;
+    result.prepare_preview = glance::components::prepare_preview_callback<prepare_preview_with_options>;
     result.release_preview = release_preview;
     result.query_interface = query_interface;
     result.shutdown = shutdown;

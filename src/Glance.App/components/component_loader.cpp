@@ -26,7 +26,6 @@ namespace
     using glance::contracts::components::ComponentManagementActionApi;
     using glance::contracts::components::ComponentLoadingTextResult;
     using glance::contracts::components::ComponentRegistration;
-    using glance::contracts::components::ConfigurablePreviewApi;
     using glance::contracts::components::GetApiFunction;
     using glance::contracts::components::GalleryMediaKind;
     using glance::contracts::components::HealthSeverity;
@@ -86,8 +85,6 @@ namespace
         HMODULE module{};
         ComponentApi api;
         ComponentRegistration registration;
-        std::optional<ConfigurablePreviewApi> configurable_preview;
-        std::optional<glance::contracts::components::CancellablePreviewApi> cancellable_preview;
         std::optional<ProgressivePreviewApi> progressive_preview;
         std::optional<WebPreviewApi> web_preview;
         std::optional<HostRendererApi> host_renderer;
@@ -523,38 +520,6 @@ namespace
         component->gallery_kinds = std::move(collector.gallery_kinds);
         component->renderers = std::move(collector.renderers);
         void* interface_pointer{};
-        if (component->api.query_interface(
-                &glance::contracts::components::configurable_preview_api_id,
-                glance::contracts::components::configurable_preview_api_version,
-                &interface_pointer) &&
-            interface_pointer != nullptr)
-        {
-            const auto* interface_api =
-                static_cast<const ConfigurablePreviewApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(ConfigurablePreviewApi) &&
-                interface_api->version ==
-                    glance::contracts::components::configurable_preview_api_version &&
-                interface_api->prepare_preview != nullptr)
-            {
-                component->configurable_preview = *interface_api;
-            }
-        }
-        interface_pointer = nullptr;
-        if (component->api.query_interface(
-                &glance::contracts::components::cancellable_preview_api_id,
-                glance::contracts::components::cancellable_preview_api_version,
-                &interface_pointer) && interface_pointer != nullptr)
-        {
-            using glance::contracts::components::CancellablePreviewApi;
-            const auto* api = static_cast<const CancellablePreviewApi*>(interface_pointer);
-            if (api->size >= sizeof(CancellablePreviewApi) &&
-                api->version == glance::contracts::components::cancellable_preview_api_version &&
-                api->prepare_preview != nullptr)
-            {
-                component->cancellable_preview = *api;
-            }
-        }
-        interface_pointer = nullptr;
         if (component->api.query_interface(
                 &glance::contracts::components::progressive_preview_api_id,
                 glance::contracts::components::progressive_preview_api_version,
@@ -1838,8 +1803,8 @@ namespace glance::app
                 }
 
                 PreparedPreview preview;
-                if (!component->cancellable_preview.has_value() ||
-                    !component->cancellable_preview->refine_on_zoom)
+                if (!component->progressive_preview.has_value() ||
+                    !component->progressive_preview->refine_on_zoom)
                 {
                     options.maximum_dimension =
                         glance::contracts::components::PreviewPreparationOptions{}.maximum_dimension;
@@ -1855,17 +1820,7 @@ namespace glance::app
                     result.status = glance::contracts::components::PrepareStatus::cancelled;
                     return result;
                 }
-                result.status = component->cancellable_preview.has_value()
-                    ? component->cancellable_preview->prepare_preview(
-                        path.c_str(), &options, &probe, &preview)
-                    : component->configurable_preview.has_value()
-                    ? component->configurable_preview->prepare_preview(
-                        path.c_str(),
-                        &options,
-                        &preview)
-                    : component->api.prepare_preview(
-                        path.c_str(),
-                        &preview);
+                result.status = component->api.prepare_preview(path.c_str(), &options, &probe, &preview);
                 if (const auto error_key = bounded_string(preview.error_key);
                     error_key.has_value() && !error_key->empty())
                 {
@@ -1929,8 +1884,8 @@ namespace glance::app
                     result.refinement_text =
                         query_refinement_text(*session);
                     result.refinement = std::move(session);
-                    result.refinement_on_zoom = component->cancellable_preview.has_value() &&
-                        component->cancellable_preview->refine_on_zoom;
+                    result.refinement_on_zoom = component->progressive_preview.has_value() &&
+                        component->progressive_preview->refine_on_zoom;
                 }
                 return result;
             }
@@ -1963,14 +1918,8 @@ namespace glance::app
                 .is_cancelled = [](void* context) noexcept -> BOOL {
                     return context != nullptr && static_cast<std::atomic_bool*>(context)->load();
                 } };
-            result.status = session->component->cancellable_preview.has_value() &&
-                session->component->cancellable_preview->prepare_refined_preview != nullptr
-                ? session->component->cancellable_preview->prepare_refined_preview(
-                    session->token, &session->options, &probe, &preview)
-                : session->api.prepare_refined_preview(
-                session->token,
-                &session->options,
-                &preview);
+            result.status = session->api.prepare_refined_preview(
+                session->token, &session->options, &probe, &preview);
             if (const auto error_key = bounded_string(preview.error_key);
                 error_key.has_value() && !error_key->empty())
             {

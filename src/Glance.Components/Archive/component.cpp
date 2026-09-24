@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "../Common/preview_cancellation.h"
 
 #include "../Common/component_text.h"
 #include "../../version.h"
@@ -1094,7 +1095,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     result.query_status = query_status;
     result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
-    result.prepare_preview = prepare_preview;
+    result.prepare_preview = glance::components::prepare_preview_callback<prepare_preview>;
     result.release_preview = release_preview;
     result.query_interface = query_interface;
     result.shutdown = shutdown;
