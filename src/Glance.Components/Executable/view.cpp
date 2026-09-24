@@ -12,6 +12,7 @@
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.Windows.ApplicationModel.Resources.h>
@@ -75,8 +76,12 @@ struct View : std::enable_shared_from_this<View>
     Button toggle;
     std::map<const Table*, std::vector<std::size_t>> detail_columns;
     ListView detail_list;
+    DataTemplate detail_body_template{nullptr};
+    DataTemplate detail_heading_template{nullptr};
     struct DetailRow { const Table* table{}; const Row* row{}; std::wstring heading; };
     std::vector<DetailRow> detail_rows;
+    std::map<const Table*, bool> collapsed_sections;
+    Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> detail_items{nullptr};
     Microsoft::Windows::ApplicationModel::Resources::ResourceManager resources{nullptr};
     Microsoft::Windows::ApplicationModel::Resources::ResourceContext context{nullptr};
     Microsoft::UI::Dispatching::DispatcherQueue dispatcher{nullptr};
@@ -95,20 +100,26 @@ struct View : std::enable_shared_from_this<View>
     {
         if (!closed && host.state_changed) host.state_changed(host.context, host.generation, state);
     }
+    void set_status(hstring const& value)
+    {
+        status.Text(value);
+        status.Visibility(value.empty() ? Visibility::Collapsed : Visibility::Visible);
+    }
     void initialize(const wchar_t* file, const wchar_t* locale)
     {
         path = file; language = locale;
         resources = Microsoft::Windows::ApplicationModel::Resources::ResourceManager((directory() / L"resources.pri").wstring());
         context = resources.CreateResourceContext(); context.QualifierValues().Insert(L"Language", language);
         dispatcher = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
-        root.Padding({24, 18, 24, 12}); root.RowSpacing(12);
+        root.Padding({24, 18, 24, 12});
         RowDefinition heading; heading.Height({1, GridUnitType::Auto}); root.RowDefinitions().Append(heading);
         RowDefinition main; main.Height({1, GridUnitType::Star}); root.RowDefinitions().Append(main);
         RowDefinition footer; footer.Height({1, GridUnitType::Auto}); root.RowDefinitions().Append(footer);
         content.Spacing(18); scroll.Content(content); scroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
         scroll.VerticalScrollBarVisibility(ScrollBarVisibility::Auto); Grid::SetRow(scroll, 1); root.Children().Append(scroll);
         status.Opacity(0.65); status.VerticalAlignment(VerticalAlignment::Center); status.TextWrapping(TextWrapping::Wrap);
-        Grid header_bar; header_bar.ColumnSpacing(18); header_bar.Margin({0, 0, 0, 6});
+        status.Margin({0, 12, 0, 0}); status.Visibility(Visibility::Collapsed);
+        Grid header_bar; header_bar.ColumnSpacing(18); header_bar.Margin({0, 0, 0, 18});
         ColumnDefinition identity; identity.Width({1, GridUnitType::Star}); header_bar.ColumnDefinitions().Append(identity);
         ColumnDefinition action; action.Width({1, GridUnitType::Auto}); header_bar.ColumnDefinitions().Append(action);
         header_bar.Children().Append(identity_header);
@@ -119,8 +130,11 @@ struct View : std::enable_shared_from_this<View>
         root.Children().Append(header_bar);
         Grid::SetRow(status, 2); root.Children().Append(status);
         detail_list.Visibility(Visibility::Collapsed); detail_list.SelectionMode(ListViewSelectionMode::None);
+        detail_body_template = Markup::XamlReader::Load(LR"(<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><Border Background="{ThemeResource ExpanderContentBackground}" BorderBrush="{ThemeResource ExpanderContentBorderBrush}"/></DataTemplate>)").as<DataTemplate>();
+        detail_heading_template = Markup::XamlReader::Load(LR"(<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><ToggleButton Style="{StaticResource ExpanderHeaderDownStyle}" Background="{ThemeResource ExpanderHeaderBackground}" BorderBrush="{ThemeResource ExpanderHeaderBorderBrush}" BorderThickness="1" Padding="16,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" MinHeight="48" IsTabStop="False" AllowFocusOnInteraction="False"/></DataTemplate>)").as<DataTemplate>();
+        detail_list.ItemContainerTransitions(Media::Animation::TransitionCollection{});
         detail_list.ItemTemplate(Markup::XamlReader::Load(LR"(<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><StackPanel/></DataTemplate>)").as<DataTemplate>());
-        detail_list.ItemContainerStyle(Markup::XamlReader::Load(LR"(<Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/></Style>)").as<Style>());
+        detail_list.ItemContainerStyle(Markup::XamlReader::Load(LR"(<Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/><Setter Property="MinHeight" Value="0"/></Style>)").as<Style>());
         ScrollViewer::SetHorizontalScrollBarVisibility(detail_list, ScrollBarVisibility::Disabled);
         ScrollViewer::SetHorizontalScrollMode(detail_list, ScrollMode::Disabled);
         Grid::SetRow(detail_list, 1); root.Children().Append(detail_list);
@@ -148,7 +162,7 @@ struct View : std::enable_shared_from_this<View>
     void load(bool full)
     {
         auto weak = weak_from_this(); loading = true;
-        status.Text(text(L"Loading")); notify(contracts::components::ComponentViewState::loading);
+        set_status(text(L"Loading")); notify(contracts::components::ComponentViewState::loading);
         cancellation = std::make_shared<std::atomic_bool>(false); auto cancelled = cancellation;
         std::erase_if(tasks, [](Task& task) { return task.future.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
         auto queue = dispatcher; const auto host_path = (directory() / L"Glance.ExecutableHost.exe").wstring();
@@ -165,12 +179,12 @@ struct View : std::enable_shared_from_this<View>
                     try
                     {
                         self->loading = false;
-                        if (data.summary.title.empty()) { self->status.Text(data.table.detail.empty() ? self->text(data.table.state) : hstring(data.table.detail)); self->notify(full ? contracts::components::ComponentViewState::ready : contracts::components::ComponentViewState::failed); return; }
+                        if (data.summary.title.empty()) { self->set_status(data.table.detail.empty() ? self->text(data.table.state) : hstring(data.table.detail)); self->notify(full ? contracts::components::ComponentViewState::ready : contracts::components::ComponentViewState::failed); return; }
                         if (full) self->detailed_result = std::move(data);
                         else self->result = std::move(data);
                         self->toggle.IsEnabled(true); self->render(); self->notify(contracts::components::ComponentViewState::ready);
                     }
-                    catch (...) { self->status.Text(self->text(L"Error")); self->notify(contracts::components::ComponentViewState::failed); }
+                    catch (...) { self->set_status(self->text(L"Error")); self->notify(contracts::components::ComponentViewState::failed); }
                 }
             });
         })});
@@ -192,7 +206,6 @@ struct View : std::enable_shared_from_this<View>
             auto cell = label(value, row ? 13 : 12);
             cell.TextWrapping(TextWrapping::Wrap); cell.IsTextSelectionEnabled(row != nullptr);
             if (!row) { cell.Opacity(0.65); cell.FontWeight(Windows::UI::Text::FontWeight{600}); }
-            if (!value.empty()) ToolTipService::SetToolTip(cell, box_value(value));
             Grid::SetColumn(cell, static_cast<int>(i)); grid.Children().Append(cell);
         }
         return grid;
@@ -205,11 +218,63 @@ struct View : std::enable_shared_from_this<View>
         if (!entry.row)
         {
             auto heading = label(std::wstring(text(entry.heading)) + L" (" + std::to_wstring(entry.table->rows.size()) + L")", 18);
-            heading.FontWeight(Windows::UI::Text::FontWeight{600}); heading.Margin({8, 18, 0, 4});
-            panel.Children().Append(heading);
-            if (entry.table->state != L"Complete") panel.Children().Append(label(text(entry.table->state)));
+            heading.FontWeight(Windows::UI::Text::FontWeight{600});
+            auto section = detail_heading_template.LoadContent().as<Primitives::ToggleButton>();
+            section.Margin({0, 12, 0, 0}); section.Content(heading);
+            StackPanel columns; columns.Spacing(8);
+            if (entry.table->state != L"Complete") columns.Children().Append(label(text(entry.table->state)));
+            columns.Children().Append(detail_grid(*entry.table, nullptr));
+            const bool expanded = !collapsed_sections[entry.table];
+            section.IsChecked(expanded);
+            const bool has_rows = index + 1 < detail_rows.size() && detail_rows[index + 1].row;
+            section.CornerRadius(expanded ? CornerRadius{4, 4, 0, 0} : CornerRadius{4, 4, 4, 4});
+            auto column_body = detail_body_template.LoadContent().as<Border>();
+            column_body.BorderThickness({1, 0, 1, has_rows ? 0.0 : 1.0});
+            column_body.Padding({16, 16, 16, has_rows ? 0.0 : 16.0});
+            if (!has_rows) column_body.CornerRadius({0, 0, 4, 4});
+            column_body.Child(columns);
+            column_body.Visibility(expanded ? Visibility::Visible : Visibility::Collapsed);
+            const auto weak = weak_from_this();
+            section.Click([weak, index, column_body](auto&& sender, auto&&) {
+                const auto button = sender.template as<Primitives::ToggleButton>();
+                const bool open = button.IsChecked().Value();
+                button.CornerRadius(open ? CornerRadius{4, 4, 0, 0} : CornerRadius{4, 4, 4, 4});
+                column_body.Visibility(open ? Visibility::Visible : Visibility::Collapsed);
+                if (const auto self = weak.lock(); self && !self->closed) self->set_section_expanded(index, open);
+            });
+            panel.Spacing(0);
+            panel.Children().Append(section);
+            panel.Children().Append(column_body);
+            return;
         }
-        panel.Children().Append(detail_grid(*entry.table, entry.row));
+        auto body = detail_body_template.LoadContent().as<Border>();
+        const bool last = index + 1 == detail_rows.size() || !detail_rows[index + 1].row;
+        body.BorderThickness({1, 0, 1, last ? 1.0 : 0.0});
+        body.Padding({16, 0, 16, last ? 16.0 : 0.0});
+        if (last) body.CornerRadius({0, 0, 4, 4});
+        body.Child(detail_grid(*entry.table, entry.row));
+        panel.Children().Append(body);
+    }
+    void set_section_expanded(std::uint32_t index, bool expanded)
+    {
+        if (!detail_items || index >= detail_rows.size() || detail_rows[index].row) return;
+        auto& collapsed = collapsed_sections[detail_rows[index].table];
+        if (collapsed == !expanded) return;
+        collapsed = !expanded;
+        std::uint32_t position{};
+        while (position < detail_items.Size() && unbox_value<std::uint32_t>(detail_items.GetAt(position)) != index) ++position;
+        if (position == detail_items.Size()) return;
+        ++position;
+        if (expanded)
+        {
+            for (auto next = index + 1; next < detail_rows.size() && detail_rows[next].row; ++next)
+                detail_items.InsertAt(position++, box_value(next));
+        }
+        else
+        {
+            while (position < detail_items.Size() && detail_rows[unbox_value<std::uint32_t>(detail_items.GetAt(position))].row)
+                detail_items.RemoveAt(position);
+        }
     }
     void realize(ContainerContentChangingEventArgs const& args)
     {
@@ -222,6 +287,7 @@ struct View : std::enable_shared_from_this<View>
         detail_list.ItemsSource(nullptr); detail_rows.clear(); detail_columns.clear();
         const auto append = [&](const std::wstring& name, const Table& table) {
             if (table.rows.empty() && table.state == L"Complete") return;
+            collapsed_sections.try_emplace(&table, name != L"Overview");
             auto& columns = detail_columns[&table];
             for (std::size_t i = 0; i < table.columns.size(); ++i)
                 if (std::any_of(table.rows.begin(), table.rows.end(), [i](const Row& row) {
@@ -235,9 +301,11 @@ struct View : std::enable_shared_from_this<View>
         append(L"Overview", detailed_result->summary.overview);
         for (const auto& [name, table] : detailed_result->details) append(name, table);
         std::vector<Windows::Foundation::IInspectable> items; items.reserve(detail_rows.size());
-        for (std::uint32_t i = 0; i < detail_rows.size(); ++i) items.push_back(box_value(i));
-        detail_list.ItemsSource(single_threaded_observable_vector(std::move(items)));
-        status.Text(detailed_result->table.state == L"Complete" ? L"" : text(detailed_result->table.state));
+        for (std::uint32_t i = 0; i < detail_rows.size(); ++i)
+            if (!detail_rows[i].row || !collapsed_sections[detail_rows[i].table]) items.push_back(box_value(i));
+        detail_items = single_threaded_observable_vector(std::move(items));
+        detail_list.ItemsSource(detail_items);
+        set_status(detailed_result->table.state == L"Complete" ? L"" : text(detailed_result->table.state));
     }
     std::wstring field(std::wstring_view key)
     {
@@ -254,14 +322,14 @@ struct View : std::enable_shared_from_this<View>
         auto name = label(std::wstring(text(key)) + (count.empty() ? L"" : L" (" + count + L")"), 13);
         name.Opacity(0.6); entry.Children().Append(name);
         auto data = label(value); data.IsTextSelectionEnabled(true); data.MaxLines(3);
-        data.TextTrimming(TextTrimming::CharacterEllipsis); ToolTipService::SetToolTip(data, box_value(value));
+        data.TextTrimming(TextTrimming::CharacterEllipsis);
         Grid::SetColumn(data, 1); entry.Children().Append(data); panel.Children().Append(entry);
     }
     void render()
     {
         if (detailed)
         {
-            if (loading) status.Text(text(L"Loading"));
+            if (loading) set_status(text(L"Loading"));
             render_details(); return;
         }
         if (!result) return;
@@ -322,7 +390,7 @@ struct View : std::enable_shared_from_this<View>
                 hint.Opacity(0.6); content.Children().Append(hint);
             }
         }
-        status.Text(result->table.state == L"Complete" ? L"" : text(result->table.state));
+        set_status(result->table.state == L"Complete" ? L"" : text(result->table.state));
     }
     void set_language(const wchar_t* value)
     {
