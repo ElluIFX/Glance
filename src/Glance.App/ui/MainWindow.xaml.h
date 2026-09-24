@@ -326,6 +326,7 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool auto_fit_applies(bool dynamic_update = false) const noexcept;
         void save_current_window_placement() const noexcept;
         void clear_preview_content();
+        void release_component_view();
         void update_preview_navigation_ui();
         [[nodiscard]] const glance::app::ArchiveEntry* selected_folder_entry() noexcept;
         void cancel_pdf_render() noexcept;

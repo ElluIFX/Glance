@@ -75,6 +75,7 @@ void WINAPI release(std::uint64_t) noexcept
 }
 void WINAPI shutdown() noexcept
 {
+    glance::font::shutdown_views();
 }
 BOOL WINAPI query(const GUID *id, std::uint32_t version, void **output) noexcept
 {

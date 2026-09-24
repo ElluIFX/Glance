@@ -2891,7 +2891,7 @@ namespace winrt::Glance::App::implementation
             static_cast<std::size_t>(selected_index)];
     }
 
-    void MainWindow::clear_preview_content()
+    void MainWindow::release_component_view()
     {
         ComponentViewPresenter().Content(nullptr);
         ComponentViewPresenter().Visibility(Visibility::Collapsed);
@@ -2900,6 +2900,11 @@ namespace winrt::Glance::App::implementation
         component_view_registration_.reset();
         component_view_session_ = 0;
         component_view_failed_ = false;
+    }
+
+    void MainWindow::clear_preview_content()
+    {
+        release_component_view();
         text_monitor_enabled_ = false;
         text_refresh_requested_ = false;
         ++text_monitor_epoch_;
@@ -3954,6 +3959,7 @@ namespace winrt::Glance::App::implementation
             ++text_monitor_epoch_;
             TextMonitorButton().IsChecked(false);
         }
+        release_component_view();
         release_native_preview_surface();
         if (component_preparation_cancellation_)
         {
@@ -8303,6 +8309,10 @@ namespace winrt::Glance::App::implementation
             native_preview_surface_ != nullptr)
         {
             release_native_preview_surface();
+        }
+        if (kind != glance::app::PreviewKind::native_document && active_component_view_)
+        {
+            release_component_view();
         }
         if (!text)
         {

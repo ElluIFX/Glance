@@ -274,16 +274,21 @@ try {
     }
 
     if (Test-Path (Join-Path $BuildOutputDirectory 'components/font/Glance.FontComponent.dll')) {
-        $fontPath = Join-Path $env:WINDIR 'Fonts/segoeui.ttf'
+        $fontPath = (Get-ChildItem -LiteralPath (Join-Path $env:WINDIR 'Fonts') -Filter '*.ttf' -File | Select-Object -First 1).FullName
         $font = (Invoke-Cli -Arguments @('preview', $fontPath, '--timeout', '20')).data
         Assert-True ($font.state -eq 'ready' -and $font.wait_completed -and -not $font.fallback) 'Font view did not report readiness'
         $invalidFont = Join-Path $fixture 'invalid.ttf'
         [IO.File]::WriteAllText($invalidFont, 'invalid font data')
         Invoke-Cli -Arguments @('window', 'set', $invalidFont, '--timeout', '20') -Expected 9 | Out-Null
-        foreach ($iteration in 1..4) {
-            Invoke-Cli -Arguments @('window', 'set', $fontPath, '--timeout', '0') | Out-Null
-            Invoke-Cli -Arguments @('window', 'set', $first, '--timeout', '0') | Out-Null
+        Invoke-Cli -Arguments @('window', 'set', $fontPath, '--timeout', '0') | Out-Null
+        Invoke-Cli -Arguments @('window', 'set', $first, '--timeout', '20') | Out-Null
+        $cleanupDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        while ((Get-Process -Name 'Glance.FontHost' -ErrorAction SilentlyContinue) -and [DateTime]::UtcNow -lt $cleanupDeadline) {
+            Start-Sleep -Milliseconds 100
         }
+        Assert-True (-not (Get-Process -Name 'Glance.FontHost' -ErrorAction SilentlyContinue)) 'Cancelled font host did not exit'
+        $afterCancel = (Invoke-Cli -Arguments @('window', 'get')).data
+        Assert-True ($afterCancel.paths[0] -eq $first -and $afterCancel.state -eq 'ready') 'Cancelled font preview replaced the current text'
         $recovered = (Invoke-Cli -Arguments @('window', 'set', $fontPath, '--timeout', '20')).data
         Assert-True ($recovered.state -eq 'ready' -and $recovered.wait_completed -and -not $recovered.fallback) 'Font view failed after cancelled and invalid previews'
     }

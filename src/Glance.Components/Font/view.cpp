@@ -33,6 +33,34 @@ using namespace Microsoft::UI::Xaml::Controls;
 namespace Resources = Microsoft::Windows::ApplicationModel::Resources;
 namespace
 {
+struct Worker
+{
+    std::shared_ptr<Client> client = std::make_shared<Client>();
+    std::thread thread;
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool stopped{}, pending{};
+    std::atomic_bool finished{};
+    Request next;
+    std::uint64_t generation{};
+    void cancel()
+    {
+        {
+            std::scoped_lock lock(mutex);
+            stopped = true;
+        }
+        if (client) client->cancel();
+        client.reset();
+        condition.notify_all();
+    }
+    ~Worker()
+    {
+        cancel();
+        if (thread.joinable()) thread.join();
+    }
+};
+std::vector<std::shared_ptr<Worker>> workers;
+
 struct View : std::enable_shared_from_this<View>
 {
     contracts::components::ComponentViewHost view_host;
@@ -61,13 +89,8 @@ struct View : std::enable_shared_from_this<View>
     XamlRoot::Changed_revoker scale_changed;
     std::wstring path, language;
     std::shared_ptr<Metadata> metadata;
-    std::shared_ptr<Client> client;
-    std::thread worker;
-    std::mutex mutex;
-    std::condition_variable condition;
-    bool stopped{}, pending{}, updating{}, composition{}, text_initialized{}, editing{};
-    Request next;
-    std::uint64_t generation{};
+    std::shared_ptr<Worker> worker;
+    bool updating{}, composition{}, text_initialized{}, editing{};
     std::uint64_t serial{};
     std::uint64_t run{};
     unsigned desired_face{};
@@ -506,14 +529,15 @@ struct View : std::enable_shared_from_this<View>
         const auto text_value = editor.Text();
         wcsncpy_s(request.text, text_value.c_str(), _TRUNCATE);
         {
-            std::scoped_lock lock(mutex);
-            if (stopped)
+            if (!worker) return;
+            std::scoped_lock lock(worker->mutex);
+            if (worker->stopped)
                 return;
-            next = request;
-            pending = true;
-            generation = serial;
+            worker->next = request;
+            worker->pending = true;
+            worker->generation = serial;
         }
-        condition.notify_one();
+        worker->condition.notify_one();
     }
     void restart()
     {
@@ -523,22 +547,34 @@ struct View : std::enable_shared_from_this<View>
         status.Text(text(L"Loading"));
         status.Opacity(1);
         retry.Visibility(Visibility::Collapsed);
-        {
-            std::scoped_lock lock(mutex);
-            stopped = false;
-            pending = false;
-        }
-        client = std::make_shared<Client>();
-        auto connection = client;
+        std::erase_if(workers, [](const auto &item) { return item->finished.load(); });
+        worker = std::make_shared<Worker>();
+        workers.push_back(worker);
+        auto state = worker.get();
+        auto connection = state->client;
         auto weak = weak_from_this();
         auto queue = dispatcher;
         const auto file = path;
         const auto host = (directory() / L"Glance.FontHost.exe").wstring();
         const auto epoch = run;
-        worker = std::thread([this, connection, weak, queue, file, host, epoch] {
-            winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        worker->thread = std::thread([state, connection, weak, queue, file, host, epoch]() mutable {
+            struct Completion
+            {
+                Worker *state;
+                std::shared_ptr<Client> &connection;
+                ~Completion()
+                {
+                    connection.reset();
+                    state->finished = true;
+                }
+            } completion{state, connection};
             try
             {
+                winrt::init_apartment(winrt::apartment_type::multi_threaded);
+                struct Apartment
+                {
+                    ~Apartment() { winrt::uninit_apartment(); }
+                } apartment;
                 connection->open(host, file);
                 unsigned face = UINT_MAX;
                 std::shared_ptr<Metadata> info;
@@ -547,13 +583,13 @@ struct View : std::enable_shared_from_this<View>
                     Request request;
                     std::uint64_t version{};
                     {
-                        std::unique_lock lock(mutex);
-                        condition.wait(lock, [&] { return stopped || pending; });
-                        if (stopped)
+                        std::unique_lock lock(state->mutex);
+                        state->condition.wait(lock, [&] { return state->stopped || state->pending; });
+                        if (state->stopped)
                             return;
-                        request = next;
-                        version = generation;
-                        pending = false;
+                        request = state->next;
+                        version = state->generation;
+                        state->pending = false;
                     }
                     if (face != request.face)
                     {
@@ -685,16 +721,8 @@ struct View : std::enable_shared_from_this<View>
     {
         ++run;
         ++serial;
-        {
-            std::scoped_lock lock(mutex);
-            stopped = true;
-        }
-        condition.notify_all();
-        if (client)
-            client->cancel();
-        if (worker.joinable())
-            worker.join();
-        client.reset();
+        if (worker) worker->cancel();
+        worker = nullptr;
     }
     void close()
     {
@@ -795,5 +823,10 @@ const contracts::components::ComponentViewApi &view_api()
     static const contracts::components::ComponentViewApi api{
         .create = create, .set_language = language, .close = close};
     return api;
+}
+void shutdown_views() noexcept
+{
+    for (const auto &worker : workers) worker->cancel();
+    workers.clear();
 }
 } // namespace glance::font

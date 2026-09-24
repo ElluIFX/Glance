@@ -16,6 +16,7 @@ void Client::cancel() noexcept
 }
 void Client::open(const std::wstring &host, const std::wstring &path)
 {
+    if (cancelled_) winrt::throw_hresult(E_ABORT);
     SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
     winrt::handle child_in, child_out;
     if (!CreatePipe(child_in.put(), output_.put(), &security, 128 * 1024) ||
@@ -55,6 +56,11 @@ void Client::open(const std::wstring &host, const std::wstring &path)
         winrt::throw_last_error();
     process_.attach(process.hProcess);
     winrt::handle thread(process.hThread);
+    if (cancelled_)
+    {
+        TerminateProcess(process_.get(), 1);
+        winrt::throw_hresult(E_ABORT);
+    }
     job_.attach(CreateJobObjectW(nullptr, nullptr));
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limit{};
     limit.BasicLimitInformation.LimitFlags =
