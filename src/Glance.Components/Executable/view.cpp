@@ -68,6 +68,7 @@ struct View : std::enable_shared_from_this<View>
 {
     contracts::components::ComponentViewHost host;
     Grid root;
+    Border identity_header;
     ScrollViewer scroll;
     StackPanel content;
     TextBlock status;
@@ -101,22 +102,28 @@ struct View : std::enable_shared_from_this<View>
         context = resources.CreateResourceContext(); context.QualifierValues().Insert(L"Language", language);
         dispatcher = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
         root.Padding({24, 18, 24, 12}); root.RowSpacing(12);
+        RowDefinition heading; heading.Height({1, GridUnitType::Auto}); root.RowDefinitions().Append(heading);
         RowDefinition main; main.Height({1, GridUnitType::Star}); root.RowDefinitions().Append(main);
         RowDefinition footer; footer.Height({1, GridUnitType::Auto}); root.RowDefinitions().Append(footer);
         content.Spacing(18); scroll.Content(content); scroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
-        scroll.VerticalScrollBarVisibility(ScrollBarVisibility::Auto); root.Children().Append(scroll);
+        scroll.VerticalScrollBarVisibility(ScrollBarVisibility::Auto); Grid::SetRow(scroll, 1); root.Children().Append(scroll);
         status.Opacity(0.65); status.VerticalAlignment(VerticalAlignment::Center); status.TextWrapping(TextWrapping::Wrap);
-        StackPanel footer_content; footer_content.Spacing(8); footer_content.Children().Append(status);
-        toggle.HorizontalAlignment(HorizontalAlignment::Center); toggle.Content(box_value(text(L"ShowFullInformation")));
+        Grid header_bar; header_bar.ColumnSpacing(18); header_bar.Margin({0, 0, 0, 6});
+        ColumnDefinition identity; identity.Width({1, GridUnitType::Star}); header_bar.ColumnDefinitions().Append(identity);
+        ColumnDefinition action; action.Width({1, GridUnitType::Auto}); header_bar.ColumnDefinitions().Append(action);
+        header_bar.Children().Append(identity_header);
+        toggle.HorizontalAlignment(HorizontalAlignment::Right); toggle.VerticalAlignment(VerticalAlignment::Center);
+        toggle.Content(box_value(text(L"ShowFullInformation")));
         toggle.IsTabStop(false); toggle.AllowFocusOnInteraction(false);
-        toggle.IsEnabled(false); footer_content.Children().Append(toggle);
-        Grid::SetRow(footer_content, 1); root.Children().Append(footer_content);
+        toggle.IsEnabled(false); Grid::SetColumn(toggle, 1); header_bar.Children().Append(toggle);
+        root.Children().Append(header_bar);
+        Grid::SetRow(status, 2); root.Children().Append(status);
         detail_list.Visibility(Visibility::Collapsed); detail_list.SelectionMode(ListViewSelectionMode::None);
         detail_list.ItemTemplate(Markup::XamlReader::Load(LR"(<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><StackPanel/></DataTemplate>)").as<DataTemplate>());
         detail_list.ItemContainerStyle(Markup::XamlReader::Load(LR"(<Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/></Style>)").as<Style>());
         ScrollViewer::SetHorizontalScrollBarVisibility(detail_list, ScrollBarVisibility::Disabled);
         ScrollViewer::SetHorizontalScrollMode(detail_list, ScrollMode::Disabled);
-        root.Children().Append(detail_list);
+        Grid::SetRow(detail_list, 1); root.Children().Append(detail_list);
         auto weak = weak_from_this();
         detail_list.ContainerContentChanging([weak](auto&&, ContainerContentChangingEventArgs const& args) {
             if (auto self = weak.lock())
@@ -281,7 +288,7 @@ struct View : std::enable_shared_from_this<View>
             subtitle_text += value;
         }
         if (!subtitle_text.empty()) { auto subtitle = label(subtitle_text, 13); subtitle.Opacity(0.65); titles.Children().Append(subtitle); }
-        content.Children().Append(header);
+        identity_header.Child(header);
         if (!description.empty() && heading != description) content.Children().Append(label(description));
         StackPanel basic; basic.Spacing(2);
         for (const auto key : {L"Product", L"Company", L"Original"}) add(basic, key, field(key));
