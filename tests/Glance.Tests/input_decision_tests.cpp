@@ -1,3 +1,4 @@
+#include <map>
 #include "input_decision.h"
 #include "glance/contracts/component_api.h"
 #include "glance/contracts/ipc_protocol.h"
@@ -43,12 +44,16 @@ namespace
         }
     }
 
-    BOOL WINAPI collect_extension(void* context, const wchar_t* extension) noexcept
+    std::map<std::wstring, glance::contracts::components::GalleryMediaKind> collected_gallery_kinds;
+
+    BOOL WINAPI collect_extension(void* context, const wchar_t* extension,
+        glance::contracts::components::GalleryMediaKind gallery_kind) noexcept
     {
         if (context == nullptr || extension == nullptr)
         {
             return FALSE;
         }
+        collected_gallery_kinds[extension] = gallery_kind;
         static_cast<std::vector<std::wstring>*>(context)->emplace_back(extension);
         return TRUE;
     }
@@ -327,28 +332,8 @@ namespace
                 api.can_preview(preview_path.c_str()) != FALSE,
             "extension match");
 
-        void* gallery_pointer{};
-        check(
-            api.query_interface != nullptr &&
-                api.query_interface(
-                    &gallery_media_api_id,
-                    gallery_media_api_version,
-                    &gallery_pointer) != FALSE &&
-                gallery_pointer != nullptr,
-            "gallery interface");
-        if (gallery_pointer != nullptr)
-        {
-            const auto gallery = static_cast<const GalleryMediaApi*>(gallery_pointer);
-            bool classifications_match =
-                gallery->classify_extension(L".txt") == GalleryMediaKind::none;
-            for (const auto& extension : test_case.extensions)
-            {
-                classifications_match = classifications_match &&
-                    gallery->classify_extension(extension.c_str()) ==
-                        GalleryMediaKind::image;
-            }
-            check(classifications_match, "gallery classification");
-        }
+        for (const auto& extension : test_case.extensions)
+            check(collected_gallery_kinds.at(extension) == GalleryMediaKind::image, "gallery classification");
 
         void* image_metadata_pointer{};
         void* cancellation_pointer{};
@@ -1565,14 +1550,6 @@ int wmain(int argument_count, wchar_t* arguments[])
                                 L"Glance.OfficeHost.exe",
                         "Office component native host descriptor");
                 }
-                void* notice_pointer{};
-                expect(
-                    api.query_interface(
-                        &preview_notice_api_id,
-                        preview_notice_api_version,
-                        &notice_pointer) != FALSE && notice_pointer != nullptr,
-                    "Office component preview notice interface");
-                if (notice_pointer != nullptr)
                 {
                     const auto test_directory =
                         std::filesystem::temp_directory_path() /
@@ -1611,13 +1588,8 @@ int wmain(int argument_count, wchar_t* arguments[])
                                     (std::wstring(protected_preview.path) +
                                      L":Zone.Identifier").c_str()) == 0,
                             "Office protected preview uses an unblocked copy");
-                        PreviewNoticeResult notice;
-                        const auto notice_api = static_cast<const PreviewNoticeApi*>(
-                            notice_pointer);
+                        const auto& notice = protected_preview.notice;
                         expect(
-                            notice_api->query_preview_notice(
-                                protected_preview.lease_token,
-                                &notice) != FALSE &&
                                 notice.severity == PreviewNoticeSeverity::warning &&
                                 notice.duration_ms == 1000 &&
                                 std::wstring_view(notice.text_key) ==
@@ -1715,23 +1687,10 @@ int wmain(int argument_count, wchar_t* arguments[])
                 extensions == std::vector<std::wstring>{ L".psd", L".psb", L".ai" },
                 "Adobe component extensions");
 
-            void* gallery_media_pointer{};
-            expect(
-                api.query_interface(
-                    &gallery_media_api_id,
-                    gallery_media_api_version,
-                    &gallery_media_pointer) != FALSE &&
-                    gallery_media_pointer != nullptr,
-                "Adobe gallery media interface");
-            if (gallery_media_pointer != nullptr)
-            {
-                const auto gallery_media = static_cast<GalleryMediaApi*>(gallery_media_pointer);
-                expect(
-                    gallery_media->classify_extension(L".psd") == GalleryMediaKind::image &&
-                        gallery_media->classify_extension(L".PSB") == GalleryMediaKind::image &&
-                        gallery_media->classify_extension(L".ai") == GalleryMediaKind::none,
-                    "Adobe gallery media classification");
-            }
+            expect(collected_gallery_kinds.at(L".psd") == GalleryMediaKind::image &&
+                collected_gallery_kinds.at(L".psb") == GalleryMediaKind::image &&
+                collected_gallery_kinds.at(L".ai") == GalleryMediaKind::none,
+                "Adobe registered gallery classification");
 
             ComponentStatusResult status;
             expect(
@@ -1769,16 +1728,6 @@ int wmain(int argument_count, wchar_t* arguments[])
                 "Adobe progressive preview interface");
             const auto progressive =
                 static_cast<ProgressivePreviewApi*>(progressive_pointer);
-            void* notice_pointer{};
-            expect(
-                api.query_interface(
-                    &preview_notice_api_id,
-                    preview_notice_api_version,
-                    &notice_pointer) != FALSE &&
-                    notice_pointer != nullptr,
-                "Adobe preview notice interface");
-            const auto preview_notice =
-                static_cast<PreviewNoticeApi*>(notice_pointer);
             void* unsupported_pointer = reinterpret_cast<void*>(1);
             expect(
                 api.query_interface(
@@ -1914,12 +1863,8 @@ int wmain(int argument_count, wchar_t* arguments[])
                     psb_preview.lease_token != 0 &&
                     progressive->can_refine(psb_preview.lease_token) == FALSE,
                 "Adobe component limits PSB to embedded preview");
-            PreviewNoticeResult psb_notice;
+            const auto& psb_notice = psb_preview.notice;
             expect(
-                preview_notice != nullptr &&
-                    preview_notice->query_preview_notice(
-                        psb_preview.lease_token,
-                        &psb_notice) != FALSE &&
                     psb_notice.severity == PreviewNoticeSeverity::informational &&
                     psb_notice.duration_ms == 0 &&
                     std::wstring_view(psb_notice.text_key) ==

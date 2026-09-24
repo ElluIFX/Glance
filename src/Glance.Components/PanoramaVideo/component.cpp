@@ -177,23 +177,8 @@ namespace
         return TRUE;
     }
 
-    GalleryMediaKind WINAPI classify_gallery_extension(
-        const wchar_t* extension) noexcept
-    {
-        if (extension == nullptr)
-        {
-            return GalleryMediaKind::none;
-        }
-        const auto value = lowercase(extension);
-        return std::ranges::find(panorama_extensions, value) !=
-                panorama_extensions.end()
-            ? GalleryMediaKind::video
-            : GalleryMediaKind::none;
-    }
 
     const HostRendererApi native_media_api{ .query_host = query_host };
-    const GalleryMediaApi gallery_media_api{
-        .classify_extension = classify_gallery_extension };
 
     BOOL WINAPI enumerate_settings(
         ComponentSettingDescriptor* descriptors,
@@ -334,7 +319,7 @@ namespace
         }
         for (const auto* extension : panorama_extensions)
         {
-            if (!registrar->register_extension(registrar->context, extension))
+            if (!registrar->register_extension(registrar->context, extension, GalleryMediaKind::video))
             {
                 return FALSE;
             }
@@ -456,12 +441,6 @@ namespace
             minimum_version <= host_renderer_api_version)
         {
             *interface_pointer = const_cast<HostRendererApi*>(&native_media_api);
-            return TRUE;
-        }
-        if (IsEqualGUID(*interface_id, gallery_media_api_id) &&
-            minimum_version <= gallery_media_api_version)
-        {
-            *interface_pointer = const_cast<GalleryMediaApi*>(&gallery_media_api);
             return TRUE;
         }
         if (IsEqualGUID(*interface_id, settings_contribution_api_id) &&

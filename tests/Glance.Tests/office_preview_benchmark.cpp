@@ -175,7 +175,7 @@ namespace
         return files;
     }
 
-    BOOL WINAPI collect_extension(void*, const wchar_t*) noexcept
+    BOOL WINAPI collect_extension(void*, const wchar_t*, GalleryMediaKind) noexcept
     {
         return TRUE;
     }

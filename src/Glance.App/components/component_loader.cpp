@@ -28,7 +28,6 @@ namespace
     using glance::contracts::components::ComponentRegistration;
     using glance::contracts::components::ConfigurablePreviewApi;
     using glance::contracts::components::GetApiFunction;
-    using glance::contracts::components::GalleryMediaApi;
     using glance::contracts::components::GalleryMediaKind;
     using glance::contracts::components::HealthSeverity;
     using glance::contracts::components::InformationProviderApi;
@@ -42,8 +41,6 @@ namespace
     using glance::contracts::components::HostRendererApi;
     using glance::contracts::components::PreviewContentFormat;
     using glance::contracts::components::PreviewContentKind;
-    using glance::contracts::components::PreviewNoticeApi;
-    using glance::contracts::components::PreviewNoticeResult;
     using glance::contracts::components::ProgressivePreviewApi;
     using glance::contracts::components::SettingsContributionApi;
     using glance::contracts::components::StatusBarShortcutApi;
@@ -70,6 +67,7 @@ namespace
     struct RegistrationCollector
     {
         std::vector<std::wstring> extensions;
+        std::unordered_map<std::wstring, GalleryMediaKind> gallery_kinds;
         std::vector<RendererRegistration> renderers;
     };
 
@@ -91,7 +89,6 @@ namespace
         std::optional<ConfigurablePreviewApi> configurable_preview;
         std::optional<glance::contracts::components::CancellablePreviewApi> cancellable_preview;
         std::optional<ProgressivePreviewApi> progressive_preview;
-        std::optional<PreviewNoticeApi> preview_notice;
         std::optional<WebPreviewApi> web_preview;
         std::optional<HostRendererApi> host_renderer;
         std::optional<std::filesystem::path> paged_document_host;
@@ -100,12 +97,12 @@ namespace
         std::optional<std::filesystem::path> native_media_host;
         std::optional<SettingsContributionApi> settings_contribution;
         std::optional<FileDirectoryPreviewApi> file_directory_preview;
-        std::optional<GalleryMediaApi> gallery_media;
         std::optional<ImageMetadataApi> image_metadata;
         std::optional<InformationProviderApi> information_provider;
         std::optional<StatusBarShortcutApi> status_bar_shortcut;
         std::optional<ComponentManagementActionApi> component_management_action;
         std::vector<std::wstring> extensions;
+        std::unordered_map<std::wstring, GalleryMediaKind> gallery_kinds;
         std::vector<std::wstring> dependencies;
         std::vector<RendererRegistration> renderers;
         std::wstring dependency_name;
@@ -385,9 +382,11 @@ namespace
         }
     }
 
-    BOOL WINAPI register_extension(void* context, const wchar_t* extension) noexcept
+    BOOL WINAPI register_extension(void* context, const wchar_t* extension, GalleryMediaKind gallery_kind) noexcept
     {
-        if (context == nullptr || extension == nullptr)
+        if (context == nullptr || extension == nullptr ||
+            (gallery_kind != GalleryMediaKind::none && gallery_kind != GalleryMediaKind::image &&
+             gallery_kind != GalleryMediaKind::video && gallery_kind != GalleryMediaKind::audio))
         {
             return FALSE;
         }
@@ -400,6 +399,7 @@ namespace
             {
                 return FALSE;
             }
+            static_cast<RegistrationCollector*>(context)->gallery_kinds.emplace(normalized, gallery_kind);
             extensions.push_back(std::move(normalized));
             return TRUE;
         }
@@ -520,6 +520,7 @@ namespace
         }
         component->resources_registered = true;
         component->extensions = std::move(collector.extensions);
+        component->gallery_kinds = std::move(collector.gallery_kinds);
         component->renderers = std::move(collector.renderers);
         void* interface_pointer{};
         if (component->api.query_interface(
@@ -570,23 +571,6 @@ namespace
                 interface_api->prepare_refined_preview != nullptr)
             {
                 component->progressive_preview = *interface_api;
-            }
-        }
-        interface_pointer = nullptr;
-        if (component->api.query_interface(
-                &glance::contracts::components::preview_notice_api_id,
-                glance::contracts::components::preview_notice_api_version,
-                &interface_pointer) &&
-            interface_pointer != nullptr)
-        {
-            const auto* interface_api =
-                static_cast<const PreviewNoticeApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(PreviewNoticeApi) &&
-                interface_api->version ==
-                    glance::contracts::components::preview_notice_api_version &&
-                interface_api->query_preview_notice != nullptr)
-            {
-                component->preview_notice = *interface_api;
             }
         }
         interface_pointer = nullptr;
@@ -666,23 +650,6 @@ namespace
                 interface_api->enumerate_children != nullptr)
             {
                 component->file_directory_preview = *interface_api;
-            }
-        }
-        interface_pointer = nullptr;
-        if (component->api.query_interface(
-                &glance::contracts::components::gallery_media_api_id,
-                glance::contracts::components::gallery_media_api_version,
-                &interface_pointer) &&
-            interface_pointer != nullptr)
-        {
-            const auto* interface_api =
-                static_cast<const GalleryMediaApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(GalleryMediaApi) &&
-                interface_api->version ==
-                    glance::contracts::components::gallery_media_api_version &&
-                interface_api->classify_extension != nullptr)
-            {
-                component->gallery_media = *interface_api;
             }
         }
         interface_pointer = nullptr;
@@ -985,11 +952,7 @@ namespace
             for (const auto& extension : component->extensions)
             {
                 index[extension].push_back(component);
-                if (!component->gallery_media.has_value())
-                {
-                    continue;
-                }
-                const auto kind = component->gallery_media->classify_extension(extension.c_str());
+                const auto kind = component->gallery_kinds.at(extension);
                 if (kind != GalleryMediaKind::image &&
                     kind != GalleryMediaKind::video &&
                     kind != GalleryMediaKind::audio)
@@ -1941,23 +1904,13 @@ namespace glance::app
                         return result;
                     }
                 }
-                if (preview.lease_token != 0 &&
-                    component->preview_notice.has_value())
+                const auto& notice = preview.notice;
+                if (const auto notice_key = bounded_string(notice.text_key);
+                    notice.size >= sizeof(notice) && notice_key.has_value() && !notice_key->empty())
                 {
-                    PreviewNoticeResult notice;
-                    if (component->preview_notice->query_preview_notice(
-                            preview.lease_token,
-                            &notice))
-                    {
-                        const auto notice_key = bounded_string(notice.text_key);
-                        if (notice_key.has_value() && !notice_key->empty())
-                        {
-                            result.notice =
-                                localize_component_key(*component, *notice_key);
-                            result.notice_severity = notice.severity;
-                            result.notice_duration_ms = notice.duration_ms;
-                        }
-                    }
+                    result.notice = localize_component_key(*component, *notice_key);
+                    result.notice_severity = notice.severity;
+                    result.notice_duration_ms = notice.duration_ms;
                 }
                 if (preview.lease_token != 0 &&
                     component->progressive_preview.has_value() &&

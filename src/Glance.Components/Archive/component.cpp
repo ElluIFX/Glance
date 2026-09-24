@@ -763,7 +763,7 @@ namespace
         }
         for (const auto* extension : supported_extensions)
         {
-            if (!registrar->register_extension(registrar->context, extension))
+            if (!registrar->register_extension(registrar->context, extension, GalleryMediaKind::none))
             {
                 return FALSE;
             }

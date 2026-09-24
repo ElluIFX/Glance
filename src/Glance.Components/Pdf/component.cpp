@@ -63,7 +63,7 @@ namespace
             registrar->register_renderer == nullptr ||
             registration == nullptr ||
             registration->size < sizeof(ComponentRegistration) ||
-            !registrar->register_extension(registrar->context, L".pdf") ||
+            !registrar->register_extension(registrar->context, L".pdf", GalleryMediaKind::none) ||
             !registrar->register_renderer(
                 registrar->context,
                 PreviewContentKind::document,

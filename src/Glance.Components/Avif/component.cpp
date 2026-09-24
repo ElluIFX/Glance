@@ -36,7 +36,7 @@ namespace
         glance::components::avif::initialize();
         for (const auto* extension : avif_extensions)
         {
-            if (!registrar->register_extension(registrar->context, extension))
+            if (!registrar->register_extension(registrar->context, extension, GalleryMediaKind::image))
             {
                 return FALSE;
             }
@@ -186,17 +186,7 @@ namespace
         .query_refinement_text = query_refinement_text,
         .prepare_refined_preview = prepare_refined_preview };
 
-    GalleryMediaKind WINAPI classify_gallery_extension(const wchar_t* extension) noexcept
-    {
-        if (extension != nullptr && _wcsicmp(extension, L".avif") == 0)
-        {
-            return GalleryMediaKind::image;
-        }
-        return GalleryMediaKind::none;
-    }
 
-    GalleryMediaApi gallery_media_api{
-        .classify_extension = classify_gallery_extension };
 
     BOOL WINAPI query_image_metadata(
         std::uint64_t lease_token,
@@ -239,11 +229,6 @@ namespace
         if (interface_id == nullptr || minimum_version > 1)
         {
             return FALSE;
-        }
-        if (IsEqualGUID(*interface_id, gallery_media_api_id))
-        {
-            *interface_pointer = &gallery_media_api;
-            return TRUE;
         }
         if (IsEqualGUID(*interface_id, image_metadata_api_id))
         {

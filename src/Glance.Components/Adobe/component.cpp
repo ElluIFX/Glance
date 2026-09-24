@@ -38,7 +38,7 @@ namespace
         glance::components::adobe::initialize();
         for (const auto* extension : adobe_extensions)
         {
-            if (!registrar->register_extension(registrar->context, extension))
+            if (!registrar->register_extension(registrar->context, extension, (_wcsicmp(extension, L".ai") == 0 ? GalleryMediaKind::none : GalleryMediaKind::image)))
             {
                 return FALSE;
             }
@@ -125,6 +125,8 @@ namespace
         prepared.format = result.format;
         prepared.lease_token = result.lease_token;
         wcscpy_s(prepared.path, output_path.c_str());
+        if (glance::components::adobe::is_low_resolution_only(result.lease_token))
+            glance::components::copy_resource_key(low_resolution_only_key, prepared.notice.text_key);
         *preview = prepared;
         return PrepareStatus::success;
     }
@@ -223,42 +225,9 @@ namespace
         .query_refinement_text = query_refinement_text,
         .prepare_refined_preview = prepare_refined_preview };
 
-    BOOL WINAPI query_preview_notice(
-        std::uint64_t lease_token,
-        PreviewNoticeResult* result) noexcept
-    {
-        if (!glance::components::adobe::is_low_resolution_only(lease_token) ||
-            result == nullptr ||
-            result->size < sizeof(PreviewNoticeResult))
-        {
-            return FALSE;
-        }
-        PreviewNoticeResult notice;
-        if (!glance::components::copy_resource_key(
-                low_resolution_only_key,
-                notice.text_key))
-        {
-            return FALSE;
-        }
-        *result = notice;
-        return TRUE;
-    }
 
-    PreviewNoticeApi preview_notice_api{
-        .query_preview_notice = query_preview_notice };
 
-    GalleryMediaKind WINAPI classify_gallery_extension(const wchar_t* extension) noexcept
-    {
-        if (extension != nullptr &&
-            (_wcsicmp(extension, L".psd") == 0 || _wcsicmp(extension, L".psb") == 0))
-        {
-            return GalleryMediaKind::image;
-        }
-        return GalleryMediaKind::none;
-    }
 
-    GalleryMediaApi gallery_media_api{
-        .classify_extension = classify_gallery_extension };
 
     BOOL WINAPI query_interface(
         const GUID* interface_id,
@@ -291,18 +260,6 @@ namespace
         {
             if (minimum_version > progressive_preview_api_version) return FALSE;
             *interface_pointer = &progressive_preview_api;
-            return TRUE;
-        }
-        if (IsEqualGUID(*interface_id, preview_notice_api_id))
-        {
-            if (minimum_version > preview_notice_api_version) return FALSE;
-            *interface_pointer = &preview_notice_api;
-            return TRUE;
-        }
-        if (IsEqualGUID(*interface_id, gallery_media_api_id))
-        {
-            if (minimum_version > gallery_media_api_version) return FALSE;
-            *interface_pointer = &gallery_media_api;
             return TRUE;
         }
         return FALSE;

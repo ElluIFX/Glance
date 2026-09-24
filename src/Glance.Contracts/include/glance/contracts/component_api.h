@@ -8,7 +8,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 10;
+    inline constexpr std::uint32_t abi_version = 11;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -19,7 +19,6 @@ namespace glance::contracts::components
     inline constexpr std::size_t preview_error_capacity = 256;
     inline constexpr std::uint32_t configurable_preview_api_version = 2;
     inline constexpr std::uint32_t progressive_preview_api_version = 2;
-    inline constexpr std::uint32_t preview_notice_api_version = 2;
     inline constexpr std::uint32_t web_preview_api_version = 2;
     inline constexpr std::uint32_t host_renderer_api_version = 2;
     inline constexpr std::uint32_t component_view_api_version = 1;
@@ -27,7 +26,6 @@ namespace glance::contracts::components
         0xdd72b6a1, 0xf3a9, 0x42f2, {0xa6, 0x35, 0x73, 0x60, 0x36, 0xab, 0x90, 0x51}};
     inline constexpr std::uint32_t settings_contribution_api_version = 3;
     inline constexpr std::uint32_t file_directory_preview_api_version = 2;
-    inline constexpr std::uint32_t gallery_media_api_version = 1;
     inline constexpr std::uint32_t image_metadata_api_version = 1;
     inline constexpr std::uint32_t information_provider_api_version = 3;
     inline constexpr std::uint32_t status_bar_shortcut_api_version = 3;
@@ -68,11 +66,6 @@ namespace glance::contracts::components
         0xe9e8,
         0x4065,
         { 0xa9, 0x47, 0x20, 0xe2, 0xae, 0xf2, 0xb8, 0x57 } };
-    inline constexpr GUID preview_notice_api_id{
-        0xa0b393b6,
-        0x0485,
-        0x4a6c,
-        { 0x9b, 0x96, 0x46, 0x27, 0xf5, 0x2c, 0xdd, 0x14 } };
     inline constexpr GUID web_preview_api_id{
         0x934213d4,
         0x840d,
@@ -93,11 +86,6 @@ namespace glance::contracts::components
         0xc8dc,
         0x462f,
         { 0x95, 0x8a, 0xe1, 0x1f, 0xc7, 0xaf, 0xc1, 0xda } };
-    inline constexpr GUID gallery_media_api_id{
-        0x80dbd46d,
-        0xa62c,
-        0x4b43,
-        { 0x9c, 0xcd, 0x08, 0x26, 0x09, 0xaa, 0xd2, 0xd7 } };
     inline constexpr GUID image_metadata_api_id{
         0xb9bfade4,
         0xdc6c,
@@ -266,7 +254,8 @@ namespace glance::contracts::components
 
     using RegisterExtensionFunction = BOOL(WINAPI*)(
         void* context,
-        const wchar_t* extension) noexcept;
+        const wchar_t* extension,
+        GalleryMediaKind gallery_kind) noexcept;
     using RegisterRendererFunction = BOOL(WINAPI*)(
         void* context,
         PreviewContentKind kind,
@@ -324,6 +313,7 @@ namespace glance::contracts::components
         std::uint64_t lease_token{};
         wchar_t path[preview_path_capacity]{};
         wchar_t error_key[preview_error_capacity]{};
+        PreviewNoticeResult notice;
     };
 
     struct PreviewPreparationOptions
@@ -608,9 +598,6 @@ namespace glance::contracts::components
         std::uint64_t lease_token,
         const PreviewPreparationOptions* options,
         PreparedPreview* preview) noexcept;
-    using QueryPreviewNoticeFunction = BOOL(WINAPI*)(
-        std::uint64_t lease_token,
-        PreviewNoticeResult* result) noexcept;
     using QueryWebPreviewFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token,
         const WebPreviewOptions* options,
@@ -634,8 +621,6 @@ namespace glance::contracts::components
         const FileDirectoryEntrySink* sink,
         std::uint32_t* returned,
         std::uint32_t* total) noexcept;
-    using ClassifyGalleryExtensionFunction = GalleryMediaKind(WINAPI*)(
-        const wchar_t* extension) noexcept;
     using QueryImageMetadataFunction = BOOL(WINAPI*)(
         std::uint64_t lease_token,
         const ImageMetadataSink* sink) noexcept;
@@ -718,13 +703,6 @@ namespace glance::contracts::components
         PrepareRefinedPreviewFunction prepare_refined_preview{};
     };
 
-    struct PreviewNoticeApi
-    {
-        std::uint32_t size{ sizeof(PreviewNoticeApi) };
-        std::uint32_t version{ preview_notice_api_version };
-        QueryPreviewNoticeFunction query_preview_notice{};
-    };
-
     struct WebPreviewApi
     {
         std::uint32_t size{ sizeof(WebPreviewApi) };
@@ -766,13 +744,6 @@ namespace glance::contracts::components
         std::uint32_t version{ file_directory_preview_api_version };
         OpenFileDirectoryFunction open{};
         EnumerateFileDirectoryChildrenFunction enumerate_children{};
-    };
-
-    struct GalleryMediaApi
-    {
-        std::uint32_t size{ sizeof(GalleryMediaApi) };
-        std::uint32_t version{ gallery_media_api_version };
-        ClassifyGalleryExtensionFunction classify_extension{};
     };
 
     struct ImageMetadataApi

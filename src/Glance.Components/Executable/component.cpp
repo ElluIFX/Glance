@@ -29,7 +29,7 @@ namespace
             !registrar->register_extension || !registrar->register_renderer)
             return FALSE;
         for (const auto extension : extensions)
-            if (!registrar->register_extension(registrar->context, extension))
+            if (!registrar->register_extension(registrar->context, extension, GalleryMediaKind::none))
                 return FALSE;
         if (!registrar->register_renderer(
                 registrar->context, PreviewContentKind::document, PreviewContentFormat::native_surface,

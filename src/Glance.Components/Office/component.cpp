@@ -150,7 +150,7 @@ namespace
         glance::app::initialize_office_availability();
         for (const auto* extension : office_extensions)
         {
-            if (!registrar->register_extension(registrar->context, extension))
+            if (!registrar->register_extension(registrar->context, extension, GalleryMediaKind::none))
             {
                 return FALSE;
             }
@@ -286,6 +286,12 @@ namespace
             prepared.lease_token = lease_token;
             std::copy(output_value.begin(), output_value.end(), prepared.path);
             prepared.path[output_value.size()] = L'\0';
+            if (protected_source)
+            {
+                prepared.notice.severity = PreviewNoticeSeverity::warning;
+                prepared.notice.duration_ms = 1000;
+                glance::components::copy_resource_key(protected_source_notice_key, prepared.notice.text_key);
+            }
             *preview = prepared;
             return PrepareStatus::success;
         }
@@ -302,34 +308,6 @@ namespace
         return prepare_preview_impl(path, preview);
     }
 
-    BOOL WINAPI query_preview_notice(
-        std::uint64_t lease_token,
-        PreviewNoticeResult* result) noexcept
-    {
-        if (lease_token == 0 || result == nullptr ||
-            result->size < sizeof(PreviewNoticeResult))
-        {
-            return FALSE;
-        }
-        {
-            std::scoped_lock lock(preview_lease_mutex);
-            if (!preview_leases.contains(lease_token))
-            {
-                return FALSE;
-            }
-        }
-        PreviewNoticeResult notice;
-        notice.severity = PreviewNoticeSeverity::warning;
-        notice.duration_ms = 1000;
-        if (!glance::components::copy_resource_key(
-                protected_source_notice_key,
-                notice.text_key))
-        {
-            return FALSE;
-        }
-        *result = notice;
-        return TRUE;
-    }
 
     void WINAPI release_preview(std::uint64_t token) noexcept
     {
@@ -350,8 +328,6 @@ namespace
         }
     }
 
-    const PreviewNoticeApi preview_notice_api{
-        .query_preview_notice = query_preview_notice };
 
     BOOL WINAPI query_interface(
         const GUID* interface_id,
@@ -375,13 +351,6 @@ namespace
         {
             *interface_pointer = const_cast<HostRendererApi*>(
                 &native_preview_api);
-            return TRUE;
-        }
-        if (IsEqualGUID(*interface_id, preview_notice_api_id) &&
-            minimum_version <= preview_notice_api_version)
-        {
-            *interface_pointer = const_cast<PreviewNoticeApi*>(
-                &preview_notice_api);
             return TRUE;
         }
         return FALSE;

@@ -207,7 +207,7 @@ namespace
         }
         for (const auto* extension : model_extensions)
         {
-            if (!registrar->register_extension(registrar->context, extension))
+            if (!registrar->register_extension(registrar->context, extension, GalleryMediaKind::none))
             {
                 return FALSE;
             }
