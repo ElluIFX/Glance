@@ -3496,7 +3496,7 @@ namespace winrt::Glance::App::implementation
         const auto dpi = GetDpiForWindow(window_);
         const bool request_size = auto_fit_applies();
         co_await resume_background();
-        const auto status = surface->open(path, visuals, dpi);
+        const auto status = surface->open(path, visuals, dpi, glance::app::current_ui_language());
         const auto content_size = status == glance::contracts::native_preview::Status::success && request_size
             ? surface->content_size()
             : std::optional<glance::contracts::native_preview::ContentSize>{};
@@ -3557,7 +3557,7 @@ namespace winrt::Glance::App::implementation
             0.0,
             100.0));
         co_await resume_background();
-        const auto status = surface->open(path, visuals, dpi);
+        const auto status = surface->open(path, visuals, dpi, glance::app::current_ui_language());
         if (status == glance::contracts::native_preview::Status::success)
         {
             const auto settings = glance::app::component_setting_values(component_id);
@@ -3812,7 +3812,7 @@ namespace winrt::Glance::App::implementation
         glance::contracts::native_preview::PreviewVisuals visuals)
     {
         co_await resume_background();
-        surface->set_visuals(visuals);
+        surface->set_visuals(visuals, glance::app::current_ui_language());
     }
 
     void MainWindow::update_native_preview_bounds() noexcept

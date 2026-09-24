@@ -41,12 +41,14 @@ namespace glance::app
         [[nodiscard]] glance::contracts::native_preview::Status open(
             const std::wstring& path,
             const glance::contracts::native_preview::PreviewVisuals& visuals,
-            std::uint32_t dpi);
+            std::uint32_t dpi,
+            std::wstring_view language = {});
         void resize(std::uint32_t width, std::uint32_t height, std::uint32_t dpi) noexcept;
         [[nodiscard]] std::optional<glance::contracts::native_preview::ContentSize>
             content_size() noexcept;
         void set_visuals(
-            const glance::contracts::native_preview::PreviewVisuals& visuals) noexcept;
+            const glance::contracts::native_preview::PreviewVisuals& visuals,
+            std::wstring_view language = {}) noexcept;
         void set_bounds(int x, int y, int width, int height) noexcept;
         void set_occlusions(std::span<const RECT> rectangles) noexcept;
         void set_visible(bool visible) noexcept;

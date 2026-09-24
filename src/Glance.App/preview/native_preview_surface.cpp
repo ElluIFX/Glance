@@ -254,7 +254,8 @@ namespace glance::app
     Status NativePreviewSurface::open(
         const std::wstring& path,
         const PreviewVisuals& visuals,
-        std::uint32_t dpi)
+        std::uint32_t dpi,
+        std::wstring_view language)
     {
         if (path.size() >
                 (maximum_payload_size - sizeof(OpenRequest)) / sizeof(wchar_t) ||
@@ -291,6 +292,11 @@ namespace glance::app
         for (int attempt = 0; attempt != 2; ++attempt)
         {
             Status status{ Status::open_failed };
+            if (!language.empty() && !transact_locked(Command::set_language, language.data(),
+                    static_cast<std::uint32_t>(language.size() * sizeof(wchar_t)), status, 2000))
+            {
+                return Status::open_failed;
+            }
             if (transact_locked(
                     Command::open_document,
                     payload.data(),
@@ -336,7 +342,7 @@ namespace glance::app
             2000));
     }
 
-    void NativePreviewSurface::set_visuals(const PreviewVisuals& visuals) noexcept
+    void NativePreviewSurface::set_visuals(const PreviewVisuals& visuals, std::wstring_view language) noexcept
     {
         background_.store(RGB(
             visuals.background_color & 0xFFU,
@@ -359,6 +365,8 @@ namespace glance::app
             sizeof(visuals),
             status,
             2000));
+        if (!language.empty()) static_cast<void>(transact_locked(Command::set_language, language.data(),
+            static_cast<std::uint32_t>(language.size() * sizeof(wchar_t)), status, 2000));
     }
 
     void NativePreviewSurface::set_bounds(

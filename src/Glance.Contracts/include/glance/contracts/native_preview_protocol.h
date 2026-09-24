@@ -26,6 +26,8 @@ namespace glance::contracts::native_preview
         media_set_view_mode = 12,
         media_set_settings = 13,
         query_content_size = 14,
+        // Optional UTF-16 language tag without a terminating null; older hosts may reject it.
+        set_language = 15,
     };
 
     enum class Status : std::uint32_t
