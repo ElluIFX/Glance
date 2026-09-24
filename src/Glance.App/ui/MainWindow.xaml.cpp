@@ -3333,6 +3333,7 @@ namespace winrt::Glance::App::implementation
     {
         const auto preferences = glance::app::load_window_preferences();
         if (fullscreen_ || topmost_ || user_sized_ || !preferences.auto_fit_media ||
+            (disable_auto_fit_in_gallery_ && gallery_mode_ != GalleryMode::inactive) ||
             (dynamic_update && !preferences.dynamic_auto_fit) ||
             (current_index_ < files_.size() &&
                 glance::app::auto_fit_ignores_path(preferences, files_[current_index_].path)))
@@ -4087,6 +4088,7 @@ namespace winrt::Glance::App::implementation
         middle_click_gallery_enabled_ = media_preferences.middle_click_gallery_mode;
         loop_gallery_enabled_ = media_preferences.loop_gallery_scrolling;
         gallery_same_extension_only_ = media_preferences.gallery_same_extension_only;
+        disable_auto_fit_in_gallery_ = media_preferences.disable_auto_fit_in_gallery;
         const auto generation = ++content_generation_;
         update_title_text();
         image_pixel_width_ = 0;

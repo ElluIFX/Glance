@@ -711,6 +711,7 @@ namespace winrt::Glance::App::implementation
             LoopGalleryScrollingDescription(),
             L"LoopGalleryScrollingDisabledDescription.Text");
         set_text(GallerySameExtensionOnlyLabel(), L"GallerySameExtensionOnlyLabel.Text");
+        set_text(DisableAutoFitInGalleryLabel(), L"DisableAutoFitInGalleryLabel.Text");
         set_text(
             GallerySameExtensionOnlyDescription(),
             L"GallerySameExtensionOnlyDisabledDescription.Text");
@@ -1515,6 +1516,7 @@ namespace winrt::Glance::App::implementation
             media_preview_preferences_.loop_gallery_scrolling);
         GallerySameExtensionOnlyToggle().IsOn(
             media_preview_preferences_.gallery_same_extension_only);
+        DisableAutoFitInGalleryToggle().IsOn(media_preview_preferences_.disable_auto_fit_in_gallery);
         ImageZoomMapToggle().IsOn(media_preview_preferences_.show_image_zoom_map);
         text_preferences_ = glance::app::load_text_preferences();
         auto font_families = glance::app::system_font_families();
@@ -1816,6 +1818,10 @@ namespace winrt::Glance::App::implementation
             GallerySameExtensionOnlyDescription(),
             GallerySameExtensionOnlyToggle(),
             L"GallerySameExtensionOnly");
+        set_description(
+            DisableAutoFitInGalleryDescription(),
+            DisableAutoFitInGalleryToggle(),
+            L"DisableAutoFitInGallery");
     }
 
     void SettingsWindow::set_media_volume(
@@ -1884,6 +1890,7 @@ namespace winrt::Glance::App::implementation
             LoopGalleryScrollingToggle().IsOn();
         media_preview_preferences_.gallery_same_extension_only =
             GallerySameExtensionOnlyToggle().IsOn();
+        media_preview_preferences_.disable_auto_fit_in_gallery = DisableAutoFitInGalleryToggle().IsOn();
         media_preview_preferences_.show_image_zoom_map = ImageZoomMapToggle().IsOn();
         glance::app::save_media_preview_preferences(media_preview_preferences_);
     }

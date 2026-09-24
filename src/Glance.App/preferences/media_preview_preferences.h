@@ -31,6 +31,7 @@ namespace glance::app
         bool middle_click_gallery_mode{ true };
         bool loop_gallery_scrolling{ true };
         bool gallery_same_extension_only{};
+        bool disable_auto_fit_in_gallery{};
         bool show_image_zoom_map{ true };
     };
 

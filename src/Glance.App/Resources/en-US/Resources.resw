@@ -179,6 +179,9 @@
   <data name="LoopGalleryScrollingLabel.Text" xml:space="preserve"><value>Loop gallery scrolling</value></data>
   <data name="LoopGalleryScrollingEnabledDescription.Text" xml:space="preserve"><value>Continue from the opposite end after the first or last item</value></data>
   <data name="LoopGalleryScrollingDisabledDescription.Text" xml:space="preserve"><value>Stop gallery scrolling at the first or last item</value></data>
+  <data name="DisableAutoFitInGalleryLabel.Text" xml:space="preserve"><value>Disable adaptive sizing in gallery mode</value></data>
+  <data name="DisableAutoFitInGalleryEnabledDescription.Text" xml:space="preserve"><value>Keep the window size when switching files in gallery mode</value></data>
+  <data name="DisableAutoFitInGalleryDisabledDescription.Text" xml:space="preserve"><value>Use adaptive sizing preferences in gallery mode</value></data>
   <data name="GallerySameExtensionOnlyLabel.Text" xml:space="preserve"><value>Same extension only</value></data>
   <data name="GallerySameExtensionOnlyEnabledDescription.Text" xml:space="preserve"><value>Only scroll through files with the same extension as the current file</value></data>
   <data name="GallerySameExtensionOnlyDisabledDescription.Text" xml:space="preserve"><value>Scroll through all supported media files in the gallery</value></data>

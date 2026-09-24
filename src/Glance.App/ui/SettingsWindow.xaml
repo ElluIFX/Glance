@@ -980,6 +980,18 @@
                                     </StackPanel>
                                     <ToggleSwitch x:Name="GallerySameExtensionOnlyToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                                 </Grid>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock x:Name="DisableAutoFitInGalleryLabel" x:Uid="DisableAutoFitInGalleryLabel" Text="Disable adaptive sizing in gallery mode" />
+                                        <TextBlock x:Name="DisableAutoFitInGalleryDescription" x:Uid="DisableAutoFitInGalleryDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use adaptive sizing preferences in gallery mode" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="DisableAutoFitInGalleryToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                     </StackPanel>

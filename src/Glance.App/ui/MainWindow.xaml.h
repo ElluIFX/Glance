@@ -753,6 +753,7 @@ namespace winrt::Glance::App::implementation
         bool middle_click_gallery_enabled_{ true };
         bool loop_gallery_enabled_{ true };
         bool gallery_same_extension_only_{};
+        bool disable_auto_fit_in_gallery_{};
         bool gallery_same_extension_override_{};
         std::uint64_t gallery_session_id_{};
         std::uint64_t gallery_request_sequence_{};

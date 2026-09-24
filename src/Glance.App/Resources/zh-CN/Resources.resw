@@ -179,6 +179,9 @@
   <data name="LoopGalleryScrollingLabel.Text" xml:space="preserve"><value>画廊模式无限滚动</value></data>
   <data name="LoopGalleryScrollingEnabledDescription.Text" xml:space="preserve"><value>到达首尾后从另一端继续滚动</value></data>
   <data name="LoopGalleryScrollingDisabledDescription.Text" xml:space="preserve"><value>到达首项或末项时停止画廊滚动</value></data>
+  <data name="DisableAutoFitInGalleryLabel.Text" xml:space="preserve"><value>画廊模式期间禁用自适应尺寸</value></data>
+  <data name="DisableAutoFitInGalleryEnabledDescription.Text" xml:space="preserve"><value>画廊模式中切换文件时保持窗口尺寸</value></data>
+  <data name="DisableAutoFitInGalleryDisabledDescription.Text" xml:space="preserve"><value>画廊模式遵循自适应尺寸设置</value></data>
   <data name="GallerySameExtensionOnlyLabel.Text" xml:space="preserve"><value>仅浏览相同扩展名</value></data>
   <data name="GallerySameExtensionOnlyEnabledDescription.Text" xml:space="preserve"><value>画廊仅在与当前文件扩展名相同的文件中滚动</value></data>
   <data name="GallerySameExtensionOnlyDisabledDescription.Text" xml:space="preserve"><value>画廊在所有支持的媒体文件中滚动</value></data>
