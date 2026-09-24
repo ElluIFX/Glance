@@ -314,7 +314,7 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool handle_preview_content_double_click();
         [[nodiscard]] bool is_interactive_preview_source(
             IInspectable const& source);
-        void position_initial_window(bool ignore_saved_size = false);
+        void position_initial_window(bool preserve_current_size = false);
         void restore_resolved_window_placement(std::uint64_t generation);
         [[nodiscard]] bool should_defer_auto_fit_show(
             glance::app::PreviewKind kind) const noexcept;

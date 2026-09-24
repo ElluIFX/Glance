@@ -2778,11 +2778,13 @@ namespace winrt::Glance::App::implementation
         present_file(current_index_, current_kind);
         if (position_window)
         {
-            position_initial_window();
-            placement_restore_generation_ =
-                (current_kind_ == glance::app::PreviewKind::component || current_kind_ == glance::app::PreviewKind::generic)
-                ? content_generation_
-                : 0;
+            const bool awaiting_provider = current_kind_ == glance::app::PreviewKind::component ||
+                (current_kind_ == glance::app::PreviewKind::generic &&
+                 !files_[current_index_].is_cloud_placeholder && !files_[current_index_].path.empty());
+            placement_restore_generation_ = awaiting_provider ? content_generation_ : 0;
+            const bool awaiting_size = awaiting_provider || auto_fit_applies();
+            if (new_session || !awaiting_size)
+                position_initial_window(awaiting_size);
         }
         update_state();
     }
@@ -3188,7 +3190,7 @@ namespace winrt::Glance::App::implementation
             SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    void MainWindow::position_initial_window(bool ignore_saved_size)
+    void MainWindow::position_initial_window(bool preserve_current_size)
     {
         if (fullscreen_)
         {
@@ -3213,7 +3215,16 @@ namespace winrt::Glance::App::implementation
             MulDiv(saved_center_offset.y, static_cast<int>(dpi), 96) };
         int desired_width = MulDiv(static_cast<int>(preferences.default_width), static_cast<int>(dpi), 96);
         int desired_height = MulDiv(static_cast<int>(preferences.default_height), static_cast<int>(dpi), 96);
-        if (preferences.remember_size && !ignore_saved_size && !auto_fit_applies())
+        if (preserve_current_size)
+        {
+            RECT bounds{};
+            if (GetWindowRect(window_, &bounds))
+            {
+                desired_width = bounds.right - bounds.left;
+                desired_height = bounds.bottom - bounds.top;
+            }
+        }
+        else if (preferences.remember_size && !auto_fit_applies())
         {
             if (const auto& saved_size = memory.size)
             {
@@ -3253,7 +3264,7 @@ namespace winrt::Glance::App::implementation
                 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
-        if (!defer_auto_fit_show_)
+        if (!defer_auto_fit_show_ && !IsWindowVisible(window_))
         {
             show_prepared_window();
         }
@@ -4176,10 +4187,6 @@ namespace winrt::Glance::App::implementation
         {
             co_await resume_background();
             const auto kind = glance::app::probe_preview_kind(file.path);
-            if (kind == glance::app::PreviewKind::generic)
-            {
-                co_return;
-            }
             static_cast<void>(dispatcher.TryEnqueue(
                 [weak, file = std::move(file), kind, generation] {
                     const auto self = weak.get();
@@ -4188,13 +4195,17 @@ namespace winrt::Glance::App::implementation
                     {
                         return;
                     }
-                    self->present_resolved_file(file, kind, generation);
+                    if (kind != glance::app::PreviewKind::generic)
+                        self->present_resolved_file(file, kind, generation);
                     self->restore_resolved_window_placement(generation);
                 }));
         }
         catch (...)
         {
-            // Keep the generic preview when probing fails.
+            static_cast<void>(dispatcher.TryEnqueue([weak, generation] {
+                if (const auto self = weak.get(); self && generation == self->content_generation_)
+                    self->restore_resolved_window_placement(generation);
+            }));
         }
     }
 
