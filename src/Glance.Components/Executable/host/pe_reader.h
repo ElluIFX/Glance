@@ -17,10 +17,13 @@ namespace glance::executable
         resources,
         managed,
         structure,
+        managed_types,
+        managed_methods,
+        managed_fields,
         count
     };
     inline constexpr std::array section_keys{L"Overview",  L"Signatures", L"Imports",  L"Exports",
-                                             L"Resources", L"Managed",    L"Structure"};
+                                             L"Resources", L"Managed", L"Structure", L"ManagedTypes", L"ManagedMethods", L"ManagedFields"};
     struct Row
     {
         std::vector<std::wstring> cells;

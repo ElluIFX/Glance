@@ -11,7 +11,6 @@
   <data name="Managed" xml:space="preserve"><value> .NET</value></data>
   <data name="Structure" xml:space="preserve"><value>PE structure</value></data>
   <data name="Search" xml:space="preserve"><value>Search this section</value></data>
-  <data name="Copy" xml:space="preserve"><value>Copy</value></data>
   <data name="Report" xml:space="preserve"><value>Export report</value></data>
   <data name="SaveResource" xml:space="preserve"><value>Save resource</value></data>
   <data name="Hash" xml:space="preserve"><value>Calculate SHA-256</value></data>
@@ -91,7 +90,6 @@
   <data name="PreviewLimit" xml:space="preserve"><value>Preview limited; export to obtain all bytes</value></data>
   <data name="ReportTitle" xml:space="preserve"><value>Executable information</value></data>
   <data name="SaveFailed" xml:space="preserve"><value>Unable to save the file</value></data>
-  <data name="Copied" xml:space="preserve"><value>Copied</value></data>
   <data name="HashPending" xml:space="preserve"><value>Not calculated</value></data>
   <data name="AllFiles" xml:space="preserve"><value>All files</value></data>
   <data name="RawResource" xml:space="preserve"><value>Raw resource</value></data>
@@ -111,6 +109,39 @@
   <data name="CursorGroup" xml:space="preserve"><value>Cursor group</value></data>
   <data name="IconGroup" xml:space="preserve"><value>Icon group</value></data>
   <data name="VersionResource" xml:space="preserve"><value>Version resource</value></data>
-  <data name="CopyReport" xml:space="preserve"><value>Copy complete report</value></data>
   <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Summary_Library" xml:space="preserve"><value>Library capabilities</value></data>
+  <data name="Summary_Program" xml:space="preserve"><value>Program contents</value></data>
+  <data name="Summary_ExportCount" xml:space="preserve"><value>Exported interfaces</value></data>
+  <data name="Summary_Interfaces" xml:space="preserve"><value>Representative interfaces</value></data>
+  <data name="Summary_PublicTypes" xml:space="preserve"><value>Public types</value></data>
+  <data name="Summary_Dependencies" xml:space="preserve"><value>Main dependencies</value></data>
+  <data name="Summary_Icons" xml:space="preserve"><value>Icon groups</value></data>
+  <data name="Summary_Dialogs" xml:space="preserve"><value>Dialog resources</value></data>
+  <data name="Summary_Strings" xml:space="preserve"><value>String tables</value></data>
+  <data name="Summary_Embedded" xml:space="preserve"><value>Embedded data resources</value></data>
+  <data name="Summary_ExportEvidence" xml:space="preserve"><value>Capabilities indicated by exported interface names</value></data>
+  <data name="Summary_ImportEvidence" xml:space="preserve"><value>Content clues from referenced interfaces</value></data>
+  <data name="Summary_NoDetails" xml:space="preserve"><value>No additional content information</value></data>
+  <data name="Capability_Image" xml:space="preserve"><value>Image processing interfaces</value></data>
+  <data name="Capability_Media" xml:space="preserve"><value>Audio and video interfaces</value></data>
+  <data name="Capability_Archive" xml:space="preserve"><value>Compression interfaces</value></data>
+  <data name="Capability_Database" xml:space="preserve"><value>Database interfaces</value></data>
+  <data name="Capability_Network" xml:space="preserve"><value>Networking interfaces</value></data>
+  <data name="Capability_Graphics" xml:space="preserve"><value>Graphics interfaces</value></data>
+  <data name="Capability_Python" xml:space="preserve"><value>Python interfaces</value></data>
+  <data name="Capability_Com" xml:space="preserve"><value>COM component interfaces</value></data>
+  <data name="Capability_Service" xml:space="preserve"><value>Windows service interfaces</value></data>
+  <data name="ShowFullInformation" xml:space="preserve"><value>Show full information</value></data>
+  <data name="BackToSummary" xml:space="preserve"><value>Back to summary</value></data>
+  <data name="NoEntries" xml:space="preserve"><value>No entries</value></data>
+  <data name="ManagedTypes" xml:space="preserve"><value>.NET types</value></data>
+  <data name="ManagedMethods" xml:space="preserve"><value>.NET methods</value></data>
+  <data name="ManagedFields" xml:space="preserve"><value>.NET fields</value></data>
+  <data name="BaseType" xml:space="preserve"><value>Base type metadata token</value></data>
+  <data name="ImplementationFlags" xml:space="preserve"><value>Implementation flags</value></data>
+  <data name="SignatureBlob" xml:space="preserve"><value>Type signature bytes</value></data>
+  <data name="Parameters" xml:space="preserve"><value>Parameters</value></data>
+  <data name="MetadataToken" xml:space="preserve"><value>Metadata token</value></data>
+  <data name="PublicType" xml:space="preserve"><value>Public type</value></data>
 </root>

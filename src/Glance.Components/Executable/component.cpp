@@ -1,4 +1,5 @@
 #include "../Common/preview_cancellation.h"
+#include "view.h"
 #include <windows.h>
 #include <array>
 #include <filesystem>
@@ -13,17 +14,6 @@ namespace
     constexpr std::array extensions{L".exe", L".dll", L".sys", L".ocx", L".cpl",
                                     L".scr", L".pyd", L".efi", L".mui"};
 
-    BOOL WINAPI host(PreviewHostProtocol protocol, RendererHostDescriptor* result) noexcept
-    {
-        if (protocol != PreviewHostProtocol::native_document)
-            return FALSE;
-        if (!result || result->size < sizeof(*result))
-            return FALSE;
-        *result = RendererHostDescriptor{};
-        wcscpy_s(result->host_executable, L"Glance.ExecutableHost.exe");
-        return TRUE;
-    }
-    HostRendererApi renderer{.query_host = host};
     BOOL WINAPI initialize(const ComponentRegistrar* registrar, ComponentRegistration* result) noexcept
     {
         if (!registrar || !result || registrar->size < sizeof(*registrar) || result->size < sizeof(*result) ||
@@ -33,15 +23,15 @@ namespace
             if (!registrar->register_extension(registrar->context, extension, GalleryMediaKind::none))
                 return FALSE;
         if (!registrar->register_renderer(
-                registrar->context, PreviewContentKind::document, PreviewContentFormat::native_surface,
-                &host_renderer_api_id, host_renderer_api_version))
+                registrar->context, PreviewContentKind::document, PreviewContentFormat::component_view,
+                &component_view_api_id, component_view_api_version))
             return FALSE;
         *result = ComponentRegistration{};
         wcscpy_s(result->component_id, L"executable");
         wcscpy_s(result->target_app_version, GLANCE_VERSION_WSTRING);
         wcscpy_s(result->resource_path, L"resources.pri");
         result->preferred_kind = PreviewContentKind::document;
-        result->preferred_format = PreviewContentFormat::native_surface;
+        result->preferred_format = PreviewContentFormat::component_view;
         return TRUE;
     }
     BOOL WINAPI status(ComponentStatusResult* result) noexcept
@@ -103,7 +93,7 @@ namespace
             return PrepareStatus::unavailable;
         *result = PreparedPreview{};
         result->kind = PreviewContentKind::document;
-        result->format = PreviewContentFormat::native_surface;
+        result->format = PreviewContentFormat::component_view;
         wcscpy_s(result->path, path);
         return PrepareStatus::success;
     }
@@ -112,16 +102,17 @@ namespace
     }
     void WINAPI shutdown() noexcept
     {
+        glance::executable::shutdown_views();
     }
     BOOL WINAPI query(const GUID* id, std::uint32_t version, void** output) noexcept
     {
         if (!output)
             return FALSE;
         *output = nullptr;
-        if (id && IsEqualGUID(*id, host_renderer_api_id) &&
-            version <= host_renderer_api_version)
+        if (id && IsEqualGUID(*id, component_view_api_id) &&
+            version == component_view_api_version)
         {
-            *output = &renderer;
+            *output = const_cast<ComponentViewApi*>(&glance::executable::view_api());
             return TRUE;
         }
         return FALSE;

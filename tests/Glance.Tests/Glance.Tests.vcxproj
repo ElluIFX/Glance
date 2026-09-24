@@ -36,7 +36,6 @@
     <ClCompile Include="font_tests.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Font\client.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Executable\host\pe_reader.cpp" />
-    <ClCompile Include="..\..\src\Glance.Components\Executable\host\signature.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Executable\host\resource_image.cpp" />
     <ClCompile Include="office_preview_benchmark.cpp" />
     <ClCompile Include="office_package_tests.cpp" />

@@ -1,7 +1,5 @@
 #include "../../src/Glance.Components/Executable/host/pe_reader.h"
-#include "../../src/Glance.Components/Executable/host/signature.h"
 #include "../../src/Glance.Components/Executable/host/resource_image.h"
-#include "native_preview_surface.h"
 #include <windows.h>
 #include <objbase.h>
 #include <gdiplus.h>
@@ -11,60 +9,11 @@
 #include <chrono>
 #include <thread>
 
-int run_executable_tests(bool layout)
+int run_executable_tests()
 {
     using namespace glance::executable;
     wchar_t executable[32768]{};
     GetModuleFileNameW(nullptr, executable, 32768);
-    const auto root = std::filesystem::path(executable).parent_path();
-    if (layout)
-    {
-        CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-        WNDCLASSW klass{};
-        klass.hInstance = GetModuleHandleW(nullptr);
-        klass.lpszClassName = L"Glance.Executable.LayoutTest";
-        klass.lpfnWndProc = [](HWND window, UINT message, WPARAM wparam, LPARAM lparam) -> LRESULT {
-            if (message == WM_DESTROY)
-            {
-                PostQuitMessage(0);
-                return 0;
-            }
-            return DefWindowProcW(window, message, wparam, lparam);
-        };
-        RegisterClassW(&klass);
-        const HWND window =
-            CreateWindowW(klass.lpszClassName, L"Executable preview layout", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-                          100, 100, 1000, 760, nullptr, nullptr, klass.hInstance, nullptr);
-        ShowWindow(window, SW_SHOWNORMAL);
-        auto surface = std::make_shared<glance::app::NativePreviewSurface>(
-            window, (root / L"components/executable/Glance.ExecutableHost.exe").wstring(), nullptr, [] {});
-        surface->set_bounds(0, 0, 980, 720);
-        surface->set_visible(true);
-        const glance::contracts::native_preview::PreviewVisuals visuals{0x00fafafa, 0x00191919, 0};
-        std::thread opening([&] {
-            const auto result = surface->open((root / L"Glance.CLI.exe").wstring(), visuals, 96, L"zh-CN");
-            if (result != glance::contracts::native_preview::Status::success)
-                PostMessageW(window, WM_CLOSE, 0, 0);
-        });
-        MSG message{};
-        while (GetMessageW(&message, nullptr, 0, 0) > 0)
-        {
-            if (message.message == WM_SIZE && message.hwnd == window)
-            {
-                RECT bounds{};
-                GetClientRect(window, &bounds);
-                surface->set_bounds(0, 0, bounds.right, bounds.bottom);
-                surface->resize(bounds.right, bounds.bottom, GetDpiForWindow(window));
-            }
-            TranslateMessage(&message);
-            DispatchMessageW(&message);
-        }
-        surface->cancel();
-        opening.join();
-        surface.reset();
-        CoUninitialize();
-        return 0;
-    }
     int failures{};
     const auto expect = [&](bool value, const char* message) {
         std::cout << (value ? "PASS " : "FAIL ") << message << '\n';
@@ -83,23 +32,7 @@ int run_executable_tests(bool layout)
         }
         const auto imports = read_section(executable, summary.identity, Section::imports, {});
         expect(!imports.rows.empty(), "imports include actual dependencies");
-        const auto signature_host = (root / L"components/executable/Glance.ExecutableHost.exe").wstring();
-        const auto unsigned_signature =
-            verify_signature((root / L"Glance.CLI.exe").wstring(), {}, signature_host);
-        expect(unsigned_signature.state == L"Complete" &&
-                   std::any_of(
-                       unsigned_signature.rows.begin(), unsigned_signature.rows.end(),
-                       [](const Row& row) { return row.cells.size() == 2 && row.cells[1] == L"Unsigned"; }),
-               "unsigned file signature worker");
         const auto system_file = std::wstring(L"C:\\Windows\\System32\\notepad.exe");
-        const auto signed_signature = verify_signature(system_file, {}, signature_host);
-        expect(signed_signature.state == L"Complete" &&
-                   std::any_of(
-                       signed_signature.rows.begin(), signed_signature.rows.end(),
-                       [](const Row& row) { return row.cells.size() == 2 && row.cells[0] == L"Signer"; }),
-               "offline system signature and certificate extraction");
-        const auto cancel_signature = verify_signature(system_file, [] { return true; }, signature_host);
-        expect(cancel_signature.state == L"Cancelled", "signature worker cancellation");
         const auto system_summary = read_summary(system_file, {});
         const auto system_resources =
             read_section(system_file, system_summary.identity, Section::resources, {});
@@ -127,6 +60,15 @@ int run_executable_tests(bool layout)
                 read_section(managed_path.wstring(), managed_summary.identity, Section::managed, {});
             expect(managed_summary.managed && metadata.state == L"Complete" && !metadata.rows.empty(),
                    "CLR metadata and assembly tables");
+            for (const auto section : {Section::managed_types, Section::managed_methods, Section::managed_fields})
+            {
+                const auto members = read_section(managed_path.wstring(), managed_summary.identity, section, {});
+                expect(members.state == L"Complete" && !members.rows.empty(), "CLR member table is readable");
+                if (section == Section::managed_methods)
+                    expect(std::any_of(members.rows.begin(), members.rows.end(), [](const Row& row) {
+                        return !row.cells.empty() && row.cells[0] == L"System.Object::ToString";
+                    }), "CLR methods retain declaring type and method name");
+            }
         }
         const auto cancelled =
             read_section(executable, summary.identity, Section::imports, [] { return true; });

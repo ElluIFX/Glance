@@ -14,9 +14,9 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile><AdditionalIncludeDirectories>$(ProjectDir)..\..\..\Glance.Contracts\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
-    <Link><SubSystem>Windows</SubSystem><AdditionalDependencies>Comctl32.lib;Comdlg32.lib;Ole32.lib;Shell32.lib;Shlwapi.lib;Uxtheme.lib;XmlLite.lib;Bcrypt.lib;Crypt32.lib;Wintrust.lib;Version.lib;Gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+    <Link><SubSystem>Windows</SubSystem><AdditionalDependencies>Ole32.lib;Shell32.lib;Shlwapi.lib;XmlLite.lib;Bcrypt.lib;Crypt32.lib;Version.lib;Gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
-  <ItemGroup><ClCompile Include="main.cpp" /><ClCompile Include="pe_reader.cpp" /><ClCompile Include="viewer.cpp" /><ClCompile Include="resources.cpp" /><ClCompile Include="signature.cpp" /><ClCompile Include="resource_image.cpp" /></ItemGroup>
+  <ItemGroup><ClCompile Include="main.cpp" /><ClCompile Include="pe_reader.cpp" /><ClCompile Include="service.cpp" /></ItemGroup>
   <ItemGroup><Manifest Include="app.manifest" /><ResourceCompile Include="resources.rc" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

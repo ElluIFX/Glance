@@ -782,6 +782,90 @@ namespace glance::executable
                      << (full_key ? unsigned(digest[19 - i]) : std::to_integer<unsigned>(key[i]));
             return text.str();
         }
+        std::wstring blob_hex(const std::vector<std::byte>& bytes)
+        {
+            std::wostringstream value;
+            value << std::hex << std::uppercase << std::setfill(L'0');
+            for (const auto byte : bytes) value << std::setw(2) << std::to_integer<unsigned>(byte) << L' ';
+            return value.str();
+        }
+        void managed_members(Pe& pe, Table& table, Section section)
+        {
+            if (!pe.directories[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].VirtualAddress) return;
+            Metadata metadata(pe);
+            const bool types = section == Section::managed_types;
+            const bool methods = section == Section::managed_methods;
+            table.columns = types
+                ? std::vector<std::wstring>{L"Name", L"Flags", L"BaseType", L"MetadataToken"}
+                : methods
+                    ? std::vector<std::wstring>{L"Name", L"Address", L"Flags", L"ImplementationFlags", L"SignatureBlob", L"Parameters", L"MetadataToken"}
+                    : std::vector<std::wstring>{L"Name", L"Flags", L"SignatureBlob", L"MetadataToken"};
+            for (std::size_t i = 1; i <= metadata.counts[2]; ++i)
+            {
+                pe.file.check();
+                const auto row = metadata.row(2, i);
+                const auto name = metadata.heap_string(metadata.get(row + 4, metadata.string_width));
+                const auto space = metadata.heap_string(metadata.get(row + 4 + metadata.string_width, metadata.string_width));
+                const auto full_name = space.empty() ? name : space + L"." + name;
+                const auto extends_offset = row + 4 + 2 * metadata.string_width;
+                const auto extends_width = metadata.coded({2, 1, 27}, 2);
+                if (types)
+                {
+                    const auto base = metadata.get(extends_offset, extends_width);
+                    constexpr unsigned targets[]{2, 1, 27};
+                    if ((base & 3) == 3) throw std::runtime_error("Invalid");
+                    add(table, {full_name, hex(metadata.get(row, 4)),
+                        base ? hex((std::uint64_t(targets[base & 3]) << 24) | (base >> 2)) : L"",
+                        hex(0x02000000 | i)});
+                    continue;
+                }
+                const unsigned target = methods ? 6 : 4;
+                const unsigned pointers = methods ? 5 : 3;
+                const auto count = metadata.counts[pointers] ? metadata.counts[pointers] : metadata.counts[target];
+                const auto index_offset = 4 + 2 * metadata.string_width + extends_width +
+                    (methods ? metadata.table_index(4) : 0);
+                const auto first = metadata.get(row + index_offset, metadata.table_index(target));
+                const auto end = i < metadata.counts[2]
+                    ? metadata.get(metadata.row(2, i + 1) + index_offset, metadata.table_index(target)) : count + 1;
+                if (!first || first > end || end > count + 1) throw std::runtime_error("Invalid");
+                for (auto index = first; index < end; ++index)
+                {
+                    pe.file.check();
+                    const auto rid = metadata.counts[pointers]
+                        ? metadata.get(metadata.row(pointers, index), metadata.table_index(target)) : index;
+                    const auto member = metadata.row(target, rid);
+                    const auto member_name = metadata.heap_string(metadata.get(member + (methods ? 8 : 2), metadata.string_width));
+                    const auto signature_offset = member + (methods ? 8 : 2) + metadata.string_width;
+                    const auto signature = blob_hex(metadata.blob(metadata.get(signature_offset, metadata.blob_width)));
+                    if (!methods)
+                    {
+                        add(table, {full_name + L"::" + member_name, hex(metadata.get(member, 2)), signature, hex(0x04000000 | rid)});
+                        continue;
+                    }
+                    const auto parameter_offset = 8 + metadata.string_width + metadata.blob_width;
+                    const auto first_parameter = metadata.get(member + parameter_offset, metadata.table_index(8));
+                    const auto parameter_count = metadata.counts[7] ? metadata.counts[7] : metadata.counts[8];
+                    const auto end_parameter = rid < metadata.counts[6]
+                        ? metadata.get(metadata.row(6, rid + 1) + parameter_offset, metadata.table_index(8)) : parameter_count + 1;
+                    if (!first_parameter || first_parameter > end_parameter || end_parameter > parameter_count + 1)
+                        throw std::runtime_error("Invalid");
+                    std::wstring parameters;
+                    for (auto parameter = first_parameter; parameter < end_parameter; ++parameter)
+                    {
+                        pe.file.check();
+                        const auto parameter_rid = metadata.counts[7]
+                            ? metadata.get(metadata.row(7, parameter), metadata.table_index(8)) : parameter;
+                        const auto entry = metadata.row(8, parameter_rid);
+                        if (!parameters.empty()) parameters += L", ";
+                        parameters += std::to_wstring(metadata.get(entry + 2, 2)) + L": " +
+                            metadata.heap_string(metadata.get(entry + 4, metadata.string_width));
+                    }
+                    add(table, {full_name + L"::" + member_name, hex(metadata.get(member, 4)),
+                        hex(metadata.get(member + 6, 2)), hex(metadata.get(member + 4, 2)), signature,
+                        parameters, hex(0x06000000 | rid)});
+                }
+            }
+        }
         void managed(Pe& pe, Table& table)
         {
             table.columns = {L"Name", L"Value", L"Version", L"Culture", L"Token"};
@@ -790,6 +874,16 @@ namespace glance::executable
                 return;
             Metadata metadata(pe);
             add(table, {L"Metadata", metadata.version});
+            for (std::size_t i = 1; i <= metadata.counts[2]; ++i)
+            {
+                pe.file.check();
+                const auto row = metadata.row(2, i);
+                const auto visibility = metadata.get(row, 4) & 7;
+                if (visibility != 1 && visibility != 2) continue;
+                const auto name = metadata.heap_string(metadata.get(row + 4, metadata.string_width));
+                const auto space = metadata.heap_string(metadata.get(row + 4 + metadata.string_width, metadata.string_width));
+                add(table, {L"PublicType", space.empty() ? name : space + L"." + name});
+            }
             std::wstring flags;
             if (metadata.flags & COMIMAGE_FLAGS_ILONLY)
                 flags += L"IL-only ";
@@ -942,14 +1036,39 @@ namespace glance::executable
                 }
                 break;
             }
-            const auto score = [](const Row& row) {
-                return row.type == 3 && row.length <= 1024 * 1024 ? row.length : 0U;
-            };
-            const auto icon = std::max_element(
-                resource_table.rows.begin(), resource_table.rows.end(),
-                [&](const Row& left, const Row& right) { return score(left) < score(right); });
-            if (icon != resource_table.rows.end() && score(*icon))
-                result.icon = file.bytes(icon->offset, icon->length);
+            const auto icon = std::find_if(resource_table.rows.begin(), resource_table.rows.end(),
+                [](const Row& row) { return row.type == 14 && row.length <= 1024 * 1024; });
+            if (icon != resource_table.rows.end())
+            {
+                auto ico = icon_file(path, result.identity, *icon);
+                if (ico.size() >= 22)
+                {
+                    WORD count{}; memcpy(&count, ico.data() + 4, sizeof(count));
+                    if (count && count <= (ico.size() - 6) / 16)
+                    {
+                        std::size_t best = 6; unsigned best_size{};
+                        for (unsigned i = 0; i < count; ++i)
+                        {
+                            const auto entry = 6 + i * 16;
+                            const auto width = std::to_integer<unsigned>(ico[entry]);
+                            const auto size = width ? width : 256;
+                            if (size > best_size) { best = entry; best_size = size; }
+                        }
+                        DWORD size{}, offset{};
+                        memcpy(&size, ico.data() + best + 8, sizeof(size));
+                        memcpy(&offset, ico.data() + best + 12, sizeof(offset));
+                        if (offset <= ico.size() && size <= ico.size() - offset && size <= 1024 * 1024 - 22)
+                        {
+                            result.icon.resize(22 + size);
+                            memcpy(result.icon.data(), ico.data(), 6);
+                            const WORD single = 1; memcpy(result.icon.data() + 4, &single, sizeof(single));
+                            memcpy(result.icon.data() + 6, ico.data() + best, 16);
+                            const DWORD start = 22; memcpy(result.icon.data() + 18, &start, sizeof(start));
+                            memcpy(result.icon.data() + 22, ico.data() + offset, size);
+                        }
+                    }
+                }
+            }
         }
         catch (const std::exception& error)
         {
@@ -1000,6 +1119,11 @@ namespace glance::executable
                 break;
             case Section::managed:
                 managed(pe, result);
+                break;
+            case Section::managed_types:
+            case Section::managed_methods:
+            case Section::managed_fields:
+                managed_members(pe, result, section);
                 break;
             default:
                 result.state = L"NotLoaded";
