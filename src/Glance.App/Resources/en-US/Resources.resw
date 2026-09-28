@@ -420,6 +420,8 @@
   <data name="JsonArraySummaryFormat" xml:space="preserve"><value>{0} items</value></data>
   <data name="JsonInvalidRecordFormat" xml:space="preserve"><value>Invalid JSON record at line {0}</value></data>
   <data name="JsonPendingValue" xml:space="preserve"><value>Parsing...</value></data>
+  <data name="TextSelectionCopyButton.Content" xml:space="preserve"><value>Copy content</value></data>
+  <data name="TextSelectionCopied" xml:space="preserve"><value>Content copied</value></data>
   <data name="JsonNodeCopied" xml:space="preserve"><value>JSON node copied</value></data>
   <data name="JsonNodeCopyHint" xml:space="preserve"><value>Middle-click to copy</value></data>
   <data name="JsonNodeCopyUnavailable" xml:space="preserve"><value>The JSON node is not ready to copy</value></data>

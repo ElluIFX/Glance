@@ -1307,6 +1307,20 @@
             </Button>
         </Grid>
 
+        <Button
+            x:Name="TextSelectionCopyButton"
+            Grid.Row="1"
+            Margin="16,0,16,32"
+            Padding="18,10"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Canvas.ZIndex="90"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            IsTabStop="False"
+            AllowFocusOnInteraction="False"
+            Visibility="Collapsed"
+            Click="TextSelectionCopyButton_Click" />
+
         <Border
             x:Name="TextFontSizeOverlay"
             Grid.RowSpan="3"

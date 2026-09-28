@@ -658,6 +658,20 @@ namespace glance::app
         {
             ShowWindow(host_, visible ? SW_SHOWNOACTIVATE : SW_HIDE);
         }
+        update_copy_shortcut();
+    }
+
+    void ScintillaTextView::set_copy_callbacks(
+        std::function<void(bool)> selection_changed, std::function<void()> copied)
+    {
+        selection_changed_callback_ = std::move(selection_changed);
+        copied_callback_ = std::move(copied);
+        update_copy_shortcut();
+    }
+
+    void ScintillaTextView::copy_selection() noexcept
+    {
+        if (visible_ && call(SCI_GETSELECTIONEMPTY) == FALSE) call(SCI_COPY);
     }
 
     void ScintillaTextView::set_occlusions(
@@ -728,6 +742,7 @@ namespace glance::app
         call(SCI_EMPTYUNDOBUFFER);
         call(SCI_SETREADONLY, TRUE);
         update_line_number_width();
+        update_copy_shortcut();
     }
 
     void ScintillaTextView::append_text(std::wstring_view text, std::span<const UndecodableByte> bytes)
@@ -986,11 +1001,7 @@ namespace glance::app
             }
             if (message == copy_selection_message)
             {
-                const auto position = self->call(SCI_GETCURRENTPOS);
-                self->call(SCI_COPY);
-                self->call(SCI_CLEARSELECTIONS);
-                self->call(SCI_SETEMPTYSELECTION, position);
-                release_copy_shortcut(self->host_);
+                self->copy_selection();
                 return 0;
             }
             if (message == clear_selection_message)
@@ -998,7 +1009,7 @@ namespace glance::app
                 const auto position = self->call(SCI_GETCURRENTPOS);
                 self->call(SCI_CLEARSELECTIONS);
                 self->call(SCI_SETEMPTYSELECTION, position);
-                release_copy_shortcut(self->host_);
+                self->update_copy_shortcut();
                 return 0;
             }
             if (message == WM_NOTIFY)
@@ -1026,8 +1037,21 @@ namespace glance::app
         const bool copy_command = message == SCI_COPY || message == WM_COPY ||
             (message == WM_COMMAND && LOWORD(wparam) == scintilla_copy_menu_id) ||
             (message == WM_KEYDOWN && wparam == 'C' && (GetKeyState(VK_CONTROL) & 0x8000) != 0);
-        if (self != nullptr && copy_command && self->copy_decoded_selection())
+        if (self != nullptr && copy_command)
         {
+            if (self->call(SCI_GETSELECTIONEMPTY) != FALSE) return 0;
+            const DWORD clipboard_sequence = GetClipboardSequenceNumber();
+            if (!self->copy_decoded_selection()) DefSubclassProc(window, SCI_COPY, 0, 0);
+            if (GetClipboardSequenceNumber() != clipboard_sequence &&
+                IsClipboardFormatAvailable(CF_UNICODETEXT))
+            {
+                const auto position = self->call(SCI_GETCURRENTPOS);
+                self->call(SCI_CLEARSELECTIONS);
+                self->call(SCI_SETEMPTYSELECTION, position);
+                self->update_copy_shortcut();
+                try { if (self->copied_callback_) self->copied_callback_(); }
+                catch (...) {}
+            }
             return 0;
         }
         if (self != nullptr && (message == WM_MOUSEWHEEL || message == WM_VSCROLL ||
@@ -1577,13 +1601,20 @@ namespace glance::app
 
     void ScintillaTextView::update_copy_shortcut() noexcept
     {
-        if (visible_ && call(SCI_GETSELECTIONEMPTY) == FALSE)
+        const bool selected = visible_ && editor_ != nullptr && call(SCI_GETSELECTIONEMPTY) == FALSE;
+        if (selected)
         {
             acquire_copy_shortcut(host_, editor_);
         }
         else
         {
             release_copy_shortcut(host_);
+        }
+        if (selection_active_ != selected)
+        {
+            selection_active_ = selected;
+            try { if (selection_changed_callback_) selection_changed_callback_(selected); }
+            catch (...) {}
         }
     }
 }

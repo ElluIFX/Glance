@@ -37,6 +37,8 @@ namespace glance::app
         void set_bounds(int x, int y, int width, int height) noexcept;
         void set_occlusions(std::span<const RECT> rectangles) noexcept;
         void set_visible(bool visible) noexcept;
+        void set_copy_callbacks(std::function<void(bool)> selection_changed, std::function<void()> copied);
+        void copy_selection() noexcept;
         void clear() noexcept;
         void append_text(std::wstring_view text, std::span<const UndecodableByte> bytes = {});
         void refresh_text(std::wstring_view text, bool replace, bool auto_follow, bool has_more,
@@ -89,6 +91,9 @@ namespace glance::app
         NearEndCallback near_end_callback_;
         FontZoomCallback font_zoom_callback_;
         DoubleClickCallback double_click_callback_;
+        std::function<void(bool)> selection_changed_callback_;
+        std::function<void()> copied_callback_;
+        bool selection_active_{};
         ULONGLONG last_left_down_tick_{};
         std::wstring error_;
         std::wstring path_;

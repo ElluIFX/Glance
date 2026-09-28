@@ -1184,6 +1184,9 @@ namespace winrt::Glance::App::implementation
                 self->update_state();
             }
         }), true);
+        TextSelectionCopyButton().SizeChanged([weak](IInspectable const&, SizeChangedEventArgs const&) {
+            if (const auto self = weak.get()) self->update_text_editor_occlusions();
+        });
         RootGrid().PreviewKeyDown([weak](IInspectable const&, KeyRoutedEventArgs const& args) {
             if (const auto self = weak.get(); self && self->visible_ && !self->detached_ &&
                 !self->component_input_active_ && self->password_prompt_target_ == PasswordPromptTarget::none &&
@@ -2016,6 +2019,7 @@ namespace winrt::Glance::App::implementation
             GenericAdvancedInfoButton(),
             L"GenericAdvancedInfoButton.ToolTipService.ToolTip");
         LoadCloudFileText().Text(glance::app::localize(L"LoadCloudFileText.Text"));
+        TextSelectionCopyButton().Content(box_value(glance::app::localize(L"TextSelectionCopyButton.Content")));
         PreviewAsTextText().Text(glance::app::localize(L"PreviewAsTextText.Text"));
         MarkdownPreviewButton().Content(box_value(
             glance::app::localize(L"MarkdownPreviewButton.Content")));
@@ -3111,6 +3115,7 @@ namespace winrt::Glance::App::implementation
             font_size_overlay_timer_.Stop();
         }
         TextFontSizeOverlay().Visibility(Visibility::Collapsed);
+        TextSelectionCopyButton().Visibility(Visibility::Collapsed);
         archive_render_state_.reset();
         archive_preview_is_directory_ = false;
         archive_entry_compressed_size_available_ = false;
@@ -8393,6 +8398,32 @@ namespace winrt::Glance::App::implementation
         {
             return false;
         }
+        text_editor_->set_copy_callbacks(
+            [weak](bool selected) {
+                if (const auto self = weak.get())
+                {
+                    const auto generation = self->content_generation_;
+                    self->DispatcherQueue().TryEnqueue([weak, generation, selected] {
+                        if (const auto current = weak.get(); current && current->content_generation_ == generation)
+                        {
+                            current->TextSelectionCopyButton().Visibility(selected ? Visibility::Visible : Visibility::Collapsed);
+                            current->queue_native_surface_occlusion_update();
+                        }
+                    });
+                }
+            },
+            [weak] {
+                if (const auto self = weak.get())
+                {
+                    const auto generation = self->content_generation_;
+                    self->DispatcherQueue().TryEnqueue([weak, generation] {
+                        if (const auto current = weak.get(); current && current->visible_ &&
+                            current->content_generation_ == generation)
+                            current->show_preview_message(glance::app::localize(L"TextSelectionCopied"),
+                                InfoBarSeverity::Informational, true, 1600);
+                    });
+                }
+            });
         update_text_editor_bounds();
         return true;
     }
@@ -8471,6 +8502,7 @@ namespace winrt::Glance::App::implementation
                 append(PreviewFooterBar());
             }
             append(TextFontSizeOverlay());
+            append(TextSelectionCopyButton());
             text_editor_->set_occlusions(rectangles);
         }
         catch (...)
@@ -8506,6 +8538,12 @@ namespace winrt::Glance::App::implementation
             !json_tree_mode_ &&
             TextPanel().Visibility() == Visibility::Visible;
         text_editor_->set_visible(code_visible);
+        if (!code_visible) TextSelectionCopyButton().Visibility(Visibility::Collapsed);
+    }
+
+    void MainWindow::TextSelectionCopyButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (text_editor_) text_editor_->copy_selection();
     }
 
     void MainWindow::apply_text_preferences()

@@ -123,6 +123,7 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::Input::DoubleTappedRoutedEventArgs const&);
         void EncodingOption_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void TextSelectionCopyButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void TextEditorHost_Loaded(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
