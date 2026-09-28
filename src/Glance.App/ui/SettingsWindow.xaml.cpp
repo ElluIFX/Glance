@@ -871,7 +871,7 @@ namespace winrt::Glance::App::implementation
         WebViewDownloadLink().Visibility(
             webview_available ? Visibility::Collapsed : Visibility::Visible);
         const bool administrator_access =
-            core_running && named_mutex_exists(L"Local\\Glance.Core.Elevated");
+            Application::Current().as<implementation::App>()->HasAdministratorAccess();
         set_status_indicator(
             AdministratorAccessStatusIcon(),
             AdministratorAccessStatusText(),
@@ -893,13 +893,15 @@ namespace winrt::Glance::App::implementation
             HWND owner{};
             check_hresult(this->try_as<::IWindowNative>()->get_WindowHandle(&owner));
             co_await resume_background();
-            result = glance::app::repair_core_task(owner);
+            result = glance::app::managed_installation()
+                ? glance::app::repair_core_task(owner) : glance::app::CoreAccessResult::success;
             co_await ui;
             if (result == glance::app::CoreAccessResult::success)
             {
                 const auto app = Application::Current().as<implementation::App>();
-                if (!co_await app->RestartCoreAfterAccessRepair())
-                    result = glance::app::CoreAccessResult::failed;
+                const HRESULT status = co_await app->RestartCoreAfterAccessRepair();
+                if (FAILED(status)) result = status == HRESULT_FROM_WIN32(ERROR_CANCELLED)
+                    ? glance::app::CoreAccessResult::cancelled : glance::app::CoreAccessResult::failed;
             }
         }
         catch (...) {}

@@ -28,7 +28,8 @@ namespace winrt::Glance::App::implementation
         ~App();
 
         void OnLaunched(Microsoft::UI::Xaml::LaunchActivatedEventArgs const&);
-        winrt::Windows::Foundation::IAsyncOperation<bool> RestartCoreAfterAccessRepair();
+        winrt::Windows::Foundation::IAsyncOperation<std::int32_t> RestartCoreAfterAccessRepair();
+        [[nodiscard]] bool HasAdministratorAccess() const noexcept;
 
     private:
         void ensure_core_started();
@@ -86,6 +87,8 @@ namespace winrt::Glance::App::implementation
         bool core_launch_in_flight_{};
         bool core_access_repair_in_flight_{};
         bool core_task_unavailable_{};
+        bool portable_elevation_unavailable_{};
+        HRESULT core_elevation_result_{ E_FAIL };
         Glance::App::MainWindow active_window_{ nullptr };
         Glance::App::SettingsWindow settings_window_{ nullptr };
         std::vector<Glance::App::MainWindow> detached_windows_;
