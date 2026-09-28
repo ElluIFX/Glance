@@ -4,6 +4,27 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.29] - 2026-09-29
+
+### Added
+
+- Support uncommon audio and video formats through an optional FFmpeg software decoder, with automatic fallback and a preference to use it first.
+- Manage optional FFmpeg and FFprobe dependencies from the add-ons page, including downloads, removal and detection of available PATH installations.
+- Add video click-to-pause feedback and enabled-by-default loop playback.
+- Add a default-enabled option to pause adaptive window sizing while always shown.
+
+### Improved
+
+- Move the gallery adaptive-sizing pause option to Window settings alongside the always-shown option.
+- Stack preview notices in arrival order with animated dismissal and independent progress updates.
+- Shorten the fullscreen double-click interval to half the system setting.
+- Automatically request Core administrator access in portable installations and display the connected Core's actual elevation state.
+
+### Fixed
+
+- Correct software-decoder seeking, buffering and playback timing, and prevent stale media callbacks from accessing released players.
+- Prevent middle-click gallery switching from toggling video playback.
+
 ## [2026.09.25] - 2026-09-25
 
 ### Added
