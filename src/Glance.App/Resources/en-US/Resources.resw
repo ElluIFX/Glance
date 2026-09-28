@@ -421,6 +421,7 @@
   <data name="JsonInvalidRecordFormat" xml:space="preserve"><value>Invalid JSON record at line {0}</value></data>
   <data name="JsonPendingValue" xml:space="preserve"><value>Parsing...</value></data>
   <data name="JsonNodeCopied" xml:space="preserve"><value>JSON node copied</value></data>
+  <data name="JsonNodeCopyHint" xml:space="preserve"><value>Middle-click to copy</value></data>
   <data name="JsonNodeCopyUnavailable" xml:space="preserve"><value>The JSON node is not ready to copy</value></data>
   <data name="JsonNodeCopyFailed" xml:space="preserve"><value>Could not copy JSON node</value></data>
   <data name="RepairCoreAccessButton.Content" xml:space="preserve"><value>Enable / repair</value></data>

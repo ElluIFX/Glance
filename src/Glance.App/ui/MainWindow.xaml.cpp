@@ -9783,7 +9783,9 @@ namespace winrt::Glance::App::implementation
                 path += L"]";
             }
         }
-        if (!path.empty()) { ToolTipService::SetToolTip(row, box_value(path)); }
+        if (!path.empty()) path += L" · ";
+        path += glance::app::localize(L"JsonNodeCopyHint");
+        ToolTipService::SetToolTip(row, box_value(path));
     }
 
     void MainWindow::JsonTreeRow_PointerPressed(
@@ -9792,7 +9794,7 @@ namespace winrt::Glance::App::implementation
     {
         const auto row = sender.try_as<FrameworkElement>();
         if (row == nullptr ||
-            !args.GetCurrentPoint(row).Properties().IsRightButtonPressed())
+            !args.GetCurrentPoint(row).Properties().IsMiddleButtonPressed())
         {
             return;
         }

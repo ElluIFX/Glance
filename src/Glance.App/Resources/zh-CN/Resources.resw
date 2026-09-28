@@ -421,6 +421,7 @@
   <data name="JsonInvalidRecordFormat" xml:space="preserve"><value>第 {0} 行不是有效的 JSON 记录</value></data>
   <data name="JsonPendingValue" xml:space="preserve"><value>正在解析...</value></data>
   <data name="JsonNodeCopied" xml:space="preserve"><value>已复制 JSON 节点</value></data>
+  <data name="JsonNodeCopyHint" xml:space="preserve"><value>中键复制</value></data>
   <data name="JsonNodeCopyUnavailable" xml:space="preserve"><value>JSON 节点尚未准备好复制</value></data>
   <data name="JsonNodeCopyFailed" xml:space="preserve"><value>无法复制 JSON 节点</value></data>
   <data name="RepairCoreAccessButton.Content" xml:space="preserve"><value>启用／修复</value></data>
