@@ -842,7 +842,12 @@ namespace winrt::Glance::App::implementation
         std::wstring image_metadata_;
         std::wstring image_metadata_json_;
         std::wstring image_taken_time_;
+        std::wstring image_capture_parameters_;
+        std::wstring image_color_info_;
+        std::wstring image_capture_device_;
+        std::wstring text_line_endings_;
         std::wstring media_dimensions_;
+        std::wstring media_color_info_;
         std::wstring media_playback_info_;
         Windows::Media::Playback::MediaPlayer media_player_{ nullptr };
         Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };

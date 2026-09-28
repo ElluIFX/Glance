@@ -29,6 +29,7 @@
 
 #include <microsoft.ui.xaml.window.h>
 #include <dwmapi.h>
+#include <mfapi.h>
 #include <dwrite.h>
 #include <shellapi.h>
 #include <shlobj_core.h>
@@ -3073,6 +3074,7 @@ namespace winrt::Glance::App::implementation
         LineNumbersButton().Visibility(Visibility::Collapsed);
 
         current_text_.clear();
+        text_line_endings_.clear();
         current_text_path_.clear();
         current_text_markdown_ = false;
         current_text_web_ = false;
@@ -3083,7 +3085,11 @@ namespace winrt::Glance::App::implementation
         image_metadata_.clear();
         image_metadata_json_.clear();
         image_taken_time_.clear();
+        image_capture_parameters_.clear();
+        image_color_info_.clear();
+        image_capture_device_.clear();
         media_dimensions_.clear();
+        media_color_info_.clear();
         media_playback_info_.clear();
         media_playback_item_ = nullptr;
         media_playback_generation_ = 0;
@@ -4080,11 +4086,16 @@ namespace winrt::Glance::App::implementation
         gallery_same_extension_only_ = media_preferences.gallery_same_extension_only;
         const auto generation = ++content_generation_;
         update_title_text();
+        text_line_endings_.clear();
         image_pixel_width_ = 0;
         image_pixel_height_ = 0;
         image_bits_per_pixel_ = 0;
         image_taken_time_.clear();
+        image_capture_parameters_.clear();
+        image_color_info_.clear();
+        image_capture_device_.clear();
         media_dimensions_.clear();
+        media_color_info_.clear();
         media_playback_info_.clear();
         media_playback_item_ = nullptr;
         media_playback_generation_ = 0;
@@ -4239,6 +4250,9 @@ namespace winrt::Glance::App::implementation
             image_metadata_.clear();
             image_metadata_json_.clear();
             image_taken_time_.clear();
+            image_capture_parameters_.clear();
+            image_color_info_.clear();
+            image_capture_device_.clear();
             image_metadata_visible_ = false;
             ImageTransform().Rotation(image_rotation_);
             ImageTransform().ScaleX(image_scale_x_);
@@ -4302,6 +4316,7 @@ namespace winrt::Glance::App::implementation
             MediaAlbumText().Text(L"");
             MediaArtistText().Text(L"");
             media_dimensions_.clear();
+            media_color_info_.clear();
             media_playback_info_.clear();
             media_playback_item_ = nullptr;
             media_playback_generation_ = 0;
@@ -4549,6 +4564,7 @@ namespace winrt::Glance::App::implementation
                 : glance::app::PreviewKind::text;
         show_content_panel(current_kind_);
         current_text_.clear();
+        text_line_endings_.clear();
         current_text_path_ = file.path;
         current_text_markdown_ = markdown;
         current_text_web_ = web;
@@ -4779,6 +4795,10 @@ namespace winrt::Glance::App::implementation
                     return;
                 }
                 lifetime->image_taken_time_ = std::move(metadata.taken_time);
+                auto footer = glance::app::format_image_footer_metadata(metadata);
+                lifetime->image_capture_parameters_ = std::move(footer.capture_parameters);
+                lifetime->image_color_info_ = std::move(footer.color_info);
+                lifetime->image_capture_device_ = std::move(footer.capture_device);
                 lifetime->image_metadata_ = format_image_metadata(metadata);
                 lifetime->image_metadata_json_ = format_image_metadata_json(metadata);
                 const auto display_text = lifetime->image_metadata_.empty()
@@ -5117,6 +5137,7 @@ namespace winrt::Glance::App::implementation
         try
         {
             std::vector<std::wstring> fields;
+            media_color_info_.clear();
             const auto append = [&fields](std::wstring value) {
                 if (!value.empty())
                 {
@@ -5162,6 +5183,24 @@ namespace winrt::Glance::App::implementation
                     {
                         media_dimensions_ = std::to_wstring(properties.Width())
                             + L"x" + std::to_wstring(properties.Height());
+                    }
+                    const auto attributes = properties.Properties();
+                    const auto attribute = [&](const GUID& key) {
+                        return attributes.HasKey(key)
+                            ? unbox_value_or<std::uint32_t>(attributes.Lookup(key), 0U) : 0U;
+                    };
+                    const auto primaries = attribute(MF_MT_VIDEO_PRIMARIES);
+                    if (primaries == MFVideoPrimaries_BT709) media_color_info_ = L"BT.709";
+                    else if (primaries == MFVideoPrimaries_BT2020) media_color_info_ = L"BT.2020";
+                    const auto transfer = attribute(MF_MT_TRANSFER_FUNCTION);
+                    std::wstring transfer_name;
+                    if (transfer == MFVideoTransFunc_2084) transfer_name = L"HDR PQ";
+                    else if (transfer == MFVideoTransFunc_HLG) transfer_name = L"HDR HLG";
+                    else if (transfer == MFVideoTransFunc_sRGB) transfer_name = L"sRGB";
+                    if (!transfer_name.empty())
+                    {
+                        if (!media_color_info_.empty()) media_color_info_ += L" · ";
+                        media_color_info_ += transfer_name;
                     }
                     append(format_media_frame_rate(properties.FrameRate()));
                     if (!software_media_source_)
@@ -5242,6 +5281,23 @@ namespace winrt::Glance::App::implementation
             case glance::app::FooterField::permissions:
                 append(footer_access_loaded_ ? footer_access_mode_ : L"--");
                 break;
+            case glance::app::FooterField::capture_parameters:
+                if (current_kind_ == glance::app::PreviewKind::image)
+                {
+                    auto capture = image_capture_device_;
+                    if (!image_capture_parameters_.empty())
+                    {
+                        if (!capture.empty()) capture += L" · ";
+                        capture += image_capture_parameters_;
+                    }
+                    append(std::move(capture));
+                }
+                break;
+            case glance::app::FooterField::line_endings:
+                if (current_kind_ == glance::app::PreviewKind::text ||
+                    current_kind_ == glance::app::PreviewKind::markdown ||
+                    current_kind_ == glance::app::PreviewKind::web) append(text_line_endings_);
+                break;
             case glance::app::FooterField::media_info:
             {
                 std::wstring media_info;
@@ -5255,21 +5311,25 @@ namespace winrt::Glance::App::implementation
                         media_info.append(value);
                     }
                 };
-                if (current_kind_ == glance::app::PreviewKind::image &&
-                    image_pixel_width_ > 0 && image_pixel_height_ > 0)
+                if (current_kind_ == glance::app::PreviewKind::image)
                 {
-                    append_media_info(
-                        std::to_wstring(image_pixel_width_) + L"x" +
-                        std::to_wstring(image_pixel_height_));
+                    if (image_pixel_width_ > 0 && image_pixel_height_ > 0)
+                    {
+                        append_media_info(
+                            std::to_wstring(image_pixel_width_) + L"x" +
+                            std::to_wstring(image_pixel_height_));
+                    }
                     if (image_bits_per_pixel_ > 0)
                     {
                         append_media_info(std::to_wstring(image_bits_per_pixel_) + L"bpp");
                     }
+                    append_media_info(image_color_info_);
                 }
                 else if (current_kind_ == glance::app::PreviewKind::media)
                 {
                     append_media_info(media_dimensions_);
                     append_media_info(media_playback_info_);
+                    append_media_info(media_color_info_);
                 }
                 append(std::move(media_info));
                 break;
@@ -6600,6 +6660,7 @@ namespace winrt::Glance::App::implementation
             MediaMuteIcon().Foreground(white);
             MediaTimeText().Foreground(white);
             media_dimensions_.clear();
+            media_color_info_.clear();
             media_playback_info_.clear();
             media_playback_item_ = nullptr;
             media_playback_generation_ = 0;
@@ -7059,6 +7120,8 @@ namespace winrt::Glance::App::implementation
         }
 
         auto initial_content = std::move(preview.content);
+        text_line_endings_ = std::move(preview.line_endings);
+        update_footer_metadata();
         current_text_ = markdown ? initial_content : std::wstring{};
         current_text_reader_ = std::move(preview.reader);
         current_text_has_more_ = preview.has_more;
@@ -7143,6 +7206,8 @@ namespace winrt::Glance::App::implementation
                 }
 
                 auto appended = std::move(preview.content);
+                lifetime->text_line_endings_ = std::move(preview.line_endings);
+                lifetime->update_footer_metadata();
                 lifetime->current_text_reader_ = std::move(preview.reader);
                 lifetime->current_text_has_more_ = preview.has_more;
                 if (lifetime->current_text_markdown_)
@@ -7267,6 +7332,8 @@ namespace winrt::Glance::App::implementation
                         self->dismiss_preview_message(self->text_error_notice_);
                     }
                     self->current_text_reader_ = std::move(result.reader);
+                    self->text_line_endings_ = std::move(result.line_endings);
+                    self->update_footer_metadata();
                     self->text_reader_monitored_ = true;
                     self->current_text_has_more_ = result.has_more;
                     if (self->text_editor_ && (result.replace_content || !result.content.empty()))
@@ -10183,6 +10250,7 @@ namespace winrt::Glance::App::implementation
         EncodingSelector().Content(box_value(option.Text()));
         glance::app::cancel_text_preview_read(current_text_reader_);
         current_text_.clear();
+        text_line_endings_.clear();
         current_text_reader_.reset();
         current_text_has_more_ = false;
         text_chunk_loading_ = true;

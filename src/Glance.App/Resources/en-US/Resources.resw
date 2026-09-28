@@ -128,14 +128,14 @@
   <data name="FooterPageTitle.Text" xml:space="preserve"><value>Footer</value></data>
   <data name="FooterPageDescription.Text" xml:space="preserve"><value>Preview metadata and path copying</value></data>
   <data name="FooterFieldsLabel.Text" xml:space="preserve"><value>Displayed fields</value></data>
-  <data name="FooterSizeCheckBox.Content" xml:space="preserve"><value>Size</value></data>
-  <data name="FooterModifiedTimeCheckBox.Content" xml:space="preserve"><value>Modified time</value></data>
-  <data name="FooterCreationTimeCheckBox.Content" xml:space="preserve"><value>Created time</value></data>
-  <data name="FooterTakenTimeCheckBox.Content" xml:space="preserve"><value>Taken time</value></data>
-  <data name="FooterPermissionsCheckBox.Content" xml:space="preserve"><value>Permissions (RWXD)</value></data>
-  <data name="FooterMediaInfoCheckBox.Content" xml:space="preserve"><value>Media information</value></data>
-  <data name="FooterFieldMoveUpToolTip" xml:space="preserve"><value>Move up</value></data>
-  <data name="FooterFieldMoveDownToolTip" xml:space="preserve"><value>Move down</value></data>
+  <data name="FooterSizeLabel" xml:space="preserve"><value>Size</value></data>
+  <data name="FooterModifiedTimeLabel" xml:space="preserve"><value>Modified time</value></data>
+  <data name="FooterCreationTimeLabel" xml:space="preserve"><value>Created time</value></data>
+  <data name="FooterTakenTimeLabel" xml:space="preserve"><value>Taken time</value></data>
+  <data name="FooterCaptureParametersLabel" xml:space="preserve"><value>Capture parameters</value></data>
+  <data name="FooterLineEndingsLabel" xml:space="preserve"><value>Line endings</value></data>
+  <data name="FooterPermissionsLabel" xml:space="preserve"><value>Permissions</value></data>
+  <data name="FooterMediaInfoLabel" xml:space="preserve"><value>Media information</value></data>
   <data name="DiagnosticsTitle.Text" xml:space="preserve"><value>Save diagnostic information</value></data>
   <data name="DiagnosticsEnabledDescription.Text" xml:space="preserve"><value>Save diagnostic logs and crash dumps</value></data>
   <data name="DiagnosticsDisabledDescription.Text" xml:space="preserve"><value>Stop recording new diagnostic logs and crash dumps</value></data>

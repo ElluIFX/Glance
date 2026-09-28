@@ -33,6 +33,15 @@ namespace glance::app
         std::wstring taken_time;
     };
 
+    struct ImageFooterMetadata
+    {
+        std::wstring capture_parameters;
+        std::wstring color_info;
+        std::wstring capture_device;
+    };
+
+    [[nodiscard]] ImageFooterMetadata format_image_footer_metadata(const ImageMetadata& metadata);
+
     [[nodiscard]] ImageMetadata load_image_metadata(const std::wstring& path);
     void merge_component_image_metadata(
         ImageMetadata& metadata,

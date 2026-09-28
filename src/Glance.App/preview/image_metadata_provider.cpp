@@ -551,4 +551,61 @@ namespace glance::app
             ? bit_depth
             : 0;
     }
+
+    ImageFooterMetadata format_image_footer_metadata(const ImageMetadata& metadata)
+    {
+        const auto value = [&](std::wstring_view name) -> std::wstring {
+            for (const auto& entry : metadata.entries)
+            {
+                if (entry.canonical_name == name)
+                    return entry.raw_value.empty() ? entry.value : entry.raw_value;
+            }
+            return {};
+        };
+        const auto number = [&](std::wstring_view name) {
+            std::wistringstream input(value(name));
+            input.imbue(std::locale::classic());
+            double result{};
+            input >> result;
+            if (!input) return 0.0;
+            input >> std::ws;
+            return input.eof() && std::isfinite(result) && result > 0 && result < 1e9 ? result : 0.0;
+        };
+        const auto formatted = [](double number) {
+            std::wostringstream output;
+            output.imbue(std::locale::classic());
+            output << std::setprecision(4) << number;
+            return output.str();
+        };
+        const auto append = [](std::wstring& target, const std::wstring& text) {
+            if (!text.empty())
+            {
+                if (!target.empty()) target += L" · ";
+                target += text;
+            }
+        };
+        ImageFooterMetadata result;
+        if (const auto focal = number(L"System.Photo.FocalLength"); focal > 0)
+            append(result.capture_parameters, formatted(focal) + L"mm");
+        if (const auto aperture = number(L"System.Photo.FNumber"); aperture > 0)
+            append(result.capture_parameters, L"f/" + formatted(aperture));
+        if (const auto exposure = number(L"System.Photo.ExposureTime"); exposure >= 1e-9)
+            append(result.capture_parameters, exposure < 1
+                ? L"1/" + std::to_wstring(std::llround(1 / exposure)) + L"s"
+                : formatted(exposure) + L"s");
+        if (const auto iso = number(L"System.Photo.ISOSpeed"); iso > 0)
+            append(result.capture_parameters, L"ISO " + formatted(iso));
+        const auto manufacturer = value(L"System.Photo.CameraManufacturer");
+        const auto model = value(L"System.Photo.CameraModel");
+        result.capture_device = manufacturer;
+        if (!model.empty())
+        {
+            if (manufacturer.empty() || _wcsnicmp(model.c_str(), manufacturer.c_str(), manufacturer.size()) == 0)
+                result.capture_device = model;
+            else
+                result.capture_device += L" " + model;
+        }
+        if (number(L"System.Image.ColorSpace") == 1) result.color_info = L"sRGB";
+        return result;
+    }
 }

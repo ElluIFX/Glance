@@ -615,82 +615,69 @@
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="FooterFieldsLabel" x:Uid="FooterFieldsLabel" Style="{StaticResource SettingsGroupTitleStyle}" Text="Displayed fields" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
-                        <StackPanel>
-                            <StackPanel x:Name="FooterFieldsPanel">
-                                <Border x:Name="FooterSizeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
-                                    <Grid MinHeight="44" Padding="16,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="FooterSizeCheckBox" x:Uid="FooterSizeCheckBox" VerticalAlignment="Center" Tag="size" Click="FooterFieldCheckBox_Click" Content="Size" />
-                                        <Button x:Name="FooterSizeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="size" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
-                                        <Button x:Name="FooterSizeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="size" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
-                                    </Grid>
-                                </Border>
-                                <Border x:Name="FooterModifiedTimeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
-                                    <Grid MinHeight="44" Padding="16,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="FooterModifiedTimeCheckBox" x:Uid="FooterModifiedTimeCheckBox" VerticalAlignment="Center" Tag="modified" Click="FooterFieldCheckBox_Click" Content="Modified time" />
-                                        <Button x:Name="FooterModifiedTimeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="modified" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
-                                        <Button x:Name="FooterModifiedTimeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="modified" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
-                                    </Grid>
-                                </Border>
-                                <Border x:Name="FooterCreationTimeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
-                                    <Grid MinHeight="44" Padding="16,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="FooterCreationTimeCheckBox" x:Uid="FooterCreationTimeCheckBox" VerticalAlignment="Center" Tag="created" Click="FooterFieldCheckBox_Click" Content="Created time" />
-                                        <Button x:Name="FooterCreationTimeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="created" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
-                                        <Button x:Name="FooterCreationTimeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="created" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
-                                    </Grid>
-                                </Border>
-                                <Border x:Name="FooterTakenTimeRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
-                                    <Grid MinHeight="44" Padding="16,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="FooterTakenTimeCheckBox" x:Uid="FooterTakenTimeCheckBox" VerticalAlignment="Center" Tag="taken" Click="FooterFieldCheckBox_Click" Content="Taken time" />
-                                        <Button x:Name="FooterTakenTimeMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="taken" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
-                                        <Button x:Name="FooterTakenTimeMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="taken" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
-                                    </Grid>
-                                </Border>
-                                <Border x:Name="FooterPermissionsRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
-                                    <Grid MinHeight="44" Padding="16,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="FooterPermissionsCheckBox" x:Uid="FooterPermissionsCheckBox" VerticalAlignment="Center" Tag="permissions" Click="FooterFieldCheckBox_Click" Content="Permissions (RWXD)" />
-                                        <Button x:Name="FooterPermissionsMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="permissions" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
-                                        <Button x:Name="FooterPermissionsMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="permissions" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
-                                    </Grid>
-                                </Border>
-                                <Border x:Name="FooterMediaInfoRow" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
-                                    <Grid MinHeight="44" Padding="16,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="FooterMediaInfoCheckBox" x:Uid="FooterMediaInfoCheckBox" VerticalAlignment="Center" Tag="media" Click="FooterFieldCheckBox_Click" Content="Media information" />
-                                        <Button x:Name="FooterMediaInfoMoveUpButton" Grid.Column="1" Width="36" Height="32" Margin="0,0,4,0" Style="{StaticResource IconButtonStyle}" Tag="media" Click="FooterFieldMoveUpButton_Click"><FontIcon Glyph="&#xE70E;" /></Button>
-                                        <Button x:Name="FooterMediaInfoMoveDownButton" Grid.Column="2" Width="36" Height="32" Style="{StaticResource IconButtonStyle}" Tag="media" Click="FooterFieldMoveDownButton_Click"><FontIcon Glyph="&#xE70D;" /></Button>
-                                    </Grid>
-                                </Border>
+                            <StackPanel Padding="12,12,6,6" Spacing="4">
+                                <GridView x:Name="FooterEnabledFields" SelectionMode="None" IsItemClickEnabled="True" Background="Transparent"
+                                    IsTabStop="False" AllowFocusOnInteraction="False" MinHeight="0" Padding="0"
+                                    CanDragItems="True" CanReorderItems="True" AllowDrop="True"
+                                    ItemClick="FooterField_ItemClick" DragItemsCompleted="FooterFields_DragItemsCompleted"
+                                    DragItemsStarting="FooterFields_DragItemsStarting"
+                                    DragOver="FooterFields_DragOver" Drop="FooterFields_Drop"
+                                    SizeChanged="FooterFields_SizeChanged"
+                                    ContainerContentChanging="FooterFields_ContainerContentChanging"
+                                    ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                    ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                                    <GridView.ItemsPanel>
+                                        <ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" /></ItemsPanelTemplate>
+                                    </GridView.ItemsPanel>
+                                    <GridView.ItemContainerStyle>
+                                        <Style TargetType="GridViewItem">
+                                            <Setter Property="IsTabStop" Value="False" />
+                                            <Setter Property="AllowFocusOnInteraction" Value="False" />
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0,0,6,6" />
+                                            <Setter Property="MinWidth" Value="0" />
+                                            <Setter Property="MinHeight" Value="0" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </GridView.ItemContainerStyle>
+                                    <GridView.ItemContainerTransitions>
+                                        <TransitionCollection>
+                                            <ReorderThemeTransition />
+                                        </TransitionCollection>
+                                    </GridView.ItemContainerTransitions>
+                                </GridView>
+                                <Line X2="1" Stretch="Fill" Height="1" Margin="0,0,6,4"
+                                    Stroke="{ThemeResource DividerStrokeColorDefaultBrush}" StrokeDashArray="4,4" />
+                                <GridView x:Name="FooterDisabledFields" SelectionMode="None" IsItemClickEnabled="True" Background="Transparent"
+                                    IsTabStop="False" AllowFocusOnInteraction="False" MinHeight="0" Padding="0"
+                                    CanDragItems="True" CanReorderItems="False" AllowDrop="True"
+                                    DragItemsStarting="FooterFields_DragItemsStarting" DragItemsCompleted="FooterFields_DragItemsCompleted"
+                                    DragOver="FooterFields_DragOver" Drop="FooterFields_Drop"
+                                    ItemClick="FooterField_ItemClick" SizeChanged="FooterFields_SizeChanged"
+                                    ContainerContentChanging="FooterFields_ContainerContentChanging"
+                                    ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                    ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                                    <GridView.ItemsPanel>
+                                        <ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" /></ItemsPanelTemplate>
+                                    </GridView.ItemsPanel>
+                                    <GridView.ItemContainerStyle>
+                                        <Style TargetType="GridViewItem">
+                                            <Setter Property="IsTabStop" Value="False" />
+                                            <Setter Property="AllowFocusOnInteraction" Value="False" />
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0,0,6,6" />
+                                            <Setter Property="MinWidth" Value="0" />
+                                            <Setter Property="MinHeight" Value="0" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </GridView.ItemContainerStyle>
+                                    <GridView.ItemContainerTransitions>
+                                        <TransitionCollection>
+                                            <ReorderThemeTransition />
+                                        </TransitionCollection>
+                                    </GridView.ItemContainerTransitions>
+                                </GridView>
                             </StackPanel>
-                        </StackPanel>
                         </Border>
                     </StackPanel>
                     <StackPanel Spacing="8">

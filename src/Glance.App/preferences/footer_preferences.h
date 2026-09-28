@@ -14,9 +14,11 @@ namespace glance::app
         permissions,
         media_info,
         taken_time,
+        capture_parameters,
+        line_endings,
     };
 
-    constexpr std::size_t footer_field_count = 6;
+    constexpr std::size_t footer_field_count = 8;
 
     struct FooterPreferences
     {
@@ -27,6 +29,8 @@ namespace glance::app
             FooterField::creation_time,
             FooterField::permissions,
             FooterField::media_info,
+            FooterField::capture_parameters,
+            FooterField::line_endings,
         };
         std::uint32_t enabled_mask{
             (1U << static_cast<std::uint32_t>(FooterField::size)) |

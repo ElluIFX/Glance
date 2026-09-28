@@ -23,6 +23,8 @@
 
 #include <microsoft.ui.xaml.window.h>
 #include <winrt/Windows.ApplicationModel.DataTransfer.h>
+#include <winrt/Microsoft.UI.Xaml.Hosting.h>
+#include <winrt/Microsoft.UI.Composition.h>
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <algorithm>
@@ -246,17 +248,36 @@ namespace
         Controls::ToolTipService::SetToolTip(icon, box_value(status));
     }
 
-    std::optional<glance::app::FooterField> footer_field_from_tag(
-        Windows::Foundation::IInspectable const& value)
+    constexpr std::array footer_field_label_keys{
+        L"FooterSizeLabel", L"FooterModifiedTimeLabel", L"FooterCreationTimeLabel",
+        L"FooterPermissionsLabel", L"FooterMediaInfoLabel", L"FooterTakenTimeLabel",
+        L"FooterCaptureParametersLabel",
+        L"FooterLineEndingsLabel" };
+
+    Controls::Border make_footer_field_card(
+        glance::app::FooterField field, bool enabled)
     {
-        const auto tag = unbox_value_or<hstring>(value, L"");
-        if (tag == L"size") return glance::app::FooterField::size;
-        if (tag == L"modified") return glance::app::FooterField::modified_time;
-        if (tag == L"created") return glance::app::FooterField::creation_time;
-        if (tag == L"taken") return glance::app::FooterField::taken_time;
-        if (tag == L"permissions") return glance::app::FooterField::permissions;
-        if (tag == L"media") return glance::app::FooterField::media_info;
-        return std::nullopt;
+        Controls::TextBlock label;
+        label.Text(glance::app::localize(footer_field_label_keys[static_cast<std::size_t>(field)]));
+        label.FontSize(14);
+        label.VerticalAlignment(VerticalAlignment::Center);
+        label.HorizontalAlignment(HorizontalAlignment::Center);
+        Controls::Border card;
+        card.Child(label);
+        card.Tag(box_value(static_cast<std::uint32_t>(field)));
+        card.IsHitTestVisible(false);
+        card.Opacity(enabled ? 1.0 : 0.45);
+        card.Height(34);
+        card.Padding(Thickness{ 12, 0, 12, 0 });
+        card.CornerRadius(CornerRadius{ 4, 4, 4, 4 });
+        card.BorderThickness(Thickness{ 1, 1, 1, 1 });
+        const auto resources = Application::Current().Resources();
+        card.Background(resources.Lookup(box_value(enabled
+            ? L"ControlFillColorDefaultBrush" : L"ControlAltFillColorTertiaryBrush")).as<Media::Brush>());
+        card.BorderBrush(resources.Lookup(box_value(L"ControlStrokeColorDefaultBrush")).as<Media::Brush>());
+        label.Foreground(resources.Lookup(box_value(enabled
+            ? L"TextFillColorPrimaryBrush" : L"TextFillColorSecondaryBrush")).as<Media::Brush>());
+        return card;
     }
 }
 
@@ -631,18 +652,7 @@ namespace winrt::Glance::App::implementation
         set_text(FooterPageTitle(), L"FooterPageTitle.Text");
         set_text(FooterPageDescription(), L"FooterPageDescription.Text");
         set_text(FooterFieldsLabel(), L"FooterFieldsLabel.Text");
-        set_content(FooterSizeCheckBox(), L"FooterSizeCheckBox.Content");
-        set_content(FooterModifiedTimeCheckBox(), L"FooterModifiedTimeCheckBox.Content");
-        set_content(FooterCreationTimeCheckBox(), L"FooterCreationTimeCheckBox.Content");
-        set_content(FooterTakenTimeCheckBox(), L"FooterTakenTimeCheckBox.Content");
-        set_content(FooterPermissionsCheckBox(), L"FooterPermissionsCheckBox.Content");
-        set_content(FooterMediaInfoCheckBox(), L"FooterMediaInfoCheckBox.Content");
-        for (const auto field : footer_preferences_.order)
-        {
-            const auto controls = footer_field_controls(field);
-            set_tooltip(controls.move_up, L"FooterFieldMoveUpToolTip");
-            set_tooltip(controls.move_down, L"FooterFieldMoveDownToolTip");
-        }
+        rebuild_footer_field_cards();
         set_text(DiagnosticsTitle(), L"DiagnosticsTitle.Text");
         set_text(DiagnosticsDescription(), L"DiagnosticsDisabledDescription.Text");
         set_text(WindowPageTitle(), L"WindowPageTitle.Text");
@@ -1685,7 +1695,7 @@ namespace winrt::Glance::App::implementation
         QuoteCopiedPathToggle().IsOn(path_copy_preferences_.quote_path);
         UnixPathSeparatorsToggle().IsOn(path_copy_preferences_.use_unix_separators);
         footer_preferences_ = glance::app::load_footer_preferences();
-        rebuild_footer_field_rows();
+        rebuild_footer_field_cards();
         acrylic_opacity_region_.initialize(
             AcrylicOpacityRegion(),
             acrylic_supported && appearance_preferences_.acrylic_enabled);
@@ -2733,50 +2743,117 @@ namespace winrt::Glance::App::implementation
         glance::app::save_path_copy_preferences(path_copy_preferences_);
     }
 
-    SettingsWindow::FooterFieldControls SettingsWindow::footer_field_controls(
-        glance::app::FooterField field)
+    void SettingsWindow::rebuild_footer_field_cards()
     {
-        using glance::app::FooterField;
-        switch (field)
+        FooterEnabledFields().Items().Clear();
+        FooterDisabledFields().Items().Clear();
+        std::array<Controls::Border, glance::app::footer_field_count> cards;
+        double width = 0.0;
+        for (const auto field : glance::app::FooterPreferences{}.order)
         {
-        case FooterField::size:
-            return { FooterSizeRow(), FooterSizeCheckBox(), FooterSizeMoveUpButton(), FooterSizeMoveDownButton() };
-        case FooterField::modified_time:
-            return { FooterModifiedTimeRow(), FooterModifiedTimeCheckBox(), FooterModifiedTimeMoveUpButton(), FooterModifiedTimeMoveDownButton() };
-        case FooterField::creation_time:
-            return { FooterCreationTimeRow(), FooterCreationTimeCheckBox(), FooterCreationTimeMoveUpButton(), FooterCreationTimeMoveDownButton() };
-        case FooterField::taken_time:
-            return { FooterTakenTimeRow(), FooterTakenTimeCheckBox(), FooterTakenTimeMoveUpButton(), FooterTakenTimeMoveDownButton() };
-        case FooterField::permissions:
-            return { FooterPermissionsRow(), FooterPermissionsCheckBox(), FooterPermissionsMoveUpButton(), FooterPermissionsMoveDownButton() };
-        case FooterField::media_info:
-            return { FooterMediaInfoRow(), FooterMediaInfoCheckBox(), FooterMediaInfoMoveUpButton(), FooterMediaInfoMoveDownButton() };
-        default:
-            return {};
+            auto& card = cards[static_cast<std::size_t>(field)];
+            card = make_footer_field_card(
+                field, glance::app::footer_field_enabled(footer_preferences_, field));
+            card.Measure(Windows::Foundation::Size{ 1000, 1000 });
+            width = std::max(width, static_cast<double>(card.DesiredSize().Width));
+        }
+        for (const auto field : footer_preferences_.order)
+        {
+            auto card = cards[static_cast<std::size_t>(field)];
+            card.Width(std::ceil(width));
+            if (glance::app::footer_field_enabled(footer_preferences_, field))
+            {
+                FooterEnabledFields().Items().Append(card);
+            }
+        }
+        for (const auto field : glance::app::FooterPreferences{}.order)
+        {
+            if (!glance::app::footer_field_enabled(footer_preferences_, field))
+            {
+                FooterDisabledFields().Items().Append(cards[static_cast<std::size_t>(field)]);
+            }
+        }
+        update_footer_field_heights();
+    }
+
+    void SettingsWindow::update_footer_field_heights()
+    {
+        for (const auto grid : { FooterEnabledFields(), FooterDisabledFields() })
+        {
+            const auto count = grid.Items().Size();
+            double height = dragged_footer_card_ ? 34.0 : 0.0;
+            if (count != 0)
+            {
+                const auto card = grid.Items().GetAt(0).as<Controls::Border>();
+                const double cell_width = card.Width() + 6;
+                const double cell_height = card.Height() + 6;
+                const double columns = std::max(1.0, std::floor(grid.ActualWidth() / cell_width));
+                height = std::ceil(count / columns) * cell_height;
+                if (const auto panel = grid.ItemsPanelRoot().try_as<Controls::ItemsWrapGrid>())
+                {
+                    panel.ItemWidth(cell_width);
+                    panel.ItemHeight(cell_height);
+                }
+            }
+            grid.Height(height);
         }
     }
 
-    void SettingsWindow::rebuild_footer_field_rows()
+    void SettingsWindow::FooterFields_SizeChanged(
+        IInspectable const&, SizeChangedEventArgs const&)
     {
-        const bool was_initializing = initializing_;
-        initializing_ = true;
-        auto children = FooterFieldsPanel().Children();
-        children.Clear();
-        for (std::size_t index = 0; index < footer_preferences_.order.size(); ++index)
+        update_footer_field_heights();
+    }
+
+    void SettingsWindow::FooterFields_ContainerContentChanging(
+        Controls::ListViewBase const&, Controls::ContainerContentChangingEventArgs const& args)
+    {
+        if (args.InRecycleQueue() || !client_animations_enabled())
         {
-            const auto controls = footer_field_controls(footer_preferences_.order[index]);
-            controls.checkbox.IsChecked(glance::app::footer_field_enabled(
-                footer_preferences_, footer_preferences_.order[index]));
-            controls.move_up.IsEnabled(index > 0);
-            controls.move_down.IsEnabled(index + 1 < footer_preferences_.order.size());
-            controls.row.BorderThickness(Thickness{
-                0.0,
-                0.0,
-                0.0,
-                index + 1 < footer_preferences_.order.size() ? 1.0 : 0.0 });
-            children.Append(controls.row);
+            return;
         }
-        initializing_ = was_initializing;
+        const auto container = args.ItemContainer();
+        const auto visual = Hosting::ElementCompositionPreview::GetElementVisual(container);
+        const auto compositor = visual.Compositor();
+        const auto movement = compositor.CreateVector3KeyFrameAnimation();
+        movement.Target(L"Offset");
+        movement.Duration(std::chrono::milliseconds(120));
+        movement.InsertExpressionKeyFrame(1.0F, L"this.FinalValue",
+            compositor.CreateCubicBezierEasingFunction({ 0.16F, 1.0F }, { 0.30F, 1.0F }));
+        const auto animations = compositor.CreateImplicitAnimationCollection();
+        animations.Insert(L"Offset", movement);
+        visual.ImplicitAnimations(animations);
+        const auto appear = compositor.CreateScalarKeyFrameAnimation();
+        appear.Target(L"Opacity");
+        appear.Duration(std::chrono::milliseconds(100));
+        appear.InsertKeyFrame(0.0F, 0.0F);
+        appear.InsertKeyFrame(1.0F, 1.0F);
+        Hosting::ElementCompositionPreview::SetImplicitShowAnimation(container, appear);
+        const auto disappear = compositor.CreateScalarKeyFrameAnimation();
+        disappear.Target(L"Opacity");
+        disappear.Duration(std::chrono::milliseconds(80));
+        disappear.InsertKeyFrame(0.0F, 1.0F);
+        disappear.InsertKeyFrame(1.0F, 0.0F);
+        Hosting::ElementCompositionPreview::SetImplicitHideAnimation(container, disappear);
+    }
+
+    void SettingsWindow::update_footer_field_order()
+    {
+        update_footer_field_heights();
+        std::size_t index = 0;
+        for (const auto item : FooterEnabledFields().Items())
+        {
+            footer_preferences_.order[index++] = static_cast<glance::app::FooterField>(
+                unbox_value<std::uint32_t>(item.as<FrameworkElement>().Tag()));
+        }
+        for (const auto field : glance::app::FooterPreferences{}.order)
+        {
+            if (!glance::app::footer_field_enabled(footer_preferences_, field))
+            {
+                footer_preferences_.order[index++] = field;
+            }
+        }
+        save_footer_preferences();
     }
 
     void SettingsWindow::save_footer_preferences()
@@ -2792,72 +2869,112 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void SettingsWindow::FooterFieldCheckBox_Click(
-        IInspectable const& sender,
-        RoutedEventArgs const&)
+    void SettingsWindow::FooterField_ItemClick(
+        IInspectable const&,
+        Controls::ItemClickEventArgs const& args)
     {
         if (initializing_)
         {
             return;
         }
-        const auto checkbox = sender.try_as<Controls::CheckBox>();
-        const auto field = checkbox == nullptr
-            ? std::nullopt
-            : footer_field_from_tag(checkbox.Tag());
-        if (!field.has_value())
+        toggle_footer_field(args.ClickedItem().as<Controls::Border>());
+    }
+
+    void SettingsWindow::toggle_footer_field(Controls::Border const& card)
+    {
+        const auto field = static_cast<glance::app::FooterField>(
+            unbox_value<std::uint32_t>(card.Tag()));
+        const bool enabled = !glance::app::footer_field_enabled(footer_preferences_, field);
+        auto source = (enabled ? FooterDisabledFields() : FooterEnabledFields()).Items();
+        std::uint32_t source_index{};
+        if (!source.IndexOf(card, source_index))
         {
             return;
         }
-        const auto bit = glance::app::footer_field_bit(*field);
-        if (checkbox.IsChecked().Value())
+        source.RemoveAt(source_index);
+        footer_preferences_.enabled_mask ^= glance::app::footer_field_bit(field);
+        // Keep the outgoing element available to its removal transition.
+        const auto replacement = make_footer_field_card(field, enabled);
+        replacement.Width(card.Width());
+        if (enabled)
         {
-            footer_preferences_.enabled_mask |= bit;
+            FooterEnabledFields().Items().Append(replacement);
         }
         else
         {
-            footer_preferences_.enabled_mask &= ~bit;
+            std::uint32_t insertion_index = 0;
+            for (const auto candidate : glance::app::FooterPreferences{}.order)
+            {
+                if (candidate == field)
+                {
+                    break;
+                }
+                if (!glance::app::footer_field_enabled(footer_preferences_, candidate))
+                {
+                    ++insertion_index;
+                }
+            }
+            FooterDisabledFields().Items().InsertAt(insertion_index, replacement);
         }
-        save_footer_preferences();
+        update_footer_field_order();
     }
 
-    void SettingsWindow::FooterFieldMoveUpButton_Click(
-        IInspectable const& sender,
-        RoutedEventArgs const&)
+    void SettingsWindow::FooterFields_DragItemsCompleted(
+        Controls::ListViewBase const&,
+        Controls::DragItemsCompletedEventArgs const&)
     {
-        const auto button = sender.try_as<Controls::Button>();
-        const auto field = button == nullptr ? std::nullopt : footer_field_from_tag(button.Tag());
-        if (!field.has_value())
-        {
-            return;
-        }
-        const auto position = std::ranges::find(footer_preferences_.order, *field);
-        if (position == footer_preferences_.order.end() || position == footer_preferences_.order.begin())
-        {
-            return;
-        }
-        std::iter_swap(position, position - 1);
-        rebuild_footer_field_rows();
-        save_footer_preferences();
+        dragged_footer_card_ = nullptr;
+        update_footer_field_order();
     }
 
-    void SettingsWindow::FooterFieldMoveDownButton_Click(
-        IInspectable const& sender,
-        RoutedEventArgs const&)
+    void SettingsWindow::FooterFields_DragItemsStarting(
+        IInspectable const&, Controls::DragItemsStartingEventArgs const& args)
     {
-        const auto button = sender.try_as<Controls::Button>();
-        const auto field = button == nullptr ? std::nullopt : footer_field_from_tag(button.Tag());
-        if (!field.has_value())
+        if (args.Items().Size() != 1)
+        {
+            args.Cancel(true);
+            return;
+        }
+        dragged_footer_card_ = args.Items().GetAt(0).as<Controls::Border>();
+        args.Data().RequestedOperation(Windows::ApplicationModel::DataTransfer::DataPackageOperation::Move);
+        update_footer_field_heights();
+    }
+
+    void SettingsWindow::FooterFields_DragOver(IInspectable const& sender, DragEventArgs const& args)
+    {
+        using Windows::ApplicationModel::DataTransfer::DataPackageOperation;
+        if (!dragged_footer_card_)
+        {
+            args.AcceptedOperation(DataPackageOperation::None);
+            args.Handled(true);
+            return;
+        }
+        const auto target = sender.as<Controls::GridView>();
+        std::uint32_t index{};
+        const bool same_region = target.Items().IndexOf(dragged_footer_card_, index);
+        if (same_region && target == FooterEnabledFields())
         {
             return;
         }
-        const auto position = std::ranges::find(footer_preferences_.order, *field);
-        if (position == footer_preferences_.order.end() || position + 1 == footer_preferences_.order.end())
+        args.AcceptedOperation(same_region ? DataPackageOperation::None : DataPackageOperation::Move);
+        args.Handled(true);
+    }
+
+    void SettingsWindow::FooterFields_Drop(IInspectable const& sender, DragEventArgs const& args)
+    {
+        if (!dragged_footer_card_)
         {
             return;
         }
-        std::iter_swap(position, position + 1);
-        rebuild_footer_field_rows();
-        save_footer_preferences();
+        const auto target = sender.as<Controls::GridView>();
+        std::uint32_t index{};
+        if (target.Items().IndexOf(dragged_footer_card_, index))
+        {
+            return;
+        }
+        toggle_footer_field(dragged_footer_card_);
+        args.AcceptedOperation(Windows::ApplicationModel::DataTransfer::DataPackageOperation::Move);
+        args.Handled(true);
     }
 
     void SettingsWindow::save_appearance_preferences()

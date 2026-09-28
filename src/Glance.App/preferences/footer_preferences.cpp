@@ -7,8 +7,8 @@
 namespace
 {
     const glance::app::RegisterPublicSettings public_settings{
-        { L"Footer/EnabledFields", L"integer", L"19", 0, 63, L"", L"immediate" },
-        { L"Footer/FieldOrder", L"array", L"[0,1,5,2,3,4]", 0, 5, L"", L"immediate" },
+        { L"Footer/EnabledFields", L"integer", L"19", 0, 255, L"", L"immediate" },
+        { L"Footer/FieldOrder", L"array", L"[0,1,5,2,3,4,6,7]", 0, 7, L"", L"immediate" },
     };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Footer";
     constexpr std::size_t legacy_field_count = 4;
@@ -69,7 +69,7 @@ namespace glance::app
     FooterPreferences load_footer_preferences() noexcept
     {
         FooterPreferences result;
-        DWORD mask{};
+        DWORD mask = result.enabled_mask;
         DWORD mask_size = sizeof(mask);
         if (RegGetValueW(
                 HKEY_CURRENT_USER,
@@ -83,7 +83,7 @@ namespace glance::app
             result.enabled_mask = mask & all_fields_mask;
         }
 
-        std::array<FooterField, footer_field_count> order{};
+        std::array<FooterField, 10> order{};
         DWORD order_size = static_cast<DWORD>(sizeof(order));
         const LSTATUS order_status = RegGetValueW(
                 HKEY_CURRENT_USER,
@@ -93,9 +93,51 @@ namespace glance::app
                 nullptr,
                 order.data(),
                 &order_size);
-        if (order_status == ERROR_SUCCESS && order_size == sizeof(order) && valid_order(order))
+        if (order_status == ERROR_SUCCESS && order_size == sizeof(result.order))
         {
-            result.order = order;
+            std::array<FooterField, footer_field_count> current_order{};
+            std::copy_n(order.begin(), current_order.size(), current_order.begin());
+            if (valid_order(current_order)) result.order = current_order;
+        }
+        else if (order_status == ERROR_SUCCESS && order_size == sizeof(order))
+        {
+            std::uint32_t seen{};
+            std::size_t output_index{};
+            auto merged_order = result.order;
+            for (const auto field : order)
+            {
+                const auto value = static_cast<std::uint32_t>(field);
+                if (value >= order.size() || (seen & (1U << value)) != 0) break;
+                seen |= 1U << value;
+                if (value != 7 && value != 8)
+                    merged_order[output_index++] = value == 9 ? FooterField::line_endings : field;
+            }
+            if (seen == 1023)
+            {
+                result.order = merged_order;
+                result.enabled_mask = (mask & 127U) | ((mask & (1U << 9)) >> 2);
+                if (mask & (1U << 7)) result.enabled_mask |= footer_field_bit(FooterField::media_info);
+                if (mask & (1U << 8)) result.enabled_mask |= footer_field_bit(FooterField::capture_parameters);
+            }
+        }
+        else if (order_status == ERROR_SUCCESS && order_size == 6 * sizeof(FooterField))
+        {
+            std::uint32_t seen{};
+            bool valid = true;
+            for (std::size_t index = 0; index < 6; ++index)
+            {
+                const auto value = static_cast<std::uint32_t>(order[index]);
+                if (value >= 6 || (seen & (1U << value)) != 0)
+                {
+                    valid = false;
+                    break;
+                }
+                seen |= 1U << value;
+            }
+            if (valid)
+            {
+                std::copy_n(order.begin(), 6, result.order.begin());
+            }
         }
         else if (order_status == ERROR_SUCCESS &&
                  order_size == previous_field_count * sizeof(FooterField))

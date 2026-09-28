@@ -836,6 +836,7 @@ namespace glance::app
             TextPreview result;
             result.reader = shared_from_this();
             result.encoding = display_encoding_;
+            result.line_endings = line_endings();
             if (cancelled_.load(std::memory_order_relaxed) ||
                 (!monitor_ && (failed_ || byte_offset_ >= file_size_)))
             {
@@ -1003,6 +1004,18 @@ namespace glance::app
                 return result;
             }
             result.has_more = !end_of_file;
+            for (const wchar_t character : result.content)
+            {
+                if (pending_cr_)
+                {
+                    line_ending_mask_ |= character == L'\n' ? 1U : 4U;
+                    pending_cr_ = false;
+                    if (character == L'\n') continue;
+                }
+                if (character == L'\r') pending_cr_ = true;
+                else if (character == L'\n') line_ending_mask_ |= 2U;
+            }
+            result.line_endings = line_endings();
             return result;
         }
 
@@ -1012,6 +1025,17 @@ namespace glance::app
         }
 
     private:
+        std::wstring line_endings() const
+        {
+            std::wstring result;
+            const auto mask = line_ending_mask_ | (pending_cr_ && byte_offset_ >= file_size_ ? 4U : 0U);
+            if (mask & 1U) result = L"CRLF";
+            if (mask & 2U) result += result.empty() ? L"LF" : L" / LF";
+            if (mask & 4U) result += result.empty() ? L"CR" : L" / CR";
+            return result;
+        }
+        std::uint32_t line_ending_mask_{};
+        bool pending_cr_{};
         std::wstring path_;
         std::uint64_t file_size_{};
         std::uint64_t byte_offset_{};

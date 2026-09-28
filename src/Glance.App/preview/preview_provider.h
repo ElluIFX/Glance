@@ -40,6 +40,7 @@ namespace glance::app
         std::wstring content;
         std::vector<UndecodableByte> undecodable_bytes;
         std::wstring encoding;
+        std::wstring line_endings;
         std::wstring error;
         std::shared_ptr<IncrementalTextReader> reader;
         bool has_more{};

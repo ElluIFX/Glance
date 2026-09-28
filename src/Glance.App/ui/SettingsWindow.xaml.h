@@ -152,15 +152,23 @@ namespace winrt::Glance::App::implementation
         void PathCopyPreferenceToggle_Toggled(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void FooterFieldCheckBox_Click(
+        void FooterField_ItemClick(
             IInspectable const&,
-            Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void FooterFieldMoveUpButton_Click(
+            Microsoft::UI::Xaml::Controls::ItemClickEventArgs const&);
+        void FooterFields_DragItemsCompleted(
+            Microsoft::UI::Xaml::Controls::ListViewBase const&,
+            Microsoft::UI::Xaml::Controls::DragItemsCompletedEventArgs const&);
+        void FooterFields_DragItemsStarting(
             IInspectable const&,
-            Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void FooterFieldMoveDownButton_Click(
+            Microsoft::UI::Xaml::Controls::DragItemsStartingEventArgs const&);
+        void FooterFields_DragOver(IInspectable const&, Microsoft::UI::Xaml::DragEventArgs const&);
+        void FooterFields_Drop(IInspectable const&, Microsoft::UI::Xaml::DragEventArgs const&);
+        void FooterFields_SizeChanged(
             IInspectable const&,
-            Microsoft::UI::Xaml::RoutedEventArgs const&);
+            Microsoft::UI::Xaml::SizeChangedEventArgs const&);
+        void FooterFields_ContainerContentChanging(
+            Microsoft::UI::Xaml::Controls::ListViewBase const&,
+            Microsoft::UI::Xaml::Controls::ContainerContentChangingEventArgs const&);
         void AppearanceComboBox_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
@@ -207,14 +215,6 @@ namespace winrt::Glance::App::implementation
             failed,
         };
 
-        struct FooterFieldControls
-        {
-            Microsoft::UI::Xaml::Controls::Border row{ nullptr };
-            Microsoft::UI::Xaml::Controls::CheckBox checkbox{ nullptr };
-            Microsoft::UI::Xaml::Controls::Button move_up{ nullptr };
-            Microsoft::UI::Xaml::Controls::Button move_down{ nullptr };
-        };
-
         void configure_window();
         void refresh_runtime_statuses();
         void refresh_component_statuses();
@@ -233,9 +233,12 @@ namespace winrt::Glance::App::implementation
         void update_auto_fit_dependency(bool animate);
         void refresh_toggle_descriptions();
         void save_footer_preferences();
-        void rebuild_footer_field_rows();
+        void rebuild_footer_field_cards();
+        void update_footer_field_heights();
+        void update_footer_field_order();
+        void toggle_footer_field(Microsoft::UI::Xaml::Controls::Border const& card);
+        Microsoft::UI::Xaml::Controls::Border dragged_footer_card_{ nullptr };
         void rebuild_component_settings();
-        [[nodiscard]] FooterFieldControls footer_field_controls(glance::app::FooterField field);
         winrt::fire_and_forget download_and_install_update(glance::app::UpdateInstallerAsset asset);
         void show_update_download_card(std::wstring_view version);
         void show_download_card(std::wstring_view title, std::wstring_view message);
