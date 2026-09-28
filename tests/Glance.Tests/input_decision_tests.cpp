@@ -1282,7 +1282,7 @@ int wmain(int argument_count, wchar_t* arguments[])
     const glance::app::FooterPreferences default_footer_preferences;
     expect(
         default_footer_preferences.order[2] == glance::app::FooterField::taken_time &&
-            default_footer_preferences.order.back() == glance::app::FooterField::media_info &&
+            default_footer_preferences.order[5] == glance::app::FooterField::media_info &&
             !glance::app::footer_field_enabled(
                 default_footer_preferences,
                 glance::app::FooterField::taken_time),
