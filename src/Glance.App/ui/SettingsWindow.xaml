@@ -915,6 +915,18 @@
                                     OnContent="{x:Null}"
                                     Toggled="MediaPreferenceToggle_Toggled" />
                             </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="PreferFFmpegLabel" x:Uid="PreferFFmpegLabel" Text="Prefer FFmpeg software decoding" />
+                                    <TextBlock x:Name="PreferFFmpegDescription" x:Uid="PreferFFmpegDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Compatibility option" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="PreferFFmpegToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                            </Grid>
                         </StackPanel>
                         </Border>
                     </StackPanel>

@@ -455,6 +455,7 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget load_media_async(std::wstring path, std::uint64_t generation);
         void initialize_media_player();
         void handle_media_failure(Windows::Media::Playback::MediaPlaybackItem const& item, HRESULT error);
+        void begin_software_media();
         winrt::fire_and_forget load_software_media_async(std::wstring path, std::uint64_t generation,
             bool playing);
         winrt::fire_and_forget load_pdf_async(

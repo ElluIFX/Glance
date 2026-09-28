@@ -447,9 +447,10 @@
   <data name="DependencyCancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="DependencyUninstall" xml:space="preserve"><value>Uninstall</value></data>
   <data name="DependencyDownload" xml:space="preserve"><value>Download</value></data>
-  <data name="DependencyRequired" xml:space="preserve"><value>This preview requires an optional dependency</value></data>
+  <data name="DependencyRequired" xml:space="preserve"><value>Install the required dependency: {0}</value></data>
   <data name="DependencyVideoConsumer" xml:space="preserve"><value>Video preview</value></data>
   <data name="DependencyAudioConsumer" xml:space="preserve"><value>Audio preview</value></data>
   <data name="MediaDecodeFailed" xml:space="preserve"><value>This media could not be decoded</value></data>
-  <data name="SoftwareMediaPreparing" xml:space="preserve"><value>Preparing software playback...</value></data>
+  <data name="PreferFFmpegLabel.Text" xml:space="preserve"><value>Prefer FFmpeg software decoding</value></data>
+  <data name="PreferFFmpegDescription.Text" xml:space="preserve"><value>Compatibility option</value></data>
 </root>

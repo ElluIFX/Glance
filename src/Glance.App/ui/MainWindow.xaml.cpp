@@ -4844,16 +4844,20 @@ namespace winrt::Glance::App::implementation
             media_playback_generation_ = generation;
             media_fallback_attempted_ = false;
             MediaControlsOverlay().IsHitTestVisible(true);
-            media_player_.Source(playback_item);
             media_player_.IsMuted(false);
             media_player_.Volume(MediaVolumeSlider().Value() / 100.0);
             const auto preferences = glance::app::load_media_preview_preferences();
             media_play_intent_ = media_is_audio_ ? preferences.autoplay_audio : preferences.autoplay_video;
-            if (media_play_intent_)
+            if (preferences.prefer_ffmpeg)
             {
-                media_player_.Play();
+                begin_software_media();
             }
-            media_timer_.Start();
+            else
+            {
+                media_player_.Source(playback_item);
+                if (media_play_intent_) media_player_.Play();
+                media_timer_.Start();
+            }
 
             if (media_is_audio_)
             {
@@ -4999,8 +5003,18 @@ namespace winrt::Glance::App::implementation
             show_provider_error(glance::app::localize(L"MediaDecodeFailed"), content_generation_);
             return;
         }
-        media_fallback_attempted_ = true;
         failed_system_media_item_ = item;
+        begin_software_media();
+    }
+    catch (const hresult_error& failure)
+    {
+        glance::contracts::log_event(L"Media fallback setup failed: " + std::to_wstring(static_cast<HRESULT>(failure.code())));
+    }
+
+    void MainWindow::begin_software_media()
+    {
+        media_fallback_attempted_ = true;
+        MediaControlsOverlay().IsHitTestVisible(false);
         const auto generation = content_generation_;
         const auto path = files_[current_index_].path;
         const auto weak = get_weak();
@@ -5009,13 +5023,10 @@ namespace winrt::Glance::App::implementation
                 self->load_software_media_async(path, generation, self->media_play_intent_);
         };
         const auto availability = glance::app::dependencies::host_api().query(L"ffmpeg", L"avcodec");
-        if (availability == glance::contracts::dependencies::Availability::managed) load();
+        if (availability == glance::contracts::dependencies::Availability::managed ||
+            availability == glance::contracts::dependencies::Availability::external) load();
         else request_dependency(L"ffmpeg", load);
         reveal_deferred_preview();
-    }
-    catch (const hresult_error& failure)
-    {
-        glance::contracts::log_event(L"Media fallback setup failed: " + std::to_wstring(static_cast<HRESULT>(failure.code())));
     }
 
     fire_and_forget MainWindow::load_software_media_async(std::wstring path, std::uint64_t generation,
@@ -5023,8 +5034,6 @@ namespace winrt::Glance::App::implementation
     {
         const auto lifetime = get_strong();
         const apartment_context ui_thread;
-        show_preview_notice(L"SoftwareMediaPreparing");
-        const auto notice = preview_notice_generation_;
         const auto cancellation = std::make_shared<std::atomic_bool>(false);
         software_media_opening_cancellation_ = cancellation;
         std::shared_ptr<glance::app::SoftwareMediaSource> source;
@@ -5047,7 +5056,6 @@ namespace winrt::Glance::App::implementation
         {
             if (FAILED(error))
             {
-                if (notice == preview_notice_generation_) dismiss_preview_info_bar();
                 show_provider_error(glance::app::localize(L"MediaDecodeFailed"), generation);
                 co_return;
             }
@@ -5063,7 +5071,6 @@ namespace winrt::Glance::App::implementation
             player.IsMuted(muted);
             if (playing) player.Play();
             else player.Pause();
-            if (notice == preview_notice_generation_) dismiss_preview_info_bar();
             MediaControlsOverlay().IsHitTestVisible(true);
             media_timer_.Start();
         }
@@ -5072,7 +5079,6 @@ namespace winrt::Glance::App::implementation
             glance::contracts::log_event(L"Software media activation failed: " + std::to_wstring(static_cast<HRESULT>(winrt::to_hresult())));
             if (software_media_source_) software_media_source_->cancel();
             software_media_source_.reset();
-            if (notice == preview_notice_generation_) dismiss_preview_info_bar();
             show_provider_error(glance::app::localize(L"MediaDecodeFailed"), generation);
         }
     }
@@ -8841,7 +8847,11 @@ namespace winrt::Glance::App::implementation
         namespace dependencies = glance::app::dependencies;
         const auto generation = content_generation_;
         const auto weak = get_weak();
-        show_preview_message(glance::app::localize(L"DependencyRequired"), InfoBarSeverity::Informational, false);
+        const auto registered = dependencies::snapshot();
+        const auto dependency = std::ranges::find(registered, id, [](const auto& item) { return item.definition.id; });
+        if (dependency == registered.end()) return;
+        show_preview_message(glance::app::localize_format(L"DependencyRequired", {dependency->definition.display_name}),
+            InfoBarSeverity::Informational, false);
         Controls::Button download;
         download.IsTabStop(false);
         download.AllowFocusOnInteraction(false);

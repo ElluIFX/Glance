@@ -11,6 +11,7 @@ namespace
         { L"MediaPreview/VideoVolume", L"integer", L"100", 0, 100, L"", L"next_preview" },
         { L"MediaPreview/AutoplayAudio", L"boolean", L"1", 0, 1, L"", L"next_preview" },
         { L"MediaPreview/AutoplayVideo", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"MediaPreview/PreferFFmpeg", L"boolean", L"0", 0, 1, L"", L"next_preview" },
         { L"MediaPreview/ReverseSeekWheel", L"boolean", L"0", 0, 1, L"", L"next_preview" },
         { L"MediaPreview/MiddleClickGalleryMode", L"boolean", L"1", 0, 1, L"", L"next_preview" },
         { L"MediaPreview/LoopGalleryScrolling", L"boolean", L"1", 0, 1, L"", L"next_preview" },
@@ -65,6 +66,7 @@ namespace glance::app
             .video_volume_percent = read_volume(L"VideoVolume"),
             .autoplay_audio = read_bool(L"AutoplayAudio", true),
             .autoplay_video = read_bool(L"AutoplayVideo", true),
+            .prefer_ffmpeg = read_bool(L"PreferFFmpeg", false),
             .reverse_seek_wheel = read_bool(L"ReverseSeekWheel", false),
             .middle_click_gallery_mode = read_bool(L"MiddleClickGalleryMode", true),
             .loop_gallery_scrolling = read_bool(L"LoopGalleryScrolling", true),
@@ -95,6 +97,7 @@ namespace glance::app
         write_volume(key, L"VideoVolume", preferences.video_volume_percent);
         write_bool(key, L"AutoplayAudio", preferences.autoplay_audio);
         write_bool(key, L"AutoplayVideo", preferences.autoplay_video);
+        write_bool(key, L"PreferFFmpeg", preferences.prefer_ffmpeg);
         write_bool(key, L"ReverseSeekWheel", preferences.reverse_seek_wheel);
         write_bool(key, L"MiddleClickGalleryMode", preferences.middle_click_gallery_mode);
         write_bool(key, L"LoopGalleryScrolling", preferences.loop_gallery_scrolling);

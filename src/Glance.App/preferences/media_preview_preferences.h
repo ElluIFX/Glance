@@ -27,6 +27,7 @@ namespace glance::app
         std::uint32_t video_volume_percent{ 100 };
         bool autoplay_audio{ true };
         bool autoplay_video{ true };
+        bool prefer_ffmpeg{};
         bool reverse_seek_wheel{};
         bool middle_click_gallery_mode{ true };
         bool loop_gallery_scrolling{ true };
