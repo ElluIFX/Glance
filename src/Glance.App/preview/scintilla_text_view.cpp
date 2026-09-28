@@ -750,6 +750,7 @@ namespace glance::app
             static_cast<WPARAM>(encoded.size()),
             reinterpret_cast<LPARAM>(encoded.data()));
         call(SCI_SETREADONLY, TRUE);
+        call(SCI_USEPOPUP, SC_POPUP_NEVER);
         mark_undecodable_bytes(editor_, offset, display);
         update_line_number_width();
     }
