@@ -13,6 +13,8 @@ namespace
         { L"Window/DefaultHeight", L"integer", L"520", 320, 4320, L"", L"next_preview" },
         { L"Window/RememberSize", L"boolean", L"1", 0, 1, L"", L"next_preview" },
         { L"Window/AutoFitMedia", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"Window/PauseAutoFitWhenTopmost", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"Window/PauseAutoFitInGallery", L"boolean", L"0", 0, 1, L"", L"next_preview" },
         { L"Window/ShowAfterAutoFit", L"boolean", L"0", 0, 1, L"", L"next_preview" },
         { L"Window/DynamicAutoFit", L"boolean", L"0", 0, 1, L"", L"next_preview" },
         { L"Window/AdaptiveMinimumPercent", L"integer", L"40", 10, 100, L"", L"next_preview" },
@@ -106,6 +108,8 @@ namespace glance::app
             .default_height = std::clamp<DWORD>(read_dword(L"DefaultHeight", 520), 320, 4320),
             .remember_size = read_dword(L"RememberSize", 1) != 0,
             .auto_fit_media = read_dword(L"AutoFitMedia", read_legacy_auto_fit() ? 1U : 0U) != 0,
+            .pause_auto_fit_when_topmost = read_dword(L"PauseAutoFitWhenTopmost", 1) != 0,
+            .pause_auto_fit_in_gallery = read_dword(L"PauseAutoFitInGallery", 0) != 0,
             .show_after_auto_fit = read_dword(L"ShowAfterAutoFit", 0) != 0,
             .dynamic_auto_fit = read_dword(L"DynamicAutoFit", 0) != 0,
             .adaptive_minimum_percent = std::clamp<DWORD>(
@@ -143,6 +147,8 @@ namespace glance::app
         write_dword(key, L"DefaultHeight", std::clamp<std::uint32_t>(preferences.default_height, 320, 4320));
         write_dword(key, L"RememberSize", preferences.remember_size ? 1U : 0U);
         write_dword(key, L"AutoFitMedia", preferences.auto_fit_media ? 1U : 0U);
+        write_dword(key, L"PauseAutoFitWhenTopmost", preferences.pause_auto_fit_when_topmost ? 1U : 0U);
+        write_dword(key, L"PauseAutoFitInGallery", preferences.pause_auto_fit_in_gallery ? 1U : 0U);
         write_dword(key, L"ShowAfterAutoFit", preferences.show_after_auto_fit ? 1U : 0U);
         write_dword(key, L"DynamicAutoFit", preferences.dynamic_auto_fit ? 1U : 0U);
         write_dword(

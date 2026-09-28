@@ -149,6 +149,12 @@
   <data name="RememberWindowSizeDisabledDescription.Text" xml:space="preserve"><value>Window size follows the default size and auto fit settings</value></data>
   <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>Media auto fit</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>Auto fit window size</value></data>
+  <data name="PauseAutoFitWhenTopmostLabel.Text" xml:space="preserve"><value>Pause when always shown</value></data>
+  <data name="PauseAutoFitWhenTopmostEnabledDescription.Text" xml:space="preserve"><value>Pause automatic window sizing while always shown</value></data>
+  <data name="PauseAutoFitWhenTopmostDisabledDescription.Text" xml:space="preserve"><value>Continue automatic window sizing while always shown</value></data>
+  <data name="PauseAutoFitInGalleryLabel.Text" xml:space="preserve"><value>Pause in gallery mode</value></data>
+  <data name="PauseAutoFitInGalleryEnabledDescription.Text" xml:space="preserve"><value>Pause automatic window sizing in gallery mode</value></data>
+  <data name="PauseAutoFitInGalleryDisabledDescription.Text" xml:space="preserve"><value>Continue automatic window sizing in gallery mode</value></data>
   <data name="AutoFitWindowSizeEnabledDescription.Text" xml:space="preserve"><value>Adjust the window size to the preview media dimensions</value></data>
   <data name="AutoFitWindowSizeDisabledDescription.Text" xml:space="preserve"><value>Media window sizes follow the window behavior settings</value></data>
   <data name="ShowAfterAutoFitLabel.Text" xml:space="preserve"><value>Avoid window size flicker</value></data>
@@ -179,9 +185,6 @@
   <data name="LoopGalleryScrollingLabel.Text" xml:space="preserve"><value>Loop gallery scrolling</value></data>
   <data name="LoopGalleryScrollingEnabledDescription.Text" xml:space="preserve"><value>Continue from the opposite end after the first or last item</value></data>
   <data name="LoopGalleryScrollingDisabledDescription.Text" xml:space="preserve"><value>Stop gallery scrolling at the first or last item</value></data>
-  <data name="DisableAutoFitInGalleryLabel.Text" xml:space="preserve"><value>Disable adaptive sizing in gallery mode</value></data>
-  <data name="DisableAutoFitInGalleryEnabledDescription.Text" xml:space="preserve"><value>Keep the window size when switching files in gallery mode</value></data>
-  <data name="DisableAutoFitInGalleryDisabledDescription.Text" xml:space="preserve"><value>Use adaptive sizing preferences in gallery mode</value></data>
   <data name="GallerySameExtensionOnlyLabel.Text" xml:space="preserve"><value>Same extension only</value></data>
   <data name="GallerySameExtensionOnlyEnabledDescription.Text" xml:space="preserve"><value>Only scroll through files with the same extension as the current file</value></data>
   <data name="GallerySameExtensionOnlyDisabledDescription.Text" xml:space="preserve"><value>Scroll through all supported media files in the gallery</value></data>

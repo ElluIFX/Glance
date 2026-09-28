@@ -524,6 +524,30 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="PauseAutoFitWhenTopmostLabel" x:Uid="PauseAutoFitWhenTopmostLabel" Text="Pause when always shown" />
+                                    <TextBlock x:Name="PauseAutoFitWhenTopmostDescription" x:Uid="PauseAutoFitWhenTopmostEnabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Pause automatic window sizing while always shown" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="PauseAutoFitWhenTopmostToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="PauseAutoFitInGalleryLabel" x:Uid="PauseAutoFitInGalleryLabel" Text="Pause in gallery mode" />
+                                    <TextBlock x:Name="PauseAutoFitInGalleryDescription" x:Uid="PauseAutoFitInGalleryDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Continue automatic window sizing in gallery mode" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="PauseAutoFitInGalleryToggle" Grid.Column="1" Toggled="WindowPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="ShowAfterAutoFitLabel" x:Uid="ShowAfterAutoFitLabel" Text="Avoid window size flicker" />
                                     <TextBlock x:Name="ShowAfterAutoFitDescription" x:Uid="ShowAfterAutoFitDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Show the preview window immediately" />
                                 </StackPanel>
@@ -1003,18 +1027,6 @@
                                         <TextBlock x:Name="GallerySameExtensionOnlyDescription" x:Uid="GallerySameExtensionOnlyDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Scroll through all supported media files in the gallery" />
                                     </StackPanel>
                                     <ToggleSwitch x:Name="GallerySameExtensionOnlyToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
-                                </Grid>
-                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                                <Grid Style="{StaticResource SettingsRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center" Spacing="3">
-                                        <TextBlock x:Name="DisableAutoFitInGalleryLabel" x:Uid="DisableAutoFitInGalleryLabel" Text="Disable adaptive sizing in gallery mode" />
-                                        <TextBlock x:Name="DisableAutoFitInGalleryDescription" x:Uid="DisableAutoFitInGalleryDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use adaptive sizing preferences in gallery mode" />
-                                    </StackPanel>
-                                    <ToggleSwitch x:Name="DisableAutoFitInGalleryToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
                                 </Grid>
                             </StackPanel>
                         </Border>

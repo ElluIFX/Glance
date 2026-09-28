@@ -149,6 +149,12 @@
   <data name="RememberWindowSizeDisabledDescription.Text" xml:space="preserve"><value>窗口尺寸由默认尺寸与自适应选项决定</value></data>
   <data name="AdaptiveMediaSizeSectionTitle.Text" xml:space="preserve"><value>媒体自适应</value></data>
   <data name="AutoFitWindowSizeLabel.Text" xml:space="preserve"><value>自适应窗口尺寸</value></data>
+  <data name="PauseAutoFitWhenTopmostLabel.Text" xml:space="preserve"><value>始终显示时暂停</value></data>
+  <data name="PauseAutoFitWhenTopmostEnabledDescription.Text" xml:space="preserve"><value>始终显示期间暂停窗口自适应</value></data>
+  <data name="PauseAutoFitWhenTopmostDisabledDescription.Text" xml:space="preserve"><value>始终显示期间继续窗口自适应</value></data>
+  <data name="PauseAutoFitInGalleryLabel.Text" xml:space="preserve"><value>画廊模式时暂停</value></data>
+  <data name="PauseAutoFitInGalleryEnabledDescription.Text" xml:space="preserve"><value>画廊模式期间暂停窗口自适应</value></data>
+  <data name="PauseAutoFitInGalleryDisabledDescription.Text" xml:space="preserve"><value>画廊模式期间继续窗口自适应</value></data>
   <data name="AutoFitWindowSizeEnabledDescription.Text" xml:space="preserve"><value>根据预览媒体尺寸调整窗口大小</value></data>
   <data name="AutoFitWindowSizeDisabledDescription.Text" xml:space="preserve"><value>媒体窗口尺寸受窗口行为选项控制</value></data>
   <data name="ShowAfterAutoFitLabel.Text" xml:space="preserve"><value>避免窗口尺寸闪烁</value></data>
@@ -179,9 +185,6 @@
   <data name="LoopGalleryScrollingLabel.Text" xml:space="preserve"><value>画廊模式无限滚动</value></data>
   <data name="LoopGalleryScrollingEnabledDescription.Text" xml:space="preserve"><value>到达首尾后从另一端继续滚动</value></data>
   <data name="LoopGalleryScrollingDisabledDescription.Text" xml:space="preserve"><value>到达首项或末项时停止画廊滚动</value></data>
-  <data name="DisableAutoFitInGalleryLabel.Text" xml:space="preserve"><value>画廊模式期间禁用自适应尺寸</value></data>
-  <data name="DisableAutoFitInGalleryEnabledDescription.Text" xml:space="preserve"><value>画廊模式中切换文件时保持窗口尺寸</value></data>
-  <data name="DisableAutoFitInGalleryDisabledDescription.Text" xml:space="preserve"><value>画廊模式遵循自适应尺寸设置</value></data>
   <data name="GallerySameExtensionOnlyLabel.Text" xml:space="preserve"><value>仅浏览相同扩展名</value></data>
   <data name="GallerySameExtensionOnlyEnabledDescription.Text" xml:space="preserve"><value>画廊仅在与当前文件扩展名相同的文件中滚动</value></data>
   <data name="GallerySameExtensionOnlyDisabledDescription.Text" xml:space="preserve"><value>画廊在所有支持的媒体文件中滚动</value></data>

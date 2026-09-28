@@ -1349,6 +1349,11 @@ namespace winrt::Glance::App::implementation
         if (!preserve_navigation)
         {
             show_preview_notice(L"GalleryScrollModeNotice");
+            const auto preferences = glance::app::load_window_preferences();
+            if (preferences.auto_fit_media && preferences.pause_auto_fit_in_gallery)
+            {
+                show_preview_notice(L"AutoFitPausedNotice");
+            }
         }
     }
 
@@ -3326,8 +3331,8 @@ namespace winrt::Glance::App::implementation
     bool MainWindow::auto_fit_applies(bool dynamic_update) const noexcept
     {
         const auto preferences = glance::app::load_window_preferences();
-        if (fullscreen_ || topmost_ || user_sized_ || !preferences.auto_fit_media ||
-            (disable_auto_fit_in_gallery_ && gallery_mode_ != GalleryMode::inactive) ||
+        if (fullscreen_ || (topmost_ && preferences.pause_auto_fit_when_topmost) || user_sized_ || !preferences.auto_fit_media ||
+            (preferences.pause_auto_fit_in_gallery && gallery_mode_ != GalleryMode::inactive) ||
             (dynamic_update && !preferences.dynamic_auto_fit) ||
             (current_index_ < files_.size() &&
                 glance::app::auto_fit_ignores_path(preferences, files_[current_index_].path)))
@@ -4082,7 +4087,6 @@ namespace winrt::Glance::App::implementation
         middle_click_gallery_enabled_ = media_preferences.middle_click_gallery_mode;
         loop_gallery_enabled_ = media_preferences.loop_gallery_scrolling;
         gallery_same_extension_only_ = media_preferences.gallery_same_extension_only;
-        disable_auto_fit_in_gallery_ = media_preferences.disable_auto_fit_in_gallery;
         const auto generation = ++content_generation_;
         update_title_text();
         image_pixel_width_ = 0;
@@ -9303,7 +9307,8 @@ namespace winrt::Glance::App::implementation
         topmost_ = TopmostButton().IsChecked().Value();
         set_topmost(topmost_);
         update_state();
-        if (!was_topmost && topmost_ && glance::app::load_window_preferences().auto_fit_media)
+        const auto preferences = glance::app::load_window_preferences();
+        if (!was_topmost && topmost_ && preferences.auto_fit_media && preferences.pause_auto_fit_when_topmost)
         {
             show_preview_notice(L"AutoFitPausedNotice");
         }
