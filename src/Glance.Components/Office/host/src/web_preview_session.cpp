@@ -550,6 +550,8 @@ namespace glance::office
                                             RECT rectangle{};
                                             GetClientRect(target->window, &rectangle);
                                             controller->put_Bounds(rectangle);
+                                            if (!target->presentation)
+                                                winrt::check_hresult(controller->put_ZoomFactor(0.8));
                                             controller->put_IsVisible(TRUE);
                                             winrt::com_ptr<ICoreWebView2Settings> settings;
                                             target->view->get_Settings(settings.put());
