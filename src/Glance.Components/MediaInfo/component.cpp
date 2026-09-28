@@ -60,9 +60,10 @@ namespace
             {L"ffprobe", glance::contracts::dependencies::EntryKind::executable, L"bin/ffprobe.exe", L"ffprobe.exe",
              L"Components/media-info/bin/ffprobe.exe"}};
         const glance::contracts::dependencies::Declaration dependency{
-            .id = L"ffprobe", .version = L"8.1.2", .display_name = L"ffprobe",
+            .id = L"ffprobe", .version = L"8.1.2", .display_name = L"FFprobe",
             .url = archive_url, .archive_name = archive_file_name, .sha256 = archive_sha256,
-            .archive_size = archive_size, .files = files, .file_count = 2, .entries = entries, .entry_count = 1};
+            .archive_size = archive_size, .files = files, .file_count = 2, .entries = entries, .entry_count = 1,
+            .description_key = L"Dependency.Description"};
         if (FAILED(dependencies->register_dependency(&dependency, component_id))) return FALSE;
 
         ComponentRegistration result;

@@ -31,6 +31,7 @@ namespace glance::app::dependencies
         std::uint64_t archive_size{};
         std::vector<File> files;
         std::vector<Entry> entries;
+        std::wstring description_key;
         bool operator==(const Definition&) const = default;
     };
     struct Snapshot

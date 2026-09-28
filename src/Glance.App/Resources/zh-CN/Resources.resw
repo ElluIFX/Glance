@@ -432,6 +432,11 @@
   <data name="TextMonitorEnabledNotice" xml:space="preserve"><value>已开启文件监视</value></data>
   <data name="TextMonitorPausedNotice" xml:space="preserve"><value>已暂停文件监视</value></data>
   <data name="DependencyGroupTitle.Text" xml:space="preserve"><value>可选依赖</value></data>
+  <data name="DependencyFolderLabel.Text" xml:space="preserve"><value>依赖文件夹</value></data>
+  <data name="DependencyFolderDescription.Text" xml:space="preserve"><value>下载的依赖保存在此文件夹中</value></data>
+  <data name="OpenDependenciesFolderButton.Content" xml:space="preserve"><value>打开文件夹</value></data>
+  <data name="DependencyStatusGroupTitle.Text" xml:space="preserve"><value>依赖状态</value></data>
+  <data name="DependencyMediaDescription" xml:space="preserve"><value>为不常见的音视频格式提供支持</value></data>
   <data name="DependencyInstalled" xml:space="preserve"><value>已安装</value></data>
   <data name="DependencyExternal" xml:space="preserve"><value>PATH 中可用</value></data>
   <data name="DependencyMissing" xml:space="preserve"><value>未安装</value></data>

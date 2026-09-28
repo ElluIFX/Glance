@@ -1011,8 +1011,24 @@
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="DependencyGroupTitle" x:Uid="DependencyGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Optional dependencies" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
-                            <StackPanel x:Name="DependencyStatusList" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="DependencyFolderLabel" x:Uid="DependencyFolderLabel" Text="Dependency folder" />
+                                    <TextBlock x:Name="DependencyFolderDescription" x:Uid="DependencyFolderDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Downloaded dependencies are stored in this folder" />
+                                </StackPanel>
+                                <Button x:Name="OpenDependenciesFolderButton" x:Uid="OpenDependenciesFolderButton" Grid.Column="1" Click="OpenDependenciesFolderButton_Click" Content="Open folder" IsTabStop="False" AllowFocusOnInteraction="False" />
+                            </Grid>
                         </Border>
+                        <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="0">
+                            <Expander.Header>
+                                <TextBlock x:Name="DependencyStatusGroupTitle" x:Uid="DependencyStatusGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Dependency status" />
+                            </Expander.Header>
+                            <StackPanel x:Name="DependencyStatusList" />
+                        </Expander>
                     </StackPanel>
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="ComponentLocationGroupTitle" x:Uid="ComponentLocationGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on component location" />

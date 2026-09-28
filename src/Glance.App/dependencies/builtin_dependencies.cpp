@@ -25,7 +25,8 @@ namespace glance::app::dependencies
             .archive_name = L"ffmpeg-8.1.2-full_build-shared.7z",
             .sha256 = L"cba748035c21ce1431d0823c7a3a711f38616f89f87a265dceddf9b7f6749d2d",
             .archive_size = 59459100, .files = files, .file_count = static_cast<std::uint32_t>(std::size(files)),
-            .entries = entries, .entry_count = static_cast<std::uint32_t>(std::size(entries))};
+            .entries = entries, .entry_count = static_cast<std::uint32_t>(std::size(entries)),
+            .description_key = L"DependencyMediaDescription"};
         winrt::check_hresult(host_api().register_dependency(&declaration, L"video-preview"));
         winrt::check_hresult(host_api().register_dependency(&declaration, L"audio-preview"));
     }

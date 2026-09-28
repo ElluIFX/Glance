@@ -782,6 +782,10 @@ namespace winrt::Glance::App::implementation
         set_text(AppearanceGroupTitle(), L"AppearanceGroupTitle.Text");
         set_text(StartupGroupTitle(), L"StartupGroupTitle.Text");
         set_text(ComponentLocationGroupTitle(), L"ComponentLocationGroupTitle.Text");
+        set_text(DependencyFolderLabel(), L"DependencyFolderLabel.Text");
+        set_text(DependencyFolderDescription(), L"DependencyFolderDescription.Text");
+        set_text(DependencyStatusGroupTitle(), L"DependencyStatusGroupTitle.Text");
+        set_content(OpenDependenciesFolderButton(), L"OpenDependenciesFolderButton.Content");
         set_text(ComponentFolderLabel(), L"ComponentFolderLabel.Text");
         set_text(ComponentFolderDescription(), L"ComponentFolderDescription.Text");
         set_content(OpenComponentsFolderButton(), L"OpenComponentsFolderButton.Content");
@@ -948,6 +952,15 @@ namespace winrt::Glance::App::implementation
                     std::wstring(glance::app::localize(L"DependencyAudioConsumer")) : consumer;
             }
             consumers.Text(names);
+            if (!item.definition.description_key.empty())
+            {
+                const auto owner = std::ranges::find_if(components, [&](const auto& component) {
+                    return std::ranges::find(item.consumers, component.id) != item.consumers.end();
+                });
+                consumers.Text(owner != components.end()
+                    ? glance::app::localize_component(owner->id, item.definition.description_key)
+                    : glance::app::localize(item.definition.description_key));
+            }
             content.Children().Append(title);
             content.Children().Append(consumers);
             row.Children().Append(content);
@@ -2549,6 +2562,17 @@ namespace winrt::Glance::App::implementation
         RoutedEventArgs const&)
     {
         cancel_update_download();
+    }
+
+    void SettingsWindow::OpenDependenciesFolderButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        try
+        {
+            const auto path = glance::app::dependencies::storage_root();
+            std::filesystem::create_directories(path);
+            static_cast<void>(ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        }
+        catch (...) {}
     }
 
     void SettingsWindow::OpenComponentsFolderButton_Click(

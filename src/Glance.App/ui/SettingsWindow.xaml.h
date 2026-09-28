@@ -125,6 +125,9 @@ namespace winrt::Glance::App::implementation
         void OpenComponentsFolderButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void OpenDependenciesFolderButton_Click(
+            IInspectable const&,
+            Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OpenSourcesFolderButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);

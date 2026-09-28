@@ -432,6 +432,11 @@
   <data name="TextMonitorEnabledNotice" xml:space="preserve"><value>File monitoring enabled</value></data>
   <data name="TextMonitorPausedNotice" xml:space="preserve"><value>File monitoring paused</value></data>
   <data name="DependencyGroupTitle.Text" xml:space="preserve"><value>Optional dependencies</value></data>
+  <data name="DependencyFolderLabel.Text" xml:space="preserve"><value>Dependency folder</value></data>
+  <data name="DependencyFolderDescription.Text" xml:space="preserve"><value>Downloaded dependencies are stored in this folder</value></data>
+  <data name="OpenDependenciesFolderButton.Content" xml:space="preserve"><value>Open folder</value></data>
+  <data name="DependencyStatusGroupTitle.Text" xml:space="preserve"><value>Dependency status</value></data>
+  <data name="DependencyMediaDescription" xml:space="preserve"><value>Support for uncommon audio and video formats</value></data>
   <data name="DependencyInstalled" xml:space="preserve"><value>Installed</value></data>
   <data name="DependencyExternal" xml:space="preserve"><value>Available on PATH</value></data>
   <data name="DependencyMissing" xml:space="preserve"><value>Not installed</value></data>

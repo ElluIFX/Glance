@@ -39,6 +39,7 @@ namespace glance::contracts::dependencies
         std::uint32_t file_count{};
         const Entry* entries{};
         std::uint32_t entry_count{};
+        const wchar_t* description_key{};
     };
     struct Cancellation
     {

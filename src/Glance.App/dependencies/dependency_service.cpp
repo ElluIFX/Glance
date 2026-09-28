@@ -117,7 +117,7 @@ namespace glance::app::dependencies
         Definition definition_from(const api::Declaration& value)
         {
             Definition result{copy(value.id), copy(value.version), copy(value.display_name), copy(value.url),
-                copy(value.archive_name), copy(value.sha256), value.archive_size, {}, {}};
+                copy(value.archive_name), copy(value.sha256), value.archive_size, {}, {}, copy(value.description_key)};
             if (!safe_id(result.id) || !relative_path(result.version) ||
                 std::filesystem::path(result.version).has_parent_path() || result.display_name.empty() ||
                 !result.url.starts_with(L"https://") || !relative_path(result.archive_name) ||
