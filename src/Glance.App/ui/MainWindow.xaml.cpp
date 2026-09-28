@@ -5064,7 +5064,6 @@ namespace winrt::Glance::App::implementation
             const auto muted = media_player_.IsMuted();
             initialize_media_player();
             const auto player = media_player_;
-            player.RealTimePlayback(true);
             media_playback_item_ = Windows::Media::Playback::MediaPlaybackItem(software_media_source_->source());
             media_player_.Source(media_playback_item_);
             player.Volume(volume);

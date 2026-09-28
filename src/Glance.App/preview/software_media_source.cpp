@@ -12,7 +12,6 @@
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.h>
 #include <wil/resource.h>
-#include <condition_variable>
 #include <deque>
 #include <array>
 #include <chrono>
@@ -57,15 +56,14 @@ namespace glance::app
             dependencies::Lease lease;
             wil::unique_handle process, job, request_pipe, response_pipe, mapping, cancellation;
             unsigned char* shared{};
-            std::mutex io_mutex, buffer_mutex;
-            std::condition_variable buffer_available;
+            std::mutex queue_mutex, buffer_mutex;
+            std::deque<std::function<void()>> requests;
+            bool processing{};
             std::array<std::deque<std::vector<unsigned char>>, 2> buffers;
-            std::array<unsigned, 2> buffer_count{};
             std::atomic_bool cancelled{};
             std::atomic_uint64_t io_deadline{};
             std::thread watchdog;
             std::shared_ptr<std::atomic_bool> external_cancellation;
-            std::atomic_uint64_t generation{};
             std::array<std::atomic_uint64_t, 2> delivered_samples{};
             std::array<std::int64_t, 2> next_positions{};
             std::array<bool, 2> active_streams{};
@@ -84,7 +82,6 @@ namespace glance::app
                 if (cancelled.exchange(true)) return;
                 if (cancellation) SetEvent(cancellation.get());
                 if (job) TerminateJobObject(job.get(), ERROR_CANCELLED);
-                buffer_available.notify_all();
                 try
                 {
                     contracts::log_event(L"Software media closed: video samples=" + std::to_wstring(delivered_samples[0].load()) +
@@ -190,63 +187,83 @@ namespace glance::app
             }
             std::vector<unsigned char> take_buffer(bool video)
             {
-                std::unique_lock lock(buffer_mutex);
+                std::scoped_lock lock(buffer_mutex);
                 const unsigned index = video ? 0 : 1;
                 auto& pool = buffers[index];
-                buffer_available.wait(lock, [&] { return cancelled.load() || !pool.empty() || buffer_count[index] < 4; });
                 if (cancelled.load()) throw winrt::hresult_canceled();
                 if (!pool.empty()) { auto value = std::move(pool.front()); pool.pop_front(); return value; }
-                ++buffer_count[index];
                 return {};
             }
             void return_buffer(std::vector<unsigned char> buffer, bool video)
             {
                 std::scoped_lock lock(buffer_mutex);
-                buffers[video ? 0 : 1].push_back(std::move(buffer));
-                buffer_available.notify_all();
+                auto& pool = buffers[video ? 0 : 1];
+                if (!cancelled.load() && pool.size() < 4) pool.push_back(std::move(buffer));
             }
-            static winrt::fire_and_forget provide(std::shared_ptr<Session> self, MediaStreamSourceSampleRequest request, bool video)
+            template<typename Request, typename Work>
+            void enqueue(Request request, Work work)
             {
-                const auto expected = self->generation.load();
+                const auto deferral = request.GetDeferral();
                 try
                 {
-                    const auto deferral = request.GetDeferral();
-                    const auto finish = wil::scope_exit([&] { try { deferral.Complete(); } catch (...) {} });
-                    co_await winrt::resume_background();
-                    std::vector<unsigned char> bytes;
-                    bool borrowed{};
-                    const auto return_unused = wil::scope_exit([&] {
-                        try { if (borrowed) self->return_buffer(std::move(bytes), video); } catch (...) {}
+                    std::scoped_lock lock(queue_mutex);
+                    requests.push_back([this, request, deferral, work] {
+                        const auto finish = wil::scope_exit([&] { try { deferral.Complete(); } catch (...) {} });
+                        if (!cancelled.load()) work(request);
                     });
-                    bytes = self->take_buffer(video);
-                    borrowed = true;
-                    std::unique_lock lock(self->io_mutex);
-                    if (self->generation.load() != expected) co_return;
-                    const auto response = self->exchange(video ? protocol::Command::sample_video : protocol::Command::sample_audio);
-                    if (response.bytes == 0) { request.Sample(nullptr); co_return; }
-                    bytes.resize(response.bytes);
-                    std::memcpy(bytes.data(), self->shared, response.bytes);
-                    self->next_positions[video ? 0 : 1] = response.timestamp + response.duration;
-                    lock.unlock();
-                    if (self->generation.load() != expected) co_return;
-                    const std::weak_ptr<Session> weak = self;
-                    const auto buffer = winrt::make<SampleBuffer>(std::move(bytes), [weak, video](std::vector<unsigned char> value) {
-                        if (const auto active = weak.lock()) active->return_buffer(std::move(value), video);
-                    });
-                    borrowed = false;
-                    auto sample = MediaStreamSample::CreateFromBuffer(buffer, TimeSpan{std::max<std::int64_t>(0, response.timestamp)});
-                    sample.Duration(TimeSpan{std::max<std::int64_t>(1, response.duration)});
-                    sample.KeyFrame(true);
-                    request.Sample(sample);
-                    ++self->delivered_samples[video ? 0 : 1];
+                    if (processing) return;
+                    processing = true;
                 }
                 catch (...)
                 {
-                    self->fail_request(expected);
+                    try { deferral.Complete(); } catch (...) {}
+                    throw;
+                }
+                drain(shared_from_this());
+            }
+            static winrt::fire_and_forget drain(std::shared_ptr<Session> self)
+            {
+                try { co_await winrt::resume_background(); }
+                catch (...) { self->fail_request(); }
+                for (;;)
+                {
+                    std::function<void()> work;
+                    {
+                        std::scoped_lock lock(self->queue_mutex);
+                        if (self->requests.empty()) { self->processing = false; co_return; }
+                        work = std::move(self->requests.front());
+                        self->requests.pop_front();
+                    }
+                    try { work(); }
+                    catch (...) { self->fail_request(); }
                 }
             }
-            void fail_request(std::uint64_t expected) noexcept
+            void provide(MediaStreamSourceSampleRequest const& request, bool video)
             {
+                auto bytes = take_buffer(video);
+                bool borrowed = true;
+                const auto return_unused = wil::scope_exit([&] {
+                    try { if (borrowed) return_buffer(std::move(bytes), video); } catch (...) {}
+                });
+                const auto response = exchange(video ? protocol::Command::sample_video : protocol::Command::sample_audio);
+                if (response.bytes == 0) { request.Sample(nullptr); return; }
+                bytes.resize(response.bytes);
+                std::memcpy(bytes.data(), shared, response.bytes);
+                next_positions[video ? 0 : 1] = response.timestamp + response.duration;
+                const std::weak_ptr<Session> weak = shared_from_this();
+                const auto buffer = winrt::make<SampleBuffer>(std::move(bytes), [weak, video](std::vector<unsigned char> value) {
+                    if (const auto active = weak.lock()) active->return_buffer(std::move(value), video);
+                });
+                borrowed = false;
+                auto sample = MediaStreamSample::CreateFromBuffer(buffer, TimeSpan{std::max<std::int64_t>(0, response.timestamp)});
+                sample.Duration(TimeSpan{std::max<std::int64_t>(1, response.duration)});
+                sample.KeyFrame(true);
+                request.Sample(sample);
+                ++delivered_samples[video ? 0 : 1];
+            }
+            void fail_request() noexcept
+            {
+                if (cancelled.load()) return;
                 try
                 {
                     contracts::log_event(L"Software media request failure: " + std::to_wstring(static_cast<HRESULT>(winrt::to_hresult())));
@@ -255,38 +272,25 @@ namespace glance::app
                     catch (...) {}
                 }
                 catch (...) {}
-                if (!cancelled.load() && generation.load() == expected)
+                if (!cancelled.load())
                 {
                     try { stream.NotifyError(MediaStreamSourceErrorStatus::Other); } catch (...) {}
                     cancel();
                 }
             }
-            static winrt::fire_and_forget seek(std::shared_ptr<Session> self, MediaStreamSourceStartingRequest request)
+            void seek(MediaStreamSourceStartingRequest const& request)
             {
-                const auto expected = ++self->generation;
-                try
+                const auto position = request.StartPosition();
+                const auto target = position ? position.Value().count() : 0;
+                if (position)
                 {
-                    const auto deferral = request.GetDeferral();
-                    const auto finish = wil::scope_exit([&] { try { deferral.Complete(); } catch (...) {} });
-                    const auto position = request.StartPosition();
-                    const auto target = position ? position.Value().count() : 0;
-                    co_await winrt::resume_background();
-                    std::scoped_lock lock(self->io_mutex);
-                    if (self->generation.load() != expected) co_return;
-                    if (position)
-                    {
-                        self->exchange(protocol::Command::seek, target);
-                        self->next_positions.fill(target);
-                    }
-                    const auto next = self->active_streams[0] && self->active_streams[1] ?
-                        std::min(self->next_positions[0], self->next_positions[1]) :
-                        self->next_positions[self->active_streams[0] ? 0 : 1];
-                    request.SetActualStartPosition(TimeSpan{position ? target : next});
+                    exchange(protocol::Command::seek, target);
+                    next_positions.fill(target);
                 }
-                catch (...)
-                {
-                    self->fail_request(expected);
-                }
+                const auto next = active_streams[0] && active_streams[1] ?
+                    std::min(next_positions[0], next_positions[1]) :
+                    next_positions[active_streams[0] ? 0 : 1];
+                request.SetActualStartPosition(TimeSpan{position ? target : next});
             }
             void open_file(const std::wstring& path)
             {
@@ -315,26 +319,25 @@ namespace glance::app
                 active_streams = {video != nullptr, audio != nullptr};
                 stream.CanSeek(info.duration > 0);
                 if (info.duration > 0) stream.Duration(TimeSpan{info.duration});
-                stream.BufferTime(std::chrono::milliseconds(0));
+                stream.BufferTime(std::chrono::milliseconds(100));
                 const std::weak_ptr<Session> weak = shared_from_this();
                 stream.SampleRequested([weak](auto const&, MediaStreamSourceSampleRequestedEventArgs const& args) {
                     if (const auto self = weak.lock())
                     {
-                        const auto expected = self->generation.load();
                         try
                         {
                             const auto request = args.Request();
-                            provide(self, request, request.StreamDescriptor().try_as<VideoStreamDescriptor>() != nullptr);
+                            const bool video = request.StreamDescriptor().try_as<VideoStreamDescriptor>() != nullptr;
+                            self->enqueue(request, [session = self.get(), video](auto const& value) { session->provide(value, video); });
                         }
-                        catch (...) { self->fail_request(expected); }
+                        catch (...) { self->fail_request(); }
                     }
                 });
                 stream.Starting([weak](auto const&, MediaStreamSourceStartingEventArgs const& args) {
                     if (const auto self = weak.lock())
                     {
-                        const auto expected = self->generation.load();
-                        try { seek(self, args.Request()); }
-                        catch (...) { self->fail_request(expected); }
+                        try { self->enqueue(args.Request(), [session = self.get()](auto const& value) { session->seek(value); }); }
+                        catch (...) { self->fail_request(); }
                     }
                 });
                 stream.Closed([weak](auto const&, auto const&) { if (const auto self = weak.lock()) self->cancel(); });

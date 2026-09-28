@@ -935,7 +935,8 @@ int run_dependency_child(int count, wchar_t* arguments[]);
 int wmain(int argument_count, wchar_t* arguments[])
 {
     if (argument_count > 1 && (std::wstring_view(arguments[1]) == L"--software-media-tests" ||
-        std::wstring_view(arguments[1]) == L"--software-media-fallback-tests"))
+        std::wstring_view(arguments[1]) == L"--software-media-fallback-tests" ||
+        std::wstring_view(arguments[1]) == L"--software-media-composition-tests"))
         return run_software_media_tests(argument_count, arguments);
     if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--dependency-service-tests")
         return run_dependency_service_tests();
