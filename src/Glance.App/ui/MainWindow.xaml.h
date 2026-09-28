@@ -247,9 +247,6 @@ namespace winrt::Glance::App::implementation
         void PasswordPromptInput_KeyDown(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const&);
-        void PreviewErrorInfoBar_Closed(
-            Microsoft::UI::Xaml::Controls::InfoBar const&,
-            Microsoft::UI::Xaml::Controls::InfoBarClosedEventArgs const&);
         void FileList_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
@@ -646,12 +643,18 @@ namespace winrt::Glance::App::implementation
         void dismiss_preview_info_bar();
         void show_preview_notice(std::wstring resource_key);
         void request_dependency(std::wstring id, std::function<void()> ready);
-        void show_preview_message(
+        std::uint64_t show_preview_message(
             std::wstring message,
             Microsoft::UI::Xaml::Controls::InfoBarSeverity severity,
             bool auto_hide,
-            std::uint32_t auto_hide_delay_ms = 2880);
-        void animate_preview_info_bar(bool opening);
+            std::uint32_t auto_hide_delay_ms = 2880,
+            std::wstring resource_key = {},
+            std::wstring title_key = {});
+        void update_preview_message(std::uint64_t id, std::wstring message);
+        void set_preview_message_action(std::uint64_t id, Microsoft::UI::Xaml::Controls::Primitives::ButtonBase const& action);
+        void dismiss_preview_message(std::uint64_t id);
+        void update_preview_notices();
+        void animate_preview_info_bar(Microsoft::UI::Xaml::Controls::InfoBar const& bar, bool opening);
         void show_text_preview_error(std::wstring message);
         void show_provider_error(std::wstring message, std::uint64_t generation);
         void update_image_fit_surface();
@@ -915,15 +918,24 @@ namespace winrt::Glance::App::implementation
         winrt::hstring copy_feedback_original_glyph_;
         Microsoft::UI::Xaml::DispatcherTimer font_size_overlay_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer preview_notice_timer_{ nullptr };
-        Microsoft::UI::Xaml::DispatcherTimer preview_notice_hide_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer json_row_animation_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer web_view_idle_timer_{ nullptr };
         Microsoft::UI::Xaml::Controls::WebView2 web_preview_{ nullptr };
         std::vector<std::wstring> web_resource_mapping_hosts_;
-        std::uint64_t preview_notice_generation_{};
-        bool preview_notice_active_{};
-        bool preview_notice_hiding_{};
-        std::wstring preview_notice_resource_key_;
+        struct PreviewNotice
+        {
+            std::uint64_t id{};
+            Microsoft::UI::Xaml::Controls::InfoBar bar{ nullptr };
+            std::wstring resource_key;
+            std::wstring title_key;
+            std::chrono::steady_clock::time_point expires;
+            bool hiding{};
+        };
+        std::vector<PreviewNotice> preview_notices_;
+        std::uint64_t preview_notice_sequence_{};
+        std::uint64_t text_error_notice_{};
+        std::uint64_t component_refinement_notice_{};
+        std::chrono::steady_clock::time_point preview_notice_animation_until_{};
         glance::app::PreviewKind current_kind_{ glance::app::PreviewKind::generic };
         glance::app::PreviewKind content_preview_kind_{ glance::app::PreviewKind::generic };
         bool basic_info_mode_{};

@@ -1207,6 +1207,7 @@ namespace winrt::Glance::App::implementation
                 {
                     self->fullscreen_chrome_timer_.Stop();
                 }
+                if (self->preview_notice_timer_) self->preview_notice_timer_.Stop();
                 self->acrylic_backdrop_.reset();
             }
         });
@@ -2052,17 +2053,10 @@ namespace winrt::Glance::App::implementation
                 files_[current_index_].path,
                 content_generation_);
         }
-        if (preview_notice_active_)
+        for (const auto& notice : preview_notices_)
         {
-            if (!preview_notice_resource_key_.empty())
-            {
-                PreviewErrorInfoBar().Message(
-                    glance::app::localize(preview_notice_resource_key_));
-            }
-        }
-        else
-        {
-            PreviewErrorInfoBar().Title(glance::app::localize(L"PreviewErrorInfoBar.Title"));
+            if (!notice.resource_key.empty()) notice.bar.Message(glance::app::localize(notice.resource_key));
+            if (!notice.title_key.empty()) notice.bar.Title(glance::app::localize(notice.title_key));
         }
         set_tooltip(MediaPlayPauseButton(), L"MediaPlayPauseButton.ToolTipService.ToolTip");
         set_tooltip(MediaMuteButton(), L"MediaMuteButton.ToolTipService.ToolTip");
@@ -3975,10 +3969,7 @@ namespace winrt::Glance::App::implementation
                     static_cast<LONG>(std::ceil(
                         (origin.Y + static_cast<float>(element.ActualHeight())) * scale)) });
             };
-            if (PreviewErrorInfoBar().IsOpen())
-            {
-                append(PreviewErrorInfoBar());
-            }
+            if (!preview_notices_.empty()) append(PreviewNoticeStack());
             if (native_media_active_)
             {
                 append(MediaControlsOverlay());
@@ -6892,7 +6883,7 @@ namespace winrt::Glance::App::implementation
         const auto weak = get_weak();
         const auto dispatcher = DispatcherQueue();
         const auto language = glance::app::current_ui_language();
-        show_preview_message(
+        component_refinement_notice_ = show_preview_message(
             std::move(notice),
             InfoBarSeverity::Informational,
             false);
@@ -6921,10 +6912,10 @@ namespace winrt::Glance::App::implementation
                 lifetime->active_component_refinement_.reset();
                 lifetime->component_refinement_text_.clear();
                 lifetime->component_refinement_started_ = false;
+                lifetime->dismiss_preview_message(lifetime->component_refinement_notice_);
                 if (result.status ==
                     glance::contracts::components::PrepareStatus::cancelled)
                 {
-                    lifetime->dismiss_preview_info_bar();
                     return;
                 }
                 lifetime->show_preview_message(
@@ -6983,7 +6974,7 @@ namespace winrt::Glance::App::implementation
             update_image_zoom_map();
             update_footer_metadata();
             auto_fit_window_to_content(width, height);
-            dismiss_preview_info_bar();
+            dismiss_preview_message(component_refinement_notice_);
             if (glance::app::footer_field_enabled(
                     footer_preferences_,
                     glance::app::FooterField::media_info))
@@ -7008,6 +6999,7 @@ namespace winrt::Glance::App::implementation
             active_component_refinement_.reset();
             component_refinement_text_.clear();
             component_refinement_started_ = false;
+            dismiss_preview_message(component_refinement_notice_);
             show_preview_message(
                 glance::app::localize(L"ComponentStateError"),
                 InfoBarSeverity::Warning,
@@ -7272,7 +7264,7 @@ namespace winrt::Glance::App::implementation
                 {
                     if (reader == nullptr)
                     {
-                        self->dismiss_preview_info_bar();
+                        self->dismiss_preview_message(self->text_error_notice_);
                     }
                     self->current_text_reader_ = std::move(result.reader);
                     self->text_reader_monitored_ = true;
@@ -8340,10 +8332,7 @@ namespace winrt::Glance::App::implementation
                         (origin.Y + static_cast<float>(element.ActualHeight())) * scale)) + padding,
                 });
             };
-            if (PreviewErrorInfoBar().IsOpen())
-            {
-                append(PreviewErrorInfoBar());
-            }
+            if (!preview_notices_.empty()) append(PreviewNoticeStack());
             if (fullscreen_ && fullscreen_title_visible_)
             {
                 append(PreviewTitleBar());
@@ -8872,20 +8861,21 @@ namespace winrt::Glance::App::implementation
         const auto registered = dependencies::snapshot();
         const auto dependency = std::ranges::find(registered, id, [](const auto& item) { return item.definition.id; });
         if (dependency == registered.end()) return;
-        show_preview_message(glance::app::localize_format(L"DependencyRequired", {dependency->definition.display_name}),
+        const auto prompt_notice = show_preview_message(glance::app::localize_format(L"DependencyRequired", {dependency->definition.display_name}),
             InfoBarSeverity::Informational, false);
         Controls::Button download;
         download.IsTabStop(false);
         download.AllowFocusOnInteraction(false);
         download.Content(box_value(glance::app::localize(L"DependencyDownload")));
-        download.Click([weak, generation, id, ready = std::move(ready)](IInspectable const&, RoutedEventArgs const&) {
+        download.Click([weak, generation, id, prompt_notice, ready = std::move(ready)](IInspectable const&, RoutedEventArgs const&) {
             const auto self = weak.get();
             if (!self || self->content_generation_ != generation) return;
             try
             {
                 const auto task = dependencies::begin_install(id);
-                self->show_preview_message(glance::app::localize(L"DependencyDownloading"), InfoBarSeverity::Informational, false);
-                const auto notice = self->preview_notice_generation_;
+                self->set_preview_message_action(prompt_notice, nullptr);
+                self->update_preview_message(prompt_notice, glance::app::localize(L"DependencyDownloading"));
+                const auto notice = prompt_notice;
                 const auto dispatcher = self->DispatcherQueue();
                 std::weak_ptr<dependencies::Transfer> weak_task = task;
                 const auto completed = std::make_shared<bool>(false);
@@ -8894,47 +8884,37 @@ namespace winrt::Glance::App::implementation
                     const auto active = weak_task.lock();
                     if (!window || !active || *completed || window->content_generation_ != generation) return;
                     const auto state = active->state();
-                    const bool owns_notice = window->preview_notice_generation_ == notice;
                     if (state.complete)
                     {
                         *completed = true;
-                        if (owns_notice) window->dismiss_preview_info_bar();
+                        window->dismiss_preview_message(notice);
                         if (SUCCEEDED(state.error)) ready();
-                        else if (owns_notice) window->show_preview_notice(L"DependencyFailed");
+                        else window->show_preview_notice(L"DependencyFailed");
                     }
-                    else if (owns_notice) window->PreviewErrorInfoBar().Message(glance::app::localize(
+                    else window->update_preview_message(notice, glance::app::localize(
                         state.availability == glance::contracts::dependencies::Availability::installing ?
                         L"DependencyInstalling" : L"DependencyDownloading"));
                 };
                 task->subscribe([dispatcher, refresh] { dispatcher.TryEnqueue(refresh); });
                 refresh();
             }
-            catch (...) { self->show_preview_notice(L"DependencyFailed"); }
+            catch (...)
+            {
+                self->dismiss_preview_message(prompt_notice);
+                self->show_preview_notice(L"DependencyFailed");
+            }
         });
-        PreviewErrorInfoBar().ActionButton(download);
-        queue_native_surface_occlusion_update();
+        set_preview_message_action(prompt_notice, download);
     }
 
     void MainWindow::dismiss_preview_info_bar()
     {
-        ++preview_notice_generation_;
-        preview_notice_active_ = false;
-        preview_notice_hiding_ = false;
-        preview_notice_resource_key_.clear();
-        if (preview_notice_timer_ != nullptr)
-        {
-            preview_notice_timer_.Stop();
-        }
-        if (preview_notice_hide_timer_ != nullptr)
-        {
-            preview_notice_hide_timer_.Stop();
-        }
-        const auto visual = Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
-            PreviewErrorInfoBar());
-        visual.StopAnimation(L"Opacity");
-        visual.Opacity(1.0F);
-        PreviewErrorInfoBar().IsOpen(false);
-        PreviewErrorInfoBar().ActionButton(nullptr);
+        if (preview_notice_timer_) preview_notice_timer_.Stop();
+        preview_notices_.clear();
+        PreviewNoticeStack().Children().Clear();
+        PreviewNoticeStack().MinHeight(0);
+        text_error_notice_ = 0;
+        component_refinement_notice_ = 0;
         queue_native_surface_occlusion_update();
     }
 
@@ -8944,83 +8924,158 @@ namespace winrt::Glance::App::implementation
         show_preview_message(
             message,
             InfoBarSeverity::Informational,
-            true);
-        preview_notice_resource_key_ = std::move(resource_key);
+            true, 2880, std::move(resource_key));
     }
 
-    void MainWindow::show_preview_message(
+    std::uint64_t MainWindow::show_preview_message(
         std::wstring message,
         InfoBarSeverity severity,
         bool auto_hide,
-        std::uint32_t auto_hide_delay_ms)
+        std::uint32_t auto_hide_delay_ms,
+        std::wstring resource_key,
+        std::wstring title_key)
     {
-        dismiss_preview_info_bar();
-        preview_notice_active_ = true;
-        PreviewErrorInfoBar().Title(L"");
-        PreviewErrorInfoBar().Message(std::move(message));
-        PreviewErrorInfoBar().Severity(severity);
-        PreviewErrorInfoBar().IsClosable(false);
-        PreviewErrorInfoBar().IsOpen(true);
-        queue_native_surface_occlusion_update();
-        animate_preview_info_bar(true);
-        if (!auto_hide)
+        const auto now = std::chrono::steady_clock::now();
+        auto expires = std::chrono::steady_clock::time_point::max();
+        if (auto_hide)
         {
-            return;
+            expires = now + std::chrono::milliseconds(std::max<std::uint32_t>(1, auto_hide_delay_ms));
+            for (const auto& notice : preview_notices_)
+            {
+                if (notice.expires != std::chrono::steady_clock::time_point::max() && !notice.hiding)
+                    expires = std::max(expires, notice.expires + std::chrono::milliseconds(80));
+            }
         }
-        if (preview_notice_timer_ == nullptr)
+        const auto id = ++preview_notice_sequence_;
+        InfoBar bar;
+        bar.Message(std::move(message));
+        bar.Severity(severity);
+        bar.IsClosable(!title_key.empty());
+        bar.IsTabStop(false);
+        bar.AllowFocusOnInteraction(false);
+        bar.IsOpen(true);
+        if (!title_key.empty()) bar.Title(glance::app::localize(title_key));
+        const auto weak = get_weak();
+        bar.Closing([weak, id](InfoBar const&, InfoBarClosingEventArgs const& args) {
+            args.Cancel(true);
+            if (const auto self = weak.get()) self->dismiss_preview_message(id);
+        });
+        bar.Loaded([](IInspectable const& sender, RoutedEventArgs const&) {
+            std::vector<DependencyObject> pending{ sender.as<DependencyObject>() };
+            while (!pending.empty())
+            {
+                const auto current = pending.back();
+                pending.pop_back();
+                if (const auto button = current.try_as<Controls::Primitives::ButtonBase>())
+                {
+                    button.IsTabStop(false);
+                    button.AllowFocusOnInteraction(false);
+                }
+                for (int index = 0; index < Media::VisualTreeHelper::GetChildrenCount(current); ++index)
+                    pending.push_back(Media::VisualTreeHelper::GetChild(current, index));
+            }
+        });
+        bar.SizeChanged([weak](IInspectable const&, SizeChangedEventArgs const&) {
+            if (const auto self = weak.get()) self->queue_native_surface_occlusion_update();
+        });
+        const auto visual = Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(bar);
+        const auto movement = visual.Compositor().CreateVector3KeyFrameAnimation();
+        movement.Target(L"Offset");
+        movement.Duration(std::chrono::milliseconds(180));
+        movement.InsertExpressionKeyFrame(1.0F, L"this.FinalValue",
+            visual.Compositor().CreateCubicBezierEasingFunction({ 0.16F, 1.0F }, { 0.30F, 1.0F }));
+        const auto animations = visual.Compositor().CreateImplicitAnimationCollection();
+        animations.Insert(L"Offset", movement);
+        visual.ImplicitAnimations(animations);
+        preview_notices_.push_back({ id, bar, std::move(resource_key), std::move(title_key), expires });
+        PreviewNoticeStack().Children().Append(bar);
+        animate_preview_info_bar(bar, true);
+        preview_notice_animation_until_ = now + std::chrono::milliseconds(180);
+        if (!preview_notice_timer_)
         {
             preview_notice_timer_ = DispatcherTimer();
-            preview_notice_timer_.Interval(std::chrono::milliseconds(2880));
-            const auto weak = get_weak();
+            preview_notice_timer_.Interval(std::chrono::milliseconds(30));
             preview_notice_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
-                if (const auto self = weak.get())
-                {
-                    self->preview_notice_timer_.Stop();
-                    if (!self->preview_notice_active_)
-                    {
-                        return;
-                    }
-                    self->preview_notice_hiding_ = true;
-                    self->animate_preview_info_bar(false);
-                    self->preview_notice_hide_timer_.Start();
-                }
+                if (const auto self = weak.get()) self->update_preview_notices();
             });
         }
-        if (preview_notice_hide_timer_ == nullptr)
-        {
-            preview_notice_hide_timer_ = DispatcherTimer();
-            preview_notice_hide_timer_.Interval(std::chrono::milliseconds(120));
-            const auto weak = get_weak();
-            preview_notice_hide_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
-                if (const auto self = weak.get())
-                {
-                    self->preview_notice_hide_timer_.Stop();
-                    if (!self->preview_notice_hiding_)
-                    {
-                        return;
-                    }
-                    self->preview_notice_active_ = false;
-                    self->preview_notice_hiding_ = false;
-                    self->preview_notice_resource_key_.clear();
-                    self->PreviewErrorInfoBar().IsOpen(false);
-                    self->queue_native_surface_occlusion_update();
-                    const auto visual =
-                        Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
-                            self->PreviewErrorInfoBar());
-                    visual.StopAnimation(L"Opacity");
-                    visual.Opacity(1.0F);
-                }
-            });
-        }
-        preview_notice_timer_.Interval(std::chrono::milliseconds(
-            std::max<std::uint32_t>(1, auto_hide_delay_ms)));
         preview_notice_timer_.Start();
+        queue_native_surface_occlusion_update();
+        return id;
     }
 
-    void MainWindow::animate_preview_info_bar(bool opening)
+    void MainWindow::update_preview_message(std::uint64_t id, std::wstring message)
+    {
+        for (auto& notice : preview_notices_)
+        {
+            if (notice.id != id || notice.hiding) continue;
+            notice.resource_key.clear();
+            notice.bar.Message(std::move(message));
+            queue_native_surface_occlusion_update();
+            return;
+        }
+    }
+
+    void MainWindow::set_preview_message_action(std::uint64_t id, Controls::Primitives::ButtonBase const& action)
+    {
+        for (const auto& notice : preview_notices_)
+        {
+            if (notice.id != id || notice.hiding) continue;
+            notice.bar.ActionButton(action);
+            queue_native_surface_occlusion_update();
+            return;
+        }
+    }
+
+    void MainWindow::dismiss_preview_message(std::uint64_t id)
+    {
+        for (auto& notice : preview_notices_)
+        {
+            if (notice.id != id || notice.hiding) continue;
+            notice.hiding = true;
+            notice.bar.IsHitTestVisible(false);
+            notice.expires = std::chrono::steady_clock::now() + std::chrono::milliseconds(120);
+            animate_preview_info_bar(notice.bar, false);
+            preview_notice_timer_.Start();
+            return;
+        }
+    }
+
+    void MainWindow::update_preview_notices()
+    {
+        const auto now = std::chrono::steady_clock::now();
+        for (std::size_t index = 0; index < preview_notices_.size();)
+        {
+            auto& notice = preview_notices_[index];
+            if (now < notice.expires) { ++index; continue; }
+            if (!notice.hiding)
+            {
+                dismiss_preview_message(notice.id);
+                ++index;
+                continue;
+            }
+            // Keep native surface occlusion over the moving cards until the animation ends.
+            PreviewNoticeStack().MinHeight(std::max(PreviewNoticeStack().MinHeight(), PreviewNoticeStack().ActualHeight()));
+            PreviewNoticeStack().Children().RemoveAt(static_cast<std::uint32_t>(index));
+            preview_notices_.erase(preview_notices_.begin() + static_cast<std::ptrdiff_t>(index));
+            preview_notice_animation_until_ = now + std::chrono::milliseconds(180);
+        }
+        if (now <= preview_notice_animation_until_) queue_native_surface_occlusion_update();
+        else if (PreviewNoticeStack().MinHeight() > 0)
+        {
+            PreviewNoticeStack().MinHeight(0);
+            queue_native_surface_occlusion_update();
+        }
+        const bool pending = std::ranges::any_of(preview_notices_, [](const auto& notice) {
+            return notice.expires != std::chrono::steady_clock::time_point::max();
+        });
+        if (!pending && now >= preview_notice_animation_until_) preview_notice_timer_.Stop();
+    }
+
+    void MainWindow::animate_preview_info_bar(InfoBar const& bar, bool opening)
     {
         const auto visual = Microsoft::UI::Xaml::Hosting::ElementCompositionPreview::GetElementVisual(
-            PreviewErrorInfoBar());
+            bar);
         const auto compositor = visual.Compositor();
         visual.StopAnimation(L"Opacity");
         visual.Opacity(opening ? 1.0F : 0.0F);
@@ -9043,14 +9098,9 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::show_text_preview_error(std::wstring message)
     {
-        dismiss_preview_info_bar();
-        PreviewErrorInfoBar().Title(glance::app::localize(L"PreviewErrorInfoBar.Title"));
-        PreviewErrorInfoBar().Message(std::move(message));
-        PreviewErrorInfoBar().Severity(InfoBarSeverity::Error);
-        PreviewErrorInfoBar().IsClosable(true);
-        PreviewErrorInfoBar().IsOpen(true);
-        queue_native_surface_occlusion_update();
-        animate_preview_info_bar(true);
+        dismiss_preview_message(text_error_notice_);
+        text_error_notice_ = show_preview_message(std::move(message), InfoBarSeverity::Error,
+            false, 2880, {}, L"PreviewErrorInfoBar.Title");
     }
 
     void MainWindow::update_preview_mode_button()
@@ -9967,10 +10017,6 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::SyntaxHighlightButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        if (preview_notice_active_)
-        {
-            dismiss_preview_info_bar();
-        }
         syntax_highlighting_ = SyntaxHighlightButton().IsChecked().Value();
         text_preferences_.syntax_highlighting = syntax_highlighting_;
         glance::app::save_text_preferences(text_preferences_);
@@ -11043,13 +11089,6 @@ namespace winrt::Glance::App::implementation
             args.Handled(true);
             submit_password();
         }
-    }
-
-    void MainWindow::PreviewErrorInfoBar_Closed(
-        InfoBar const&,
-        InfoBarClosedEventArgs const&)
-    {
-        queue_native_surface_occlusion_update();
     }
 
     void MainWindow::show_pdf_navigation(bool thumbnails)

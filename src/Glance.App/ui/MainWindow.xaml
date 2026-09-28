@@ -1328,24 +1328,20 @@
                 FontWeight="SemiBold" />
         </Border>
 
-        <InfoBar
-            x:Name="PreviewErrorInfoBar"
-            x:Uid="PreviewErrorInfoBar"
+        <StackPanel
+            x:Name="PreviewNoticeStack"
             Grid.RowSpan="3"
             Margin="16,52,16,0"
             MaxWidth="560"
             HorizontalAlignment="Center"
             VerticalAlignment="Top"
-            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
             Canvas.ZIndex="200"
-            Closed="PreviewErrorInfoBar_Closed"
-            IsClosable="True"
-            IsIconVisible="True"
-            IsOpen="False"
-            Severity="Informational"
-            Title="Unable to preview as text">
-            <InfoBar.Resources>
+            Spacing="8">
+            <StackPanel.Resources>
                 <ResourceDictionary>
+                    <Style TargetType="InfoBar">
+                        <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+                    </Style>
                     <ResourceDictionary.ThemeDictionaries>
                         <ResourceDictionary x:Key="Light">
                             <SolidColorBrush x:Key="InfoBarInformationalSeverityIconBackground" Color="#005FB8" />
@@ -1358,7 +1354,7 @@
                         </ResourceDictionary>
                     </ResourceDictionary.ThemeDictionaries>
                 </ResourceDictionary>
-            </InfoBar.Resources>
-        </InfoBar>
+            </StackPanel.Resources>
+        </StackPanel>
     </Grid>
 </Window>
