@@ -568,8 +568,15 @@ namespace winrt::Glance::App::implementation
         };
         PreviewNavigationEntry capture_preview_navigation();
         bool navigate_preview_history(bool forward);
-        bool queue_preview_history_navigation(bool forward);
+        bool queue_preview_history_navigation(bool forward, bool right_click = false);
         bool can_navigate_preview_history(bool forward) const noexcept;
+        bool can_handle_preview_mouse(bool forward, bool right_click) const noexcept;
+        void update_preview_mouse_bounds() noexcept;
+        bool is_preview_content_point(POINT point) const noexcept;
+        RECT preview_mouse_content_bounds_{};
+        RECT preview_mouse_title_bounds_{};
+        RECT preview_mouse_footer_bounds_{};
+        bool preview_mouse_bounds_valid_{};
         void update_preview_navigation_hook(bool active);
         static LRESULT CALLBACK preview_navigation_mouse_hook(int code, WPARAM message, LPARAM data) noexcept;
         static HHOOK preview_navigation_hook_;
@@ -720,6 +727,8 @@ namespace winrt::Glance::App::implementation
         bool fullscreen_title_visible_{ true };
         bool fullscreen_footer_visible_{ true };
         bool double_click_fullscreen_enabled_{};
+        bool right_click_close_enabled_{};
+        bool exclude_right_click_navigation_{};
         ULONGLONG fullscreen_last_press_tick_{};
         bool fullscreen_fast_double_tap_{};
         bool fullscreen_toggle_pending_{};

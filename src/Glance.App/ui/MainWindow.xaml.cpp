@@ -1175,6 +1175,9 @@ namespace winrt::Glance::App::implementation
         media_timer_ = DispatcherTimer();
         media_timer_.Interval(std::chrono::milliseconds(250));
         const auto weak = get_weak();
+        PreviewContentHost().LayoutUpdated([weak](IInspectable const&, IInspectable const&) {
+            if (const auto self = weak.get()) self->update_preview_mouse_bounds();
+        });
         RootGrid().AddHandler(UIElement::PointerPressedEvent(), box_value<PointerEventHandler>([weak](IInspectable const&, PointerRoutedEventArgs const& args) {
             if (const auto self = weak.get(); self && self->active_component_view_)
             {
@@ -2255,8 +2258,11 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::ApplyWindowPreferences()
     {
-        double_click_fullscreen_enabled_ =
-            glance::app::load_window_preferences().double_click_fullscreen;
+        const auto preferences = glance::app::load_window_preferences();
+        double_click_fullscreen_enabled_ = preferences.double_click_fullscreen;
+        right_click_close_enabled_ = preferences.right_click_close;
+        update_preview_navigation_hook(visible_ && (right_click_close_enabled_ ||
+            !preview_navigation_.empty() || !preview_forward_navigation_.empty()));
         try
         {
             if (web_preview_ != nullptr)
@@ -2615,6 +2621,10 @@ namespace winrt::Glance::App::implementation
             {
                 try
                 {
+                    POINT point{};
+                    if (GET_DEVICE_LPARAM(lparam) == FAPPCOMMAND_MOUSE &&
+                        (!GetCursorPos(&point) || !self->is_preview_content_point(point)))
+                        return DefSubclassProc(window, message, wparam, lparam);
                     if (self->queue_preview_history_navigation(command == APPCOMMAND_BROWSER_FORWARD))
                         return TRUE;
                 }
@@ -2924,25 +2934,66 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void MainWindow::update_preview_mouse_bounds() noexcept
+    {
+        preview_mouse_bounds_valid_ = false;
+        try
+        {
+            const auto root = RootGrid();
+            if (!root.XamlRoot()) return;
+            const double scale = root.XamlRoot().RasterizationScale();
+            const auto bounds = [&](FrameworkElement const& element) {
+                const auto origin = element.TransformToVisual(root).TransformPoint({ 0, 0 });
+                return RECT{
+                    static_cast<LONG>(std::floor(origin.X * scale)),
+                    static_cast<LONG>(std::floor(origin.Y * scale)),
+                    static_cast<LONG>(std::ceil((origin.X + element.ActualWidth()) * scale)),
+                    static_cast<LONG>(std::ceil((origin.Y + element.ActualHeight()) * scale)) };
+            };
+            preview_mouse_content_bounds_ = bounds(PreviewContentHost());
+            preview_mouse_title_bounds_ = bounds(PreviewTitleBar());
+            preview_mouse_footer_bounds_ = bounds(PreviewFooterBar());
+            preview_mouse_bounds_valid_ = true;
+        }
+        catch (...) {}
+    }
+
+    bool MainWindow::is_preview_content_point(POINT point) const noexcept
+    {
+        return preview_mouse_bounds_valid_ && ScreenToClient(window_, &point) &&
+            PtInRect(&preview_mouse_content_bounds_, point) &&
+            !((!fullscreen_ || fullscreen_title_visible_) && PtInRect(&preview_mouse_title_bounds_, point)) &&
+            !((!fullscreen_ || fullscreen_footer_visible_) && PtInRect(&preview_mouse_footer_bounds_, point));
+    }
+
+    bool MainWindow::can_handle_preview_mouse(bool forward, bool right_click) const noexcept
+    {
+        if (!visible_ || xaml_modal_overlay_active_ || password_prompt_target_ != PasswordPromptTarget::none ||
+            current_index_ >= files_.size() || (right_click && exclude_right_click_navigation_)) return false;
+        return can_navigate_preview_history(forward) || (right_click && right_click_close_enabled_);
+    }
+
     LRESULT CALLBACK MainWindow::preview_navigation_mouse_hook(int code, WPARAM message, LPARAM data) noexcept
     {
         if (code == HC_ACTION && (message == WM_RBUTTONDOWN || message == WM_RBUTTONUP ||
             message == WM_XBUTTONDOWN || message == WM_XBUTTONUP))
         {
             const auto& input = *reinterpret_cast<const MSLLHOOKSTRUCT*>(data);
+            const bool right_click = message == WM_RBUTTONDOWN || message == WM_RBUTTONUP;
             const bool forward = (message == WM_XBUTTONDOWN || message == WM_XBUTTONUP) &&
                 HIWORD(input.mouseData) == XBUTTON2;
             const HWND target = GetAncestor(WindowFromPoint(input.pt), GA_ROOT);
             for (auto* window : preview_navigation_windows_)
             {
-                if (!window->can_navigate_preview_history(forward)) continue;
+                if (!window->can_handle_preview_mouse(forward, right_click) ||
+                    !window->is_preview_content_point(input.pt)) continue;
                 for (HWND owner = target; owner; owner = GetWindow(owner, GW_OWNER))
                 {
                     if (owner != window->window_) continue;
                     try
                     {
                         if (message == WM_RBUTTONDOWN || message == WM_XBUTTONDOWN ||
-                            window->queue_preview_history_navigation(forward))
+                            window->queue_preview_history_navigation(forward, right_click))
                             return 1;
                     }
                     catch (...) {}
@@ -2953,15 +3004,18 @@ namespace winrt::Glance::App::implementation
         return CallNextHookEx(preview_navigation_hook_, code, message, data);
     }
 
-    bool MainWindow::queue_preview_history_navigation(bool forward)
+    bool MainWindow::queue_preview_history_navigation(bool forward, bool right_click)
     {
-        if (!can_navigate_preview_history(forward)) return false;
-        return DispatcherQueue().TryEnqueue([weak = get_weak(), generation = content_generation_, forward] {
-            if (const auto self = weak.get(); self && self->visible_ &&
-                self->content_generation_ == generation && !self->xaml_modal_overlay_active_ &&
-                self->password_prompt_target_ == PasswordPromptTarget::none)
+        if (!can_handle_preview_mouse(forward, right_click)) return false;
+        return DispatcherQueue().TryEnqueue([weak = get_weak(), generation = content_generation_, forward, right_click] {
+            if (const auto self = weak.get(); self && self->content_generation_ == generation &&
+                self->can_handle_preview_mouse(forward, right_click))
             {
-                try { static_cast<void>(self->navigate_preview_history(forward)); }
+                try
+                {
+                    if (!self->navigate_preview_history(forward) && right_click && self->right_click_close_enabled_)
+                        self->ClosePreviewButton_Click(nullptr, nullptr);
+                }
                 catch (...) { glance::contracts::log_event(L"Preview history navigation failed."); }
             }
         });
@@ -3003,7 +3057,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::update_preview_navigation_ui()
     {
         update_preview_navigation_hook(visible_ &&
-            (!preview_navigation_.empty() || !preview_forward_navigation_.empty()));
+            (right_click_close_enabled_ || !preview_navigation_.empty() || !preview_forward_navigation_.empty()));
         BackButton().Visibility(
             preview_navigation_.empty() ? Visibility::Collapsed : Visibility::Visible);
         const bool show_file_list = preview_navigation_.empty() && files_.size() > 1;
@@ -3073,6 +3127,7 @@ namespace winrt::Glance::App::implementation
         reset_json_preview();
         clear_web_view_content();
         active_component_web_preview_.reset();
+        exclude_right_click_navigation_ = false;
         active_component_file_directory_.reset();
         active_file_directory_descriptor_ = {};
         active_file_directory_columns_.clear();
@@ -4146,6 +4201,7 @@ namespace winrt::Glance::App::implementation
             std::move(active_component_file_directory_);
         auto previous_component_refinement = std::move(active_component_refinement_);
         active_component_web_preview_.reset();
+        exclude_right_click_navigation_ = false;
         component_refinement_text_.clear();
         component_refinement_started_ = false;
         cancel_pdf_render();
@@ -4454,6 +4510,7 @@ namespace winrt::Glance::App::implementation
             std::move(active_component_file_directory_);
         auto previous_component_refinement = std::move(active_component_refinement_);
         active_component_web_preview_.reset();
+        exclude_right_click_navigation_ = false;
         active_file_directory_descriptor_ = {};
         active_file_directory_columns_.clear();
         component_refinement_text_.clear();
@@ -6618,6 +6675,7 @@ namespace winrt::Glance::App::implementation
         glance::app::ComponentPreviewResult result,
         std::uint64_t generation)
     {
+        exclude_right_click_navigation_ = result.exclude_right_click_navigation;
         using glance::contracts::components::PreviewContentFormat;
         using glance::contracts::components::PreviewContentKind;
 

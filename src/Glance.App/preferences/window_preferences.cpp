@@ -22,6 +22,7 @@ namespace
         { L"Window/AutoFitIgnoredExtensions", L"string", L"", 0, 4096, L"", L"next_preview" },
         { L"Window/RememberPosition", L"boolean", L"0", 0, 1, L"", L"next_preview" },
         { L"Window/DoubleClickFullscreen", L"boolean", L"0", 0, 1, L"", L"immediate" },
+        { L"Window/RightClickClose", L"boolean", L"0", 0, 1, L"", L"immediate" },
     };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Window";
 
@@ -119,6 +120,7 @@ namespace glance::app
             .auto_fit_ignored_extensions = read_string(L"AutoFitIgnoredExtensions"),
             .remember_position = read_dword(L"RememberPosition", 0) != 0,
             .double_click_fullscreen = read_dword(L"DoubleClickFullscreen", 0) != 0,
+            .right_click_close = read_dword(L"RightClickClose", 0) != 0,
         };
         preferences.adaptive_minimum_percent = std::min(
             preferences.adaptive_minimum_percent,
@@ -165,6 +167,7 @@ namespace glance::app
             key,
             L"DoubleClickFullscreen",
             preferences.double_click_fullscreen ? 1U : 0U);
+        write_dword(key, L"RightClickClose", preferences.right_click_close ? 1U : 0U);
         RegCloseKey(key);
     }
 

@@ -264,6 +264,7 @@ namespace glance::contracts::components
         wchar_t resource_path[component_resource_path_capacity]{};
         PreviewContentKind preferred_kind{ PreviewContentKind::none };
         PreviewContentFormat preferred_format{ PreviewContentFormat::none };
+        BOOL exclude_right_click_navigation{ FALSE };
     };
 
     struct ComponentStatusResult

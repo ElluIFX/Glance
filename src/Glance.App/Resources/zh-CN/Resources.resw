@@ -172,6 +172,9 @@
   <data name="RememberWindowPositionEnabledDescription.Text" xml:space="preserve"><value>按预览类型保存窗口中心相对屏幕中心的偏移</value></data>
   <data name="RememberWindowPositionDisabledDescription.Text" xml:space="preserve"><value>预览窗口使用默认位置</value></data>
   <data name="DoubleClickFullscreenLabel.Text" xml:space="preserve"><value>双击全屏</value></data>
+  <data name="RightClickCloseLabel.Text" xml:space="preserve"><value>右键关闭预览</value></data>
+  <data name="RightClickCloseEnabledDescription.Text" xml:space="preserve"><value>右键优先返回上一级，没有上一级时关闭预览</value></data>
+  <data name="RightClickCloseDisabledDescription.Text" xml:space="preserve"><value>启用后，没有上一级时右键关闭预览</value></data>
   <data name="DoubleClickFullscreenEnabledDescription.Text" xml:space="preserve"><value>双击预览区域切换全屏模式</value></data>
   <data name="DoubleClickFullscreenDisabledDescription.Text" xml:space="preserve"><value>启用后可双击预览切换全屏</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>重置</value></data>

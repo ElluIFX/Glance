@@ -220,6 +220,7 @@ namespace
         wcscpy_s(result.resource_path, L"resources.pri");
         result.preferred_kind = PreviewContentKind::web;
         result.preferred_format = PreviewContentFormat::html;
+        result.exclude_right_click_navigation = TRUE;
         *registration = result;
         return TRUE;
     }

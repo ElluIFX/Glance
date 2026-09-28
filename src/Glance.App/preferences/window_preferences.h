@@ -21,6 +21,7 @@ namespace glance::app
         std::wstring auto_fit_ignored_extensions;
         bool remember_position{};
         bool double_click_fullscreen{};
+        bool right_click_close{};
     };
 
     [[nodiscard]] WindowPreferences load_window_preferences() noexcept;

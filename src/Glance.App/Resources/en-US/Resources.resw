@@ -172,6 +172,9 @@
   <data name="RememberWindowPositionEnabledDescription.Text" xml:space="preserve"><value>Remember the window center offset for each preview type</value></data>
   <data name="RememberWindowPositionDisabledDescription.Text" xml:space="preserve"><value>Place preview windows at the default position</value></data>
   <data name="DoubleClickFullscreenLabel.Text" xml:space="preserve"><value>Double-click full screen</value></data>
+  <data name="RightClickCloseLabel.Text" xml:space="preserve"><value>Right-click to close preview</value></data>
+  <data name="RightClickCloseEnabledDescription.Text" xml:space="preserve"><value>Right-click to go back, or close the preview when there is no parent preview</value></data>
+  <data name="RightClickCloseDisabledDescription.Text" xml:space="preserve"><value>Enable to close the preview with a right-click when there is no parent preview</value></data>
   <data name="DoubleClickFullscreenEnabledDescription.Text" xml:space="preserve"><value>Double-click preview content to toggle full screen</value></data>
   <data name="DoubleClickFullscreenDisabledDescription.Text" xml:space="preserve"><value>Enable to toggle full screen by double-clicking the preview</value></data>
   <data name="ResetWindowPositionsButton.Content" xml:space="preserve"><value>Reset</value></data>

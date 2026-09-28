@@ -1009,6 +1009,7 @@ namespace
     {
         glance::app::ComponentPreviewResult result;
         result.status = glance::contracts::components::PrepareStatus::success;
+        result.exclude_right_click_navigation = component->registration.exclude_right_click_navigation != FALSE;
         if (!valid_content_pair(preview.kind, preview.format))
         {
             component->api.release_preview(preview.lease_token);

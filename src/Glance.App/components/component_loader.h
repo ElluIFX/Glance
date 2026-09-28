@@ -102,6 +102,7 @@ namespace glance::app
 
     struct ComponentPreviewResult
     {
+        bool exclude_right_click_navigation{};
         std::wstring component_id;
         glance::contracts::components::PrepareStatus status{
             glance::contracts::components::PrepareStatus::unavailable };
