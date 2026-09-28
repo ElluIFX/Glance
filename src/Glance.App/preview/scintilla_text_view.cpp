@@ -675,13 +675,13 @@ namespace glance::app
     }
 
     void ScintillaTextView::set_occlusions(
-        std::span<const RECT> rectangles) noexcept
+        std::span<const Occlusion> occlusions) noexcept
     {
         if (host_ == nullptr)
         {
             return;
         }
-        if (rectangles.empty())
+        if (occlusions.empty())
         {
             SetWindowRgn(host_, nullptr, TRUE);
             return;
@@ -697,8 +697,9 @@ namespace glance::app
         {
             return;
         }
-        for (const auto& rectangle : rectangles)
+        for (const auto& occlusion : occlusions)
         {
+            const auto& rectangle = occlusion.bounds;
             RECT clipped{
                 std::clamp(rectangle.left, bounds.left, bounds.right),
                 std::clamp(rectangle.top, bounds.top, bounds.bottom),
@@ -709,7 +710,10 @@ namespace glance::app
             {
                 continue;
             }
-            const HRGN excluded_region = CreateRectRgnIndirect(&clipped);
+            const HRGN excluded_region = occlusion.corner_radius > 0
+                ? CreateRoundRectRgn(rectangle.left, rectangle.top, rectangle.right + 1, rectangle.bottom + 1,
+                    occlusion.corner_radius * 2, occlusion.corner_radius * 2)
+                : CreateRectRgnIndirect(&clipped);
             if (excluded_region != nullptr)
             {
                 CombineRgn(
@@ -1034,6 +1038,12 @@ namespace glance::app
         DWORD_PTR reference_data) noexcept
     {
         auto* self = reinterpret_cast<ScintillaTextView*>(reference_data);
+        if (message == WM_MBUTTONDOWN && self != nullptr &&
+            self->call(SCI_GETSELECTIONEMPTY) == FALSE)
+        {
+            self->copy_selection();
+            return 0;
+        }
         const bool copy_command = message == SCI_COPY || message == WM_COPY ||
             (message == WM_COMMAND && LOWORD(wparam) == scintilla_copy_menu_id) ||
             (message == WM_KEYDOWN && wparam == 'C' && (GetKeyState(VK_CONTROL) & 0x8000) != 0);

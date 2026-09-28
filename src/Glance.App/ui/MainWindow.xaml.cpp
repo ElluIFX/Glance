@@ -8529,8 +8529,8 @@ namespace winrt::Glance::App::implementation
                 return;
             }
             const double scale = xaml_root.RasterizationScale();
-            std::vector<RECT> rectangles;
-            const auto append = [&](FrameworkElement const& element) {
+            std::vector<glance::app::ScintillaTextView::Occlusion> rectangles;
+            const auto append = [&](FrameworkElement const& element, int padding = 3, double radius = 0.0) {
                 if (element.Visibility() != Visibility::Visible ||
                     element.ActualWidth() <= 0.0 ||
                     element.ActualHeight() <= 0.0)
@@ -8540,15 +8540,14 @@ namespace winrt::Glance::App::implementation
                 const auto origin = element
                     .TransformToVisual(TextEditorHost())
                     .TransformPoint({ 0.0F, 0.0F });
-                constexpr int padding = 3;
-                rectangles.push_back({
+                rectangles.push_back({ {
                     static_cast<LONG>(std::floor(origin.X * scale)) - padding,
                     static_cast<LONG>(std::floor(origin.Y * scale)) - padding,
                     static_cast<LONG>(std::ceil(
                         (origin.X + static_cast<float>(element.ActualWidth())) * scale)) + padding,
                     static_cast<LONG>(std::ceil(
                         (origin.Y + static_cast<float>(element.ActualHeight())) * scale)) + padding,
-                });
+                }, static_cast<int>(std::lround(radius * scale)) });
             };
             if (!preview_notices_.empty()) append(PreviewNoticeStack());
             if (fullscreen_ && fullscreen_title_visible_)
@@ -8560,7 +8559,7 @@ namespace winrt::Glance::App::implementation
                 append(PreviewFooterBar());
             }
             append(TextFontSizeOverlay());
-            append(TextSelectionCopyButton());
+            append(TextSelectionCopyButton(), 0, TextSelectionCopyButton().CornerRadius().TopLeft);
             text_editor_->set_occlusions(rectangles);
         }
         catch (...)

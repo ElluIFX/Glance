@@ -1309,6 +1309,8 @@
 
         <Button
             x:Name="TextSelectionCopyButton"
+            CornerRadius="4"
+            Opacity="0.9"
             Grid.Row="1"
             Margin="16,0,16,32"
             Padding="18,10"

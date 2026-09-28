@@ -35,7 +35,12 @@ namespace glance::app
         [[nodiscard]] bool should_load_more() const noexcept;
 
         void set_bounds(int x, int y, int width, int height) noexcept;
-        void set_occlusions(std::span<const RECT> rectangles) noexcept;
+        struct Occlusion
+        {
+            RECT bounds{};
+            int corner_radius{};
+        };
+        void set_occlusions(std::span<const Occlusion> occlusions) noexcept;
         void set_visible(bool visible) noexcept;
         void set_copy_callbacks(std::function<void(bool)> selection_changed, std::function<void()> copied);
         void copy_selection() noexcept;
