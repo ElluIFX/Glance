@@ -9821,9 +9821,7 @@ namespace winrt::Glance::App::implementation
                 path += L"]";
             }
         }
-        if (!path.empty()) path += L" · ";
-        path += glance::app::localize(L"JsonNodeCopyHint");
-        ToolTipService::SetToolTip(row, box_value(path));
+        if (!path.empty()) { ToolTipService::SetToolTip(row, box_value(path)); }
     }
 
     void MainWindow::JsonTreeRow_PointerPressed(
