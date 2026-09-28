@@ -4938,6 +4938,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::initialize_media_player()
     {
         Windows::Media::Playback::MediaPlayer player;
+        player.IsLoopingEnabled(glance::app::load_media_preview_preferences().loop_playback);
         const auto weak = get_weak();
         const auto dispatcher = DispatcherQueue();
         player.MediaOpened([weak, dispatcher](auto const& sender, IInspectable const&) {

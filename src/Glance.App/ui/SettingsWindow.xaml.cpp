@@ -713,6 +713,8 @@ namespace winrt::Glance::App::implementation
         set_text(AutoplayAudioLabel(), L"AutoplayAudioLabel.Text");
         set_text(AutoplayAudioDescription(), L"AutoplayAudioDisabledDescription.Text");
         set_text(AutoplayVideoLabel(), L"AutoplayVideoLabel.Text");
+        set_text(LoopPlaybackLabel(), L"LoopPlaybackLabel.Text");
+        set_text(LoopPlaybackDescription(), L"LoopPlaybackDescription.Text");
         set_text(AutoplayVideoDescription(), L"AutoplayVideoDisabledDescription.Text");
         set_text(ReverseSeekWheelLabel(), L"ReverseSeekWheelLabel.Text");
         set_text(
@@ -1634,6 +1636,7 @@ namespace winrt::Glance::App::implementation
         DefaultVideoVolumeNumberBox().Value(media_preview_preferences_.video_volume_percent);
         AutoplayAudioToggle().IsOn(media_preview_preferences_.autoplay_audio);
         AutoplayVideoToggle().IsOn(media_preview_preferences_.autoplay_video);
+        LoopPlaybackToggle().IsOn(media_preview_preferences_.loop_playback);
         PreferFFmpegToggle().IsOn(media_preview_preferences_.prefer_ffmpeg);
         ReverseSeekWheelToggle().IsOn(media_preview_preferences_.reverse_seek_wheel);
         MiddleClickGalleryModeToggle().IsOn(
@@ -2009,6 +2012,7 @@ namespace winrt::Glance::App::implementation
         }
         media_preview_preferences_.autoplay_audio = AutoplayAudioToggle().IsOn();
         media_preview_preferences_.autoplay_video = AutoplayVideoToggle().IsOn();
+        media_preview_preferences_.loop_playback = LoopPlaybackToggle().IsOn();
         media_preview_preferences_.prefer_ffmpeg = PreferFFmpegToggle().IsOn();
         media_preview_preferences_.reverse_seek_wheel = ReverseSeekWheelToggle().IsOn();
         media_preview_preferences_.middle_click_gallery_mode =

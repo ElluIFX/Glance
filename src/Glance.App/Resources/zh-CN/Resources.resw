@@ -452,5 +452,7 @@
   <data name="DependencyAudioConsumer" xml:space="preserve"><value>音频预览</value></data>
   <data name="MediaDecodeFailed" xml:space="preserve"><value>无法解码此媒体文件</value></data>
   <data name="PreferFFmpegLabel.Text" xml:space="preserve"><value>优先使用 FFmpeg 软解</value></data>
+  <data name="LoopPlaybackLabel.Text" xml:space="preserve"><value>循环播放</value></data>
+  <data name="LoopPlaybackDescription.Text" xml:space="preserve"><value>播放完成后自动从头继续播放</value></data>
   <data name="PreferFFmpegDescription.Text" xml:space="preserve"><value>兼容性选项</value></data>
 </root>

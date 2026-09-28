@@ -904,6 +904,18 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="LoopPlaybackLabel" x:Uid="LoopPlaybackLabel" Text="Loop playback" />
+                                    <TextBlock x:Name="LoopPlaybackDescription" x:Uid="LoopPlaybackDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Restart playback from the beginning when it finishes" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="LoopPlaybackToggle" Grid.Column="1" Toggled="MediaPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
                                     <TextBlock x:Name="ReverseSeekWheelLabel" x:Uid="ReverseSeekWheelLabel" Text="Reverse seek wheel direction" />
                                     <TextBlock x:Name="ReverseSeekWheelDescription" x:Uid="ReverseSeekWheelDisabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Use the standard mouse wheel direction to seek media" />
                                 </StackPanel>

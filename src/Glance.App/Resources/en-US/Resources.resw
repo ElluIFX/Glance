@@ -452,5 +452,7 @@
   <data name="DependencyAudioConsumer" xml:space="preserve"><value>Audio preview</value></data>
   <data name="MediaDecodeFailed" xml:space="preserve"><value>This media could not be decoded</value></data>
   <data name="PreferFFmpegLabel.Text" xml:space="preserve"><value>Prefer FFmpeg software decoding</value></data>
+  <data name="LoopPlaybackLabel.Text" xml:space="preserve"><value>Loop playback</value></data>
+  <data name="LoopPlaybackDescription.Text" xml:space="preserve"><value>Restart playback from the beginning when it finishes</value></data>
   <data name="PreferFFmpegDescription.Text" xml:space="preserve"><value>Compatibility option</value></data>
 </root>
