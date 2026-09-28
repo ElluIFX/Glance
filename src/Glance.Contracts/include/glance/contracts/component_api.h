@@ -8,7 +8,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 12;
+    inline constexpr std::uint32_t abi_version = 13;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -28,7 +28,6 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t image_metadata_api_version = 1;
     inline constexpr std::uint32_t information_provider_api_version = 3;
     inline constexpr std::uint32_t status_bar_shortcut_api_version = 3;
-    inline constexpr std::uint32_t component_management_action_api_version = 2;
     inline constexpr std::size_t component_resource_path_capacity = 260;
     inline constexpr std::size_t resource_key_capacity = 256;
     inline constexpr std::size_t web_resource_host_capacity = 64;
@@ -47,10 +46,6 @@ namespace glance::contracts::components
     inline constexpr std::size_t contribution_id_capacity = 64;
     inline constexpr std::size_t contribution_text_capacity = 256;
     inline constexpr std::size_t maximum_status_bar_shortcuts = 8;
-    inline constexpr std::size_t maximum_component_management_actions = 4;
-    inline constexpr std::size_t download_url_capacity = 2048;
-    inline constexpr std::size_t download_file_name_capacity = 260;
-    inline constexpr std::size_t sha256_capacity = 65;
     inline constexpr std::size_t image_metadata_property_capacity = 128;
     inline constexpr std::size_t image_metadata_text_capacity = 512;
     inline constexpr std::size_t information_panel_value_capacity = 1024;
@@ -95,11 +90,6 @@ namespace glance::contracts::components
         0x38fc,
         0x43c3,
         { 0x89, 0xd5, 0x24, 0x71, 0x19, 0xb1, 0xdf, 0x79 } };
-    inline constexpr GUID component_management_action_api_id{
-        0xa41f0c2d,
-        0x3002,
-        0x46f6,
-        { 0x8b, 0xce, 0xb4, 0x51, 0x54, 0x4b, 0xc4, 0x62 } };
 
     enum class PreviewContentKind : std::uint32_t
     {
@@ -242,8 +232,8 @@ namespace glance::contracts::components
     {
         none = 0,
         toggle_hover_info = 1,
-        request_component_action = 2,
         set_native_media_view_mode = 3,
+        request_dependency = 4,
     };
 
     using RegisterExtensionFunction = BOOL(WINAPI*)(
@@ -263,6 +253,7 @@ namespace glance::contracts::components
         void* context{};
         RegisterExtensionFunction register_extension{};
         RegisterRendererFunction register_renderer{};
+        BOOL(WINAPI* query_host_interface)(const GUID*, std::uint32_t minimum_version, void**) noexcept{};
     };
 
     struct ComponentRegistration
@@ -519,42 +510,10 @@ namespace glance::contracts::components
         StatusBarShortcutActivation activation{ StatusBarShortcutActivation::none };
         BOOL checked{};
         wchar_t hover_info_id[contribution_id_capacity]{};
-        wchar_t component_action_id[contribution_id_capacity]{};
+        wchar_t dependency_id[contribution_id_capacity]{};
         wchar_t loading_text_key[contribution_text_capacity]{};
     };
 
-    struct ComponentManagementActionDescriptor
-    {
-        std::uint32_t size{ sizeof(ComponentManagementActionDescriptor) };
-        wchar_t action_id[contribution_id_capacity]{};
-        std::uint32_t order{};
-        wchar_t button_text_key[contribution_text_capacity]{};
-        wchar_t confirmation_title_key[contribution_text_capacity]{};
-        wchar_t confirmation_message_key[contribution_text_capacity]{};
-        wchar_t confirmation_button_key[contribution_text_capacity]{};
-        wchar_t download_title_key[contribution_text_capacity]{};
-        wchar_t download_message_key[contribution_text_capacity]{};
-        wchar_t preparing_title_key[contribution_text_capacity]{};
-        wchar_t preparing_message_key[contribution_text_capacity]{};
-        wchar_t completed_title_key[contribution_text_capacity]{};
-        wchar_t completed_message_key[contribution_text_capacity]{};
-    };
-
-    struct ComponentDownloadRequest
-    {
-        std::uint32_t size{ sizeof(ComponentDownloadRequest) };
-        wchar_t url[download_url_capacity]{};
-        wchar_t file_name[download_file_name_capacity]{};
-        wchar_t sha256[sha256_capacity]{};
-        std::uint64_t expected_size{};
-    };
-
-    struct ComponentManagementActionResult
-    {
-        std::uint32_t size{ sizeof(ComponentManagementActionResult) };
-        BOOL succeeded{};
-        wchar_t detail_key[contribution_text_capacity]{};
-    };
 
     using AppendFileDirectoryEntryFunction = BOOL(WINAPI*)(
         void* context,
@@ -645,18 +604,6 @@ namespace glance::contracts::components
         const wchar_t* shortcut_id,
         const wchar_t* path,
         const HoverInfoTextSink* sink) noexcept;
-    using EnumerateComponentManagementActionsFunction = BOOL(WINAPI*)(
-        ComponentManagementActionDescriptor* descriptors,
-        std::uint32_t capacity,
-        std::uint32_t* count) noexcept;
-    using PrepareComponentManagementActionFunction = BOOL(WINAPI*)(
-        const wchar_t* action_id,
-        ComponentDownloadRequest* request) noexcept;
-    using CompleteComponentManagementActionFunction = BOOL(WINAPI*)(
-        const wchar_t* action_id,
-        const wchar_t* downloaded_path,
-        const wchar_t* component_storage_path,
-        ComponentManagementActionResult* result) noexcept;
     using QueryInterfaceFunction = BOOL(WINAPI*)(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -760,14 +707,6 @@ namespace glance::contracts::components
         EnumerateStatusBarShortcutsFunction enumerate_shortcuts{};
         QueryStatusBarShortcutStateFunction query_state{};
         ActivateStatusBarShortcutFunction activate{};
-    };
-    struct ComponentManagementActionApi
-    {
-        std::uint32_t size{ sizeof(ComponentManagementActionApi) };
-        std::uint32_t version{ component_management_action_api_version };
-        EnumerateComponentManagementActionsFunction enumerate_actions{};
-        PrepareComponentManagementActionFunction prepare_action{};
-        CompleteComponentManagementActionFunction complete_action{};
     };
 
     struct ComponentApi

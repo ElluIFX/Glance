@@ -45,7 +45,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Advapi32.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;Dwmapi.lib;icu.lib;Ole32.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Advapi32.lib;Bcrypt.lib;Comctl32.lib;Dbghelp.lib;Dwrite.lib;Dwmapi.lib;icu.lib;Ole32.lib;Propsys.lib;RuntimeObject.lib;Shell32.lib;Shlwapi.lib;User32.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -58,6 +58,8 @@
     <ClInclude Include="preview\archive_provider.h" />
     <ClInclude Include="preview\fullscreen_interaction.h" />
     <ClInclude Include="components\component_loader.h" />
+    <ClInclude Include="dependencies\dependency_service.h" />
+    <ClInclude Include="preview\software_media_source.h" />
     <ClInclude Include="application\core_network_client.h" />
     <ClInclude Include="preferences\footer_preferences.h" />
     <ClInclude Include="preferences\folder_preview_preferences.h" />
@@ -113,6 +115,9 @@
   <ItemGroup>
     <ClCompile Include="preview\archive_provider.cpp" />
     <ClCompile Include="components\component_loader.cpp" />
+    <ClCompile Include="dependencies\dependency_service.cpp" />
+    <ClCompile Include="dependencies\builtin_dependencies.cpp" />
+    <ClCompile Include="preview\software_media_source.cpp" />
     <ClCompile Include="application\core_network_client.cpp" />
     <ClCompile Include="preferences\footer_preferences.cpp" />
     <ClCompile Include="preferences\folder_preview_preferences.cpp" />
@@ -195,6 +200,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Glance.Contracts\Glance.Contracts.vcxproj">
       <Project>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Glance.MediaHost\Glance.MediaHost.vcxproj">
+      <Project>{A1CD1C75-DB62-49D9-BFA8-A40666B10CF4}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

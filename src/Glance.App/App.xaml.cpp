@@ -4,6 +4,7 @@
 #include "localization.h"
 #include "MainWindow.xaml.h"
 #include "component_loader.h"
+#include "dependencies/dependency_service.h"
 #include "resource.h"
 #include "SettingsWindow.xaml.h"
 #include "startup_registration.h"
@@ -213,6 +214,9 @@ namespace winrt::Glance::App::implementation
               [this](auto type, auto payload) { return pipe_client_.send(type, payload); },
               [this](auto result) { handle_automatic_update_result(std::move(result)); })
     {
+        glance::app::dependencies::configure_downloader([this](const auto& request, const auto& cancelled, const auto& progress) {
+            return core_network_client_.download(request, cancelled, progress);
+        });
         Input::FocusManager::GettingFocus([](IInspectable const&, Input::GettingFocusEventArgs const& args) {
             if (const auto button = args.NewFocusedElement().try_as<Controls::Primitives::ButtonBase>())
             {
@@ -248,6 +252,7 @@ namespace winrt::Glance::App::implementation
     {
         shutting_down_.store(true, std::memory_order_release);
         core_network_client_.disconnect();
+        glance::app::dependencies::shutdown();
         command_server_.reset();
         pipe_client_.stop();
         close_core_process();
@@ -319,6 +324,8 @@ namespace winrt::Glance::App::implementation
 
         glance::app::initialize_webview_availability();
         glance::app::initialize_components();
+        glance::app::dependencies::register_media_dependency();
+        glance::app::dependencies::migrate_legacy_installations();
         glance::contracts::log_event(L"Creating the initial preview window.");
         create_active_window();
         glance::contracts::log_event(L"Creating the notification area icon.");
@@ -732,14 +739,6 @@ namespace winrt::Glance::App::implementation
                 return pipe_client_.send(
                     glance::contracts::MessageType::gallery_request,
                     payload);
-            },
-            [this](std::wstring component_id, std::wstring action_id) {
-                show_settings();
-                if (settings_window_ != nullptr)
-                {
-                    get_self<implementation::SettingsWindow>(settings_window_)
-                        ->ShowComponentAction(component_id, action_id);
-                }
             });
     }
 
@@ -754,18 +753,6 @@ namespace winrt::Glance::App::implementation
                 [this] { apply_text_preferences(); },
                 [this] { apply_footer_preferences(); },
                 [this] { apply_window_preferences(); },
-                [this] {
-                    if (active_window_ != nullptr)
-                    {
-                        get_self<implementation::MainWindow>(active_window_)
-                            ->RefreshComponentContributions();
-                    }
-                    for (const auto& window : detached_windows_)
-                    {
-                        get_self<implementation::MainWindow>(window)
-                            ->RefreshComponentContributions();
-                    }
-                },
                 [this](std::wstring component_id) {
                     if (active_window_ != nullptr)
                     {

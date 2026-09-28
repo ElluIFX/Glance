@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <map>
 
 namespace winrt::Glance::App::implementation
 {
@@ -35,7 +36,6 @@ namespace winrt::Glance::App::implementation
         using TextPreferencesChangedCallback = std::function<void()>;
         using FooterPreferencesChangedCallback = std::function<void()>;
         using WindowPreferencesChangedCallback = std::function<void()>;
-        using ComponentChangedCallback = std::function<void()>;
         using ComponentSettingChangedCallback =
             std::function<void(std::wstring)>;
         using SourceStatusRequestCallback = std::function<bool(std::string)>;
@@ -57,7 +57,6 @@ namespace winrt::Glance::App::implementation
             TextPreferencesChangedCallback text_preferences_changed_callback,
             FooterPreferencesChangedCallback footer_preferences_changed_callback,
             WindowPreferencesChangedCallback window_preferences_changed_callback,
-            ComponentChangedCallback component_changed_callback,
             ComponentSettingChangedCallback component_setting_changed_callback,
             SourceStatusRequestCallback source_status_request_callback,
             UpdateCheckCallback update_check_callback,
@@ -67,9 +66,6 @@ namespace winrt::Glance::App::implementation
         void ReloadPreferences();
         void ApplyLocalizedResources();
         void ShowAndActivate();
-        void ShowComponentAction(
-            std::wstring_view component_id,
-            std::wstring_view action_id);
         void ShowUpdateDownload(glance::app::UpdateInstallerAsset asset);
         static winrt::Windows::Foundation::IAsyncOperation<std::int32_t>
             ShowUpdateResultDialog(
@@ -219,6 +215,8 @@ namespace winrt::Glance::App::implementation
         void configure_window();
         void refresh_runtime_statuses();
         void refresh_component_statuses();
+        void refresh_dependency_statuses();
+        winrt::fire_and_forget uninstall_dependency(std::wstring id);
         void request_source_statuses();
         void refresh_diagnostic_bundle_status();
         void refresh_launch_at_sign_in();
@@ -236,8 +234,6 @@ namespace winrt::Glance::App::implementation
         void rebuild_component_settings();
         [[nodiscard]] FooterFieldControls footer_field_controls(glance::app::FooterField field);
         winrt::fire_and_forget download_and_install_update(glance::app::UpdateInstallerAsset asset);
-        winrt::fire_and_forget run_component_action(
-            glance::app::ComponentManagementAction action);
         void show_update_download_card(std::wstring_view version);
         void show_download_card(std::wstring_view title, std::wstring_view message);
         void show_preparing_card(std::wstring_view title, std::wstring_view message);
@@ -284,11 +280,11 @@ namespace winrt::Glance::App::implementation
         TextPreferencesChangedCallback text_preferences_changed_callback_;
         FooterPreferencesChangedCallback footer_preferences_changed_callback_;
         WindowPreferencesChangedCallback window_preferences_changed_callback_;
-        ComponentChangedCallback component_changed_callback_;
         ComponentSettingChangedCallback component_setting_changed_callback_;
         SourceStatusRequestCallback source_status_request_callback_;
         UpdateCheckCallback update_check_callback_;
         NetworkDownloadCallback network_download_callback_;
+        std::map<std::wstring, std::wstring> dependency_errors_;
         UpdatePreferencesChangedCallback update_preferences_changed_callback_;
     };
 }

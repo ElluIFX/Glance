@@ -33,6 +33,12 @@
   <ItemGroup>
     <ClCompile Include="input_decision_tests.cpp" />
     <ClCompile Include="window_memory_tests.cpp" />
+    <ClCompile Include="dependency_runtime_tests.cpp" />
+    <ClCompile Include="dependency_service_tests.cpp" />
+    <ClCompile Include="software_media_tests.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\dependencies\builtin_dependencies.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\software_media_source.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\dependencies\dependency_service.cpp" />
     <ClCompile Include="..\..\src\Glance.App\preferences\window_size_store.cpp" />
     <ClCompile Include="executable_tests.cpp" />
     <ClCompile Include="font_tests.cpp" />
@@ -62,6 +68,10 @@
     <ProjectReference Include="..\..\src\Glance.Contracts\Glance.Contracts.vcxproj">
       <Project>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\Glance.MediaHost\Glance.MediaHost.vcxproj">
+      <Project>{A1CD1C75-DB62-49D9-BFA8-A40666B10CF4}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\Glance.Components\Pdf\host\Glance.PdfHost.vcxproj">
       <Project>{9C9F6ED2-C2C8-4EB2-BE90-A9696AA97F50}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
@@ -73,6 +83,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.5" />
+    <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
     <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.3" />
     <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.3.1" />
   </ItemGroup>

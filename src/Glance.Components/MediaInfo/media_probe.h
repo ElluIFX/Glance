@@ -1,6 +1,7 @@
 #pragma once
 
 #include "glance/contracts/component_api.h"
+#include "glance/contracts/dependency_api.h"
 
 #include <filesystem>
 #include <string>
@@ -8,18 +9,12 @@
 
 namespace glance::components::media_info
 {
-    [[nodiscard]] std::filesystem::path find_ffprobe() noexcept;
-    [[nodiscard]] bool validate_ffprobe(const std::filesystem::path& path) noexcept;
     [[nodiscard]] glance::contracts::components::PrepareStatus query_media_info(
-        const std::filesystem::path& ffprobe,
+        const glance::contracts::dependencies::HostApi& dependencies,
         std::wstring_view path,
         const glance::contracts::components::InformationPanelSink& sink) noexcept;
     [[nodiscard]] std::wstring query_media_json(
-        const std::filesystem::path& ffprobe,
+        const glance::contracts::dependencies::HostApi& dependencies,
         std::wstring_view path,
         const glance::contracts::components::HoverInfoTextSink& sink) noexcept;
-    [[nodiscard]] bool install_ffprobe(
-        const std::filesystem::path& archive,
-        const std::filesystem::path& storage,
-        std::wstring& error_key) noexcept;
 }

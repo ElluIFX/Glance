@@ -375,15 +375,15 @@
   <data name="UpdateFrequencyWeeklyItem.Content" xml:space="preserve"><value>每周</value></data>
   <data name="UpdateFrequencyMonthlyItem.Content" xml:space="preserve"><value>每月</value></data>
   <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>附加</value></data>
-  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>可选组件、来源及其运行状态</value></data>
-  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>附加组件位置</value></data>
+  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>可选依赖、组件、来源及其运行状态</value></data>
+  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>可选组件</value></data>
   <data name="ComponentFolderLabel.Text" xml:space="preserve"><value>组件文件夹</value></data>
   <data name="ComponentFolderDescription.Text" xml:space="preserve"><value>Glance 启动时将从此目录加载组件</value></data>
   <data name="OpenComponentsFolderButton.Content" xml:space="preserve"><value>打开文件夹</value></data>
   <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>附加组件状态</value></data>
   <data name="ComponentEmptyTitle.Text" xml:space="preserve"><value>未安装任何组件</value></data>
   <data name="ComponentEmptyDescription.Text" xml:space="preserve"><value>安装可选组件以支持更多文件格式</value></data>
-  <data name="SourceLocationGroupTitle.Text" xml:space="preserve"><value>附加来源位置</value></data>
+  <data name="SourceLocationGroupTitle.Text" xml:space="preserve"><value>可选来源</value></data>
   <data name="SourceFolderLabel.Text" xml:space="preserve"><value>来源文件夹</value></data>
   <data name="SourceFolderDescription.Text" xml:space="preserve"><value>Glance 启动时将从此目录加载来源</value></data>
   <data name="OpenSourcesFolderButton.Content" xml:space="preserve"><value>打开文件夹</value></data>
@@ -397,12 +397,6 @@
   <data name="ComponentWebViewUnavailable" xml:space="preserve"><value>未检测到 WebView2 运行时</value></data>
   <data name="ComponentDependencyUnavailable" xml:space="preserve"><value>依赖组件 {0} 不可用</value></data>
   <data name="ComponentDependencyCycle" xml:space="preserve"><value>组件依赖关系存在循环</value></data>
-  <data name="ComponentActionDownloadFailedTitle" xml:space="preserve"><value>无法下载依赖</value></data>
-  <data name="ComponentActionDownloadNetworkFailedMessage" xml:space="preserve"><value>无法下载依赖，请检查网络连接后重试</value></data>
-  <data name="ComponentActionDownloadFileFailedMessage" xml:space="preserve"><value>无法保存依赖，请检查可用磁盘空间后重试</value></data>
-  <data name="ComponentActionDownloadIntegrityFailedMessage" xml:space="preserve"><value>下载的依赖与预期校验值不一致</value></data>
-  <data name="ComponentActionFailedTitle" xml:space="preserve"><value>无法准备组件</value></data>
-  <data name="ComponentActionFailedMessage" xml:space="preserve"><value>无法安装下载的依赖</value></data>
   <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>预览</value></data>
   <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>代码</value></data>
   <data name="JsonTreeButton.Content" xml:space="preserve"><value>结构化</value></data>
@@ -437,4 +431,20 @@
   <data name="TextMonitorButton.ToolTipService.ToolTip" xml:space="preserve"><value>切换文件监视&#xA;右键刷新一次</value></data>
   <data name="TextMonitorEnabledNotice" xml:space="preserve"><value>已开启文件监视</value></data>
   <data name="TextMonitorPausedNotice" xml:space="preserve"><value>已暂停文件监视</value></data>
+  <data name="DependencyGroupTitle.Text" xml:space="preserve"><value>可选依赖</value></data>
+  <data name="DependencyInstalled" xml:space="preserve"><value>已安装</value></data>
+  <data name="DependencyExternal" xml:space="preserve"><value>PATH 中可用</value></data>
+  <data name="DependencyMissing" xml:space="preserve"><value>未安装</value></data>
+  <data name="DependencyDownloading" xml:space="preserve"><value>正在下载...</value></data>
+  <data name="DependencyInstalling" xml:space="preserve"><value>正在安装...</value></data>
+  <data name="DependencyFailed" xml:space="preserve"><value>操作失败，请重试</value></data>
+  <data name="DependencyInUse" xml:space="preserve"><value>正在使用，请先关闭相关预览</value></data>
+  <data name="DependencyCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="DependencyUninstall" xml:space="preserve"><value>卸载</value></data>
+  <data name="DependencyDownload" xml:space="preserve"><value>下载</value></data>
+  <data name="DependencyRequired" xml:space="preserve"><value>此预览需要可选依赖</value></data>
+  <data name="DependencyVideoConsumer" xml:space="preserve"><value>视频预览</value></data>
+  <data name="DependencyAudioConsumer" xml:space="preserve"><value>音频预览</value></data>
+  <data name="MediaDecodeFailed" xml:space="preserve"><value>无法解码此媒体文件</value></data>
+  <data name="SoftwareMediaPreparing" xml:space="preserve"><value>正在准备软解播放...</value></data>
 </root>

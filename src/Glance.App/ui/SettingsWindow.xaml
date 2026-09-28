@@ -1009,6 +1009,12 @@
                         <TextBlock x:Name="ComponentsPageDescription" x:Uid="ComponentsPageDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Install and manage optional preview support" />
                     </StackPanel>
                     <StackPanel Spacing="8">
+                        <TextBlock x:Name="DependencyGroupTitle" x:Uid="DependencyGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Optional dependencies" />
+                        <Border Style="{StaticResource SettingsGroupStyle}">
+                            <StackPanel x:Name="DependencyStatusList" />
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
                         <TextBlock x:Name="ComponentLocationGroupTitle" x:Uid="ComponentLocationGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on component location" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
                             <Grid Style="{StaticResource SettingsRowStyle}">
@@ -1023,7 +1029,6 @@
                                 <Button x:Name="OpenComponentsFolderButton" x:Uid="OpenComponentsFolderButton" Grid.Column="1" Click="OpenComponentsFolderButton_Click" Content="Open folder" />
                             </Grid>
                         </Border>
-                    </StackPanel>
                     <Expander
                         x:Name="ComponentStatusExpander"
                         HorizontalAlignment="Stretch"
@@ -1069,6 +1074,7 @@
                             </Grid>
                         </Grid>
                     </Expander>
+                    </StackPanel>
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="SourceLocationGroupTitle" x:Uid="SourceLocationGroupTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Add-on source location" />
                         <Border Style="{StaticResource SettingsGroupStyle}">
@@ -1084,7 +1090,6 @@
                                 <Button x:Name="OpenSourcesFolderButton" x:Uid="OpenSourcesFolderButton" Grid.Column="1" Click="OpenSourcesFolderButton_Click" Content="Open folder" />
                             </Grid>
                         </Border>
-                    </StackPanel>
                     <Expander
                         x:Name="SourceStatusExpander"
                         HorizontalAlignment="Stretch"
@@ -1108,6 +1113,7 @@
                             </Grid>
                         </Grid>
                     </Expander>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 

@@ -1,9 +1,6 @@
 #include "pch.h"
 #include "media_probe.h"
 
-#include <bcrypt.h>
-#include <shlobj.h>
-
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -13,7 +10,6 @@
 #include <optional>
 #include <ranges>
 #include <sstream>
-#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -25,125 +21,11 @@ namespace
     constexpr std::size_t maximum_tag_value_characters = 512;
     constexpr std::uint32_t maximum_stream_count = 64;
     constexpr std::size_t maximum_tag_count = 128;
-    constexpr wchar_t ffprobe_sha256[] =
-        L"b49ccc7c6547b141ad5a2f6ec69cc04323d7133d7704d70b331b904c63eecb07";
-    constexpr wchar_t ffprobe_archive_member[] =
-        L"ffmpeg-8.1.2-essentials_build/bin/ffprobe.exe";
-
-    class Handle
-    {
-    public:
-        explicit Handle(HANDLE value = INVALID_HANDLE_VALUE) noexcept : value_(value)
-        {
-        }
-
-        ~Handle()
-        {
-            reset();
-        }
-
-        Handle(const Handle&) = delete;
-        Handle& operator=(const Handle&) = delete;
-
-        Handle(Handle&& other) noexcept : value_(other.release())
-        {
-        }
-
-        Handle& operator=(Handle&& other) noexcept
-        {
-            if (this != &other)
-            {
-                reset(other.release());
-            }
-            return *this;
-        }
-
-        void reset(HANDLE value = INVALID_HANDLE_VALUE) noexcept
-        {
-            if (value_ != INVALID_HANDLE_VALUE && value_ != nullptr)
-            {
-                CloseHandle(value_);
-            }
-            value_ = value;
-        }
-
-        [[nodiscard]] HANDLE release() noexcept
-        {
-            const HANDLE value = value_;
-            value_ = INVALID_HANDLE_VALUE;
-            return value;
-        }
-
-        [[nodiscard]] HANDLE get() const noexcept
-        {
-            return value_;
-        }
-
-        [[nodiscard]] explicit operator bool() const noexcept
-        {
-            return value_ != INVALID_HANDLE_VALUE && value_ != nullptr;
-        }
-
-    private:
-        HANDLE value_{ INVALID_HANDLE_VALUE };
-    };
-
-    struct BCryptState
-    {
-        BCRYPT_ALG_HANDLE algorithm{};
-        BCRYPT_HASH_HANDLE hash{};
-
-        ~BCryptState()
-        {
-            if (hash != nullptr)
-            {
-                BCryptDestroyHash(hash);
-            }
-            if (algorithm != nullptr)
-            {
-                BCryptCloseAlgorithmProvider(algorithm, 0);
-            }
-        }
-    };
-
-    std::wstring quote_argument(std::wstring_view value)
-    {
-        std::wstring result{ L'"' };
-        std::size_t backslashes{};
-        for (const wchar_t character : value)
-        {
-            if (character == L'\\')
-            {
-                ++backslashes;
-                continue;
-            }
-            if (character == L'"')
-            {
-                result.append(backslashes * 2 + 1, L'\\');
-                result.push_back(character);
-                backslashes = 0;
-                continue;
-            }
-            result.append(backslashes, L'\\');
-            backslashes = 0;
-            result.push_back(character);
-        }
-        result.append(backslashes * 2, L'\\');
-        result.push_back(L'"');
-        return result;
-    }
-
     struct CancellationProbe
     {
         void* context{};
-        BOOL(WINAPI* is_cancelled)(void* context) noexcept{};
+        BOOL(WINAPI* is_cancelled)(void*) noexcept{};
     };
-
-    bool sink_cancelled(const CancellationProbe* sink) noexcept
-    {
-        return sink != nullptr && sink->is_cancelled != nullptr &&
-            sink->is_cancelled(sink->context) != FALSE;
-    }
 
     struct ProcessOutput
     {
@@ -151,146 +33,6 @@ namespace
         bool succeeded{};
         bool cancelled{};
     };
-
-    ProcessOutput run_process_capture(
-        const std::filesystem::path& executable,
-        std::wstring arguments,
-        DWORD timeout_ms,
-        const CancellationProbe* sink)
-    {
-        SECURITY_ATTRIBUTES security{ sizeof(security), nullptr, TRUE };
-        HANDLE raw_read{};
-        HANDLE raw_write{};
-        if (!CreatePipe(&raw_read, &raw_write, &security, 0))
-        {
-            return {};
-        }
-        Handle read_pipe(raw_read);
-        Handle write_pipe(raw_write);
-        if (!SetHandleInformation(read_pipe.get(), HANDLE_FLAG_INHERIT, 0))
-        {
-            return {};
-        }
-
-        std::wstring command_line = quote_argument(executable.wstring());
-        if (!arguments.empty())
-        {
-            command_line.push_back(L' ');
-            command_line.append(arguments);
-        }
-        STARTUPINFOW startup{ sizeof(startup) };
-        startup.dwFlags = STARTF_USESTDHANDLES;
-        startup.hStdOutput = write_pipe.get();
-        startup.hStdError = write_pipe.get();
-        PROCESS_INFORMATION process{};
-        if (!CreateProcessW(
-                executable.c_str(),
-                command_line.data(),
-                nullptr,
-                nullptr,
-                TRUE,
-                CREATE_NO_WINDOW,
-                nullptr,
-                nullptr,
-                &startup,
-                &process))
-        {
-            return {};
-        }
-        Handle process_handle(process.hProcess);
-        Handle thread_handle(process.hThread);
-        write_pipe.reset();
-
-        ProcessOutput result;
-        std::thread reader([handle = read_pipe.release(), &result] {
-            Handle pipe(handle);
-            std::array<char, 8192> buffer{};
-            DWORD read{};
-            while (ReadFile(
-                       pipe.get(),
-                       buffer.data(),
-                       static_cast<DWORD>(buffer.size()),
-                       &read,
-                       nullptr) &&
-                   read != 0)
-            {
-                const std::size_t remaining =
-                    maximum_probe_output_bytes - result.text.size();
-                result.text.append(buffer.data(), std::min<std::size_t>(read, remaining));
-            }
-        });
-
-        const ULONGLONG deadline = GetTickCount64() + timeout_ms;
-        while (true)
-        {
-            const DWORD wait = WaitForSingleObject(process_handle.get(), 50);
-            if (wait == WAIT_OBJECT_0)
-            {
-                break;
-            }
-            if (wait == WAIT_FAILED || sink_cancelled(sink) || GetTickCount64() >= deadline)
-            {
-                result.cancelled = sink_cancelled(sink);
-                static_cast<void>(TerminateProcess(
-                    process_handle.get(),
-                    result.cancelled ? ERROR_CANCELLED : ERROR_TIMEOUT));
-                static_cast<void>(WaitForSingleObject(process_handle.get(), 1000));
-                break;
-            }
-        }
-        reader.join();
-        DWORD exit_code = ERROR_GEN_FAILURE;
-        result.succeeded = !result.cancelled &&
-            GetExitCodeProcess(process_handle.get(), &exit_code) && exit_code == 0;
-        return result;
-    }
-
-    std::filesystem::path local_ffprobe_path()
-    {
-        PWSTR raw_path{};
-        if (FAILED(SHGetKnownFolderPath(
-                FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &raw_path)))
-        {
-            return {};
-        }
-        const std::unique_ptr<wchar_t, decltype(&CoTaskMemFree)> path(
-            raw_path,
-            CoTaskMemFree);
-        return std::filesystem::path(path.get()) / L"Glance" / L"Components" /
-            L"media-info" / L"bin" / L"ffprobe.exe";
-    }
-
-    std::filesystem::path path_ffprobe()
-    {
-        const DWORD path_length = GetEnvironmentVariableW(L"PATH", nullptr, 0);
-        if (path_length == 0)
-        {
-            return {};
-        }
-        std::wstring search_path(path_length, L'\0');
-        if (GetEnvironmentVariableW(L"PATH", search_path.data(), path_length) == 0)
-        {
-            return {};
-        }
-        while (!search_path.empty() && search_path.back() == L'\0')
-        {
-            search_path.pop_back();
-        }
-        std::wstring executable(32768, L'\0');
-        const DWORD length = SearchPathW(
-            search_path.c_str(),
-            L"ffprobe.exe",
-            nullptr,
-            static_cast<DWORD>(executable.size()),
-            executable.data(),
-            nullptr);
-        if (length == 0 || length >= executable.size())
-        {
-            return {};
-        }
-        executable.resize(length);
-        return executable;
-    }
 
     std::wstring json_string(
         const winrt::Windows::Data::Json::JsonObject& object,
@@ -829,126 +571,9 @@ namespace
         return emitted;
     }
 
-    std::optional<std::wstring> sha256_file(const std::filesystem::path& path)
-    {
-        Handle file(CreateFileW(
-            path.c_str(),
-            GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_DELETE,
-            nullptr,
-            OPEN_EXISTING,
-            FILE_FLAG_SEQUENTIAL_SCAN,
-            nullptr));
-        if (!file)
-        {
-            return std::nullopt;
-        }
-
-        BCryptState state;
-        std::vector<std::uint8_t> object;
-        if (!BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(
-                &state.algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0)))
-        {
-            return std::nullopt;
-        }
-        DWORD object_size{};
-        DWORD result_size{};
-        if (!BCRYPT_SUCCESS(BCryptGetProperty(
-                state.algorithm,
-                BCRYPT_OBJECT_LENGTH,
-                reinterpret_cast<PUCHAR>(&object_size),
-                sizeof(object_size),
-                &result_size,
-                0)))
-        {
-            return std::nullopt;
-        }
-        object.resize(object_size);
-        if (!BCRYPT_SUCCESS(BCryptCreateHash(
-                state.algorithm,
-                &state.hash,
-                object.data(),
-                static_cast<ULONG>(object.size()),
-                nullptr,
-                0,
-                0)))
-        {
-            return std::nullopt;
-        }
-        std::array<std::uint8_t, 256 * 1024> buffer{};
-        while (true)
-        {
-            DWORD read{};
-            if (!ReadFile(file.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr))
-            {
-                return std::nullopt;
-            }
-            if (read == 0)
-            {
-                break;
-            }
-            if (!BCRYPT_SUCCESS(BCryptHashData(state.hash, buffer.data(), read, 0)))
-            {
-                return std::nullopt;
-            }
-        }
-        std::array<std::uint8_t, 32> digest{};
-        if (!BCRYPT_SUCCESS(BCryptFinishHash(
-                state.hash, digest.data(), static_cast<ULONG>(digest.size()), 0)))
-        {
-            return std::nullopt;
-        }
-        BCryptDestroyHash(state.hash);
-        state.hash = nullptr;
-        constexpr wchar_t hexadecimal[] = L"0123456789abcdef";
-        std::wstring value;
-        value.reserve(64);
-        for (const auto byte : digest)
-        {
-            value.push_back(hexadecimal[byte >> 4]);
-            value.push_back(hexadecimal[byte & 0x0f]);
-        }
-        return value;
-    }
-
-    bool run_tar(
-        const std::filesystem::path& tar,
-        const std::filesystem::path& archive,
-        const std::filesystem::path& staging)
-    {
-        std::wstring command_line = quote_argument(tar.wstring()) +
-            L" -xf " + quote_argument(archive.wstring()) +
-            L" -C " + quote_argument(staging.wstring()) +
-            L" " + quote_argument(ffprobe_archive_member);
-        STARTUPINFOW startup{ sizeof(startup) };
-        PROCESS_INFORMATION process{};
-        if (!CreateProcessW(
-                tar.c_str(),
-                command_line.data(),
-                nullptr,
-                nullptr,
-                FALSE,
-                CREATE_NO_WINDOW,
-                nullptr,
-                nullptr,
-                &startup,
-                &process))
-        {
-            return false;
-        }
-        Handle process_handle(process.hProcess);
-        Handle thread_handle(process.hThread);
-        if (WaitForSingleObject(process_handle.get(), 30000) != WAIT_OBJECT_0)
-        {
-            static_cast<void>(TerminateProcess(process_handle.get(), ERROR_TIMEOUT));
-            return false;
-        }
-        DWORD exit_code = ERROR_GEN_FAILURE;
-        return GetExitCodeProcess(process_handle.get(), &exit_code) && exit_code == 0;
-    }
 
     ProcessOutput run_media_probe(
-        const std::filesystem::path& ffprobe,
+        const glance::contracts::dependencies::HostApi& dependencies,
         std::wstring_view path,
         const CancellationProbe* sink)
     {
@@ -965,51 +590,31 @@ namespace
             L"stream_side_data=rotation:"
             L"chapter=id,start_time,end_time:"
             L"chapter_tags=title";
-        return run_process_capture(
-            ffprobe,
-            L"-v error -show_entries " + std::wstring(entries) +
-            L" -of json " + quote_argument(path),
-            10000,
-            sink);
+        const std::wstring source(path);
+        const wchar_t* arguments[]{L"-v", L"error", L"-show_entries", entries.data(), L"-of", L"json", source.c_str()};
+        ProcessOutput output;
+        const glance::contracts::dependencies::ProcessRequest request{
+            .dependency_id = L"ffprobe", .entry_id = L"ffprobe",
+            .arguments = arguments, .argument_count = static_cast<std::uint32_t>(std::size(arguments)),
+            .maximum_output_bytes = maximum_probe_output_bytes,
+            .cancellation = {sink ? sink->context : nullptr, sink ? sink->is_cancelled : nullptr},
+            .output = {&output, [](void* context, BOOL error, const char* bytes, std::uint32_t size) noexcept -> BOOL {
+                try { if (!error) static_cast<ProcessOutput*>(context)->text.append(bytes, size); return TRUE; }
+                catch (...) { return FALSE; }
+            }}};
+        glance::contracts::dependencies::ProcessResult result;
+        const auto status = dependencies.execute(&request, &result);
+        output.succeeded = SUCCEEDED(status) && result.exit_code == 0;
+        output.cancelled = status == HRESULT_FROM_WIN32(ERROR_CANCELLED);
+        return output;
     }
 }
 
 namespace glance::components::media_info
 {
-    std::filesystem::path find_ffprobe() noexcept
-    {
-        try
-        {
-            for (const auto& candidate : { path_ffprobe(), local_ffprobe_path() })
-            {
-                if (!candidate.empty() && validate_ffprobe(candidate))
-                {
-                    return candidate;
-                }
-            }
-        }
-        catch (...)
-        {
-        }
-        return {};
-    }
-
-    bool validate_ffprobe(const std::filesystem::path& path) noexcept
-    {
-        try
-        {
-            std::error_code error;
-            return std::filesystem::is_regular_file(path, error) &&
-                run_process_capture(path, L"-version", 1500, nullptr).succeeded;
-        }
-        catch (...)
-        {
-            return false;
-        }
-    }
 
     PrepareStatus query_media_info(
-        const std::filesystem::path& ffprobe,
+        const glance::contracts::dependencies::HostApi& dependencies,
         std::wstring_view path,
         const InformationPanelSink& sink) noexcept
     {
@@ -1018,7 +623,7 @@ namespace glance::components::media_info
             const CancellationProbe cancellation{
                 .context = sink.context,
                 .is_cancelled = sink.is_cancelled };
-            const auto output = run_media_probe(ffprobe, path, &cancellation);
+            const auto output = run_media_probe(dependencies, path, &cancellation);
             if (output.cancelled)
             {
                 return PrepareStatus::cancelled;
@@ -1040,7 +645,7 @@ namespace glance::components::media_info
     }
 
     std::wstring query_media_json(
-        const std::filesystem::path& ffprobe,
+        const glance::contracts::dependencies::HostApi& dependencies,
         std::wstring_view path,
         const glance::contracts::components::HoverInfoTextSink& sink) noexcept
     {
@@ -1049,7 +654,7 @@ namespace glance::components::media_info
             const CancellationProbe cancellation{
                 .context = sink.context,
                 .is_cancelled = sink.is_cancelled };
-            const auto output = run_media_probe(ffprobe, path, &cancellation);
+            const auto output = run_media_probe(dependencies, path, &cancellation);
             if (output.cancelled || !output.succeeded || output.text.empty())
             {
                 return {};
@@ -1064,70 +669,4 @@ namespace glance::components::media_info
         }
     }
 
-    bool install_ffprobe(
-        const std::filesystem::path& archive,
-        const std::filesystem::path& storage,
-        std::wstring& error_key) noexcept
-    {
-        std::filesystem::path staging;
-        try
-        {
-            wchar_t system_directory[MAX_PATH]{};
-            const UINT length = GetSystemDirectoryW(system_directory, std::size(system_directory));
-            if (length == 0 || length >= std::size(system_directory))
-            {
-                error_key = L"Action.ExtractFailed";
-                return false;
-            }
-            const auto tar = std::filesystem::path(system_directory) / L"tar.exe";
-            std::error_code error;
-            if (!std::filesystem::is_regular_file(tar, error))
-            {
-                error_key = L"Action.ExtractFailed";
-                return false;
-            }
-            staging = storage / (L"staging-" + std::to_wstring(GetCurrentProcessId()) +
-                L"-" + std::to_wstring(GetTickCount64()));
-            std::filesystem::create_directories(staging);
-            if (!run_tar(tar, archive, staging))
-            {
-                error_key = L"Action.ExtractFailed";
-                std::filesystem::remove_all(staging, error);
-                return false;
-            }
-            const auto extracted = staging / std::filesystem::path(ffprobe_archive_member);
-            const auto hash = sha256_file(extracted);
-            if (!hash || _wcsicmp(hash->c_str(), ffprobe_sha256) != 0 ||
-                !validate_ffprobe(extracted))
-            {
-                error_key = L"Action.IntegrityFailed";
-                std::filesystem::remove_all(staging, error);
-                return false;
-            }
-            const auto bin = storage / L"bin";
-            const auto destination = bin / L"ffprobe.exe";
-            std::filesystem::create_directories(bin);
-            if (!MoveFileExW(
-                    extracted.c_str(),
-                    destination.c_str(),
-                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-            {
-                error_key = L"Action.InstallFailed";
-                std::filesystem::remove_all(staging, error);
-                return false;
-            }
-            std::filesystem::remove_all(staging, error);
-            return true;
-        }
-        catch (...)
-        {
-            std::error_code error;
-            if (!staging.empty())
-            {
-                std::filesystem::remove_all(staging, error);
-            }
-            error_key = L"Action.InstallFailed";
-            return false;
-        }
-    }
 }

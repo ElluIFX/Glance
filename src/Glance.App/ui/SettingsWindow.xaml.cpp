@@ -4,6 +4,7 @@
 #include "core_task.h"
 #include "appearance_preferences.h"
 #include "component_loader.h"
+#include "dependencies/dependency_service.h"
 #include "footer_preferences.h"
 #include "localization.h"
 #include "path_copy_preferences.h"
@@ -400,7 +401,6 @@ namespace winrt::Glance::App::implementation
         TextPreferencesChangedCallback text_preferences_changed_callback,
         FooterPreferencesChangedCallback footer_preferences_changed_callback,
         WindowPreferencesChangedCallback window_preferences_changed_callback,
-        ComponentChangedCallback component_changed_callback,
         ComponentSettingChangedCallback component_setting_changed_callback,
         SourceStatusRequestCallback source_status_request_callback,
         UpdateCheckCallback update_check_callback,
@@ -412,7 +412,6 @@ namespace winrt::Glance::App::implementation
         text_preferences_changed_callback_ = std::move(text_preferences_changed_callback);
         footer_preferences_changed_callback_ = std::move(footer_preferences_changed_callback);
         window_preferences_changed_callback_ = std::move(window_preferences_changed_callback);
-        component_changed_callback_ = std::move(component_changed_callback);
         component_setting_changed_callback_ =
             std::move(component_setting_changed_callback);
         source_status_request_callback_ = std::move(source_status_request_callback);
@@ -550,20 +549,6 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    void SettingsWindow::ShowComponentAction(
-        std::wstring_view component_id,
-        std::wstring_view action_id)
-    {
-        SettingsNavigation().SelectedItem(ComponentsNavigationItem());
-        refresh_component_statuses();
-        if (const auto action = glance::app::component_management_action(
-                component_id,
-                action_id,
-                glance::app::current_ui_language()))
-        {
-            run_component_action(*action);
-        }
-    }
 
     void SettingsWindow::ShowUpdateDownload(glance::app::UpdateInstallerAsset asset)
     {
@@ -927,8 +912,146 @@ namespace winrt::Glance::App::implementation
         catch (...) {}
     }
 
+    void SettingsWindow::refresh_dependency_statuses()
+    {
+        namespace dependencies = glance::app::dependencies;
+        using Availability = glance::contracts::dependencies::Availability;
+        DependencyGroupTitle().Text(glance::app::localize(L"DependencyGroupTitle.Text"));
+        DependencyStatusList().Children().Clear();
+        const auto row_style = SettingsNavigation().Resources().Lookup(box_value(L"SettingsRowStyle")).as<Style>();
+        const auto detail_style = SettingsNavigation().Resources().Lookup(box_value(L"SettingsDescriptionStyle")).as<Style>();
+        const auto components = glance::app::component_statuses(glance::app::current_ui_language());
+        const auto weak = get_weak();
+        for (const auto& item : dependencies::snapshot())
+        {
+            Controls::Grid row;
+            row.Style(row_style);
+            row.ColumnSpacing(16);
+            Controls::ColumnDefinition left, right;
+            left.Width(GridLength{1, GridUnitType::Star});
+            right.Width(GridLengthHelper::Auto());
+            row.ColumnDefinitions().Append(left);
+            row.ColumnDefinitions().Append(right);
+            Controls::StackPanel content;
+            content.Spacing(3);
+            Controls::TextBlock title, consumers;
+            title.Text(item.definition.display_name);
+            consumers.Style(detail_style);
+            consumers.TextWrapping(TextWrapping::Wrap);
+            std::wstring names;
+            for (const auto& consumer : item.consumers)
+            {
+                const auto found = std::ranges::find(components, consumer, &glance::app::ComponentStatus::id);
+                if (!names.empty()) names += L", ";
+                names += found != components.end() ? found->display_name : consumer == L"video-preview" ?
+                    std::wstring(glance::app::localize(L"DependencyVideoConsumer")) : consumer == L"audio-preview" ?
+                    std::wstring(glance::app::localize(L"DependencyAudioConsumer")) : consumer;
+            }
+            consumers.Text(names);
+            content.Children().Append(title);
+            content.Children().Append(consumers);
+            row.Children().Append(content);
+            Controls::StackPanel actions;
+            actions.Orientation(Controls::Orientation::Horizontal);
+            actions.Spacing(8);
+            actions.VerticalAlignment(VerticalAlignment::Center);
+            Controls::TextBlock status;
+            status.Style(detail_style);
+            status.VerticalAlignment(VerticalAlignment::Center);
+            const auto task = dependencies::transfer(item.definition.id);
+            const bool busy = task && !task->state().complete;
+            const bool installed = item.availability == Availability::managed;
+            const auto state_key = busy ? (item.availability == Availability::installing ? L"DependencyInstalling" : L"DependencyDownloading") :
+                installed ? L"DependencyInstalled" : item.availability == Availability::external ? L"DependencyExternal" :
+                task && FAILED(task->state().error) && task->state().error != HRESULT_FROM_WIN32(ERROR_CANCELLED) ? L"DependencyFailed" : L"DependencyMissing";
+            status.Text(glance::app::localize(state_key));
+            if (const auto error = dependency_errors_.find(item.definition.id); error != dependency_errors_.end())
+                status.Text(glance::app::localize(error->second));
+            actions.Children().Append(status);
+            Controls::Button button;
+            button.IsTabStop(false);
+            button.AllowFocusOnInteraction(false);
+            button.Content(box_value(glance::app::localize(busy ? L"DependencyCancel" : installed ? L"DependencyUninstall" : L"DependencyDownload")));
+            button.Click([weak, id = item.definition.id, busy, installed](IInspectable const&, RoutedEventArgs const&) {
+                if (const auto self = weak.get())
+                {
+                    self->dependency_errors_.erase(id);
+                    if (busy)
+                    {
+                        if (const auto active = dependencies::transfer(id)) active->cancel();
+                    }
+                    else if (installed) self->uninstall_dependency(id);
+                    else
+                    {
+                        try
+                        {
+                            static_cast<void>(dependencies::begin_install(id, self->network_download_callback_));
+                            self->refresh_dependency_statuses();
+                        }
+                        catch (...)
+                        {
+                            self->dependency_errors_[id] = L"DependencyFailed";
+                            self->refresh_dependency_statuses();
+                        }
+                    }
+                }
+            });
+            actions.Children().Append(button);
+            Controls::Grid::SetColumn(actions, 1);
+            row.Children().Append(actions);
+            DependencyStatusList().Children().Append(row);
+            if (busy)
+            {
+                Controls::ProgressBar progress;
+                progress.Maximum(100);
+                progress.IsIndeterminate(item.availability == Availability::installing);
+                const auto initial = task->state();
+                if (initial.total) progress.Value(100.0 * initial.downloaded / initial.total);
+                content.Children().Append(progress);
+                const auto dispatcher = DispatcherQueue();
+                const auto weak_progress = make_weak(progress);
+                const auto weak_status = make_weak(status);
+                std::weak_ptr<dependencies::Transfer> weak_task = task;
+                task->subscribe([weak, dispatcher, weak_task, weak_progress, weak_status] {
+                    dispatcher.TryEnqueue([weak, weak_task, weak_progress, weak_status] {
+                        const auto active = weak_task.lock();
+                        const auto self = weak.get();
+                        if (!active || !self) return;
+                        const auto state = active->state();
+                        if (state.complete) { self->refresh_component_statuses(); return; }
+                        if (const auto bar = weak_progress.get())
+                        {
+                            bar.IsIndeterminate(state.availability == Availability::installing);
+                            if (state.total) bar.Value(100.0 * state.downloaded / state.total);
+                        }
+                        if (const auto text = weak_status.get()) text.Text(glance::app::localize(
+                            state.availability == Availability::installing ? L"DependencyInstalling" : L"DependencyDownloading"));
+                    });
+                });
+                if (task->state().complete) DispatcherQueue().TryEnqueue([weak] {
+                    if (const auto self = weak.get()) self->refresh_component_statuses();
+                });
+            }
+        }
+    }
+
+    winrt::fire_and_forget SettingsWindow::uninstall_dependency(std::wstring id)
+    {
+        const auto lifetime = get_strong();
+        const apartment_context ui_thread;
+        HRESULT result = S_OK;
+        co_await resume_background();
+        try { glance::app::dependencies::uninstall(id); }
+        catch (...) { result = winrt::to_hresult(); }
+        co_await ui_thread;
+        if (FAILED(result)) lifetime->dependency_errors_[id] =
+            result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) ? L"DependencyInUse" : L"DependencyFailed";
+        lifetime->refresh_component_statuses();
+    }
+
     void SettingsWindow::refresh_component_statuses()
     {
+        refresh_dependency_statuses();
         ComponentStatusList().Children().Clear();
         const auto statuses =
             glance::app::component_statuses(glance::app::current_ui_language());
@@ -1009,19 +1132,6 @@ namespace winrt::Glance::App::implementation
             actions.Orientation(Controls::Orientation::Horizontal);
             actions.Spacing(8);
             actions.VerticalAlignment(VerticalAlignment::Center);
-            const auto weak = get_weak();
-            for (const auto& action : status.actions)
-            {
-                Controls::Button button;
-                button.Content(box_value(action.button_text));
-                button.Click([weak, action](IInspectable const&, RoutedEventArgs const&) {
-                    if (const auto self = weak.get())
-                    {
-                        self->run_component_action(action);
-                    }
-                });
-                actions.Children().Append(button);
-            }
             Controls::FontIcon status_icon;
             status_icon.Glyph(glyph);
             status_icon.FontSize(18);
@@ -2287,181 +2397,6 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    fire_and_forget SettingsWindow::run_component_action(
-        glance::app::ComponentManagementAction action)
-    {
-        const auto lifetime = get_strong();
-        try
-        {
-            if (update_download_in_progress_ || action.lease == nullptr)
-            {
-                co_return;
-            }
-
-            const std::wstring language = glance::app::current_ui_language();
-            const auto request = glance::app::prepare_component_management_action(action, language);
-            if (!request)
-            {
-                Controls::ContentDialog dialog;
-                dialog.XamlRoot(RootGrid().XamlRoot());
-                dialog.Title(box_value(glance::app::localize(L"ComponentActionFailedTitle")));
-                dialog.Content(box_value(glance::app::localize(L"ComponentActionFailedMessage")));
-                dialog.CloseButtonText(glance::app::localize(L"OK"));
-                co_await dialog.ShowAsync();
-                co_return;
-            }
-
-            update_download_in_progress_ = true;
-            update_installing_ = false;
-            update_total_bytes_ = request.expected_size;
-            const auto cancellation = std::make_shared<std::atomic_bool>(false);
-            update_download_cancellation_ = cancellation;
-            show_download_card(action.download_title, action.download_message);
-
-            const auto dispatcher = DispatcherQueue();
-            const auto weak = get_weak();
-            apartment_context ui_thread;
-            glance::contracts::NetworkDownloadResult download_result;
-            co_await resume_background();
-            download_result = network_download_callback_
-                ? network_download_callback_(
-                    glance::contracts::NetworkDownloadRequest{
-                        request.url,
-                        request.file_name,
-                        request.sha256,
-                        request.expected_size },
-                    *cancellation,
-                    [dispatcher, weak, cancellation](std::uint64_t downloaded, std::uint64_t total) {
-                    static_cast<void>(
-                        dispatcher.TryEnqueue([weak, cancellation, downloaded, total] {
-                            if (const auto self = weak.get();
-                                self != nullptr && self->RootGrid().XamlRoot() != nullptr &&
-                                self->update_download_cancellation_ == cancellation)
-                            {
-                                self->set_update_progress(downloaded, total);
-                            }
-                        }));
-                    })
-                : glance::contracts::NetworkDownloadResult{};
-            co_await ui_thread;
-
-            if (lifetime->RootGrid().XamlRoot() == nullptr)
-            {
-                lifetime->update_download_in_progress_ = false;
-                co_return;
-            }
-            if (download_result.status == glance::contracts::NetworkDownloadStatus::cancelled)
-            {
-                lifetime->hide_update_card();
-                co_return;
-            }
-            if (download_result.status != glance::contracts::NetworkDownloadStatus::succeeded)
-            {
-                const wchar_t* message_key = L"ComponentActionDownloadNetworkFailedMessage";
-                if (download_result.status == glance::contracts::NetworkDownloadStatus::file_error)
-                {
-                    message_key = L"ComponentActionDownloadFileFailedMessage";
-                }
-                else if (download_result.status == glance::contracts::NetworkDownloadStatus::integrity_error)
-                {
-                    message_key = L"ComponentActionDownloadIntegrityFailedMessage";
-                }
-                lifetime->hide_update_card();
-
-                Controls::ContentDialog dialog;
-                dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
-                dialog.Title(
-                    box_value(glance::app::localize(L"ComponentActionDownloadFailedTitle")));
-                dialog.Content(box_value(glance::app::localize(message_key)));
-                dialog.PrimaryButtonText(glance::app::localize(L"UpdateRetry"));
-                dialog.CloseButtonText(glance::app::localize(L"Cancel"));
-                dialog.DefaultButton(Controls::ContentDialogButton::Primary);
-                if (co_await dialog.ShowAsync() == Controls::ContentDialogResult::Primary)
-                {
-                    lifetime->run_component_action(std::move(action));
-                }
-                co_return;
-            }
-
-            lifetime->set_update_progress(request.expected_size, request.expected_size);
-            co_await resume_after(std::chrono::milliseconds(350));
-            co_await ui_thread;
-            if (lifetime->RootGrid().XamlRoot() == nullptr)
-            {
-                lifetime->update_download_in_progress_ = false;
-                co_return;
-            }
-            if (cancellation->load(std::memory_order_acquire))
-            {
-                lifetime->hide_update_card();
-                co_return;
-            }
-
-            lifetime->show_preparing_card(action.preparing_title, action.preparing_message);
-            glance::app::ComponentManagementActionCompletion completion;
-            co_await resume_background();
-            completion = glance::app::complete_component_management_action(
-                action, download_result.path, language);
-            std::error_code cleanup_error;
-            std::filesystem::remove(download_result.path, cleanup_error);
-            co_await ui_thread;
-
-            if (lifetime->RootGrid().XamlRoot() == nullptr)
-            {
-                lifetime->update_download_in_progress_ = false;
-                co_return;
-            }
-            if (!completion.succeeded)
-            {
-                lifetime->hide_update_card();
-                Controls::ContentDialog dialog;
-                dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
-                dialog.Title(box_value(glance::app::localize(L"ComponentActionFailedTitle")));
-                dialog.Content(
-                    box_value(completion.detail.empty()
-                                  ? glance::app::localize(L"ComponentActionFailedMessage")
-                                  : completion.detail));
-                dialog.CloseButtonText(glance::app::localize(L"OK"));
-                co_await dialog.ShowAsync();
-                co_return;
-            }
-
-            lifetime->refresh_component_statuses();
-            if (lifetime->component_changed_callback_)
-            {
-                lifetime->component_changed_callback_();
-            }
-            lifetime->update_installing_ = false;
-            lifetime->UpdateProgressRing().IsIndeterminate(false);
-            lifetime->UpdateProgressRing().Value(100);
-            lifetime->UpdateProgressPercentText().Text(L"100%");
-            lifetime->UpdateProgressPercentText().Visibility(Visibility::Visible);
-            lifetime->UpdateProgressBytesText().Visibility(Visibility::Collapsed);
-            lifetime->CancelUpdateButton().Visibility(Visibility::Collapsed);
-            lifetime->UpdateCardTitle().Text(action.completed_title);
-            lifetime->UpdateCardMessage().Text(action.completed_message);
-            co_await resume_after(std::chrono::milliseconds(900));
-            co_await ui_thread;
-            if (lifetime->RootGrid().XamlRoot() != nullptr)
-            {
-                lifetime->hide_update_card();
-            }
-        }
-        catch (...)
-        {
-            try
-            {
-                if (lifetime->RootGrid().XamlRoot() != nullptr &&
-                    lifetime->update_download_in_progress_)
-                {
-                    lifetime->hide_update_card();
-                }
-            }
-            catch (...)
-            {
-            }
-        }
-    }
 
     void SettingsWindow::show_update_download_card(std::wstring_view version)
     {

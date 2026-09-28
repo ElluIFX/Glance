@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "glance/contracts/component_api.h"
+#include "glance/contracts/dependency_api.h"
 #include "media_probe.h"
 #include "../Common/component_text.h"
 #include "../../version.h"
@@ -18,7 +19,6 @@ namespace
     constexpr wchar_t component_id[] = L"media-info";
     constexpr wchar_t shortcut_id[] = L"advanced-media-info";
     constexpr wchar_t hover_info_id[] = L"advanced-media-info";
-    constexpr wchar_t action_id[] = L"prepare-ffprobe";
     constexpr wchar_t archive_url[] =
         L"https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.7z";
     constexpr wchar_t archive_file_name[] = L"ffmpeg-8.1.2-essentials_build.7z";
@@ -26,13 +26,14 @@ namespace
         L"e25b682664025d49034c981afb4bae36238a40f29a3cc1c713ad9a8b5b3528f6";
     constexpr std::uint64_t archive_size = 33876939;
 
-    std::mutex state_mutex;
-    std::filesystem::path ffprobe_path;
+    const glance::contracts::dependencies::HostApi* dependencies{};
 
     bool available() noexcept
     {
-        std::scoped_lock lock(state_mutex);
-        return !ffprobe_path.empty();
+        if (!dependencies) return false;
+        const auto state = dependencies->query(L"ffprobe", L"ffprobe");
+        return state == glance::contracts::dependencies::Availability::managed ||
+            state == glance::contracts::dependencies::Availability::external;
     }
 
     BOOL WINAPI initialize(
@@ -45,10 +46,25 @@ namespace
             return FALSE;
         }
 
-        {
-            std::scoped_lock lock(state_mutex);
-            ffprobe_path = glance::components::media_info::find_ffprobe();
-        }
+        void* service{};
+        if (!registrar->query_host_interface || !registrar->query_host_interface(
+            &glance::contracts::dependencies::host_api_id, glance::contracts::dependencies::host_api_version, &service))
+            return FALSE;
+        dependencies = static_cast<const glance::contracts::dependencies::HostApi*>(service);
+        const glance::contracts::dependencies::File files[]{
+            {L"ffmpeg-8.1.2-essentials_build/bin/ffprobe.exe", L"bin/ffprobe.exe",
+             L"b49ccc7c6547b141ad5a2f6ec69cc04323d7133d7704d70b331b904c63eecb07"},
+            {L"ffmpeg-8.1.2-essentials_build/LICENSE", L"LICENSE",
+             L"8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"}};
+        const glance::contracts::dependencies::Entry entries[]{
+            {L"ffprobe", glance::contracts::dependencies::EntryKind::executable, L"bin/ffprobe.exe", L"ffprobe.exe",
+             L"Components/media-info/bin/ffprobe.exe"}};
+        const glance::contracts::dependencies::Declaration dependency{
+            .id = L"ffprobe", .version = L"8.1.2", .display_name = L"ffprobe",
+            .url = archive_url, .archive_name = archive_file_name, .sha256 = archive_sha256,
+            .archive_size = archive_size, .files = files, .file_count = 2, .entries = entries, .entry_count = 1};
+        if (FAILED(dependencies->register_dependency(&dependency, component_id))) return FALSE;
+
         ComponentRegistration result;
         wcscpy_s(result.component_id, component_id);
         wcscpy_s(result.target_app_version, GLANCE_VERSION_WSTRING);
@@ -161,8 +177,8 @@ namespace
         }
         else
         {
-            activation.activation = StatusBarShortcutActivation::request_component_action;
-            wcscpy_s(activation.component_action_id, action_id);
+            activation.activation = StatusBarShortcutActivation::request_dependency;
+            wcscpy_s(activation.dependency_id, L"ffprobe");
         }
         *result = activation;
         return TRUE;
@@ -179,17 +195,12 @@ namespace
         {
             return PrepareStatus::failed;
         }
-        std::filesystem::path executable;
-        {
-            std::scoped_lock lock(state_mutex);
-            executable = ffprobe_path;
-        }
-        if (executable.empty())
+        if (!available())
         {
             return PrepareStatus::unavailable;
         }
         return glance::components::media_info::query_media_info(
-            executable,
+            *dependencies,
             path,
             *sink);
     }
@@ -205,17 +216,12 @@ namespace
         {
             return PrepareStatus::failed;
         }
-        std::filesystem::path executable;
-        {
-            std::scoped_lock lock(state_mutex);
-            executable = ffprobe_path;
-        }
-        if (executable.empty())
+        if (!available())
         {
             return PrepareStatus::unavailable;
         }
         const auto json = glance::components::media_info::query_media_json(
-            executable,
+            *dependencies,
             path,
             *sink);
         if (json.empty())
@@ -235,125 +241,6 @@ namespace
         return PrepareStatus::success;
     }
 
-    BOOL WINAPI enumerate_actions(
-        ComponentManagementActionDescriptor* descriptors,
-        std::uint32_t capacity,
-        std::uint32_t* count) noexcept
-    {
-        if (count == nullptr)
-        {
-            return FALSE;
-        }
-        *count = available() ? 0 : 1;
-        if (*count == 0 || descriptors == nullptr || capacity == 0)
-        {
-            return TRUE;
-        }
-        if (capacity < 1 || descriptors[0].size < sizeof(ComponentManagementActionDescriptor))
-        {
-            return FALSE;
-        }
-        ComponentManagementActionDescriptor descriptor;
-        wcscpy_s(descriptor.action_id, action_id);
-        if (!glance::components::copy_resource_key(
-                L"Action.Button",
-                descriptor.button_text_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.ConfirmationTitle",
-                descriptor.confirmation_title_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.ConfirmationMessage",
-                descriptor.confirmation_message_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.ConfirmationButton",
-                descriptor.confirmation_button_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.DownloadTitle",
-                descriptor.download_title_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.DownloadMessage",
-                descriptor.download_message_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.PreparingTitle",
-                descriptor.preparing_title_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.PreparingMessage",
-                descriptor.preparing_message_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.CompletedTitle",
-                descriptor.completed_title_key) ||
-            !glance::components::copy_resource_key(
-                L"Action.CompletedMessage",
-                descriptor.completed_message_key))
-        {
-            return FALSE;
-        }
-        descriptors[0] = descriptor;
-        return TRUE;
-    }
-
-    BOOL WINAPI prepare_action(
-        const wchar_t* requested_action_id,
-        ComponentDownloadRequest* request) noexcept
-    {
-        if (requested_action_id == nullptr || request == nullptr ||
-            request->size < sizeof(ComponentDownloadRequest) ||
-            wcscmp(requested_action_id, action_id) != 0 || available())
-        {
-            return FALSE;
-        }
-        ComponentDownloadRequest download;
-        wcscpy_s(download.url, archive_url);
-        wcscpy_s(download.file_name, archive_file_name);
-        wcscpy_s(download.sha256, archive_sha256);
-        download.expected_size = archive_size;
-        *request = download;
-        return TRUE;
-    }
-
-    BOOL WINAPI complete_action(
-        const wchar_t* requested_action_id,
-        const wchar_t* downloaded_path,
-        const wchar_t* component_storage_path,
-        ComponentManagementActionResult* result) noexcept
-    {
-        if (requested_action_id == nullptr || downloaded_path == nullptr ||
-            component_storage_path == nullptr || result == nullptr ||
-            result->size < sizeof(ComponentManagementActionResult) ||
-            wcscmp(requested_action_id, action_id) != 0)
-        {
-            return FALSE;
-        }
-        std::wstring error_key;
-        ComponentManagementActionResult action_result;
-        action_result.succeeded = glance::components::media_info::install_ffprobe(
-            downloaded_path,
-            component_storage_path,
-            error_key);
-        if (action_result.succeeded)
-        {
-            const auto installed = glance::components::media_info::find_ffprobe();
-            if (installed.empty())
-            {
-                action_result.succeeded = FALSE;
-                error_key = L"Action.InstallFailed";
-            }
-            else
-            {
-                std::scoped_lock lock(state_mutex);
-                ffprobe_path = installed;
-            }
-        }
-        if (!action_result.succeeded &&
-            !glance::components::copy_resource_key(
-                error_key,
-                action_result.detail_key))
-        {
-            return FALSE;
-        }
-        *result = action_result;
-        return TRUE;
-    }
 
     const InformationProviderApi information_api{
         .query_info = query_hover_info,
@@ -362,10 +249,6 @@ namespace
         .enumerate_shortcuts = enumerate_shortcuts,
         .query_state = query_shortcut_state,
         .activate = activate_shortcut };
-    const ComponentManagementActionApi management_action_api{
-        .enumerate_actions = enumerate_actions,
-        .prepare_action = prepare_action,
-        .complete_action = complete_action };
 
     BOOL WINAPI query_interface(
         const GUID* interface_id,
@@ -389,22 +272,12 @@ namespace
             *interface_pointer = const_cast<StatusBarShortcutApi*>(&shortcut_api);
             return TRUE;
         }
-        if (IsEqualGUID(*interface_id, component_management_action_api_id) &&
-            minimum_version <= component_management_action_api_version)
-        {
-            *interface_pointer =
-                const_cast<ComponentManagementActionApi*>(&management_action_api);
-            return TRUE;
-        }
         return FALSE;
     }
 
     void WINAPI shutdown() noexcept
     {
-        {
-            std::scoped_lock lock(state_mutex);
-            ffprobe_path.clear();
-        }
+        dependencies = nullptr;
     }
 }
 

@@ -1,6 +1,7 @@
 #include <map>
 #include "input_decision.h"
 #include "glance/contracts/component_api.h"
+#include "glance/contracts/dependency_api.h"
 #include "glance/contracts/ipc_protocol.h"
 #include "glance/contracts/network_protocol.h"
 #include "glance/contracts/source_api.h"
@@ -752,6 +753,20 @@ namespace
             .register_extension = collect_extension,
             .register_renderer = accept_renderer };
         ComponentRegistration registration;
+        registrar.query_host_interface = [](const GUID* id, std::uint32_t version, void** pointer) noexcept -> BOOL {
+            namespace dependencies = glance::contracts::dependencies;
+            if (!id || !pointer) return FALSE;
+            *pointer = nullptr;
+            if (!IsEqualGUID(*id, dependencies::host_api_id) || version > dependencies::host_api_version) return FALSE;
+            static const dependencies::HostApi host{
+                .register_dependency = [](const dependencies::Declaration* declaration, const wchar_t* consumer) noexcept -> HRESULT {
+                    return declaration && declaration->file_count && declaration->entry_count &&
+                        std::wstring_view(declaration->id) == L"ffprobe" && std::wstring_view(consumer) == L"media-info" ? S_OK : E_INVALIDARG;
+                },
+                .query = [](const wchar_t*, const wchar_t*) noexcept { return dependencies::Availability::missing; }};
+            *pointer = const_cast<dependencies::HostApi*>(&host);
+            return TRUE;
+        };
         const bool initialized = api.initialize(&registrar, &registration) != FALSE;
         expect(initialized, "MediaInfo component registration");
         if (!initialized)
@@ -805,10 +820,6 @@ namespace
             status_bar_shortcut_api_id,
             status_bar_shortcut_api_version,
             "MediaInfo component shortcut interface"));
-        const auto actions = static_cast<const ComponentManagementActionApi*>(query_interface(
-            component_management_action_api_id,
-            component_management_action_api_version,
-            "MediaInfo component management interface"));
         expect(
             information != nullptr && information->query_info != nullptr &&
                 information->query_json != nullptr,
@@ -855,47 +866,16 @@ namespace
                     &activation) != FALSE &&
                     activation.activation == (ffprobe_available
                         ? StatusBarShortcutActivation::toggle_hover_info
-                        : StatusBarShortcutActivation::request_component_action) &&
+                        : StatusBarShortcutActivation::request_dependency) &&
                     (ffprobe_available
                         ? std::wstring_view(activation.hover_info_id) ==
                               L"advanced-media-info" && activation.checked != FALSE &&
                               std::wstring_view(activation.loading_text_key) ==
                                   L"Preview.Loading"
-                        : std::wstring_view(activation.component_action_id) ==
-                              L"prepare-ffprobe"),
+                        : std::wstring_view(activation.dependency_id) == L"ffprobe"),
                 "MediaInfo component shortcut activation");
         }
 
-        if (actions != nullptr)
-        {
-            std::uint32_t count{};
-            expect(
-                actions->enumerate_actions(nullptr, 0, &count) != FALSE &&
-                    count == (ffprobe_available ? 0U : 1U),
-                "MediaInfo component management action count");
-            if (!ffprobe_available)
-            {
-                ComponentManagementActionDescriptor action;
-                expect(
-                    actions->enumerate_actions(&action, 1, &count) != FALSE &&
-                        std::wstring_view(action.action_id) == L"prepare-ffprobe" &&
-                        std::wstring_view(action.button_text_key) == L"Action.Button" &&
-                        std::wstring_view(action.confirmation_message_key) ==
-                            L"Action.ConfirmationMessage",
-                    "MediaInfo component management action descriptor");
-                ComponentDownloadRequest download;
-                expect(
-                    actions->prepare_action(L"prepare-ffprobe", &download) != FALSE &&
-                        std::wstring_view(download.url) ==
-                            L"https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.7z" &&
-                        std::wstring_view(download.file_name) ==
-                            L"ffmpeg-8.1.2-essentials_build.7z" &&
-                        std::wstring_view(download.sha256) ==
-                            L"e25b682664025d49034c981afb4bae36238a40f29a3cc1c713ad9a8b5b3528f6" &&
-                        download.expected_size == 33876939,
-                    "MediaInfo component download contract");
-            }
-        }
 
         void* unsupported_interface = reinterpret_cast<void*>(1);
         expect(
@@ -947,9 +927,28 @@ int run_office_package_tests();
 int run_executable_tests();
 int run_font_tests();
 int run_window_memory_tests();
+int run_dependency_runtime_tests();
+int run_dependency_service_tests();
+int run_software_media_tests(int count, wchar_t* arguments[]);
+int run_dependency_child(int count, wchar_t* arguments[]);
 
 int wmain(int argument_count, wchar_t* arguments[])
 {
+    if (argument_count > 1 && (std::wstring_view(arguments[1]) == L"--software-media-tests" ||
+        std::wstring_view(arguments[1]) == L"--software-media-fallback-tests"))
+        return run_software_media_tests(argument_count, arguments);
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--dependency-service-tests")
+        return run_dependency_service_tests();
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--media-info-tests")
+    {
+        test_media_info_component(std::filesystem::absolute(arguments[0]).parent_path() / L"components");
+        return failures == 0 ? 0 : 1;
+    }
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--dependency-child")
+        return run_dependency_child(argument_count, arguments);
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--dependency-runtime-tests")
+        return run_dependency_runtime_tests();
+    if (argument_count == 1 && run_dependency_runtime_tests() != 0) return 1;
     if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--window-memory-tests")
         return run_window_memory_tests();
     if (argument_count == 1 && run_window_memory_tests() != 0) return 1;

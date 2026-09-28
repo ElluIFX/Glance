@@ -10,6 +10,7 @@
 #include "json_preview.h"
 #include "media_preview_preferences.h"
 #include "native_preview_surface.h"
+#include "software_media_source.h"
 #include "preview_file.h"
 #include "preview_provider.h"
 #include "path_copy_preferences.h"
@@ -47,8 +48,6 @@ namespace winrt::Glance::App::implementation
             std::uint64_t,
             glance::contracts::PreviewWindowState)>;
         using GalleryRequestCallback = std::function<bool(std::string)>;
-        using ComponentActionCallback =
-            std::function<void(std::wstring, std::wstring)>;
 
         MainWindow();
 
@@ -63,8 +62,7 @@ namespace winrt::Glance::App::implementation
         void InitializeSession(
             std::uint64_t instance_id,
             StateCallback callback,
-            GalleryRequestCallback gallery_request_callback,
-            ComponentActionCallback component_action_callback);
+            GalleryRequestCallback gallery_request_callback);
         void ShowPreview(
             std::vector<glance::app::PreviewFile> files,
             std::uint32_t focused_index,
@@ -83,7 +81,6 @@ namespace winrt::Glance::App::implementation
         void ApplyTextPreferences();
         void ApplyFooterPreferences();
         void ApplyWindowPreferences();
-        void RefreshComponentContributions();
         void ApplyComponentSettings(std::wstring_view component_id);
         void SetXamlModalOverlayActive(bool active) noexcept;
         void HandleGalleryResponse(std::string_view payload);
@@ -456,6 +453,10 @@ namespace winrt::Glance::App::implementation
             std::wstring path,
             std::uint64_t generation);
         winrt::fire_and_forget load_media_async(std::wstring path, std::uint64_t generation);
+        void initialize_media_player();
+        void handle_media_failure(Windows::Media::Playback::MediaPlaybackItem const& item, HRESULT error);
+        winrt::fire_and_forget load_software_media_async(std::wstring path, std::uint64_t generation,
+            bool playing);
         winrt::fire_and_forget load_pdf_async(
             std::wstring path,
             std::uint64_t generation,
@@ -640,10 +641,9 @@ namespace winrt::Glance::App::implementation
         winrt::fire_and_forget copy_component_shortcut_data_async(
             glance::app::ComponentStatusBarShortcut shortcut,
             Microsoft::UI::Xaml::Controls::FontIcon feedback_icon);
-        winrt::fire_and_forget confirm_component_action(
-            glance::app::ComponentManagementAction action);
         void dismiss_preview_info_bar();
         void show_preview_notice(std::wstring resource_key);
+        void request_dependency(std::wstring id, std::function<void()> ready);
         void show_preview_message(
             std::wstring message,
             Microsoft::UI::Xaml::Controls::InfoBarSeverity severity,
@@ -694,7 +694,6 @@ namespace winrt::Glance::App::implementation
         std::wstring cli_id_;
         StateCallback state_callback_;
         GalleryRequestCallback gallery_request_callback_;
-        ComponentActionCallback component_action_callback_;
         std::vector<glance::app::PreviewFile> files_;
         std::uint32_t current_index_{};
         std::uint32_t source_kind_{};
@@ -838,8 +837,14 @@ namespace winrt::Glance::App::implementation
         std::wstring image_taken_time_;
         std::wstring media_dimensions_;
         std::wstring media_playback_info_;
+        Windows::Media::Playback::MediaPlayer media_player_{ nullptr };
         Windows::Media::Playback::MediaPlaybackItem media_playback_item_{ nullptr };
         std::uint64_t media_playback_generation_{};
+        std::shared_ptr<glance::app::SoftwareMediaSource> software_media_source_;
+        std::shared_ptr<std::atomic_bool> software_media_opening_cancellation_;
+        bool media_fallback_attempted_{};
+        Windows::Media::Playback::MediaPlaybackItem failed_system_media_item_{ nullptr };
+        bool media_play_intent_{};
         glance::contracts::native_preview::MediaState native_media_state_{};
         std::shared_ptr<std::atomic_bool> component_hover_cancellation_;
         std::shared_ptr<std::atomic_bool> component_data_copy_cancellation_;
@@ -910,6 +915,7 @@ namespace winrt::Glance::App::implementation
         Microsoft::UI::Xaml::DispatcherTimer web_view_idle_timer_{ nullptr };
         Microsoft::UI::Xaml::Controls::WebView2 web_preview_{ nullptr };
         std::vector<std::wstring> web_resource_mapping_hosts_;
+        std::uint64_t preview_notice_generation_{};
         bool preview_notice_active_{};
         bool preview_notice_hiding_{};
         std::wstring preview_notice_resource_key_;

@@ -23,23 +23,6 @@ namespace glance::app
         error,
     };
 
-    struct ComponentManagementAction
-    {
-        std::wstring component_id;
-        std::wstring action_id;
-        std::uint32_t order{};
-        std::wstring button_text;
-        std::wstring confirmation_title;
-        std::wstring confirmation_message;
-        std::wstring confirmation_button;
-        std::wstring download_title;
-        std::wstring download_message;
-        std::wstring preparing_title;
-        std::wstring preparing_message;
-        std::wstring completed_title;
-        std::wstring completed_message;
-        std::shared_ptr<void> lease;
-    };
 
     struct ComponentStatus
     {
@@ -47,7 +30,6 @@ namespace glance::app
         std::wstring display_name;
         std::wstring detail;
         ComponentState state{ ComponentState::error };
-        std::vector<ComponentManagementAction> actions;
     };
 
     enum class ComponentStatusBarShortcutState
@@ -73,7 +55,7 @@ namespace glance::app
     {
         none,
         toggle_hover_info,
-        request_component_action,
+        request_dependency,
         set_native_media_view_mode,
     };
 
@@ -83,30 +65,11 @@ namespace glance::app
         bool checked{};
         std::wstring component_id;
         std::wstring hover_info_id;
-        std::wstring component_action_id;
+        std::wstring dependency_id;
         std::wstring loading_text;
         std::shared_ptr<void> lease;
     };
 
-    struct ComponentDownloadRequest
-    {
-        std::wstring url;
-        std::wstring file_name;
-        std::wstring sha256;
-        std::uint64_t expected_size{};
-
-        [[nodiscard]] explicit operator bool() const noexcept
-        {
-            return !url.empty() && !file_name.empty() && sha256.size() == 64 &&
-                expected_size > 0;
-        }
-    };
-
-    struct ComponentManagementActionCompletion
-    {
-        bool succeeded{};
-        std::wstring detail;
-    };
 
     struct ComponentLoadingMessage
     {
@@ -324,19 +287,6 @@ namespace glance::app
         const ComponentStatusBarShortcut& shortcut,
         std::wstring_view path,
         const std::atomic_bool& cancelled) noexcept;
-    [[nodiscard]] std::optional<ComponentManagementAction> component_management_action(
-        std::wstring_view component_id,
-        std::wstring_view action_id,
-        std::wstring_view language_tag) noexcept;
-    [[nodiscard]] ComponentDownloadRequest prepare_component_management_action(
-        const ComponentManagementAction& action,
-        std::wstring_view language_tag) noexcept;
-    [[nodiscard]] ComponentManagementActionCompletion complete_component_management_action(
-        const ComponentManagementAction& action,
-        const std::filesystem::path& downloaded_path,
-        std::wstring_view language_tag) noexcept;
-    [[nodiscard]] std::filesystem::path component_storage_directory(
-        std::wstring_view component_id) noexcept;
     [[nodiscard]] std::optional<PagedDocumentRendererRegistration>
         paged_document_renderer() noexcept;
     [[nodiscard]] std::vector<ComponentSetting> component_settings(

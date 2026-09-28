@@ -1,12 +1,12 @@
 #include "pch.h"
 #include "component_loader.h"
+#include "dependencies/dependency_service.h"
 
 #include "localization.h"
 #include "webview_availability.h"
 #include "glance/contracts/diagnostics.h"
 #include "../../version.h"
 
-#include <shlobj.h>
 
 #include <algorithm>
 #include <cwctype>
@@ -23,7 +23,6 @@
 namespace
 {
     using glance::contracts::components::ComponentApi;
-    using glance::contracts::components::ComponentManagementActionApi;
     using glance::contracts::components::ComponentLoadingTextResult;
     using glance::contracts::components::ComponentRegistration;
     using glance::contracts::components::GetApiFunction;
@@ -97,7 +96,6 @@ namespace
         std::optional<ImageMetadataApi> image_metadata;
         std::optional<InformationProviderApi> information_provider;
         std::optional<StatusBarShortcutApi> status_bar_shortcut;
-        std::optional<ComponentManagementActionApi> component_management_action;
         std::vector<std::wstring> extensions;
         std::unordered_map<std::wstring, GalleryMediaKind> gallery_kinds;
         std::vector<std::wstring> dependencies;
@@ -118,6 +116,7 @@ namespace
             {
                 api.shutdown();
             }
+            glance::app::dependencies::unregister_consumer(id);
             if (module != nullptr)
             {
                 FreeLibrary(module);
@@ -475,10 +474,22 @@ namespace
         }
 
         RegistrationCollector collector;
+        component->id = manifest.id;
         glance::contracts::components::ComponentRegistrar registrar{
             .context = &collector,
             .register_extension = register_extension,
-            .register_renderer = register_renderer };
+            .register_renderer = register_renderer,
+            .query_host_interface = [](const GUID* id, std::uint32_t version, void** result) noexcept -> BOOL {
+                if (!result) return FALSE;
+                *result = nullptr;
+                if (id && IsEqualGUID(*id, glance::contracts::dependencies::host_api_id) &&
+                    version <= glance::contracts::dependencies::host_api_version)
+                {
+                    *result = const_cast<glance::contracts::dependencies::HostApi*>(&glance::app::dependencies::host_api());
+                    return TRUE;
+                }
+                return FALSE;
+            } };
         if (!component->api.initialize(&registrar, &component->registration) ||
             component->registration.size < sizeof(ComponentRegistration))
         {
@@ -670,25 +681,6 @@ namespace
                 component->status_bar_shortcut = *interface_api;
             }
         }
-        interface_pointer = nullptr;
-        if (component->api.query_interface(
-                &glance::contracts::components::component_management_action_api_id,
-                glance::contracts::components::component_management_action_api_version,
-                &interface_pointer) &&
-            interface_pointer != nullptr)
-        {
-            const auto* interface_api =
-                static_cast<const ComponentManagementActionApi*>(interface_pointer);
-            if (interface_api->size >= sizeof(ComponentManagementActionApi) &&
-                interface_api->version ==
-                    glance::contracts::components::component_management_action_api_version &&
-                interface_api->enumerate_actions != nullptr &&
-                interface_api->prepare_action != nullptr &&
-                interface_api->complete_action != nullptr)
-            {
-                component->component_management_action = *interface_api;
-            }
-        }
         const bool primary_preview = !component->extensions.empty();
         if (primary_preview)
         {
@@ -706,8 +698,7 @@ namespace
             component->registration.preferred_format != PreviewContentFormat::none ||
             (component->renderers.empty() &&
              !component->settings_contribution.has_value() &&
-             !component->status_bar_shortcut.has_value() &&
-             !component->component_management_action.has_value()))
+             !component->status_bar_shortcut.has_value()))
         {
             return {};
         }
@@ -1307,99 +1298,6 @@ namespace
         }
     }
 
-    std::vector<glance::app::ComponentManagementAction> enumerate_management_actions(
-        const std::shared_ptr<LoadedComponent>& component,
-        std::wstring_view language_tag)
-    {
-        std::vector<glance::app::ComponentManagementAction> actions;
-        if (!component->active || !component->component_management_action.has_value())
-        {
-            return actions;
-        }
-
-        static_cast<void>(language_tag);
-        std::uint32_t count{};
-        if (!component->component_management_action->enumerate_actions(
-                nullptr, 0, &count) ||
-            count == 0 ||
-            count > glance::contracts::components::maximum_component_management_actions)
-        {
-            return actions;
-        }
-
-        std::vector<glance::contracts::components::ComponentManagementActionDescriptor>
-            descriptors(count);
-        std::uint32_t written = count;
-        if (!component->component_management_action->enumerate_actions(
-                descriptors.data(), count, &written) ||
-            written != count)
-        {
-            return actions;
-        }
-
-        for (const auto& descriptor : descriptors)
-        {
-            const auto action_id = bounded_string(descriptor.action_id);
-            const auto button_text = bounded_string(descriptor.button_text_key);
-            const auto confirmation_title = bounded_string(descriptor.confirmation_title_key);
-            const auto confirmation_message = bounded_string(descriptor.confirmation_message_key);
-            const auto confirmation_button = bounded_string(descriptor.confirmation_button_key);
-            const auto download_title = bounded_string(descriptor.download_title_key);
-            const auto download_message = bounded_string(descriptor.download_message_key);
-            const auto preparing_title = bounded_string(descriptor.preparing_title_key);
-            const auto preparing_message = bounded_string(descriptor.preparing_message_key);
-            const auto completed_title = bounded_string(descriptor.completed_title_key);
-            const auto completed_message = bounded_string(descriptor.completed_message_key);
-            if (descriptor.size < sizeof(descriptor) ||
-                !action_id.has_value() || !valid_setting_id(*action_id) ||
-                !button_text.has_value() || button_text->empty() ||
-                !valid_resource_key(*button_text) ||
-                !confirmation_title.has_value() || !confirmation_message.has_value() ||
-                !confirmation_button.has_value() ||
-                (((!confirmation_title->empty() || !confirmation_message->empty() ||
-                   !confirmation_button->empty()) &&
-                  (confirmation_title->empty() || confirmation_message->empty() ||
-                   confirmation_button->empty()))) ||
-                !download_title.has_value() || download_title->empty() ||
-                !valid_resource_key(*download_title) ||
-                !download_message.has_value() ||
-                !preparing_title.has_value() || preparing_title->empty() ||
-                !valid_resource_key(*preparing_title) ||
-                !preparing_message.has_value() ||
-                !completed_title.has_value() || completed_title->empty() ||
-                !valid_resource_key(*completed_title) ||
-                !completed_message.has_value())
-            {
-                continue;
-            }
-            actions.push_back(glance::app::ComponentManagementAction{
-                .component_id = component->id,
-                .action_id = std::move(*action_id),
-                .order = descriptor.order,
-                .button_text = localize_component_key(*component, *button_text),
-                .confirmation_title = confirmation_title->empty()
-                    ? L"" : localize_component_key(*component, *confirmation_title),
-                .confirmation_message = confirmation_message->empty()
-                    ? L"" : localize_component_key(*component, *confirmation_message),
-                .confirmation_button = confirmation_button->empty()
-                    ? L"" : localize_component_key(*component, *confirmation_button),
-                .download_title = localize_component_key(*component, *download_title),
-                .download_message = download_message->empty()
-                    ? L"" : localize_component_key(*component, *download_message),
-                .preparing_title = localize_component_key(*component, *preparing_title),
-                .preparing_message = preparing_message->empty()
-                    ? L"" : localize_component_key(*component, *preparing_message),
-                .completed_title = localize_component_key(*component, *completed_title),
-                .completed_message = completed_message->empty()
-                    ? L"" : localize_component_key(*component, *completed_message),
-                .lease = std::static_pointer_cast<void>(component) });
-        }
-        std::ranges::sort(actions, [](const auto& left, const auto& right) {
-            return std::tie(left.order, left.action_id) <
-                std::tie(right.order, right.action_id);
-        });
-        return actions;
-    }
 
     struct HoverInfoCollector
     {
@@ -2188,8 +2086,7 @@ namespace glance::app
                     .display_name =
                         localize_component_key(*component, *display_name_key),
                     .detail = std::move(detail),
-                    .state = state,
-                    .actions = enumerate_management_actions(component, language_tag) });
+                    .state = state });
             }
             catch (...)
             {
@@ -2337,9 +2234,9 @@ namespace glance::app
                 return activation;
             }
             const auto hover_info_id = bounded_string(result.hover_info_id);
-            const auto component_action_id = bounded_string(result.component_action_id);
+            const auto dependency_id = bounded_string(result.dependency_id);
             const auto loading_text_key = bounded_string(result.loading_text_key);
-            if (!hover_info_id.has_value() || !component_action_id.has_value() ||
+            if (!hover_info_id.has_value() || !dependency_id.has_value() ||
                 !loading_text_key.has_value())
             {
                 return activation;
@@ -2363,13 +2260,11 @@ namespace glance::app
             {
                 activation.kind = ComponentStatusBarActivationKind::toggle_hover_info;
             }
-            else if (result.activation ==
-                         glance::contracts::components::StatusBarShortcutActivation::request_component_action &&
-                valid_setting_id(*component_action_id) &&
-                component->component_management_action.has_value())
+            else if (result.activation == glance::contracts::components::StatusBarShortcutActivation::request_dependency &&
+                valid_setting_id(*dependency_id))
             {
-                activation.kind = ComponentStatusBarActivationKind::request_component_action;
-                activation.component_action_id = std::move(*component_action_id);
+                activation.kind = ComponentStatusBarActivationKind::request_dependency;
+                activation.dependency_id = *dependency_id;
             }
             else if (result.activation == glance::contracts::components::
                          StatusBarShortcutActivation::set_native_media_view_mode)
@@ -2467,179 +2362,7 @@ namespace glance::app
         }
     }
 
-    std::optional<ComponentManagementAction> component_management_action(
-        std::wstring_view component_id,
-        std::wstring_view action_id,
-        std::wstring_view language_tag) noexcept
-    {
-        try
-        {
-            initialize_components();
-            std::shared_ptr<LoadedComponent> component;
-            {
-                std::scoped_lock lock(registry_mutex);
-                const auto match = std::ranges::find_if(
-                    registered_components,
-                    [component_id](const auto& candidate) {
-                        return candidate->id == component_id;
-                    });
-                if (match == registered_components.end())
-                {
-                    return std::nullopt;
-                }
-                component = *match;
-            }
-            auto actions = enumerate_management_actions(component, language_tag);
-            const auto match = std::ranges::find(actions, action_id, &ComponentManagementAction::action_id);
-            return match == actions.end()
-                ? std::nullopt
-                : std::optional<ComponentManagementAction>(std::move(*match));
-        }
-        catch (...)
-        {
-            return std::nullopt;
-        }
-    }
 
-    ComponentDownloadRequest prepare_component_management_action(
-        const ComponentManagementAction& action,
-        std::wstring_view language_tag) noexcept
-    {
-        ComponentDownloadRequest request;
-        try
-        {
-            const auto component = std::static_pointer_cast<LoadedComponent>(action.lease);
-            if (component == nullptr || !component->active ||
-                component->id != action.component_id ||
-                !component->component_management_action.has_value())
-            {
-                return request;
-            }
-            glance::contracts::components::ComponentDownloadRequest raw;
-            static_cast<void>(language_tag);
-            if (!component->component_management_action->prepare_action(
-                    action.action_id.c_str(), &raw) ||
-                raw.size < sizeof(raw))
-            {
-                return request;
-            }
-            const auto url = bounded_string(raw.url);
-            const auto file_name = bounded_string(raw.file_name);
-            const auto sha256 = bounded_string(raw.sha256);
-            if (!url.has_value() || !file_name.has_value() || !sha256.has_value() ||
-                file_name->empty() ||
-                std::filesystem::path(*file_name) !=
-                    std::filesystem::path(*file_name).filename() ||
-                sha256->size() != 64 ||
-                !std::ranges::all_of(*sha256, [](wchar_t character) {
-                    return std::iswxdigit(character) != 0;
-                }) ||
-                raw.expected_size == 0 || raw.expected_size > 512ULL * 1024 * 1024)
-            {
-                return request;
-            }
-            const winrt::Windows::Foundation::Uri uri(*url);
-            if (_wcsicmp(uri.SchemeName().c_str(), L"https") != 0)
-            {
-                return request;
-            }
-            request = ComponentDownloadRequest{
-                .url = std::move(*url),
-                .file_name = std::move(*file_name),
-                .sha256 = std::move(*sha256),
-                .expected_size = raw.expected_size };
-        }
-        catch (...)
-        {
-        }
-        return request;
-    }
-
-    ComponentManagementActionCompletion complete_component_management_action(
-        const ComponentManagementAction& action,
-        const std::filesystem::path& downloaded_path,
-        std::wstring_view language_tag) noexcept
-    {
-        ComponentManagementActionCompletion completion;
-        try
-        {
-            const auto component = std::static_pointer_cast<LoadedComponent>(action.lease);
-            std::error_code error;
-            if (component == nullptr || !component->active ||
-                component->id != action.component_id ||
-                !component->component_management_action.has_value() ||
-                !downloaded_path.is_absolute() ||
-                !std::filesystem::is_regular_file(downloaded_path, error))
-            {
-                return completion;
-            }
-            const auto storage = component_storage_directory(component->id);
-            if (storage.empty())
-            {
-                return completion;
-            }
-            std::filesystem::create_directories(storage, error);
-            if (error)
-            {
-                return completion;
-            }
-            glance::contracts::components::ComponentManagementActionResult raw;
-            static_cast<void>(language_tag);
-            if (!component->component_management_action->complete_action(
-                    action.action_id.c_str(),
-                    downloaded_path.c_str(),
-                    storage.c_str(),
-                    &raw) ||
-                raw.size < sizeof(raw))
-            {
-                return completion;
-            }
-            const auto detail_key = bounded_string(raw.detail_key);
-            if (!detail_key.has_value() ||
-                (!detail_key->empty() && !valid_resource_key(*detail_key)))
-            {
-                return completion;
-            }
-            completion.succeeded = raw.succeeded != FALSE;
-            completion.detail = detail_key->empty()
-                ? L""
-                : localize_component_key(*component, *detail_key);
-        }
-        catch (...)
-        {
-        }
-        return completion;
-    }
-
-    std::filesystem::path component_storage_directory(
-        std::wstring_view component_id) noexcept
-    {
-        if (!valid_component_id(component_id))
-        {
-            return {};
-        }
-        PWSTR raw_path{};
-        if (FAILED(SHGetKnownFolderPath(
-                FOLDERID_LocalAppData,
-                KF_FLAG_CREATE,
-                nullptr,
-                &raw_path)))
-        {
-            return {};
-        }
-        const std::unique_ptr<wchar_t, decltype(&CoTaskMemFree)> owned_path(
-            raw_path,
-            CoTaskMemFree);
-        try
-        {
-            return std::filesystem::path(owned_path.get()) / L"Glance" / L"Components" /
-                std::wstring(component_id);
-        }
-        catch (...)
-        {
-            return {};
-        }
-    }
 
     std::optional<PagedDocumentRendererRegistration>
     paged_document_renderer() noexcept

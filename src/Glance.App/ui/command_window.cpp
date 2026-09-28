@@ -31,11 +31,18 @@ namespace winrt::Glance::App::implementation
         case Kind::markdown:
         case Kind::web: ready = !text_loading_ && (!markdown_preview_ || web_content_ready_); break;
         case Kind::media:
-            ready = native_media_active_ ? native_preview_ready_ :
-                MediaPreview().MediaPlayer() && MediaPreview().MediaPlayer().PlaybackSession().PlaybackState() !=
-                    Windows::Media::Playback::MediaPlaybackState::Opening &&
-                MediaPreview().MediaPlayer().PlaybackSession().PlaybackState() !=
-                    Windows::Media::Playback::MediaPlaybackState::None;
+            if (media_fallback_attempted_ && !software_media_source_) return L"loading";
+            try
+            {
+                if (native_media_active_) ready = native_preview_ready_;
+                else if (const auto player = media_player_)
+                {
+                    const auto state = player.PlaybackSession().PlaybackState();
+                    ready = state != Windows::Media::Playback::MediaPlaybackState::Opening &&
+                        state != Windows::Media::Playback::MediaPlaybackState::None;
+                }
+            }
+            catch (const hresult_error&) { return L"loading"; }
             break;
         }
         return ready ? L"ready" : L"loading";
@@ -96,14 +103,20 @@ namespace winrt::Glance::App::implementation
                 result.SetNamedValue(L"muted", JsonValue::CreateBooleanValue((native_media_state_.flags & glance::contracts::native_preview::media_state_muted) != 0));
                 result.SetNamedValue(L"playing", JsonValue::CreateBooleanValue((native_media_state_.flags & glance::contracts::native_preview::media_state_playing) != 0));
             }
-            else if (const auto player = MediaPreview().MediaPlayer())
+            else if (!(media_fallback_attempted_ && !software_media_source_))
             {
-                const auto session = player.PlaybackSession();
-                result.SetNamedValue(L"position", JsonValue::CreateNumberValue(session.Position().count() / 10000000.0));
-                result.SetNamedValue(L"duration", JsonValue::CreateNumberValue(session.NaturalDuration().count() / 10000000.0));
-                result.SetNamedValue(L"volume", JsonValue::CreateNumberValue(player.Volume() * 100));
-                result.SetNamedValue(L"muted", JsonValue::CreateBooleanValue(player.IsMuted()));
-                result.SetNamedValue(L"playing", JsonValue::CreateBooleanValue(session.PlaybackState() == Windows::Media::Playback::MediaPlaybackState::Playing));
+                try
+                {
+                    const auto player = media_player_;
+                    if (!player) return result;
+                    const auto session = player.PlaybackSession();
+                    result.SetNamedValue(L"position", JsonValue::CreateNumberValue(session.Position().count() / 10000000.0));
+                    result.SetNamedValue(L"duration", JsonValue::CreateNumberValue(session.NaturalDuration().count() / 10000000.0));
+                    result.SetNamedValue(L"volume", JsonValue::CreateNumberValue(player.Volume() * 100));
+                    result.SetNamedValue(L"muted", JsonValue::CreateBooleanValue(player.IsMuted()));
+                    result.SetNamedValue(L"playing", JsonValue::CreateBooleanValue(session.PlaybackState() == Windows::Media::Playback::MediaPlaybackState::Playing));
+                }
+                catch (const hresult_error&) { result.SetNamedValue(L"state", JsonValue::CreateStringValue(L"loading")); }
             }
         }
         return result;
@@ -160,7 +173,7 @@ namespace winrt::Glance::App::implementation
             return true;
         }
         if (current_kind_ != Kind::media) throw Error(8, "content_type", "Expected a media preview");
-        const auto player = MediaPreview().MediaPlayer();
+        const auto player = media_player_;
         if (command == L"window.seek")
         {
             const auto duration = native_media_active_ ? native_media_state_.duration_ticks / 10000000.0 : player.PlaybackSession().NaturalDuration().count() / 10000000.0;
@@ -182,6 +195,7 @@ namespace winrt::Glance::App::implementation
         else if (command == L"window.play" || command == L"window.pause")
         {
             const bool play = command == L"window.play";
+            media_play_intent_ = play;
             if (native_media_active_) send_native_media_control_async(native_preview_surface_, play ? NativeMediaControl::play : NativeMediaControl::pause, 0);
             else if (play) player.Play(); else player.Pause();
         }

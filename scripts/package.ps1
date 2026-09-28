@@ -116,6 +116,7 @@ $requiredFiles = @(
     "Glance.exe",
     "Glance.CLI.exe",
     "Glance.Core.exe",
+    "Glance.MediaHost.exe",
     "Glance.DialogBroker32.exe",
     "Glance.DialogHook.dll",
     "Glance.DialogHook32.dll",
@@ -227,6 +228,8 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot "src\Glance.App\third_party\ra
     -Destination (Join-Path $licenseDirectory "RapidJSON.txt") -Force
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "licenses\Tinted-Theming.txt") `
     -Destination (Join-Path $licenseDirectory "Tinted-Theming.txt") -Force
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "src\Glance.MediaHost\third_party\ffmpeg\LICENSE") `
+    -Destination (Join-Path $licenseDirectory "FFmpeg.txt") -Force
 
 $forbiddenRuntimeFiles = Get-ChildItem -LiteralPath $payloadDirectory -Recurse -File | Where-Object {
     $_.Name -in @(

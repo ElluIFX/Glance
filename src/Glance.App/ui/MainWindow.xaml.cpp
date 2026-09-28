@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "dependencies/dependency_service.h"
 #include "appearance_preferences.h"
 #include "footer_preferences.h"
 #include "fullscreen_interaction.h"
@@ -1206,27 +1207,7 @@ namespace winrt::Glance::App::implementation
                 self->update_media_controls();
             }
         });
-        Windows::Media::Playback::MediaPlayer media_player;
-        MediaPreview().SetMediaPlayer(media_player);
-        const auto dispatcher = DispatcherQueue();
-        media_player.MediaOpened([weak, dispatcher](
-                                     Windows::Media::Playback::MediaPlayer const& sender,
-                                     IInspectable const&) {
-            const auto item =
-                sender.Source().try_as<Windows::Media::Playback::MediaPlaybackItem>();
-            if (item == nullptr)
-            {
-                return;
-            }
-            static_cast<void>(dispatcher.TryEnqueue([weak, item] {
-                if (const auto self = weak.get())
-                {
-                    self->update_media_playback_metadata(
-                        item,
-                        self->media_playback_generation_);
-                }
-            }));
-        });
+        initialize_media_player();
         web_view_idle_timer_ = DispatcherTimer();
         web_view_idle_timer_.Interval(web_view_idle_timeout);
         web_view_idle_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
@@ -1250,13 +1231,11 @@ namespace winrt::Glance::App::implementation
     void MainWindow::InitializeSession(
         std::uint64_t instance_id,
         StateCallback callback,
-        GalleryRequestCallback gallery_request_callback,
-        ComponentActionCallback component_action_callback)
+        GalleryRequestCallback gallery_request_callback)
     {
         instance_id_ = instance_id;
         state_callback_ = std::move(callback);
         gallery_request_callback_ = std::move(gallery_request_callback);
-        component_action_callback_ = std::move(component_action_callback);
     }
 
     bool MainWindow::send_gallery_request(
@@ -4860,15 +4839,19 @@ namespace winrt::Glance::App::implementation
                 MediaTimeText().Foreground(white);
             }
             update_media_surface_background();
+            initialize_media_player();
             media_playback_item_ = playback_item;
             media_playback_generation_ = generation;
-            MediaPreview().Source(playback_item);
-            MediaPreview().MediaPlayer().IsMuted(false);
-            MediaPreview().MediaPlayer().Volume(MediaVolumeSlider().Value() / 100.0);
+            media_fallback_attempted_ = false;
+            MediaControlsOverlay().IsHitTestVisible(true);
+            media_player_.Source(playback_item);
+            media_player_.IsMuted(false);
+            media_player_.Volume(MediaVolumeSlider().Value() / 100.0);
             const auto preferences = glance::app::load_media_preview_preferences();
-            if (media_is_audio_ ? preferences.autoplay_audio : preferences.autoplay_video)
+            media_play_intent_ = media_is_audio_ ? preferences.autoplay_audio : preferences.autoplay_video;
+            if (media_play_intent_)
             {
-                MediaPreview().MediaPlayer().Play();
+                media_player_.Play();
             }
             media_timer_.Start();
 
@@ -4948,6 +4931,152 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    void MainWindow::initialize_media_player()
+    {
+        Windows::Media::Playback::MediaPlayer player;
+        const auto weak = get_weak();
+        const auto dispatcher = DispatcherQueue();
+        player.MediaOpened([weak, dispatcher](auto const& sender, IInspectable const&) {
+            try
+            {
+                const auto item = sender.Source().template try_as<Windows::Media::Playback::MediaPlaybackItem>();
+                dispatcher.TryEnqueue([weak, sender, item] {
+                    const auto self = weak.get();
+                    if (!self || !item) return;
+                    try
+                    {
+                        if (self->media_player_ != sender || self->media_playback_item_ != item ||
+                            item == self->failed_system_media_item_) return;
+                        self->MediaPreview().SetMediaPlayer(sender);
+                        self->update_media_playback_metadata(item, self->media_playback_generation_);
+                        if (self->software_media_source_ && !self->media_is_audio_)
+                        {
+                            const auto session = sender.PlaybackSession();
+                            if (session.NaturalVideoWidth() && session.NaturalVideoHeight())
+                                self->auto_fit_window_to_content(session.NaturalVideoWidth(), session.NaturalVideoHeight());
+                            self->reveal_deferred_preview();
+                        }
+                    }
+                    catch (const hresult_error& error) { self->handle_media_failure(item, error.code()); }
+                });
+            }
+            catch (const hresult_error&) {}
+        });
+        player.MediaFailed([weak, dispatcher](auto const& sender,
+            Windows::Media::Playback::MediaPlayerFailedEventArgs const& args) {
+            try
+            {
+                const auto item = sender.Source().template try_as<Windows::Media::Playback::MediaPlaybackItem>();
+                const HRESULT error = args.ExtendedErrorCode();
+                dispatcher.TryEnqueue([weak, sender, item, error] {
+                    try
+                    {
+                        if (const auto self = weak.get(); self && self->media_player_ == sender)
+                            self->handle_media_failure(item, error);
+                    }
+                    catch (const hresult_error&) { glance::contracts::log_event(L"Media failure handling failed"); }
+                });
+            }
+            catch (const hresult_error&) {}
+        });
+        MediaPreview().SetMediaPlayer(nullptr);
+        media_player_ = std::move(player);
+    }
+
+    void MainWindow::handle_media_failure(Windows::Media::Playback::MediaPlaybackItem const& item, HRESULT error)
+    try
+    {
+        if (!item || item != media_playback_item_ || media_playback_generation_ != content_generation_ ||
+            current_index_ >= files_.size() || !visible_) return;
+        if (item == failed_system_media_item_) return;
+        media_timer_.Stop();
+        MediaPreview().SetMediaPlayer(nullptr);
+        MediaControlsOverlay().IsHitTestVisible(false);
+        if (media_fallback_attempted_ || error == E_ACCESSDENIED ||
+            error == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || error == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND) ||
+            error == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+        {
+            show_provider_error(glance::app::localize(L"MediaDecodeFailed"), content_generation_);
+            return;
+        }
+        media_fallback_attempted_ = true;
+        failed_system_media_item_ = item;
+        const auto generation = content_generation_;
+        const auto path = files_[current_index_].path;
+        const auto weak = get_weak();
+        const auto load = [weak, path, generation] {
+            if (const auto self = weak.get(); self && self->content_generation_ == generation)
+                self->load_software_media_async(path, generation, self->media_play_intent_);
+        };
+        const auto availability = glance::app::dependencies::host_api().query(L"ffmpeg", L"avcodec");
+        if (availability == glance::contracts::dependencies::Availability::managed) load();
+        else request_dependency(L"ffmpeg", load);
+        reveal_deferred_preview();
+    }
+    catch (const hresult_error& failure)
+    {
+        glance::contracts::log_event(L"Media fallback setup failed: " + std::to_wstring(static_cast<HRESULT>(failure.code())));
+    }
+
+    fire_and_forget MainWindow::load_software_media_async(std::wstring path, std::uint64_t generation,
+        bool playing)
+    {
+        const auto lifetime = get_strong();
+        const apartment_context ui_thread;
+        show_preview_notice(L"SoftwareMediaPreparing");
+        const auto notice = preview_notice_generation_;
+        const auto cancellation = std::make_shared<std::atomic_bool>(false);
+        software_media_opening_cancellation_ = cancellation;
+        std::shared_ptr<glance::app::SoftwareMediaSource> source;
+        HRESULT error = S_OK;
+        co_await resume_background();
+        try { source = glance::app::SoftwareMediaSource::open(path, cancellation); }
+        catch (...)
+        {
+            error = winrt::to_hresult();
+            glance::contracts::log_event(L"Software media preparation failed: " + std::to_wstring(error));
+        }
+        co_await ui_thread;
+        if (generation != content_generation_ || cancellation->load() ||
+            software_media_opening_cancellation_ != cancellation || state_ == glance::contracts::PreviewWindowState::closed)
+        {
+            if (source) source->cancel();
+            co_return;
+        }
+        try
+        {
+            if (FAILED(error))
+            {
+                if (notice == preview_notice_generation_) dismiss_preview_info_bar();
+                show_provider_error(glance::app::localize(L"MediaDecodeFailed"), generation);
+                co_return;
+            }
+            software_media_source_ = std::move(source);
+            const auto volume = MediaVolumeSlider().Value() / 100.0;
+            const auto muted = media_player_.IsMuted();
+            initialize_media_player();
+            const auto player = media_player_;
+            player.RealTimePlayback(true);
+            media_playback_item_ = Windows::Media::Playback::MediaPlaybackItem(software_media_source_->source());
+            media_player_.Source(media_playback_item_);
+            player.Volume(volume);
+            player.IsMuted(muted);
+            if (playing) player.Play();
+            else player.Pause();
+            if (notice == preview_notice_generation_) dismiss_preview_info_bar();
+            MediaControlsOverlay().IsHitTestVisible(true);
+            media_timer_.Start();
+        }
+        catch (...)
+        {
+            glance::contracts::log_event(L"Software media activation failed: " + std::to_wstring(static_cast<HRESULT>(winrt::to_hresult())));
+            if (software_media_source_) software_media_source_->cancel();
+            software_media_source_.reset();
+            if (notice == preview_notice_generation_) dismiss_preview_info_bar();
+            show_provider_error(glance::app::localize(L"MediaDecodeFailed"), generation);
+        }
+    }
+
     void MainWindow::update_media_footer()
     {
         update_footer_metadata();
@@ -4977,7 +5106,7 @@ namespace winrt::Glance::App::implementation
                 }
             };
 
-            if (media_is_audio_)
+            if (media_is_audio_ && !software_media_source_)
             {
                 const auto tracks = item.AudioTracks();
                 if (tracks.Size() > 0)
@@ -5005,7 +5134,7 @@ namespace winrt::Glance::App::implementation
                     append(format_media_bitrate(properties.Bitrate()));
                 }
             }
-            else
+            else if (!media_is_audio_)
             {
                 const auto tracks = item.VideoTracks();
                 if (tracks.Size() > 0)
@@ -5017,8 +5146,11 @@ namespace winrt::Glance::App::implementation
                             + L"x" + std::to_wstring(properties.Height());
                     }
                     append(format_media_frame_rate(properties.FrameRate()));
-                    append(format_media_subtype(properties.Subtype()));
-                    append(format_media_bitrate(properties.Bitrate()));
+                    if (!software_media_source_)
+                    {
+                        append(format_media_subtype(properties.Subtype()));
+                        append(format_media_bitrate(properties.Bitrate()));
+                    }
                 }
             }
 
@@ -6439,11 +6571,7 @@ namespace winrt::Glance::App::implementation
             const auto preferences = glance::app::load_media_preview_preferences();
             MediaVolumeSlider().Value(preferences.video_volume_percent);
             reverse_media_seek_wheel_ = preferences.reverse_seek_wheel;
-            if (MediaPreview().MediaPlayer() != nullptr)
-            {
-                MediaPreview().MediaPlayer().Pause();
-            }
-            MediaPreview().Source(nullptr);
+            MediaPreview().SetMediaPlayer(nullptr);
             MediaPreview().Visibility(Visibility::Collapsed);
             AudioMetadataPanel().Visibility(Visibility::Collapsed);
             MediaControlsOverlay().Background(
@@ -8390,11 +8518,6 @@ namespace winrt::Glance::App::implementation
         rebuild_component_contributions();
     }
 
-    void MainWindow::RefreshComponentContributions()
-    {
-        rebuild_component_contributions();
-    }
-
     void MainWindow::ApplyComponentSettings(std::wstring_view component_id)
     {
         if (!native_media_active_ || native_preview_surface_ == nullptr ||
@@ -8543,16 +8666,19 @@ namespace winrt::Glance::App::implementation
             files_[current_index_].path,
             glance::app::current_ui_language(),
             requested_checked);
-        if (activation.kind == glance::app::ComponentStatusBarActivationKind::request_component_action)
+        if (activation.kind == glance::app::ComponentStatusBarActivationKind::request_dependency)
         {
             button.IsChecked(false);
-            if (const auto action = glance::app::component_management_action(
-                    activation.component_id,
-                    activation.component_action_id,
-                    glance::app::current_ui_language()))
-            {
-                confirm_component_action(*action);
-            }
+            const auto weak = get_weak();
+            const auto weak_button = make_weak(button);
+            request_dependency(activation.dependency_id, [weak, weak_button, shortcut] {
+                if (const auto self = weak.get())
+                    if (const auto toggle = weak_button.get())
+                    {
+                        toggle.IsChecked(true);
+                        self->activate_component_shortcut(shortcut, toggle);
+                    }
+            });
             return;
         }
         if (activation.kind == glance::app::ComponentStatusBarActivationKind::
@@ -8710,52 +8836,56 @@ namespace winrt::Glance::App::implementation
             }));
     }
 
-    fire_and_forget MainWindow::confirm_component_action(
-        glance::app::ComponentManagementAction action)
+    void MainWindow::request_dependency(std::wstring id, std::function<void()> ready)
     {
-        const auto lifetime = get_strong();
-        try
-        {
-            Controls::ContentDialog dialog;
-            dialog.XamlRoot(RootGrid().XamlRoot());
-            dialog.Title(box_value(action.confirmation_title));
-            dialog.Content(box_value(action.confirmation_message));
-            dialog.PrimaryButtonText(action.confirmation_button);
-            dialog.CloseButtonText(glance::app::localize(L"Cancel"));
-            dialog.DefaultButton(Controls::ContentDialogButton::Primary);
-            lifetime->SetXamlModalOverlayActive(true);
-            const auto result = co_await dialog.ShowAsync();
-            if (result != Controls::ContentDialogResult::Primary)
+        namespace dependencies = glance::app::dependencies;
+        const auto generation = content_generation_;
+        const auto weak = get_weak();
+        show_preview_message(glance::app::localize(L"DependencyRequired"), InfoBarSeverity::Informational, false);
+        Controls::Button download;
+        download.IsTabStop(false);
+        download.AllowFocusOnInteraction(false);
+        download.Content(box_value(glance::app::localize(L"DependencyDownload")));
+        download.Click([weak, generation, id, ready = std::move(ready)](IInspectable const&, RoutedEventArgs const&) {
+            const auto self = weak.get();
+            if (!self || self->content_generation_ != generation) return;
+            try
             {
-                lifetime->SetXamlModalOverlayActive(false);
-                co_return;
+                const auto task = dependencies::begin_install(id);
+                self->show_preview_message(glance::app::localize(L"DependencyDownloading"), InfoBarSeverity::Informational, false);
+                const auto notice = self->preview_notice_generation_;
+                const auto dispatcher = self->DispatcherQueue();
+                std::weak_ptr<dependencies::Transfer> weak_task = task;
+                const auto completed = std::make_shared<bool>(false);
+                auto refresh = [weak, generation, notice, weak_task, ready, completed] {
+                    const auto window = weak.get();
+                    const auto active = weak_task.lock();
+                    if (!window || !active || *completed || window->content_generation_ != generation) return;
+                    const auto state = active->state();
+                    const bool owns_notice = window->preview_notice_generation_ == notice;
+                    if (state.complete)
+                    {
+                        *completed = true;
+                        if (owns_notice) window->dismiss_preview_info_bar();
+                        if (SUCCEEDED(state.error)) ready();
+                        else if (owns_notice) window->show_preview_notice(L"DependencyFailed");
+                    }
+                    else if (owns_notice) window->PreviewErrorInfoBar().Message(glance::app::localize(
+                        state.availability == glance::contracts::dependencies::Availability::installing ?
+                        L"DependencyInstalling" : L"DependencyDownloading"));
+                };
+                task->subscribe([dispatcher, refresh] { dispatcher.TryEnqueue(refresh); });
+                refresh();
             }
-            if (lifetime->detached_)
-            {
-                lifetime->stop_detached_focus_monitor();
-                lifetime->clear_preview_content();
-                lifetime->Close();
-            }
-            else
-            {
-                lifetime->HidePreview();
-            }
-            lifetime->SetXamlModalOverlayActive(false);
-            if (lifetime->component_action_callback_)
-            {
-                lifetime->component_action_callback_(
-                    std::move(action.component_id),
-                    std::move(action.action_id));
-            }
-        }
-        catch (...)
-        {
-            lifetime->SetXamlModalOverlayActive(false);
-        }
+            catch (...) { self->show_preview_notice(L"DependencyFailed"); }
+        });
+        PreviewErrorInfoBar().ActionButton(download);
+        queue_native_surface_occlusion_update();
     }
 
     void MainWindow::dismiss_preview_info_bar()
     {
+        ++preview_notice_generation_;
         preview_notice_active_ = false;
         preview_notice_hiding_ = false;
         preview_notice_resource_key_.clear();
@@ -8772,6 +8902,7 @@ namespace winrt::Glance::App::implementation
         visual.StopAnimation(L"Opacity");
         visual.Opacity(1.0F);
         PreviewErrorInfoBar().IsOpen(false);
+        PreviewErrorInfoBar().ActionButton(nullptr);
         queue_native_surface_occlusion_update();
     }
 
@@ -10423,7 +10554,7 @@ namespace winrt::Glance::App::implementation
             MediaControlsOverlay().Opacity() <= 0.0;
         media_controls_idle_ticks_ = 0;
         MediaControlsOverlay().Opacity(1.0);
-        MediaControlsOverlay().IsHitTestVisible(true);
+        MediaControlsOverlay().IsHitTestVisible(!media_fallback_attempted_ || software_media_source_ != nullptr);
         if (reveal_native_controls)
         {
             update_native_preview_occlusions();
@@ -10433,21 +10564,32 @@ namespace winrt::Glance::App::implementation
     void MainWindow::stop_media_playback()
     {
         media_timer_.Stop();
+        const auto player = media_player_;
+        MediaPreview().SetMediaPlayer(nullptr);
+        media_player_ = nullptr;
+        if (player)
+        {
+            try { player.Pause(); } catch (const hresult_error&) {}
+            try { player.Source(nullptr); } catch (const hresult_error&) {}
+        }
+        if (software_media_opening_cancellation_) software_media_opening_cancellation_->store(true);
+        software_media_opening_cancellation_.reset();
+        if (software_media_source_) software_media_source_->cancel();
+        software_media_source_.reset();
+        media_fallback_attempted_ = false;
+        failed_system_media_item_ = nullptr;
+        media_play_intent_ = false;
         if (native_media_active_)
         {
             release_native_preview_surface();
         }
-        if (MediaPreview().MediaPlayer() != nullptr)
-        {
-            MediaPreview().MediaPlayer().Pause();
-        }
-        MediaPreview().Source(nullptr);
         media_playback_item_ = nullptr;
         media_playback_generation_ = 0;
         media_playback_info_.clear();
     }
 
     void MainWindow::update_media_controls()
+    try
     {
         if (MediaPanel().Visibility() != Visibility::Visible)
         {
@@ -10465,11 +10607,11 @@ namespace winrt::Glance::App::implementation
             }
             return;
         }
-        if (MediaPreview().MediaPlayer() == nullptr)
+        if (media_player_ == nullptr)
         {
             return;
         }
-        const auto player = MediaPreview().MediaPlayer();
+        const auto player = media_player_;
         const auto session = player.PlaybackSession();
         const double duration = std::max(0.0, session.NaturalDuration().count() / 10000000.0);
         const double position = std::max(0.0, session.Position().count() / 10000000.0);
@@ -10496,6 +10638,13 @@ namespace winrt::Glance::App::implementation
             }
         }
     }
+    catch (const hresult_error& error)
+    {
+        updating_media_position_ = false;
+        media_timer_.Stop();
+        glance::contracts::log_event(L"Media session unavailable: " + std::to_wstring(static_cast<HRESULT>(error.code())));
+        handle_media_failure(media_playback_item_, error.code());
+    }
 
     void MainWindow::MediaPanel_PointerMoved(IInspectable const&, PointerRoutedEventArgs const&)
     {
@@ -10517,6 +10666,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::MediaPanel_PointerWheelChanged(
         IInspectable const&,
         PointerRoutedEventArgs const& args)
+    try
     {
         if (current_kind_ != glance::app::PreviewKind::media)
         {
@@ -10557,13 +10707,14 @@ namespace winrt::Glance::App::implementation
             }
             return;
         }
-        if (MediaPreview().MediaPlayer() == nullptr)
+        if (media_player_ == nullptr ||
+            (media_fallback_attempted_ && !software_media_source_))
         {
             return;
         }
 
         args.Handled(true);
-        const auto player = MediaPreview().MediaPlayer();
+        const auto player = media_player_;
         if ((GetKeyState(VK_CONTROL) & 0x8000) != 0)
         {
             media_volume_wheel_delta_ += delta;
@@ -10610,6 +10761,11 @@ namespace winrt::Glance::App::implementation
         show_media_controls();
         update_media_controls();
     }
+    catch (const hresult_error& error)
+    {
+        updating_media_position_ = false;
+        handle_media_failure(media_playback_item_, error.code());
+    }
 
     void MainWindow::MediaPlayPauseButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
@@ -10634,17 +10790,19 @@ namespace winrt::Glance::App::implementation
             show_media_controls();
             return;
         }
-        if (MediaPreview().MediaPlayer() == nullptr)
+        if (media_player_ == nullptr)
         {
             return;
         }
-        const auto player = MediaPreview().MediaPlayer();
+        const auto player = media_player_;
         if (player.PlaybackSession().PlaybackState() == Windows::Media::Playback::MediaPlaybackState::Playing)
         {
+            media_play_intent_ = false;
             player.Pause();
         }
         else
         {
+            media_play_intent_ = true;
             player.Play();
         }
         show_media_controls();
@@ -10674,11 +10832,11 @@ namespace winrt::Glance::App::implementation
             show_media_controls();
             return;
         }
-        if (MediaPreview().MediaPlayer() == nullptr)
+        if (media_player_ == nullptr)
         {
             return;
         }
-        const auto player = MediaPreview().MediaPlayer();
+        const auto player = media_player_;
         player.IsMuted(!player.IsMuted());
         MediaMuteIcon().Glyph(player.IsMuted() ? L"\xE74F" : L"\xE767");
         show_media_controls();
@@ -10710,6 +10868,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::MediaSeekSlider_ValueChanged(
         IInspectable const&,
         Primitives::RangeBaseValueChangedEventArgs const& args)
+    try
     {
         if (!updating_media_position_ && native_media_active_ &&
             native_preview_surface_ != nullptr)
@@ -10721,13 +10880,17 @@ namespace winrt::Glance::App::implementation
                     args.NewValue() * 10000000.0)));
             show_media_controls();
         }
-        else if (!updating_media_position_ && MediaPreview().MediaPlayer() != nullptr)
+        else if (!updating_media_position_ && media_player_ != nullptr)
         {
-            MediaPreview().MediaPlayer().PlaybackSession().Position(
+            media_player_.PlaybackSession().Position(
                 std::chrono::duration_cast<Windows::Foundation::TimeSpan>(
                     std::chrono::duration<double>(args.NewValue())));
             show_media_controls();
         }
+    }
+    catch (const hresult_error& error)
+    {
+        handle_media_failure(media_playback_item_, error.code());
     }
 
     void MainWindow::MediaVolumeSlider_ValueChanged(
@@ -10744,9 +10907,9 @@ namespace winrt::Glance::App::implementation
                 static_cast<std::int64_t>(native_media_state_.volume_percent));
             show_media_controls();
         }
-        else if (MediaPreview().MediaPlayer() != nullptr)
+        else if (media_player_ != nullptr)
         {
-            MediaPreview().MediaPlayer().Volume(args.NewValue() / 100.0);
+            media_player_.Volume(args.NewValue() / 100.0);
             show_media_controls();
         }
     }

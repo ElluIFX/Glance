@@ -375,15 +375,15 @@
   <data name="UpdateFrequencyWeeklyItem.Content" xml:space="preserve"><value>Weekly</value></data>
   <data name="UpdateFrequencyMonthlyItem.Content" xml:space="preserve"><value>Monthly</value></data>
   <data name="ComponentsPageTitle.Text" xml:space="preserve"><value>Add-ons</value></data>
-  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>Optional components, sources, and runtime status</value></data>
-  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>Add-on component location</value></data>
+  <data name="ComponentsPageDescription.Text" xml:space="preserve"><value>Optional dependencies, components, sources, and runtime status</value></data>
+  <data name="ComponentLocationGroupTitle.Text" xml:space="preserve"><value>Optional components</value></data>
   <data name="ComponentFolderLabel.Text" xml:space="preserve"><value>Component folder</value></data>
   <data name="ComponentFolderDescription.Text" xml:space="preserve"><value>Glance loads components from this folder at startup</value></data>
   <data name="OpenComponentsFolderButton.Content" xml:space="preserve"><value>Open folder</value></data>
   <data name="ComponentStatusGroupTitle.Text" xml:space="preserve"><value>Add-on component status</value></data>
   <data name="ComponentEmptyTitle.Text" xml:space="preserve"><value>No components installed</value></data>
   <data name="ComponentEmptyDescription.Text" xml:space="preserve"><value>Install optional components to add support for more file formats</value></data>
-  <data name="SourceLocationGroupTitle.Text" xml:space="preserve"><value>Add-on source location</value></data>
+  <data name="SourceLocationGroupTitle.Text" xml:space="preserve"><value>Optional sources</value></data>
   <data name="SourceFolderLabel.Text" xml:space="preserve"><value>Source folder</value></data>
   <data name="SourceFolderDescription.Text" xml:space="preserve"><value>Glance loads sources from this folder at startup</value></data>
   <data name="OpenSourcesFolderButton.Content" xml:space="preserve"><value>Open folder</value></data>
@@ -397,12 +397,6 @@
   <data name="ComponentWebViewUnavailable" xml:space="preserve"><value>WebView2 Runtime not found</value></data>
   <data name="ComponentDependencyUnavailable" xml:space="preserve"><value>Required component {0} is unavailable</value></data>
   <data name="ComponentDependencyCycle" xml:space="preserve"><value>The component dependency graph contains a cycle</value></data>
-  <data name="ComponentActionDownloadFailedTitle" xml:space="preserve"><value>Could not download dependency</value></data>
-  <data name="ComponentActionDownloadNetworkFailedMessage" xml:space="preserve"><value>The dependency could not be downloaded. Check your connection and try again</value></data>
-  <data name="ComponentActionDownloadFileFailedMessage" xml:space="preserve"><value>The dependency could not be saved. Check available disk space and try again</value></data>
-  <data name="ComponentActionDownloadIntegrityFailedMessage" xml:space="preserve"><value>The downloaded dependency did not match the expected checksum</value></data>
-  <data name="ComponentActionFailedTitle" xml:space="preserve"><value>Could not prepare component</value></data>
-  <data name="ComponentActionFailedMessage" xml:space="preserve"><value>The downloaded dependency could not be installed</value></data>
   <data name="MarkdownPreviewButton.Content" xml:space="preserve"><value>Preview</value></data>
   <data name="MarkdownCodeButton.Content" xml:space="preserve"><value>Code</value></data>
   <data name="JsonTreeButton.Content" xml:space="preserve"><value>Structured</value></data>
@@ -437,4 +431,20 @@
   <data name="TextMonitorButton.ToolTipService.ToolTip" xml:space="preserve"><value>Toggle file monitoring&#xA;Right-click to refresh once</value></data>
   <data name="TextMonitorEnabledNotice" xml:space="preserve"><value>File monitoring enabled</value></data>
   <data name="TextMonitorPausedNotice" xml:space="preserve"><value>File monitoring paused</value></data>
+  <data name="DependencyGroupTitle.Text" xml:space="preserve"><value>Optional dependencies</value></data>
+  <data name="DependencyInstalled" xml:space="preserve"><value>Installed</value></data>
+  <data name="DependencyExternal" xml:space="preserve"><value>Available on PATH</value></data>
+  <data name="DependencyMissing" xml:space="preserve"><value>Not installed</value></data>
+  <data name="DependencyDownloading" xml:space="preserve"><value>Downloading...</value></data>
+  <data name="DependencyInstalling" xml:space="preserve"><value>Installing...</value></data>
+  <data name="DependencyFailed" xml:space="preserve"><value>Operation failed, retry</value></data>
+  <data name="DependencyInUse" xml:space="preserve"><value>In use, close related previews first</value></data>
+  <data name="DependencyCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="DependencyUninstall" xml:space="preserve"><value>Uninstall</value></data>
+  <data name="DependencyDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="DependencyRequired" xml:space="preserve"><value>This preview requires an optional dependency</value></data>
+  <data name="DependencyVideoConsumer" xml:space="preserve"><value>Video preview</value></data>
+  <data name="DependencyAudioConsumer" xml:space="preserve"><value>Audio preview</value></data>
+  <data name="MediaDecodeFailed" xml:space="preserve"><value>This media could not be decoded</value></data>
+  <data name="SoftwareMediaPreparing" xml:space="preserve"><value>Preparing software playback...</value></data>
 </root>

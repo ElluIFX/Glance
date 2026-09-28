@@ -17,19 +17,6 @@
   <data name="Shortcut.Tooltip" xml:space="preserve"><value>Show advanced media information&#xA;Right-click to copy media data</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>Loading advanced media information...</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Unable to read advanced media information</value></data>
-  <data name="Action.Button" xml:space="preserve"><value>Download ffprobe</value></data>
-  <data name="Action.ConfirmationTitle" xml:space="preserve"><value>Download ffprobe</value></data>
-  <data name="Action.ConfirmationMessage" xml:space="preserve"><value>Advanced media previews require ffprobe. Download it now?</value></data>
-  <data name="Action.ConfirmationButton" xml:space="preserve"><value>Download</value></data>
-  <data name="Action.DownloadTitle" xml:space="preserve"><value>Downloading ffprobe</value></data>
-  <data name="Action.DownloadMessage" xml:space="preserve"><value>Downloading from gyan.dev</value></data>
-  <data name="Action.PreparingTitle" xml:space="preserve"><value>Installing ffprobe</value></data>
-  <data name="Action.PreparingMessage" xml:space="preserve"><value>Extracting and verifying ffprobe</value></data>
-  <data name="Action.CompletedTitle" xml:space="preserve"><value>ffprobe is ready</value></data>
-  <data name="Action.CompletedMessage" xml:space="preserve"><value>Advanced media information is now available</value></data>
-  <data name="Action.ExtractFailed" xml:space="preserve"><value>ffprobe could not be extracted</value></data>
-  <data name="Action.IntegrityFailed" xml:space="preserve"><value>The extracted ffprobe executable did not match the expected checksum</value></data>
-  <data name="Action.InstallFailed" xml:space="preserve"><value>ffprobe could not be installed</value></data>
   <data name="MediaInfo.General" xml:space="preserve"><value>General</value></data>
   <data name="MediaInfo.Container" xml:space="preserve"><value>Container</value></data>
   <data name="MediaInfo.Duration" xml:space="preserve"><value>Duration</value></data>
