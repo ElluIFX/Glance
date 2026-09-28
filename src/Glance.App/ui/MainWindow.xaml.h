@@ -74,7 +74,6 @@ namespace winrt::Glance::App::implementation
         [[nodiscard]] bool IsPreviewingFile(const std::wstring& path) const noexcept;
         void CloseForReplacement();
         void HidePreview();
-        [[nodiscard]] bool ActivateSelectedFolderEntry();
         [[nodiscard]] bool NavigateBack();
         void ApplyAppearancePreferences();
         void ApplyLocalizedResources();
@@ -324,6 +323,7 @@ namespace winrt::Glance::App::implementation
         void clear_preview_content();
         void release_component_view();
         void update_preview_navigation_ui();
+        bool activate_folder_entry(const glance::app::ArchiveEntry& entry);
         [[nodiscard]] const glance::app::ArchiveEntry* selected_folder_entry() noexcept;
         void cancel_pdf_render() noexcept;
         static winrt::fire_and_forget close_pdf_document_async(
@@ -565,6 +565,14 @@ namespace winrt::Glance::App::implementation
             double folder_scroll_offset{};
             bool folder_scroll_offset_valid{};
         };
+        PreviewNavigationEntry capture_preview_navigation();
+        bool navigate_preview_history(bool forward);
+        bool queue_preview_history_navigation(bool forward);
+        bool can_navigate_preview_history(bool forward) const noexcept;
+        void update_preview_navigation_hook(bool active);
+        static LRESULT CALLBACK preview_navigation_mouse_hook(int code, WPARAM message, LPARAM data) noexcept;
+        static HHOOK preview_navigation_hook_;
+        static std::vector<MainWindow*> preview_navigation_windows_;
         void apply_archive_preview(glance::app::ArchivePreview preview, std::uint64_t generation);
         void render_archive_batch(const std::shared_ptr<ArchiveRenderState>& state);
         void update_archive_header_state();
@@ -826,10 +834,10 @@ namespace winrt::Glance::App::implementation
         std::shared_ptr<ArchiveRenderState> archive_render_state_;
         std::shared_ptr<std::atomic_bool> archive_icon_cancellation_;
         std::vector<PreviewNavigationEntry> preview_navigation_;
+        std::vector<PreviewNavigationEntry> preview_forward_navigation_;
         std::wstring pending_folder_selection_path_;
         double pending_folder_scroll_offset_{};
         bool pending_folder_scroll_offset_valid_{};
-        bool pending_folder_focus_restore_{};
         bool archive_preview_is_directory_{};
         bool archive_entry_compressed_size_available_{};
         PasswordPromptTarget password_prompt_target_{ PasswordPromptTarget::none };

@@ -1486,13 +1486,8 @@ namespace glance::core
 
         if (input_state_.preview_active.load(std::memory_order_acquire))
         {
-            const auto input_action = action == HookAction::toggle_preview
-                ? glance::contracts::PreviewInputAction::activate_selection
-                : glance::contracts::PreviewInputAction::navigate_back;
             static_cast<void>(pipe_server_.send(
-                glance::contracts::MessageType::preview_input,
-                {},
-                static_cast<std::uint32_t>(input_action)));
+                glance::contracts::MessageType::close_active_preview));
             return;
         }
 

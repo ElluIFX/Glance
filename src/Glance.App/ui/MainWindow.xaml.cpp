@@ -34,6 +34,7 @@
 #include <shellapi.h>
 #include <shlobj_core.h>
 #include <shlwapi.h>
+#include <windowsx.h>
 #include <winrt/Microsoft.Web.WebView2.Core.h>
 #include <winrt/Windows.Data.Json.h>
 
@@ -1131,6 +1132,9 @@ namespace
 
 namespace winrt::Glance::App::implementation
 {
+    HHOOK MainWindow::preview_navigation_hook_{};
+    std::vector<MainWindow*> MainWindow::preview_navigation_windows_;
+
     MainWindow::MainWindow()
     {
         GUID cli_id{};
@@ -2600,6 +2604,19 @@ namespace winrt::Glance::App::implementation
         DWORD_PTR reference_data) noexcept
     {
         auto* self = reinterpret_cast<MainWindow*>(reference_data);
+        if (message == WM_APPCOMMAND && self != nullptr)
+        {
+            const auto command = GET_APPCOMMAND_LPARAM(lparam);
+            if (command == APPCOMMAND_BROWSER_BACKWARD || command == APPCOMMAND_BROWSER_FORWARD)
+            {
+                try
+                {
+                    if (self->queue_preview_history_navigation(command == APPCOMMAND_BROWSER_FORWARD))
+                        return TRUE;
+                }
+                catch (...) {}
+            }
+        }
         if (message == WM_MOUSEACTIVATE)
         {
             if (self == nullptr || !self->input_activation_enabled_)
@@ -2667,6 +2684,7 @@ namespace winrt::Glance::App::implementation
         }
         if (message == WM_NCDESTROY && self != nullptr)
         {
+            self->update_preview_navigation_hook(false);
             glance::contracts::log_event(L"MainWindow received WM_NCDESTROY.");
             self->text_editor_.reset();
             self->release_native_preview_surface();
@@ -2729,9 +2747,9 @@ namespace winrt::Glance::App::implementation
         leave_gallery(false);
         stop_detached_focus_monitor();
         preview_navigation_.clear();
+        preview_forward_navigation_.clear();
         pending_folder_selection_path_.clear();
         pending_folder_scroll_offset_valid_ = false;
-        pending_folder_focus_restore_ = false;
         files_ = std::move(files);
         source_kind_ = source_kind;
         source_window_ = source_window;
@@ -2823,14 +2841,13 @@ namespace winrt::Glance::App::implementation
         }
     }
 
-    bool MainWindow::ActivateSelectedFolderEntry()
+    bool MainWindow::activate_folder_entry(const glance::app::ArchiveEntry& folder_entry)
     {
-        const auto* entry = selected_folder_entry();
-        if (entry == nullptr || current_index_ >= files_.size())
+        if (current_index_ >= files_.size())
         {
             return false;
         }
-
+        const auto* entry = &folder_entry;
         glance::app::PreviewFile child;
         child.display_name = entry->name;
         child.path = entry->path;
@@ -2846,21 +2863,11 @@ namespace winrt::Glance::App::implementation
                  FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS |
                  FILE_ATTRIBUTE_RECALL_ON_OPEN)) != 0;
 
-        PreviewNavigationEntry parent{
-            std::move(files_[current_index_]),
-            entry->path };
-        parent.window_bounds_valid =
-            GetWindowRect(window_, &parent.window_bounds) != FALSE;
-        if (const auto scroller = find_scroll_viewer(FolderEntryList()))
-        {
-            parent.folder_scroll_offset = scroller.VerticalOffset();
-            parent.folder_scroll_offset_valid = true;
-        }
-        preview_navigation_.push_back(std::move(parent));
+        preview_navigation_.push_back(capture_preview_navigation());
+        preview_forward_navigation_.clear();
         files_[current_index_] = std::move(child);
         pending_folder_selection_path_.clear();
         pending_folder_scroll_offset_valid_ = false;
-        pending_folder_focus_restore_ = false;
         update_preview_navigation_ui();
         present_file(current_index_);
         return true;
@@ -2868,23 +2875,111 @@ namespace winrt::Glance::App::implementation
 
     bool MainWindow::NavigateBack()
     {
-        if (fullscreen_)
+        return navigate_preview_history(false);
+    }
+
+    MainWindow::PreviewNavigationEntry MainWindow::capture_preview_navigation()
+    {
+        PreviewNavigationEntry entry;
+        entry.file = files_[current_index_];
+        entry.selected_path = pending_folder_selection_path_;
+        if (const auto* selected = selected_folder_entry()) entry.selected_path = selected->path;
+        entry.window_bounds_valid = GetWindowRect(window_, &entry.window_bounds) != FALSE;
+        entry.folder_scroll_offset = pending_folder_scroll_offset_;
+        entry.folder_scroll_offset_valid = pending_folder_scroll_offset_valid_;
+        if (archive_preview_is_directory_ && !pending_folder_scroll_offset_valid_)
         {
-            set_fullscreen(false);
-            return true;
+            if (const auto scroller = find_scroll_viewer(FolderEntryList()))
+            {
+                entry.folder_scroll_offset = scroller.VerticalOffset();
+                entry.folder_scroll_offset_valid = true;
+            }
         }
-        if (preview_navigation_.empty() || current_index_ >= files_.size())
+        return entry;
+    }
+
+    bool MainWindow::can_navigate_preview_history(bool forward) const noexcept
+    {
+        return visible_ && !xaml_modal_overlay_active_ && password_prompt_target_ == PasswordPromptTarget::none &&
+            current_index_ < files_.size() &&
+            !(forward ? preview_forward_navigation_ : preview_navigation_).empty();
+    }
+
+    void MainWindow::update_preview_navigation_hook(bool active)
+    {
+        std::erase(preview_navigation_windows_, this);
+        if (active) preview_navigation_windows_.push_back(this);
+        if (!preview_navigation_windows_.empty() && !preview_navigation_hook_)
+        {
+            preview_navigation_hook_ = SetWindowsHookExW(
+                WH_MOUSE_LL, preview_navigation_mouse_hook, GetModuleHandleW(nullptr), 0);
+        }
+        else if (preview_navigation_windows_.empty() && preview_navigation_hook_)
+        {
+            UnhookWindowsHookEx(std::exchange(preview_navigation_hook_, nullptr));
+        }
+    }
+
+    LRESULT CALLBACK MainWindow::preview_navigation_mouse_hook(int code, WPARAM message, LPARAM data) noexcept
+    {
+        if (code == HC_ACTION && (message == WM_RBUTTONDOWN || message == WM_RBUTTONUP ||
+            message == WM_XBUTTONDOWN || message == WM_XBUTTONUP))
+        {
+            const auto& input = *reinterpret_cast<const MSLLHOOKSTRUCT*>(data);
+            const bool forward = (message == WM_XBUTTONDOWN || message == WM_XBUTTONUP) &&
+                HIWORD(input.mouseData) == XBUTTON2;
+            const HWND target = GetAncestor(WindowFromPoint(input.pt), GA_ROOT);
+            for (auto* window : preview_navigation_windows_)
+            {
+                if (!window->can_navigate_preview_history(forward)) continue;
+                for (HWND owner = target; owner; owner = GetWindow(owner, GW_OWNER))
+                {
+                    if (owner != window->window_) continue;
+                    try
+                    {
+                        if (message == WM_RBUTTONDOWN || message == WM_XBUTTONDOWN ||
+                            window->queue_preview_history_navigation(forward))
+                            return 1;
+                    }
+                    catch (...) {}
+                    break;
+                }
+            }
+        }
+        return CallNextHookEx(preview_navigation_hook_, code, message, data);
+    }
+
+    bool MainWindow::queue_preview_history_navigation(bool forward)
+    {
+        if (!can_navigate_preview_history(forward)) return false;
+        return DispatcherQueue().TryEnqueue([weak = get_weak(), generation = content_generation_, forward] {
+            if (const auto self = weak.get(); self && self->visible_ &&
+                self->content_generation_ == generation && !self->xaml_modal_overlay_active_ &&
+                self->password_prompt_target_ == PasswordPromptTarget::none)
+            {
+                try { static_cast<void>(self->navigate_preview_history(forward)); }
+                catch (...) { glance::contracts::log_event(L"Preview history navigation failed."); }
+            }
+        });
+    }
+
+    bool MainWindow::navigate_preview_history(bool forward)
+    {
+        auto& source = forward ? preview_forward_navigation_ : preview_navigation_;
+        auto& destination = forward ? preview_navigation_ : preview_forward_navigation_;
+        if (source.empty() || current_index_ >= files_.size())
         {
             return false;
         }
 
-        auto parent = std::move(preview_navigation_.back());
-        preview_navigation_.pop_back();
+        if (fullscreen_) set_fullscreen(false);
+        destination.push_back(capture_preview_navigation());
+        auto parent = std::move(source.back());
+        source.pop_back();
         files_[current_index_] = std::move(parent.file);
         pending_folder_selection_path_ = std::move(parent.selected_path);
         pending_folder_scroll_offset_ = parent.folder_scroll_offset;
         pending_folder_scroll_offset_valid_ = parent.folder_scroll_offset_valid;
-        pending_folder_focus_restore_ = true;
         update_preview_navigation_ui();
         present_file(current_index_);
         if (parent.window_bounds_valid)
@@ -2903,6 +2998,8 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_preview_navigation_ui()
     {
+        update_preview_navigation_hook(visible_ &&
+            (!preview_navigation_.empty() || !preview_forward_navigation_.empty()));
         BackButton().Visibility(
             preview_navigation_.empty() ? Visibility::Collapsed : Visibility::Visible);
         const bool show_file_list = preview_navigation_.empty() && files_.size() > 1;
@@ -2914,20 +3011,11 @@ namespace winrt::Glance::App::implementation
 
     const glance::app::ArchiveEntry* MainWindow::selected_folder_entry() noexcept
     {
-        if (!archive_preview_is_directory_ || archive_render_state_ == nullptr)
-        {
+        if (!archive_preview_is_directory_ || archive_render_state_ == nullptr) return nullptr;
+        const int index = FolderEntryList().SelectedIndex();
+        if (index < 0 || static_cast<std::size_t>(index) >= archive_render_state_->preview.entries.size())
             return nullptr;
-        }
-
-        const int selected_index = FolderEntryList().SelectedIndex();
-        if (selected_index < 0 ||
-            static_cast<std::size_t>(selected_index) >=
-                archive_render_state_->preview.entries.size())
-        {
-            return nullptr;
-        }
-        return &archive_render_state_->preview.entries[
-            static_cast<std::size_t>(selected_index)];
+        return &archive_render_state_->preview.entries[static_cast<std::size_t>(index)];
     }
 
     void MainWindow::release_component_view()
@@ -3031,10 +3119,11 @@ namespace winrt::Glance::App::implementation
         FolderEntryList().Items().Clear();
         ArchiveStatusText().Text(L"");
         preview_navigation_.clear();
+        preview_forward_navigation_.clear();
         pending_folder_selection_path_.clear();
         pending_folder_scroll_offset_valid_ = false;
-        pending_folder_focus_restore_ = false;
         BackButton().Visibility(Visibility::Collapsed);
+        update_preview_navigation_hook(false);
         FileList().Items().Clear();
         FileList().Visibility(Visibility::Collapsed);
         FileListColumn().Width(GridLength{ 0, GridUnitType::Pixel });
@@ -4003,6 +4092,14 @@ namespace winrt::Glance::App::implementation
         if (index >= files_.size())
         {
             return;
+        }
+        if (index != current_index_)
+        {
+            preview_navigation_.clear();
+            preview_forward_navigation_.clear();
+            pending_folder_selection_path_.clear();
+            pending_folder_scroll_offset_valid_ = false;
+            update_preview_navigation_ui();
         }
         window_placement_identity_ = {};
         if (index != current_index_ || current_text_path_ != files_[index].path)
@@ -6058,19 +6155,11 @@ namespace winrt::Glance::App::implementation
                 item.Content(row);
                 folder_items.Append(item);
                 if (!pending_folder_selection_path_.empty() &&
-                    CompareStringOrdinal(
-                        entry.path.c_str(),
-                        -1,
-                        pending_folder_selection_path_.c_str(),
-                        -1,
-                        TRUE) == CSTR_EQUAL)
+                    CompareStringOrdinal(entry.path.c_str(), -1,
+                        pending_folder_selection_path_.c_str(), -1, TRUE) == CSTR_EQUAL)
                 {
-                    FolderEntryList().SelectedIndex(
-                        static_cast<int>(folder_items.Size() - 1));
-                    if (!pending_folder_focus_restore_)
-                    {
-                        FolderEntryList().ScrollIntoView(item);
-                    }
+                    FolderEntryList().SelectedIndex(static_cast<int>(folder_items.Size() - 1));
+                    if (!pending_folder_scroll_offset_valid_) FolderEntryList().ScrollIntoView(item);
                     pending_folder_selection_path_.clear();
                 }
             }
@@ -6103,46 +6192,19 @@ namespace winrt::Glance::App::implementation
         }
 
         ArchiveStatusText().Text(state->status);
-        if (archive_preview_is_directory_ && pending_folder_focus_restore_)
+        pending_folder_selection_path_.clear();
+        if (archive_preview_is_directory_ && pending_folder_scroll_offset_valid_)
         {
             FolderEntryList().UpdateLayout();
-            if (pending_folder_scroll_offset_valid_)
+            if (const auto scroller = find_scroll_viewer(FolderEntryList()))
             {
-                if (const auto scroller = find_scroll_viewer(FolderEntryList()))
-                {
-                    static_cast<void>(scroller.ChangeView(
-                        nullptr,
-                        pending_folder_scroll_offset_,
-                        nullptr,
-                        true));
-                }
+                static_cast<void>(scroller.ChangeView(
+                    nullptr,
+                    pending_folder_scroll_offset_,
+                    nullptr,
+                    true));
             }
             pending_folder_scroll_offset_valid_ = false;
-            pending_folder_focus_restore_ = false;
-
-            const auto lifetime = get_strong();
-            const auto focus_generation = state->generation;
-            static_cast<void>(DispatcherQueue().TryEnqueue([lifetime, focus_generation] {
-                if (focus_generation != lifetime->content_generation_ ||
-                    !lifetime->archive_preview_is_directory_)
-                {
-                    return;
-                }
-                const int selected_index = lifetime->FolderEntryList().SelectedIndex();
-                const auto target = selected_index >= 0
-                    ? lifetime->FolderEntryList()
-                        .ContainerFromIndex(selected_index)
-                        .try_as<Control>()
-                    : nullptr;
-                if (target != nullptr)
-                {
-                    target.Focus(FocusState::Programmatic);
-                }
-                else
-                {
-                    lifetime->FolderEntryList().Focus(FocusState::Programmatic);
-                }
-            }));
         }
         if (!state->icon_targets.empty())
         {
@@ -10160,11 +10222,9 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
-        const auto* selected_entry = selected_folder_entry();
-        pending_folder_selection_path_ =
-            selected_entry == nullptr ? std::wstring{} : selected_entry->path;
+        const auto* selected = selected_folder_entry();
+        pending_folder_selection_path_ = selected ? selected->path : std::wstring{};
         pending_folder_scroll_offset_valid_ = false;
-        pending_folder_focus_restore_ = false;
         auto preview = std::move(archive_render_state_->preview);
         archive_render_state_.reset();
         ArchiveEntryTree().RootNodes().Clear();
@@ -10177,7 +10237,14 @@ namespace winrt::Glance::App::implementation
         IInspectable const&,
         DoubleTappedRoutedEventArgs const& args)
     {
-        if (ActivateSelectedFolderEntry())
+        if (!archive_preview_is_directory_ || !archive_render_state_) return;
+        auto source = args.OriginalSource().try_as<DependencyObject>();
+        while (source && !source.try_as<ListViewItem>() && source != FolderEntryList())
+            source = Media::VisualTreeHelper::GetParent(source);
+        const auto container = source.try_as<ListViewItem>();
+        const int index = container ? FolderEntryList().IndexFromContainer(container) : -1;
+        if (index >= 0 && static_cast<std::size_t>(index) < archive_render_state_->preview.entries.size() &&
+            activate_folder_entry(archive_render_state_->preview.entries[static_cast<std::size_t>(index)]))
         {
             args.Handled(true);
         }

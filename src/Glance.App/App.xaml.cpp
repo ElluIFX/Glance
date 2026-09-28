@@ -1160,11 +1160,6 @@ namespace winrt::Glance::App::implementation
             {
                 close_active_preview();
             }
-            else if (type == glance::contracts::MessageType::preview_input)
-            {
-                handle_preview_input(
-                    static_cast<glance::contracts::PreviewInputAction>(flags));
-            }
             else if (type == glance::contracts::MessageType::gallery_response)
             {
                 try
@@ -1397,46 +1392,9 @@ namespace winrt::Glance::App::implementation
 
     void App::close_active_preview()
     {
-        if (active_window_ != nullptr)
+        if (active_window_ != nullptr && !update_prompt_active_)
         {
             get_self<implementation::MainWindow>(active_window_)->HidePreview();
-        }
-    }
-
-    void App::handle_preview_input(glance::contracts::PreviewInputAction action)
-    {
-        if (active_window_ == nullptr)
-        {
-            return;
-        }
-
-        const auto window = get_self<implementation::MainWindow>(active_window_);
-        bool handled = false;
-        if (action == glance::contracts::PreviewInputAction::activate_selection)
-        {
-            handled = window->ActivateSelectedFolderEntry();
-        }
-        else if (action == glance::contracts::PreviewInputAction::navigate_back)
-        {
-            handled = window->NavigateBack();
-        }
-        else
-        {
-            return;
-        }
-
-        if (!handled)
-        {
-            if (action == glance::contracts::PreviewInputAction::activate_selection &&
-                pending_update_ && !update_prompt_active_)
-            {
-                show_pending_update_prompt();
-            }
-            if (update_prompt_active_)
-            {
-                return;
-            }
-            window->HidePreview();
         }
     }
 }

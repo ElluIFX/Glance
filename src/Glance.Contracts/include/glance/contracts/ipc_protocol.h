@@ -23,7 +23,6 @@ namespace glance::contracts
         open_active_preview = 10,
         close_active_preview = 11,
         preview_state_changed = 12,
-        preview_input = 14,
         gallery_request = 15,
         gallery_response = 16,
         source_status_request = 17,
@@ -49,12 +48,6 @@ namespace glance::contracts
     {
         return pending_sequence - acknowledged_sequence <= 1U;
     }
-
-    enum class PreviewInputAction : std::uint32_t
-    {
-        activate_selection = 1,
-        navigate_back = 2,
-    };
 
     struct FrameHeader
     {
