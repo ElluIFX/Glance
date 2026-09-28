@@ -5312,7 +5312,7 @@ namespace winrt::Glance::App::implementation
             for (const auto& field : fields)
             {
                 media_playback_info_ +=
-                    media_playback_info_.empty() ? field : L" " + field;
+                    media_playback_info_.empty() ? field : L" · " + field;
             }
             update_media_footer();
         }
@@ -5403,7 +5403,7 @@ namespace winrt::Glance::App::implementation
                     {
                         if (!media_info.empty())
                         {
-                            media_info.push_back(L' ');
+                            media_info += L" · ";
                         }
                         media_info.append(value);
                     }
