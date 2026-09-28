@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "scintilla_text_view.h"
+#include "fullscreen_interaction.h"
 
 #include "syntax_theme.h"
 #include "preview_provider.h"
@@ -1034,7 +1035,13 @@ namespace glance::app
             self->follow_after_layout_ = false;
             self->refresh_position_.reset();
         }
+        if (message == WM_LBUTTONDOWN && self != nullptr)
+        {
+            self->last_left_down_tick_ = GetTickCount64();
+        }
         if (message == WM_LBUTTONDBLCLK && self != nullptr &&
+            self->last_left_down_tick_ != 0 &&
+            GetTickCount64() - self->last_left_down_tick_ <= fullscreen_double_click_interval(GetDoubleClickTime()) &&
             self->double_click_callback_ && self->double_click_callback_())
         {
             return 0;

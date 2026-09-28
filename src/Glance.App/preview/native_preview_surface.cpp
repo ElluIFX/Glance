@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "native_preview_surface.h"
+#include "fullscreen_interaction.h"
 
 #include <algorithm>
 #include <array>
@@ -945,7 +946,7 @@ namespace glance::app
         const int maximum_x = std::max(1, GetSystemMetrics(SM_CXDOUBLECLK) / 2);
         const int maximum_y = std::max(1, GetSystemMetrics(SM_CYDOUBLECLK) / 2);
         const bool double_click = last_left_down_tick_ != 0 &&
-            now - last_left_down_tick_ <= GetDoubleClickTime() &&
+            now - last_left_down_tick_ <= fullscreen_double_click_interval(GetDoubleClickTime()) &&
             std::abs(input.pt.x - last_left_down_point_.x) <= maximum_x &&
             std::abs(input.pt.y - last_left_down_point_.y) <= maximum_y;
         last_left_down_tick_ = now;

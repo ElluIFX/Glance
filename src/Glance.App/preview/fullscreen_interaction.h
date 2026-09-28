@@ -2,6 +2,11 @@
 
 namespace glance::app
 {
+    [[nodiscard]] constexpr unsigned int fullscreen_double_click_interval(unsigned int system_interval) noexcept
+    {
+        return system_interval > 1 ? system_interval / 2 : 1;
+    }
+
     [[nodiscard]] constexpr bool can_toggle_preview_fullscreen(
         bool visible,
         bool enabled,

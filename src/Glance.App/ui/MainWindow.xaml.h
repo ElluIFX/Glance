@@ -213,6 +213,7 @@ namespace winrt::Glance::App::implementation
         void MediaPanel_PointerMoved(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
+        void MediaPanel_Tapped(IInspectable const&, Microsoft::UI::Xaml::Input::TappedRoutedEventArgs const&);
         void MediaPanel_PointerPressed(
             IInspectable const&,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&);
@@ -707,6 +708,8 @@ namespace winrt::Glance::App::implementation
         bool fullscreen_title_visible_{ true };
         bool fullscreen_footer_visible_{ true };
         bool double_click_fullscreen_enabled_{};
+        ULONGLONG fullscreen_last_press_tick_{};
+        bool fullscreen_fast_double_tap_{};
         bool fullscreen_toggle_pending_{};
         bool topmost_{};
         bool pinned_{};
@@ -723,6 +726,7 @@ namespace winrt::Glance::App::implementation
         bool syntax_highlighting_{ true };
         bool word_wrap_{ true };
         bool media_is_audio_{};
+        bool media_primary_tap_{};
         bool native_media_active_{};
         bool native_media_query_in_flight_{};
         bool native_media_dimensions_applied_{};
@@ -906,6 +910,7 @@ namespace winrt::Glance::App::implementation
         std::uint64_t text_monitor_epoch_{};
         Microsoft::UI::Xaml::DispatcherTimer fullscreen_chrome_timer_{ nullptr };
         Microsoft::UI::Xaml::DispatcherTimer media_timer_{ nullptr };
+        std::chrono::steady_clock::time_point media_pause_overlay_deadline_{};
         Microsoft::UI::Xaml::DispatcherTimer copy_feedback_timer_{ nullptr };
         Microsoft::UI::Xaml::Controls::FontIcon copy_feedback_icon_{ nullptr };
         winrt::hstring copy_feedback_original_glyph_;

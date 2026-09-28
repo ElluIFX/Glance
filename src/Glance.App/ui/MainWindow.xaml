@@ -508,6 +508,7 @@
                     Loaded="NativeDocumentPanel_Loaded"
                     PointerMoved="MediaPanel_PointerMoved"
                     PointerPressed="MediaPanel_PointerPressed"
+                    Tapped="MediaPanel_Tapped"
                     PointerWheelChanged="MediaPanel_PointerWheelChanged"
                     SizeChanged="NativeDocumentPanel_SizeChanged"
                     Visibility="Collapsed">
@@ -571,6 +572,27 @@
                         Visibility="Collapsed">
                         <ProgressRing Width="32" Height="32" IsActive="True" />
                     </StackPanel>
+                    <Border
+                        x:Name="MediaPausedOverlay"
+                        Width="72"
+                        Height="72"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Background="#E6000000"
+                        CornerRadius="36"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed">
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Path Width="8" Height="30" Fill="White" Stretch="Fill"
+                                Data="M5.74609 3C4.7796 3 3.99609 3.7835 3.99609 4.75V19.25C3.99609 20.2165 4.7796 21 5.74609 21H9.24609C10.2126 21 10.9961 20.2165 10.9961 19.25V4.75C10.9961 3.7835 10.2126 3 9.24609 3H5.74609Z" />
+                            <Path Width="8" Height="30" Fill="White" Stretch="Fill"
+                                Data="M5.74609 3C4.7796 3 3.99609 3.7835 3.99609 4.75V19.25C3.99609 20.2165 4.7796 21 5.74609 21H9.24609C10.2126 21 10.9961 20.2165 10.9961 19.25V4.75C10.9961 3.7835 10.2126 3 9.24609 3H5.74609Z" />
+                        </StackPanel>
+                    </Border>
                     <Border
                         x:Name="MediaControlsOverlay"
                         Height="56"

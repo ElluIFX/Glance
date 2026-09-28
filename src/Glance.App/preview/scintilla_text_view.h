@@ -89,6 +89,7 @@ namespace glance::app
         NearEndCallback near_end_callback_;
         FontZoomCallback font_zoom_callback_;
         DoubleClickCallback double_click_callback_;
+        ULONGLONG last_left_down_tick_{};
         std::wstring error_;
         std::wstring path_;
         std::string lexer_name_;

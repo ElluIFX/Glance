@@ -449,12 +449,18 @@ namespace
         L"glance:double-click-fullscreen:disabled";
     constexpr wchar_t web_toggle_fullscreen[] = L"glance:toggle-fullscreen";
     constexpr wchar_t web_double_click_fullscreen_script[] = LR"JS(
-(() => {
+((doubleClickInterval) => {
   if (window.__glanceDoubleClickFullscreenInstalled) {
     return;
   }
   window.__glanceDoubleClickFullscreenInstalled = true;
   let enabled = false;
+  let lastPress = -Infinity;
+  let pressInterval = Infinity;
+  window.addEventListener("pointerdown", (event) => {
+    pressInterval = event.button === 0 ? event.timeStamp - lastPress : Infinity;
+    lastPress = event.button === 0 ? event.timeStamp : -Infinity;
+  }, true);
   const interactiveTags = new Set([
     "BUTTON", "INPUT", "TEXTAREA", "SELECT", "OPTION", "SUMMARY"
   ]);
@@ -470,7 +476,7 @@ namespace
     }
   });
   window.addEventListener("dblclick", (event) => {
-    if (!enabled || event.button !== 0) {
+    if (!enabled || event.button !== 0 || pressInterval > doubleClickInterval) {
       return;
     }
     const interactive = event.composedPath().some((node) => {
@@ -492,7 +498,7 @@ namespace
     event.stopImmediatePropagation();
     window.chrome.webview.postMessage("glance:toggle-fullscreen");
   }, true);
-})();
+})
 )JS";
 
     std::optional<std::wstring> file_url_from_path(const std::wstring& path)
@@ -1143,6 +1149,15 @@ namespace winrt::Glance::App::implementation
         text_preferences_ = glance::app::load_text_preferences();
         footer_preferences_ = glance::app::load_footer_preferences();
         ApplyWindowPreferences();
+        PreviewContentHost().AddHandler(
+            UIElement::PointerPressedEvent(),
+            box_value<PointerEventHandler>([this](IInspectable const&, PointerRoutedEventArgs const& args) {
+                const auto now = GetTickCount64();
+                const bool primary = args.GetCurrentPoint(PreviewContentHost()).Properties().IsLeftButtonPressed();
+                fullscreen_fast_double_tap_ = primary && fullscreen_last_press_tick_ != 0 &&
+                    now - fullscreen_last_press_tick_ <= glance::app::fullscreen_double_click_interval(GetDoubleClickTime());
+                fullscreen_last_press_tick_ = primary ? now : 0;
+            }), true);
         PreviewContentHost().AddHandler(
             UIElement::DoubleTappedEvent(),
             box_value<Input::DoubleTappedEventHandler>(
@@ -4937,6 +4952,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::initialize_media_player()
     {
+        MediaPausedOverlay().Visibility(Visibility::Collapsed);
         Windows::Media::Playback::MediaPlayer player;
         player.IsLoopingEnabled(glance::app::load_media_preview_preferences().loop_playback);
         const auto weak = get_weak();
@@ -4994,6 +5010,7 @@ namespace winrt::Glance::App::implementation
         if (!item || item != media_playback_item_ || media_playback_generation_ != content_generation_ ||
             current_index_ >= files_.size() || !visible_) return;
         if (item == failed_system_media_item_) return;
+        MediaPausedOverlay().Visibility(Visibility::Collapsed);
         media_timer_.Stop();
         MediaPreview().SetMediaPlayer(nullptr);
         MediaControlsOverlay().IsHitTestVisible(false);
@@ -8031,7 +8048,8 @@ namespace winrt::Glance::App::implementation
         }
 
         co_await core.AddScriptToExecuteOnDocumentCreatedAsync(
-            web_double_click_fullscreen_script);
+            std::wstring(web_double_click_fullscreen_script) + L"(" +
+            std::to_wstring(glance::app::fullscreen_double_click_interval(GetDoubleClickTime())) + L");");
 
         const auto weak = get_weak();
         core.NavigationStarting(
@@ -10051,6 +10069,7 @@ namespace winrt::Glance::App::implementation
         IInspectable const&,
         DoubleTappedRoutedEventArgs const& args)
     {
+        if (!std::exchange(fullscreen_fast_double_tap_, false)) return;
         if (!glance::app::should_handle_xaml_fullscreen_double_tap(
                 args.Handled(),
                 WebPreviewHost().Visibility() == Visibility::Visible,
@@ -10573,6 +10592,8 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::stop_media_playback()
     {
+        media_primary_tap_ = false;
+        MediaPausedOverlay().Visibility(Visibility::Collapsed);
         media_timer_.Stop();
         const auto player = media_player_;
         MediaPreview().SetMediaPlayer(nullptr);
@@ -10634,6 +10655,10 @@ namespace winrt::Glance::App::implementation
             format_media_duration(position) + L" / " +
             format_media_duration(duration));
         const bool playing = session.PlaybackState() == Windows::Media::Playback::MediaPlaybackState::Playing;
+        if (playing || std::chrono::steady_clock::now() >= media_pause_overlay_deadline_)
+        {
+            MediaPausedOverlay().Visibility(Visibility::Collapsed);
+        }
         MediaPlayPauseIcon().Glyph(playing ? L"\xE769" : L"\xE768");
         MediaMuteIcon().Glyph(player.IsMuted() || player.Volume() == 0.0 ? L"\xE74F" : L"\xE767");
 
@@ -10656,6 +10681,21 @@ namespace winrt::Glance::App::implementation
         handle_media_failure(media_playback_item_, error.code());
     }
 
+    void MainWindow::MediaPanel_Tapped(IInspectable const&, TappedRoutedEventArgs const& args)
+    {
+        if (!std::exchange(media_primary_tap_, false)) return;
+        if (media_is_audio_ || native_media_active_ || MediaPreview().MediaPlayer() == nullptr ||
+            is_interactive_preview_source(args.OriginalSource())) return;
+        auto source = args.OriginalSource().try_as<DependencyObject>();
+        while (source && source != MediaPanel())
+        {
+            if (source == MediaControlsOverlay()) return;
+            source = Media::VisualTreeHelper::GetParent(source);
+        }
+        MediaPlayPauseButton_Click(nullptr, nullptr);
+        args.Handled(true);
+    }
+
     void MainWindow::MediaPanel_PointerMoved(IInspectable const&, PointerRoutedEventArgs const&)
     {
         show_media_controls();
@@ -10666,6 +10706,8 @@ namespace winrt::Glance::App::implementation
         PointerRoutedEventArgs const& args)
     {
         const auto point = args.GetCurrentPoint(MediaPanel());
+        media_primary_tap_ = point.Properties().IsLeftButtonPressed() &&
+            !point.Properties().IsMiddleButtonPressed() && !point.Properties().IsRightButtonPressed();
         if (point.Properties().IsMiddleButtonPressed() && middle_click_gallery_enabled_)
         {
             toggle_gallery_mode();
@@ -10778,6 +10820,7 @@ namespace winrt::Glance::App::implementation
     }
 
     void MainWindow::MediaPlayPauseButton_Click(IInspectable const&, RoutedEventArgs const&)
+    try
     {
         if (native_media_active_ && native_preview_surface_ != nullptr)
         {
@@ -10815,7 +10858,17 @@ namespace winrt::Glance::App::implementation
             media_play_intent_ = true;
             player.Play();
         }
+        media_pause_overlay_deadline_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+        MediaPausedOverlay().Visibility(
+            !media_is_audio_ && !media_play_intent_ && MediaPreview().MediaPlayer() != nullptr
+                ? Visibility::Visible : Visibility::Collapsed);
+        MediaPlayPauseIcon().Glyph(media_play_intent_ ? L"\xE769" : L"\xE768");
         show_media_controls();
+    }
+
+    catch (const hresult_error& error)
+    {
+        handle_media_failure(media_playback_item_, error.code());
     }
 
     void MainWindow::MediaMuteButton_Click(IInspectable const&, RoutedEventArgs const&)
