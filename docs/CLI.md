@@ -176,8 +176,6 @@ if ($LASTEXITCODE -ne 0) {
 
 ### 通用选项与等待时间
 
-窗口结果中的 `fullwindow` 表示是否全屏。纯文本结果中的 `line_count` 为已加载文本的行数，`content_complete` 表示全文是否已加载完成。
-
 | 选项 | 作用 |
 | --- | --- |
 | `-h` / `--help` | 显示当前命令帮助；也支持 `help COMMAND` |

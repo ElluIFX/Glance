@@ -176,8 +176,6 @@ if ($LASTEXITCODE -ne 0) {
 
 ### Common options and timeouts
 
-Window results include `fullwindow` to indicate full-screen mode. For plain text, `line_count` counts loaded lines and `content_complete` indicates whether the entire file has been loaded.
-
 | Option | Effect |
 | --- | --- |
 | `-h` / `--help` | Show help for the current command; `help COMMAND` also works |
