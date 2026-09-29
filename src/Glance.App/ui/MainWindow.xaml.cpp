@@ -2855,6 +2855,7 @@ namespace winrt::Glance::App::implementation
         }
         visible_ = false;
         defer_auto_fit_show_ = false;
+        if (text_editor_ != nullptr) text_editor_->set_visible(false);
         ShowWindow(window_, SW_HIDE);
         set_fullscreen(false);
         clear_preview_content();
@@ -3441,6 +3442,11 @@ namespace winrt::Glance::App::implementation
             return false;
         }
 
+        if (kind == glance::app::PreviewKind::text)
+        {
+            return true;
+        }
+
         const auto preferences = glance::app::load_window_preferences();
         if (!preferences.auto_fit_media || !preferences.show_after_auto_fit ||
             glance::app::auto_fit_ignores_path(preferences, file.path))
@@ -3468,18 +3474,38 @@ namespace winrt::Glance::App::implementation
             DwmSetWindowAttribute(window_, DWMWA_CLOAK, &cloaked, sizeof(cloaked)));
         ShowWindow(window_, SW_SHOWNOACTIVATE);
         UpdateWindow(window_);
+        update_text_editor_bounds();
+        update_text_editor_visibility();
         if (cloak_applied)
         {
-            static_cast<void>(DwmFlush());
-            cloaked = FALSE;
-            static_cast<void>(
-                DwmSetWindowAttribute(window_, DWMWA_CLOAK, &cloaked, sizeof(cloaked)));
+            const auto weak = get_weak();
+            const bool queued = DispatcherQueue().TryEnqueue(
+                Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
+                [weak] {
+                    if (const auto self = weak.get(); self && self->visible_)
+                    {
+                        static_cast<void>(DwmFlush());
+                        const BOOL uncloaked = FALSE;
+                        static_cast<void>(DwmSetWindowAttribute(
+                            self->window_, DWMWA_CLOAK, &uncloaked, sizeof(uncloaked)));
+                    }
+                });
+            if (!queued)
+            {
+                cloaked = FALSE;
+                static_cast<void>(
+                    DwmSetWindowAttribute(window_, DWMWA_CLOAK, &cloaked, sizeof(cloaked)));
+            }
         }
     }
 
     void MainWindow::reveal_deferred_preview() noexcept
     {
         if (!defer_auto_fit_show_ || window_ == nullptr)
+        {
+            return;
+        }
+        if (current_kind_ == glance::app::PreviewKind::text && text_loading_)
         {
             return;
         }
@@ -4726,6 +4752,7 @@ namespace winrt::Glance::App::implementation
         bool web)
     {
         stop_text_monitor();
+        set_text_loading(true);
         clear_web_view_content();
         glance::app::cancel_text_preview_read(current_text_reader_);
         reset_json_preview();
@@ -4744,7 +4771,6 @@ namespace winrt::Glance::App::implementation
             : markdown
                 ? glance::app::PreviewKind::markdown
                 : glance::app::PreviewKind::text;
-        show_content_panel(current_kind_);
         current_text_.clear();
         text_line_endings_.clear();
         current_text_path_ = file.path;
@@ -4760,13 +4786,10 @@ namespace winrt::Glance::App::implementation
             (markdown || web) && glance::app::webview_runtime_available();
         if (web_preview_ != nullptr)
         {
-            const bool dark = RootGrid().ActualTheme() == ElementTheme::Dark;
             web_preview_.DefaultBackgroundColor(
                 web
                     ? Windows::UI::Color{ 255, 255, 255, 255 }
-                    : dark
-                        ? Windows::UI::Color{ 255, 32, 32, 32 }
-                        : Windows::UI::Color{ 255, 255, 255, 255 });
+                    : Windows::UI::Color{ 0, 0, 0, 0 });
         }
         current_text_reader_.reset();
         current_text_has_more_ = false;
@@ -4781,7 +4804,7 @@ namespace winrt::Glance::App::implementation
             text_preferences_,
             syntax_highlighting_,
             RootGrid().ActualTheme() == ElementTheme::Dark);
-        set_text_loading(true);
+        show_content_panel(current_kind_);
         const bool component_web =
             web && active_component_web_preview_ != nullptr;
         MarkdownModeButtons().Visibility(
@@ -7301,6 +7324,7 @@ namespace winrt::Glance::App::implementation
             MarkdownCodeButton().IsEnabled(true);
             set_markdown_preview_mode(web_preview_available_ && markdown_preview_);
         }
+        reveal_deferred_preview();
     }
 
     fire_and_forget MainWindow::load_next_text_chunk_async(std::uint64_t generation)
@@ -8019,7 +8043,7 @@ namespace winrt::Glance::App::implementation
 
     fire_and_forget MainWindow::render_markdown()
     {
-        if (!web_preview_available_ || !web_view_ready_)
+        if (!web_preview_available_ || !web_view_ready_ || text_chunk_loading_ || current_text_has_more_)
         {
             co_return;
         }
@@ -8112,7 +8136,7 @@ namespace winrt::Glance::App::implementation
             web_navigation_generation_ = generation;
             web_navigation_id_ = 0;
             web_view.Opacity(0.0);
-            WebPreviewHost().Visibility(Visibility::Collapsed);
+            WebPreviewHost().Visibility(markdown_preview_ ? Visibility::Visible : Visibility::Collapsed);
             web_view.NavigateToString(html);
             web_preview_available_ = true;
             update_web_view_idle_state();
@@ -8182,7 +8206,7 @@ namespace winrt::Glance::App::implementation
             web_navigation_generation_ = generation;
             web_navigation_id_ = 0;
             web_view.Opacity(0.0);
-            WebPreviewHost().Visibility(Visibility::Collapsed);
+            WebPreviewHost().Visibility(markdown_preview_ ? Visibility::Visible : Visibility::Collapsed);
             core.Navigate(
                 component_web_preview != nullptr
                     ? component_web_preview->navigation_uri
@@ -8226,9 +8250,7 @@ namespace winrt::Glance::App::implementation
                 ? dark_theme
                     ? Windows::UI::Color{ 255, 32, 32, 32 }
                     : Windows::UI::Color{ 255, 255, 255, 255 }
-                : dark_theme
-                    ? Windows::UI::Color{ 255, 32, 32, 32 }
-                    : Windows::UI::Color{ 255, 255, 255, 255 });
+                : Windows::UI::Color{ 0, 0, 0, 0 });
         return web_preview_;
     }
 
@@ -8260,26 +8282,34 @@ namespace winrt::Glance::App::implementation
                     self->web_navigation_id_ = args.NavigationId();
                 }
             });
-        core.ContentLoading(
-            [weak](auto const& sender, auto const& args) {
+        core.DOMContentLoaded(
+            [weak](auto const& sender, auto const& args) -> fire_and_forget {
                 const auto self = weak.get();
                 if (self == nullptr ||
                     self->web_navigation_generation_ != self->content_generation_ ||
                     self->web_navigation_id_ == 0 ||
                     args.NavigationId() != self->web_navigation_id_)
                 {
-                    return;
+                    co_return;
                 }
 
-                self->web_content_ready_ = true;
-                sender.PostWebMessageAsString(
-                    self->double_click_fullscreen_enabled_
-                        ? web_double_click_fullscreen_enabled
-                        : web_double_click_fullscreen_disabled);
-                self->web_preview_.Opacity(1.0);
-                self->WebPreviewHost().Visibility(
-                    self->markdown_preview_ ? Visibility::Visible : Visibility::Collapsed);
-                self->update_web_view_idle_state();
+                try
+                {
+                    sender.PostWebMessageAsString(
+                        self->double_click_fullscreen_enabled_
+                            ? web_double_click_fullscreen_enabled
+                            : web_double_click_fullscreen_disabled);
+                    const auto script = L"requestAnimationFrame(() => requestAnimationFrame(() => "
+                        L"chrome.webview.postMessage('glance:paint-ready:" +
+                        std::to_wstring(self->web_navigation_generation_) + L":" +
+                        std::to_wstring(self->web_navigation_id_) + L"')));";
+                    co_await sender.ExecuteScriptAsync(script);
+                }
+                catch (const hresult_error& error)
+                {
+                    glance::contracts::log_event(
+                        L"Web preview readiness failed: " + std::wstring(error.message()));
+                }
             });
         core.NavigationCompleted(
             [weak](auto const&, auto const& args) {
@@ -8306,6 +8336,16 @@ namespace winrt::Glance::App::implementation
                     {
                         const std::wstring message =
                             args.TryGetWebMessageAsString().c_str();
+                        if (message == L"glance:paint-ready:" +
+                            std::to_wstring(self->web_navigation_generation_) + L":" +
+                            std::to_wstring(self->web_navigation_id_))
+                        {
+                            self->web_content_ready_ = true;
+                            self->web_preview_.Opacity(1.0);
+                            self->reveal_deferred_preview();
+                            self->update_web_view_idle_state();
+                            return;
+                        }
                         if (message == web_toggle_fullscreen)
                         {
                             static_cast<void>(self->handle_preview_content_double_click());
@@ -8600,6 +8640,7 @@ namespace winrt::Glance::App::implementation
         }
         const bool code_visible =
             visible_ &&
+            IsWindowVisible(window_) &&
             !xaml_modal_overlay_active_ &&
             !text_loading_ &&
             !markdown_preview_ &&
@@ -9665,9 +9706,11 @@ namespace winrt::Glance::App::implementation
         MarkdownPreviewButton().FontWeight(preview ? Windows::UI::Text::FontWeights::SemiBold() : Windows::UI::Text::FontWeights::Normal());
         MarkdownCodeButton().FontWeight(preview ? Windows::UI::Text::FontWeights::Normal() : Windows::UI::Text::FontWeights::SemiBold());
         WebPreviewHost().Visibility(
-            preview && web_content_ready_ ? Visibility::Visible : Visibility::Collapsed);
+            preview && web_navigation_generation_ == content_generation_
+                ? Visibility::Visible : Visibility::Collapsed);
         update_text_editor_visibility();
         update_web_view_idle_state();
+        if (!preview) reveal_deferred_preview();
     }
 
     void MainWindow::MarkdownPreviewButton_Click(IInspectable const&, RoutedEventArgs const&)
