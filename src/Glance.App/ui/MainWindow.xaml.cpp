@@ -12093,6 +12093,8 @@ namespace winrt::Glance::App::implementation
         cancel_format_identification();
         const auto cancellation = std::make_shared<std::atomic_bool>(false);
         format_identification_cancellation_ = cancellation;
+        format_identification_information_ = glance::app::localize(L"FileFormatIdentifying");
+        update_generic_information();
         const auto weak = get_weak();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();

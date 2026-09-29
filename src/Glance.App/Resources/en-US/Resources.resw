@@ -464,6 +464,7 @@
   <data name="LoopPlaybackDescription.Text" xml:space="preserve"><value>Restart playback from the beginning when it finishes</value></data>
   <data name="PreferFFmpegDescription.Text" xml:space="preserve"><value>Compatibility option</value></data>
   <data name="IdentifiedFileFormat" xml:space="preserve"><value>Identified file format</value></data>
+  <data name="FileFormatIdentifying" xml:space="preserve"><value>Identifying...</value></data>
   <data name="FileFormatIdentificationFailed" xml:space="preserve"><value>Unable to identify this file</value></data>
   <data name="PreviewAsIdentifiedFormatText.Text" xml:space="preserve"><value>Preview as identified format</value></data>
 </root>
