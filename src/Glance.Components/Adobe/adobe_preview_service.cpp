@@ -41,6 +41,7 @@ namespace
     {
         std::filesystem::path source;
         std::wstring fingerprint;
+        std::wstring extension;
     };
 
     struct LeaseRecord
@@ -807,7 +808,8 @@ namespace
                         : std::optional<RefinementContext>{
                             RefinementContext{
                                 .source = source,
-                                .fingerprint = std::move(fingerprint) } },
+                                .fingerprint = std::move(fingerprint),
+                                .extension = glance::components::preview_extension(source) } },
                     .low_resolution_only = low_resolution_only });
         }
         return {
@@ -891,7 +893,7 @@ namespace
             std::to_wstring(sequence);
         const auto root = final_path.parent_path();
         const auto staged_path =
-            root / (L"staging-" + suffix + source.extension().wstring());
+            root / (L"staging-" + suffix + glance::components::preview_extension(source));
         const auto output_path = root / (L"output-" + suffix + L".png");
         bool success{};
         try
@@ -902,7 +904,7 @@ namespace
                 std::filesystem::copy_options::overwrite_existing);
             const bool source_unchanged =
                 source_fingerprint(source) == fingerprint;
-            const auto extension = source.extension().wstring();
+            const auto extension = glance::components::preview_extension(source);
             if (source_unchanged &&
                 _wcsicmp(extension.c_str(), L".psd") == 0)
             {
@@ -976,7 +978,7 @@ namespace glance::components::adobe
     {
         try
         {
-            const auto extension = path.extension().wstring();
+            const auto extension = glance::components::preview_extension(path);
             if (_wcsicmp(extension.c_str(), L".ai") == 0)
             {
                 return is_pdf_compatible_ai(path);
@@ -1009,7 +1011,7 @@ namespace glance::components::adobe
         try
         {
             maximum_dimension = normalize_dimension(maximum_dimension);
-            const auto extension = path.extension().wstring();
+            const auto extension = glance::components::preview_extension(path);
             if (_wcsicmp(extension.c_str(), L".ai") == 0)
             {
                 if (is_pdf_compatible_ai(path))
@@ -1123,6 +1125,7 @@ namespace glance::components::adobe
             {
                 return { .status = PrepareStatus::failed };
             }
+            glance::components::FormatScope format(context.source.c_str(), context.extension.c_str());
             return generate_cached_preview(
                 context.source,
                 context.fingerprint,

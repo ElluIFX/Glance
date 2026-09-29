@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "office_availability.h"
+#include "../Common/preview_cancellation.h"
 
 #include <objbase.h>
 
@@ -96,7 +97,7 @@ namespace
 
     std::wstring lower_extension(std::wstring_view path)
     {
-        auto extension = std::filesystem::path(path).extension().wstring();
+        auto extension = glance::components::preview_extension(std::filesystem::path(path));
         std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
             return static_cast<wchar_t>(std::towlower(value));
         });

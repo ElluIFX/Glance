@@ -1,4 +1,5 @@
 #include "../include/preview_handler_host.h"
+#include "../../../Common/preview_cancellation.h"
 #include "../include/web_preview_session.h"
 
 #include "glance/contracts/native_preview_protocol.h"
@@ -102,7 +103,7 @@ namespace
 
     std::optional<CLSID> preview_handler_for_path(const std::wstring& path)
     {
-        auto extension = std::filesystem::path(path).extension().wstring();
+        auto extension = glance::components::preview_extension(std::filesystem::path(path));
         if (extension.empty())
         {
             return std::nullopt;
@@ -182,7 +183,8 @@ namespace
             if (use_web && web_.available(path))
             {
                 const auto web_status = web_.open(path, parent, bounds, visuals, cancellation_event,
-                    [this, path, parent, cancellation_event] {
+                    [this, path, parent, cancellation_event, extension = glance::components::preview_extension(path)] {
+                        glance::components::FormatScope format(path.c_str(), extension.c_str());
                         const auto fallback_bounds = bounds_;
                         const auto fallback_visuals = current_visuals_;
                         static_cast<void>(open(path, parent, fallback_bounds, fallback_visuals, cancellation_event, false));
@@ -417,6 +419,8 @@ namespace
             const auto* path_data = reinterpret_cast<const wchar_t*>(
                 queued.payload.data() + sizeof(OpenRequest));
             const std::wstring path(path_data, request->path_characters);
+            if (wcsnlen_s(request->effective_extension, 32) == 32) return Status::invalid_request;
+            glance::components::FormatScope format(path.c_str(), request->effective_extension);
             const RECT bounds{
                 request->bounds.left,
                 request->bounds.top,

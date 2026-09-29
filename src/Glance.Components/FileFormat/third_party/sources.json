@@ -1,0 +1,16 @@
+{
+  "siegfried_version": "1.11.9",
+  "pronom_version": "125",
+  "files": [
+    {
+      "path": "default.sig",
+      "url": "https://raw.githubusercontent.com/richardlehane/siegfried/v1.11.9/cmd/roy/data/default.sig",
+      "sha256": "8e3b81d698a515203efc543ee154577c9c31cd1d9d7d2d1be43001bf09258166"
+    },
+    {
+      "path": "formats.xml",
+      "url": "https://raw.githubusercontent.com/richardlehane/siegfried/v1.11.9/cmd/roy/data/DROID_SignatureFile_V125.xml",
+      "sha256": "c7c328dd0e131947667e9b94294c5d47e0b6ec8ec3040b7fd542ac605ecc6ec5"
+    }
+  ]
+}

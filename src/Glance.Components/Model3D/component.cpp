@@ -54,6 +54,7 @@ namespace
     struct PreviewLease
     {
         std::filesystem::path source_path;
+        std::wstring extension;
     };
 
     std::mutex lease_mutex;
@@ -84,7 +85,7 @@ namespace
 
     std::wstring lower_extension(const std::filesystem::path& path)
     {
-        auto extension = path.extension().wstring();
+        auto extension = glance::components::preview_extension(path);
         for (auto& character : extension)
         {
             character = static_cast<wchar_t>(std::towlower(character));
@@ -330,7 +331,8 @@ namespace
                 leases.insert_or_assign(
                     lease_token,
                     PreviewLease{
-                        .source_path = std::filesystem::absolute(source) });
+                        .source_path = std::filesystem::absolute(source),
+                        .extension = lower_extension(source) });
             }
 
             const auto output_path = viewer_path.wstring();
@@ -401,7 +403,7 @@ namespace
                 return FALSE;
             }
 
-            const auto extension = lower_extension(lease.source_path);
+            const auto& extension = lease.extension;
             const std::wstring model_uri =
                 std::wstring(L"https://") + model_host + L"/" +
                 url_encode(lease.source_path.filename().wstring());
@@ -521,6 +523,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     result.query_status = query_status;
     result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
+    result.can_preview_as = glance::components::can_preview_as<can_preview>;
     result.prepare_preview = glance::components::prepare_preview_callback<prepare_preview>;
     result.release_preview = release_preview;
     result.query_interface = query_interface;

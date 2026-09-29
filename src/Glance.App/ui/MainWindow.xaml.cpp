@@ -2024,6 +2024,7 @@ namespace winrt::Glance::App::implementation
         LoadCloudFileText().Text(glance::app::localize(L"LoadCloudFileText.Text"));
         TextSelectionCopyButton().Content(box_value(glance::app::localize(L"TextSelectionCopyButton.Content")));
         PreviewAsTextText().Text(glance::app::localize(L"PreviewAsTextText.Text"));
+        PreviewAsIdentifiedFormatText().Text(glance::app::localize(L"PreviewAsIdentifiedFormatText.Text"));
         MarkdownPreviewButton().Content(box_value(
             glance::app::localize(L"MarkdownPreviewButton.Content")));
         MarkdownCodeButton().Content(box_value(
@@ -3117,6 +3118,7 @@ namespace winrt::Glance::App::implementation
         }
         defer_auto_fit_show_ = false;
         cancel_pdf_render();
+        cancel_format_identification();
         if (component_preparation_cancellation_)
         {
             component_preparation_cancellation_->store(true);
@@ -3714,8 +3716,9 @@ namespace winrt::Glance::App::implementation
         const auto dispatcher = DispatcherQueue();
         const auto visuals = native_preview_visuals(RootGrid().ActualTheme());
         const auto dpi = GetDpiForWindow(window_);
+        const auto extension = effective_extension_;
         co_await resume_background();
-        const auto status = surface->open(path, visuals, dpi, glance::app::current_ui_language());
+        const auto status = surface->open(path, visuals, dpi, glance::app::current_ui_language(), extension);
         const auto content_size = status == glance::contracts::native_preview::Status::success
             ? surface->content_size()
             : std::optional<glance::contracts::native_preview::ContentSize>{};
@@ -4147,12 +4150,15 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::present_file(
         std::uint32_t index,
-        std::optional<glance::app::PreviewKind> known_kind)
+        std::optional<glance::app::PreviewKind> known_kind,
+        std::wstring effective_extension)
     {
         if (index >= files_.size())
         {
             return;
         }
+        cancel_format_identification();
+        effective_extension_ = std::move(effective_extension);
         if (index != current_index_)
         {
             preview_navigation_.clear();
@@ -4525,6 +4531,11 @@ namespace winrt::Glance::App::implementation
         GenericFileIconImage().Visibility(Visibility::Collapsed);
         GenericFileFallbackIcon().Visibility(Visibility::Visible);
         GenericAdvancedInfoText().Text(L"");
+        generic_file_information_.clear();
+        generic_file_header_.clear();
+        if (effective_extension_.empty()) format_identification_information_.clear();
+        guessed_extension_.clear();
+        PreviewAsGuessedFormatButton().Visibility(Visibility::Collapsed);
         GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
         generic_preview_preferences_ = glance::app::load_generic_preview_preferences();
         GenericAdvancedInfoButton().IsChecked(generic_preview_preferences_.show_advanced_info);
@@ -4553,6 +4564,8 @@ namespace winrt::Glance::App::implementation
         {
             load_generic_file_info_async(file.path, content_generation_);
         }
+        if (advanced_info_available && effective_extension_.empty() && glance::app::has_file_format_identifier())
+            identify_format_async(file.path, content_generation_);
         update_footer_metadata();
         if (allow_text_preview || allow_advanced_info)
         {
@@ -4669,12 +4682,13 @@ namespace winrt::Glance::App::implementation
             if (generation != lifetime->content_generation_ ||
                 lifetime->current_kind_ != glance::app::PreviewKind::generic ||
                 !lifetime->generic_preview_preferences_.show_advanced_info ||
-                info.empty())
+                (info.metadata.empty() && info.header.empty()))
             {
                 return;
             }
-            lifetime->GenericAdvancedInfoText().Text(std::move(info));
-            lifetime->GenericAdvancedInfoScroller().Visibility(Visibility::Visible);
+            lifetime->generic_file_information_ = std::move(info.metadata);
+            lifetime->generic_file_header_ = std::move(info.header);
+            lifetime->update_generic_information();
         }));
     }
 
@@ -4727,8 +4741,9 @@ namespace winrt::Glance::App::implementation
         current_text_path_ = file.path;
         current_text_markdown_ = markdown;
         current_text_web_ = web;
-        current_text_json_ = !markdown && !web && json_preview_path(file.path);
-        current_text_json_lines_ = current_text_json_ && json_lines_path(file.path);
+        const auto format_path = effective_extension_.empty() ? file.path : L"preview" + effective_extension_;
+        current_text_json_ = !markdown && !web && json_preview_path(format_path);
+        current_text_json_lines_ = current_text_json_ && json_lines_path(format_path);
         json_tree_available_ = current_text_json_;
         json_tree_mode_ = current_text_json_;
         web_preview_available_ =
@@ -4751,7 +4766,7 @@ namespace winrt::Glance::App::implementation
         EncodingSelector().Content(box_value(glance::app::localize(L"EncodingDetecting")));
         apply_text_preferences();
         text_editor_->clear();
-        text_editor_->set_file_path(file.path);
+        text_editor_->set_file_path(format_path);
         text_editor_->set_preferences(
             text_preferences_,
             syntax_highlighting_,
@@ -6469,6 +6484,7 @@ namespace winrt::Glance::App::implementation
             ? glance::contracts::components::PreviewColorScheme::dark
             : glance::contracts::components::PreviewColorScheme::light;
         glance::contracts::components::PreviewPreparationOptions options;
+        wcscpy_s(options.effective_extension, effective_extension_.c_str());
         const auto raster_scale = RootGrid().XamlRoot() != nullptr
             ? RootGrid().XamlRoot().RasterizationScale() : 1.0;
         options.maximum_dimension = static_cast<std::uint32_t>(std::clamp(
@@ -8672,6 +8688,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::show_content_panel(glance::app::PreviewKind kind)
     {
+        if (kind != glance::app::PreviewKind::generic) cancel_format_identification();
         const bool text = kind == glance::app::PreviewKind::text ||
             kind == glance::app::PreviewKind::markdown ||
             kind == glance::app::PreviewKind::web;
@@ -9366,7 +9383,14 @@ namespace winrt::Glance::App::implementation
         {
             return;
         }
-        present_generic(files_[current_index_]);
+        const auto previous_format_info = format_identification_information_;
+        present_generic(files_[current_index_], true, true);
+        if (!effective_extension_.empty())
+        {
+            cancel_format_identification();
+            format_identification_information_ = previous_format_info;
+            update_generic_information();
+        }
         ErrorText().Text(std::move(message));
         ErrorText().Visibility(Visibility::Visible);
         reveal_deferred_preview();
@@ -12029,6 +12053,7 @@ namespace winrt::Glance::App::implementation
         ++content_generation_;
         dismiss_preview_info_bar();
         PreviewAsTextButton().IsEnabled(false);
+        cancel_format_identification();
         ErrorText().Visibility(Visibility::Collapsed);
         load_text_async(
             file.path,
@@ -12037,6 +12062,117 @@ namespace winrt::Glance::App::implementation
             content_generation_,
             glance::app::TextEncoding::automatic,
             true);
+    }
+
+    void MainWindow::cancel_format_identification() noexcept
+    {
+        if (format_identification_cancellation_) format_identification_cancellation_->store(true);
+        format_identification_cancellation_.reset();
+    }
+
+    void MainWindow::update_generic_information()
+    {
+        auto info = generic_file_information_;
+        if (!format_identification_information_.empty())
+        {
+            if (!info.empty()) info += L"\n\n";
+            info += glance::app::localize(L"IdentifiedFileFormat") + L"\n" + format_identification_information_;
+        }
+        if (!generic_file_header_.empty())
+        {
+            if (!info.empty()) info += L"\n\n";
+            info += generic_file_header_;
+        }
+        GenericAdvancedInfoText().Text(info);
+        GenericAdvancedInfoScroller().Visibility(generic_preview_preferences_.show_advanced_info && !info.empty()
+            ? Visibility::Visible : Visibility::Collapsed);
+    }
+
+    fire_and_forget MainWindow::identify_format_async(std::wstring path, std::uint64_t generation)
+    {
+        cancel_format_identification();
+        const auto cancellation = std::make_shared<std::atomic_bool>(false);
+        format_identification_cancellation_ = cancellation;
+        const auto weak = get_weak();
+        const auto dispatcher = DispatcherQueue();
+        co_await resume_background();
+        auto result = glance::app::identify_file_format(path, *cancellation);
+        std::wstring supported_extension;
+        for (const auto& candidate : result.candidates)
+        {
+            const std::wstring choices(candidate.extensions);
+            std::size_t start{};
+            while (start < choices.size() && supported_extension.empty() && !cancellation->load())
+            {
+                const auto end = choices.find(L';', start);
+                const auto choice = choices.substr(start, end == std::wstring::npos ? end : end - start);
+                if (choice.size() < 32 && choice.starts_with(L'.') && choice.find_first_of(L"\\/:*?\"<>| ") == std::wstring::npos)
+                {
+                    const auto kind = glance::app::resolve_preview_kind(L"preview" + choice);
+                    if (kind != glance::app::PreviewKind::generic && (kind != glance::app::PreviewKind::component ||
+                        glance::app::component_can_preview_as(path, choice))) supported_extension = choice;
+                }
+                if (end == std::wstring::npos) break;
+                start = end + 1;
+            }
+        }
+        static_cast<void>(dispatcher.TryEnqueue([weak, cancellation, generation, extension = std::move(supported_extension), result = std::move(result)] {
+            const auto self = weak.get();
+            if (!self || cancellation->load() || self->format_identification_cancellation_ != cancellation ||
+                generation != self->content_generation_ || self->current_kind_ != glance::app::PreviewKind::generic) return;
+            self->format_identification_cancellation_.reset();
+            std::wstring text = result.status;
+            std::wstring format_name;
+            bool ambiguous{};
+            for (const auto& candidate : result.candidates)
+            {
+                if (!text.empty()) text += L"\n\n";
+                text += candidate.name;
+                if (candidate.version[0]) text += L" · " + std::wstring(candidate.version);
+                if (candidate.mime[0]) text += L"\n" + std::wstring(candidate.mime);
+                if (candidate.extensions[0]) text += L"\n" + std::wstring(candidate.extensions);
+                if (candidate.identifier[0]) text += L"\n" + std::wstring(candidate.identifier);
+                if (candidate.basis[0]) text += L" · " + std::wstring(candidate.basis).substr(0, 120);
+                if (format_name.empty()) format_name = candidate.name;
+                else if (format_name != candidate.name) ambiguous = true;
+            }
+            if (text.empty()) text = glance::app::localize(L"FileFormatIdentificationFailed");
+            self->format_identification_information_ = std::move(text);
+            self->update_generic_information();
+            if (extension.empty() || ambiguous || !self->effective_extension_.empty()) return;
+            self->guessed_extension_ = std::move(extension);
+            const auto old_position = self->PreviewAsTextButton().TransformToVisual(self->RootGrid()).TransformPoint({0, 0});
+            self->PreviewAsGuessedFormatButton().Visibility(Visibility::Visible);
+            self->GenericPreviewActions().UpdateLayout();
+            BOOL animations = TRUE;
+            SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animations, 0);
+            if (!animations) return;
+            const auto new_position = self->PreviewAsTextButton().TransformToVisual(self->RootGrid()).TransformPoint({0, 0});
+            using Microsoft::UI::Xaml::Hosting::ElementCompositionPreview;
+            ElementCompositionPreview::SetIsTranslationEnabled(self->PreviewAsTextButton(), true);
+            const auto visual = ElementCompositionPreview::GetElementVisual(self->PreviewAsTextButton());
+            const auto movement = visual.Compositor().CreateVector3KeyFrameAnimation();
+            movement.Duration(std::chrono::milliseconds(140));
+            movement.InsertKeyFrame(0, {old_position.X - new_position.X, 0, 0});
+            movement.InsertKeyFrame(1, {0, 0, 0});
+            visual.StartAnimation(L"Translation", movement);
+            const auto button = ElementCompositionPreview::GetElementVisual(self->PreviewAsGuessedFormatButton());
+            ElementCompositionPreview::SetIsTranslationEnabled(self->PreviewAsGuessedFormatButton(), true);
+            if (self->PreviewAsTextButton().Visibility() == Visibility::Visible)
+                button.StartAnimation(L"Translation", movement);
+            const auto fade = button.Compositor().CreateScalarKeyFrameAnimation();
+            fade.Duration(std::chrono::milliseconds(140));
+            fade.InsertKeyFrame(0, 0);
+            fade.InsertKeyFrame(1, 1);
+            button.StartAnimation(L"Opacity", fade);
+        }));
+    }
+
+    void MainWindow::PreviewAsGuessedFormatButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (current_index_ >= files_.size() || guessed_extension_.empty() || current_kind_ != glance::app::PreviewKind::generic) return;
+        const auto extension = guessed_extension_;
+        present_file(current_index_, glance::app::resolve_preview_kind(L"preview" + extension), extension);
     }
 
     void MainWindow::GenericAdvancedInfoButton_Click(IInspectable const&, RoutedEventArgs const&)
@@ -12050,6 +12186,7 @@ namespace winrt::Glance::App::implementation
         generic_preview_preferences_.show_advanced_info =
             GenericAdvancedInfoButton().IsChecked().Value();
         glance::app::save_generic_preview_preferences(generic_preview_preferences_);
+        update_generic_information();
         if (!generic_preview_preferences_.show_advanced_info)
         {
             GenericAdvancedInfoText().Text(L"");

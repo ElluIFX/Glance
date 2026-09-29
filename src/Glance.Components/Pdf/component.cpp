@@ -132,7 +132,7 @@ namespace
     BOOL WINAPI can_preview(const wchar_t* path) noexcept
     {
         return path != nullptr &&
-            _wcsicmp(std::filesystem::path(path).extension().c_str(), L".pdf") == 0;
+            _wcsicmp(glance::components::preview_extension(std::filesystem::path(path)).c_str(), L".pdf") == 0;
     }
 
     PrepareStatus WINAPI prepare_preview(
@@ -291,6 +291,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     result.query_status = query_status;
     result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
+    result.can_preview_as = glance::components::can_preview_as<can_preview>;
     result.prepare_preview = glance::components::prepare_preview_callback<prepare_preview>;
     result.release_preview = release_preview;
     result.query_interface = query_interface;

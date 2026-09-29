@@ -42,7 +42,8 @@ namespace glance::app
             const std::wstring& path,
             const glance::contracts::native_preview::PreviewVisuals& visuals,
             std::uint32_t dpi,
-            std::wstring_view language = {});
+            std::wstring_view language = {},
+            std::wstring_view effective_extension = {});
         void resize(std::uint32_t width, std::uint32_t height, std::uint32_t dpi) noexcept;
         [[nodiscard]] std::optional<glance::contracts::native_preview::ContentSize>
             content_size() noexcept;

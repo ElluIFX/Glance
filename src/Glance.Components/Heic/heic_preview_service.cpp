@@ -151,7 +151,7 @@ namespace glance::components::heic
     {
         try
         {
-            const auto extension = lower(path.extension().wstring());
+            const auto extension = lower(glance::components::preview_extension(path));
             for (const auto candidate : extensions)
             {
                 if (extension == candidate)

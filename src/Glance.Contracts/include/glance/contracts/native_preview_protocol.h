@@ -6,7 +6,7 @@
 namespace glance::contracts::native_preview
 {
     inline constexpr std::uint32_t protocol_magic = 0x56504E47U;
-    inline constexpr std::uint32_t protocol_version = 1U;
+    inline constexpr std::uint32_t protocol_version = 2U;
     inline constexpr std::uint32_t maximum_payload_size = 64U * 1024U;
     inline constexpr std::size_t media_setting_id_capacity = 64;
 
@@ -84,6 +84,7 @@ namespace glance::contracts::native_preview
         PreviewVisuals visuals{};
         std::uint32_t dpi{ 96 };
         std::uint32_t path_characters{};
+        wchar_t effective_extension[32]{};
     };
 
     struct ResizeRequest

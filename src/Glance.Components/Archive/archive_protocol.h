@@ -6,7 +6,7 @@ namespace glance::components::archive
 {
     inline constexpr std::uint32_t request_magic = 0x51524147;
     inline constexpr std::uint32_t response_magic = 0x52524147;
-    inline constexpr std::uint32_t protocol_version = 1;
+    inline constexpr std::uint32_t protocol_version = 2;
     inline constexpr std::uint32_t maximum_entries = 4000;
     inline constexpr std::uint32_t maximum_depth = 6;
     inline constexpr std::uint32_t maximum_response_bytes = 32U * 1024U * 1024U;
@@ -47,6 +47,7 @@ namespace glance::components::archive
         std::uint32_t version{ protocol_version };
         std::uint32_t path_characters{};
         std::uint32_t password_characters{};
+        wchar_t effective_extension[32]{};
     };
 
     struct ResponseHeader

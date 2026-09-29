@@ -463,4 +463,7 @@
   <data name="LoopPlaybackLabel.Text" xml:space="preserve"><value>循环播放</value></data>
   <data name="LoopPlaybackDescription.Text" xml:space="preserve"><value>播放完成后自动从头继续播放</value></data>
   <data name="PreferFFmpegDescription.Text" xml:space="preserve"><value>兼容性选项</value></data>
+  <data name="IdentifiedFileFormat" xml:space="preserve"><value>识别文件格式</value></data>
+  <data name="FileFormatIdentificationFailed" xml:space="preserve"><value>无法识别此文件</value></data>
+  <data name="PreviewAsIdentifiedFormatText.Text" xml:space="preserve"><value>以识别格式预览</value></data>
 </root>

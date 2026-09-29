@@ -657,7 +657,8 @@ namespace
             if (interface_api->size >= sizeof(InformationProviderApi) &&
                 interface_api->version ==
                     glance::contracts::components::information_provider_api_version &&
-                (interface_api->query_info != nullptr || interface_api->query_json != nullptr))
+                (interface_api->query_info != nullptr || interface_api->query_json != nullptr ||
+                    interface_api->identify_format != nullptr))
             {
                 component->information_provider = *interface_api;
             }
@@ -698,6 +699,7 @@ namespace
             component->registration.preferred_format != PreviewContentFormat::none ||
             (component->renderers.empty() &&
              !component->settings_contribution.has_value() &&
+             !(component->information_provider && component->information_provider->identify_format) &&
              !component->status_bar_shortcut.has_value()))
         {
             return {};
@@ -1685,9 +1687,12 @@ namespace glance::app
         {
             initialize_components();
             static_cast<void>(language_tag);
-            for (const auto& component : candidates_for_path(path))
+            const bool overridden = options.effective_extension[0] != L'\0';
+            const auto dispatch_path = overridden ? L"preview" + std::wstring(options.effective_extension) : path;
+            for (const auto& component : candidates_for_path(dispatch_path))
             {
-                if (!component->api.can_preview(path.c_str()))
+                if (overridden ? (!component->api.can_preview_as || !component->api.can_preview_as(path.c_str(), &options))
+                    : !component->api.can_preview(path.c_str()))
                 {
                     continue;
                 }
@@ -2280,6 +2285,75 @@ namespace glance::app
         {
         }
         return activation;
+    }
+
+    bool component_can_preview_as(const std::wstring& path, const std::wstring& extension) noexcept
+    {
+        try
+        {
+            glance::contracts::components::PreviewPreparationOptions options;
+            if (extension.size() >= std::size(options.effective_extension)) return false;
+            wcscpy_s(options.effective_extension, extension.c_str());
+            for (const auto& component : candidates_for_path(L"preview" + extension))
+                if (component->api.can_preview_as && component->api.can_preview_as(path.c_str(), &options)) return true;
+        }
+        catch (...) {}
+        return false;
+    }
+
+    bool has_file_format_identifier() noexcept
+    {
+        std::scoped_lock lock(registry_mutex);
+        return std::ranges::any_of(registered_components, [](const auto& component) {
+            return component->active && component->information_provider &&
+                component->information_provider->identify_format;
+        });
+    }
+
+    FileFormatIdentification identify_file_format(const std::wstring& path, const std::atomic_bool& cancelled) noexcept
+    {
+        using namespace glance::contracts::components;
+        FileFormatIdentification result;
+        try
+        {
+            std::vector<std::shared_ptr<LoadedComponent>> components;
+            {
+                std::scoped_lock lock(registry_mutex);
+                components = registered_components;
+            }
+            for (const auto& component : components)
+            {
+                if (cancelled.load() || !component->active || !component->information_provider ||
+                    !component->information_provider->identify_format) continue;
+                InformationPanelCollector collector{.component = component.get(), .cancelled = &cancelled};
+                InformationPanelSink information{.context = &collector, .append = append_information_panel_entry,
+                    .is_cancelled = information_panel_cancelled};
+                FileFormatSink sink{.context = &result, .append = [](void* context, const FileFormatCandidate* candidate) noexcept -> BOOL {
+                    try
+                    {
+                        if (!candidate || !bounded_string(candidate->name) || !bounded_string(candidate->version) ||
+                            !bounded_string(candidate->mime) || !bounded_string(candidate->identifier) ||
+                            !bounded_string(candidate->basis) || !bounded_string(candidate->extensions)) return FALSE;
+                        auto& target = *static_cast<FileFormatIdentification*>(context);
+                        if (target.candidates.size() >= 16) return FALSE;
+                        target.candidates.push_back(*candidate);
+                        return TRUE;
+                    }
+                    catch (...) { return FALSE; }
+                }};
+                PreviewCancellation cancellation{.context = const_cast<std::atomic_bool*>(&cancelled),
+                    .is_cancelled = [](void* context) noexcept -> BOOL { return static_cast<std::atomic_bool*>(context)->load(); }};
+                const auto status = component->information_provider->identify_format(path.c_str(), &cancellation, &information, &sink);
+                if (status == PrepareStatus::success && collector.valid && !cancelled.load())
+                {
+                    result.status = std::move(collector.text);
+                    return result;
+                }
+                result = {};
+            }
+        }
+        catch (...) {}
+        return result;
     }
 
     std::wstring query_component_hover_info(

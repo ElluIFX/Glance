@@ -256,7 +256,8 @@ namespace glance::app
         const std::wstring& path,
         const PreviewVisuals& visuals,
         std::uint32_t dpi,
-        std::wstring_view language)
+        std::wstring_view language,
+        std::wstring_view effective_extension)
     {
         if (path.size() >
                 (maximum_payload_size - sizeof(OpenRequest)) / sizeof(wchar_t) ||
@@ -283,6 +284,8 @@ namespace glance::app
             .visuals = visuals,
             .dpi = dpi,
             .path_characters = static_cast<std::uint32_t>(path.size()) };
+        if (effective_extension.size() >= std::size(request.effective_extension)) return Status::invalid_request;
+        std::copy(effective_extension.begin(), effective_extension.end(), request.effective_extension);
         std::vector<std::byte> payload(sizeof(request) + path.size() * sizeof(wchar_t));
         std::memcpy(payload.data(), &request, sizeof(request));
         std::memcpy(

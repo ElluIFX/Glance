@@ -8,7 +8,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 13;
+    inline constexpr std::uint32_t abi_version = 14;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -26,7 +26,7 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t settings_contribution_api_version = 3;
     inline constexpr std::uint32_t file_directory_preview_api_version = 2;
     inline constexpr std::uint32_t image_metadata_api_version = 1;
-    inline constexpr std::uint32_t information_provider_api_version = 3;
+    inline constexpr std::uint32_t information_provider_api_version = 4;
     inline constexpr std::uint32_t status_bar_shortcut_api_version = 3;
     inline constexpr std::size_t component_resource_path_capacity = 260;
     inline constexpr std::size_t resource_key_capacity = 256;
@@ -306,6 +306,7 @@ namespace glance::contracts::components
     {
         std::uint32_t size{ sizeof(PreviewPreparationOptions) };
         std::uint32_t maximum_dimension{ 4096 };
+        wchar_t effective_extension[32]{};
     };
 
     struct WebPreviewOptions
@@ -693,12 +694,30 @@ namespace glance::contracts::components
         QueryImageMetadataFunction query_metadata{};
     };
 
+    struct FileFormatCandidate
+    {
+        wchar_t name[256]{};
+        wchar_t version[128]{};
+        wchar_t mime[128]{};
+        wchar_t identifier[64]{};
+        wchar_t basis[512]{};
+        wchar_t extensions[512]{};
+    };
+
+    struct FileFormatSink
+    {
+        void* context{};
+        BOOL(WINAPI* append)(void*, const FileFormatCandidate*) noexcept{};
+    };
+
     struct InformationProviderApi
     {
         std::uint32_t size{ sizeof(InformationProviderApi) };
         std::uint32_t version{ information_provider_api_version };
         QueryHoverInfoFunction query_info{};
         QueryStatusBarShortcutDataFunction query_json{};
+        PrepareStatus(WINAPI* identify_format)(const wchar_t*, const PreviewCancellation*,
+            const InformationPanelSink*, const FileFormatSink*) noexcept{};
     };
 
     struct StatusBarShortcutApi
@@ -718,6 +737,7 @@ namespace glance::contracts::components
         QueryStatusFunction query_status{};
         QueryLoadingTextFunction query_loading_text{};
         CanPreviewFunction can_preview{};
+        BOOL(WINAPI* can_preview_as)(const wchar_t*, const PreviewPreparationOptions*) noexcept{};
         PreparePreviewFunction prepare_preview{};
         ReleasePreviewFunction release_preview{};
         QueryInterfaceFunction query_interface{};

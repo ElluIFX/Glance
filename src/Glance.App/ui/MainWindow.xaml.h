@@ -262,6 +262,10 @@ namespace winrt::Glance::App::implementation
         void LoadCloudFileButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PreviewAsTextButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void GenericAdvancedInfoButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void PreviewAsGuessedFormatButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void cancel_format_identification() noexcept;
+        void update_generic_information();
+        winrt::fire_and_forget identify_format_async(std::wstring path, std::uint64_t generation);
 
     private:
         winrt::fire_and_forget cli_control_async(Windows::Data::Json::JsonObject request, std::uint64_t generation);
@@ -369,7 +373,8 @@ namespace winrt::Glance::App::implementation
         void reset_hidden_window_size() noexcept;
         void present_file(
             std::uint32_t index,
-            std::optional<glance::app::PreviewKind> known_kind = std::nullopt);
+            std::optional<glance::app::PreviewKind> known_kind = std::nullopt,
+            std::wstring effective_extension = {});
         void present_generic(
             const glance::app::PreviewFile& file,
             bool allow_text_preview = false,
@@ -963,6 +968,12 @@ namespace winrt::Glance::App::implementation
         glance::app::PreviewKind content_preview_kind_{ glance::app::PreviewKind::generic };
         bool basic_info_mode_{};
         bool generic_text_preview_allowed_{};
+        std::shared_ptr<std::atomic_bool> format_identification_cancellation_;
+        std::wstring generic_file_information_;
+        std::wstring generic_file_header_;
+        std::wstring format_identification_information_;
+        std::wstring guessed_extension_;
+        std::wstring effective_extension_;
         glance::contracts::PreviewWindowState state_{ glance::contracts::PreviewWindowState::hidden };
     };
 }

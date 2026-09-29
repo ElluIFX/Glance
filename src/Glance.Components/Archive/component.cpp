@@ -126,6 +126,7 @@ namespace
     struct PreviewLease
     {
         std::filesystem::path source;
+        std::wstring extension;
         std::mutex mutex;
         std::wstring password;
         std::shared_ptr<ArchiveIndex> index;
@@ -160,7 +161,7 @@ namespace
 
     std::wstring lower_extension(const std::filesystem::path& path)
     {
-        auto extension = path.extension().wstring();
+        auto extension = glance::components::preview_extension(path);
         std::ranges::transform(extension, extension.begin(), [](wchar_t character) {
             return static_cast<wchar_t>(std::towlower(character));
         });
@@ -364,7 +365,8 @@ namespace
 
     std::shared_ptr<ArchiveIndex> run_host(
         const std::filesystem::path& source,
-        std::wstring_view password)
+        std::wstring_view password,
+        const std::wstring& extension)
     {
         const auto directory = component_directory();
         const auto host = directory / L"Glance.ArchiveHost.exe";
@@ -496,9 +498,10 @@ namespace
             read_succeeded = append_pipe_output(parent_output.get(), response);
         });
         const auto path = source.wstring();
-        const RequestHeader request{
+        RequestHeader request{
             .path_characters = static_cast<std::uint32_t>(path.size()),
             .password_characters = static_cast<std::uint32_t>(password.size()) };
+        wcscpy_s(request.effective_extension, extension.c_str());
         const bool request_written =
             write_exact(parent_input.get(), &request, sizeof(request)) &&
             write_exact(parent_input.get(), path.data(), path.size() * sizeof(wchar_t)) &&
@@ -860,6 +863,7 @@ namespace
             const auto token = next_lease_token.fetch_add(1, std::memory_order_relaxed);
             auto lease = std::make_shared<PreviewLease>();
             lease->source = source;
+            lease->extension = lower_extension(source);
             {
                 std::scoped_lock lock(lease_mutex);
                 leases.emplace(token, std::move(lease));
@@ -903,7 +907,7 @@ namespace
             std::scoped_lock lock(lease->mutex);
             if (lease->index == nullptr || lease->password != requested_password)
             {
-                lease->index = run_host(lease->source, requested_password);
+                lease->index = run_host(lease->source, requested_password, lease->extension);
                 lease->password = requested_password;
             }
             if (lease->index == nullptr)
@@ -1095,6 +1099,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     result.query_status = query_status;
     result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
+    result.can_preview_as = glance::components::can_preview_as<can_preview>;
     result.prepare_preview = glance::components::prepare_preview_callback<prepare_preview>;
     result.release_preview = release_preview;
     result.query_interface = query_interface;

@@ -57,7 +57,7 @@ namespace
         {
             if (!path)
                 return FALSE;
-            const auto extension = std::filesystem::path(path).extension().wstring();
+            const auto extension = glance::components::preview_extension(std::filesystem::path(path));
             for (const auto candidate : extensions)
                 if (_wcsicmp(extension.c_str(), candidate) == 0)
                     return TRUE;
@@ -128,6 +128,7 @@ GlanceComponentGetApi(std::uint32_t abi, glance::contracts::components::Componen
                            .query_status = status,
                            .query_loading_text = loading,
                            .can_preview = accepts,
+                           .can_preview_as = glance::components::can_preview_as<accepts>,
                            .prepare_preview = glance::components::prepare_preview_callback<prepare>,
                            .release_preview = release,
                            .query_interface = query,

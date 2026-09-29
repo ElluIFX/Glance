@@ -313,7 +313,7 @@ namespace
 
 namespace glance::app
 {
-    std::wstring load_generic_file_info(std::wstring_view path) noexcept
+    GenericFileInfo load_generic_file_info(std::wstring_view path) noexcept
     {
         try
         {
@@ -333,12 +333,7 @@ namespace glance::app
             {
                 result += result.empty() ? security : L"\n" + security;
             }
-            const auto header = file_header(path);
-            if (!header.empty())
-            {
-                result += result.empty() ? header : L"\n\n" + header;
-            }
-            return result;
+            return { std::move(result), file_header(path) };
         }
         catch (...)
         {

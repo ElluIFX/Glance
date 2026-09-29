@@ -233,6 +233,15 @@ namespace glance::app
         std::vector<ComponentSettingOption> options;
     };
 
+    struct FileFormatIdentification
+    {
+        std::wstring status;
+        std::vector<glance::contracts::components::FileFormatCandidate> candidates;
+    };
+    [[nodiscard]] bool has_file_format_identifier() noexcept;
+    [[nodiscard]] bool component_can_preview_as(const std::wstring& path, const std::wstring& extension) noexcept;
+    [[nodiscard]] FileFormatIdentification identify_file_format(
+        const std::wstring& path, const std::atomic_bool& cancelled) noexcept;
     [[nodiscard]] std::filesystem::path application_component_root();
     void initialize_components() noexcept;
     [[nodiscard]] bool component_has_extension(std::wstring_view extension) noexcept;

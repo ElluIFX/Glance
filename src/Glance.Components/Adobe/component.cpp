@@ -257,6 +257,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI GlanceComponentGetApi(
     result.query_status = query_status;
     result.query_loading_text = query_loading_text;
     result.can_preview = can_preview;
+    result.can_preview_as = glance::components::can_preview_as<can_preview>;
     result.prepare_preview = glance::components::prepare_preview_callback<prepare_preview_with_options>;
     result.release_preview = release_preview;
     result.query_interface = query_interface;

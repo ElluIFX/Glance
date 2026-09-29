@@ -711,6 +711,50 @@ namespace
         FreeLibrary(component);
     }
 
+    void test_file_format_component(const std::filesystem::path& component_root)
+    {
+        using namespace glance::contracts::components;
+        const auto path = component_root / L"file-format" / L"Glance.FileFormatComponent.dll";
+        const HMODULE module = LoadLibraryExW(path.c_str(), nullptr,
+            LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+        expect(module != nullptr, "load file format component");
+        if (!module) return;
+        const auto get_api = reinterpret_cast<GetApiFunction>(GetProcAddress(module, get_api_export));
+        ComponentApi api;
+        const bool loaded = get_api && get_api(abi_version, &api);
+        expect(loaded, "file format component ABI");
+        void* pointer{};
+        if (loaded && api.query_interface(&information_provider_api_id, information_provider_api_version, &pointer) && pointer)
+        {
+            const auto information = static_cast<const InformationProviderApi*>(pointer);
+            expect(information->identify_format != nullptr, "file format information contribution");
+            const auto fixture = std::filesystem::temp_directory_path() /
+                (L"glance-format-test-" + std::to_wstring(GetCurrentProcessId()) + L".unknown");
+            { std::ofstream file(fixture, std::ios::binary); file << "%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"; }
+            std::vector<FileFormatCandidate> candidates;
+            const FileFormatSink sink{.context = &candidates, .append = [](void* context, const FileFormatCandidate* value) noexcept -> BOOL {
+                try { static_cast<std::vector<FileFormatCandidate>*>(context)->push_back(*value); return TRUE; }
+                catch (...) { return FALSE; }
+            }};
+            const InformationPanelSink messages{.append = [](void*, const InformationPanelEntry*) noexcept -> BOOL { return TRUE; }};
+            if (information->identify_format)
+            {
+                expect(information->identify_format(fixture.c_str(), nullptr, &messages, &sink) == PrepareStatus::success &&
+                    !candidates.empty() && std::wstring_view(candidates.front().extensions).find(L".pdf") != std::wstring_view::npos,
+                    "identify PDF contents without filename extension");
+                candidates.clear();
+                const PreviewCancellation cancellation{.is_cancelled = [](void*) noexcept -> BOOL { return TRUE; }};
+                expect(information->identify_format(fixture.c_str(), &cancellation, &messages, &sink) == PrepareStatus::cancelled && candidates.empty(),
+                    "cancel identification before starting host");
+            }
+            std::error_code error;
+            std::filesystem::remove(fixture, error);
+        }
+        else expect(false, "file format information interface");
+        if (loaded && api.shutdown) api.shutdown();
+        FreeLibrary(module);
+    }
+
     void test_media_info_component(const std::filesystem::path& component_root)
     {
         using namespace glance::contracts::components;
@@ -1343,6 +1387,7 @@ int wmain(int argument_count, wchar_t* arguments[])
                 L"libraw.dll",
                 L"libraw-LICENSE.txt" } });
     test_model3d_component(component_root);
+    test_file_format_component(component_root);
     test_media_info_component(component_root);
     const auto source_directory =
         std::filesystem::path(executable_path).parent_path() / L"sources" / L"everything";

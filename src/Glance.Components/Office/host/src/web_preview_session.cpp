@@ -1,4 +1,5 @@
 #include "../include/web_preview_session.h"
+#include "../../../Common/preview_cancellation.h"
 #include "../include/presentation_package.h"
 #include "../../../Common/preview_directory_cleanup.h"
 
@@ -430,7 +431,7 @@ namespace glance::office
     bool WebPreviewSession::available(const std::wstring& path) const
     {
         std::error_code error;
-        const auto extension = std::filesystem::path(path).extension().wstring();
+        const auto extension = glance::components::preview_extension(std::filesystem::path(path));
         const bool modern = _wcsicmp(extension.c_str(), L".docx") == 0 || _wcsicmp(extension.c_str(), L".pptx") == 0 ||
             _wcsicmp(extension.c_str(), L".xlsx") == 0;
         if (!std::filesystem::is_regular_file(web_directory() / L"index.html", error)) return false;
@@ -466,7 +467,7 @@ namespace glance::office
         state->failure = std::move(failure);
         state->visuals = visuals;
         state->path = path;
-        const auto extension = std::filesystem::path(path).extension().wstring();
+        const auto extension = glance::components::preview_extension(std::filesystem::path(path));
         state->presentation = _wcsicmp(extension.c_str(), L".pptx") == 0 || _wcsicmp(extension.c_str(), L".ppt") == 0;
         state->workbook = _wcsicmp(extension.c_str(), L".xlsx") == 0 || _wcsicmp(extension.c_str(), L".xls") == 0;
         try

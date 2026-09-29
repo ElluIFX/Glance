@@ -657,7 +657,8 @@ namespace
     Index read_index(
         const std::filesystem::path& source,
         std::wstring password,
-        const std::filesystem::path& library_path)
+        const std::filesystem::path& library_path,
+        std::wstring_view effective_extension)
     {
         Index result;
         UniqueModule library(LoadLibraryExW(
@@ -699,7 +700,7 @@ namespace
             result.packed_size = static_cast<std::uint64_t>(physical_size.QuadPart);
         }
 
-        auto extension = lower(source.extension().wstring());
+        auto extension = lower(effective_extension.empty() ? source.extension().wstring() : std::wstring(effective_extension));
         if (!extension.empty() && extension.front() == L'.')
         {
             extension.erase(extension.begin());
@@ -1011,6 +1012,7 @@ int wmain(int argument_count, wchar_t** arguments)
     }
     const auto library =
         std::filesystem::path(module_path).parent_path() / L"7z.dll";
-    const auto index = read_index(path, std::move(password), library);
+    if (wcsnlen_s(request.effective_extension, 32) == 32) return ERROR_INVALID_DATA;
+    const auto index = read_index(path, std::move(password), library, request.effective_extension);
     return write_response(output.get(), index) ? ERROR_SUCCESS : ERROR_WRITE_FAULT;
 }

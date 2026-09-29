@@ -1,0 +1,9 @@
+{
+  "schema_version": 3,
+  "id": "file-format",
+  "architecture": "x64",
+  "entry_point": "Glance.FileFormatComponent.dll",
+  "dependencies": [],
+  "payload_files": ["resources.pri", "Glance.FileFormatHost.exe", "default.sig", "formats.json", "formats.xml", "THIRD-PARTY-NOTICES.txt"],
+  "installer_names": {"en-US": "File Format Identification", "zh-CN": "文件格式识别"}
+}
