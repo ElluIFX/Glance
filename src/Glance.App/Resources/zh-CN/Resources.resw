@@ -80,7 +80,6 @@
   <data name="PreviewModeShowInfoTooltip" xml:space="preserve"><value>显示基础信息</value></data>
   <data name="PreviewModeShowContentTooltip" xml:space="preserve"><value>显示内容预览</value></data>
   <data name="LoadCloudFileText.Text" xml:space="preserve"><value>加载文件</value></data>
-  <data name="PreviewAsTextText.Text" xml:space="preserve"><value>尝试以文本预览</value></data>
   <data name="AutoFitPausedNotice" xml:space="preserve"><value>已暂停窗口自适应</value></data>
   <data name="ArchiveUnavailableNotice" xml:space="preserve"><value>压缩包损坏或加密，不支持预览</value></data>
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>无法以文本预览</value></data>

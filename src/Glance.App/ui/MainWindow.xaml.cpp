@@ -182,7 +182,7 @@ namespace
         virtual HRESULT STDMETHODCALLTYPE Buffer(byte** value) = 0;
     };
     constexpr std::size_t text_chunk_bytes = 256U * 1024U;
-    constexpr std::uint64_t maximum_preview_as_text_bytes = 8ULL * 1024ULL * 1024ULL;
+    constexpr std::uint64_t initial_markdown_preview_bytes = 8ULL * 1024ULL * 1024ULL;
     constexpr std::size_t retained_preview_buffer_limit_bytes = 8U * 1024U * 1024U;
     constexpr std::uint32_t folder_icon_pixel_size = 20;
     constexpr std::uint64_t json_sentinel_mask = 1ULL << 63U;
@@ -2023,7 +2023,6 @@ namespace winrt::Glance::App::implementation
             L"GenericAdvancedInfoButton.ToolTipService.ToolTip");
         LoadCloudFileText().Text(glance::app::localize(L"LoadCloudFileText.Text"));
         TextSelectionCopyButton().Content(box_value(glance::app::localize(L"TextSelectionCopyButton.Content")));
-        PreviewAsTextText().Text(glance::app::localize(L"PreviewAsTextText.Text"));
         PreviewAsIdentifiedFormatText().Text(glance::app::localize(L"PreviewAsIdentifiedFormatText.Text"));
         MarkdownPreviewButton().Content(box_value(
             glance::app::localize(L"MarkdownPreviewButton.Content")));
@@ -2117,7 +2116,6 @@ namespace winrt::Glance::App::implementation
             update_text_layout();
         }
         refresh_realized_json_rows();
-        update_preview_as_text_button();
         schedule_text_monitor();
     }
 
@@ -3201,7 +3199,6 @@ namespace winrt::Glance::App::implementation
         GenericAdvancedInfoText().Text(L"");
         GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
         LoadCloudFileButton().Visibility(Visibility::Collapsed);
-        PreviewAsTextButton().Visibility(Visibility::Collapsed);
         GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
         ComponentStatusControls().Children().Clear();
         PreviewModeButton().Visibility(Visibility::Collapsed);
@@ -3255,7 +3252,6 @@ namespace winrt::Glance::App::implementation
         current_kind_ = glance::app::PreviewKind::generic;
         content_preview_kind_ = glance::app::PreviewKind::generic;
         basic_info_mode_ = false;
-        generic_text_preview_allowed_ = false;
         media_is_audio_ = false;
         image_metadata_visible_ = false;
         image_panning_ = false;
@@ -4217,7 +4213,6 @@ namespace winrt::Glance::App::implementation
         component_loading_language_.clear();
         basic_info_mode_ = false;
         content_preview_kind_ = glance::app::PreviewKind::generic;
-        generic_text_preview_allowed_ = false;
         archive_render_state_.reset();
         active_file_directory_descriptor_ = {};
         active_file_directory_columns_.clear();
@@ -4337,10 +4332,6 @@ namespace winrt::Glance::App::implementation
             return;
         }
         present_resolved_file(file, kind, generation);
-        if (kind == glance::app::PreviewKind::generic)
-        {
-            probe_preview_async(file, generation);
-        }
     }
 
     fire_and_forget MainWindow::probe_preview_async(
@@ -4352,7 +4343,9 @@ namespace winrt::Glance::App::implementation
         try
         {
             co_await resume_background();
-            const auto kind = glance::app::probe_preview_kind(file.path);
+            const auto kind = glance::app::resolve_preview_kind(file.path) == glance::app::PreviewKind::generic
+                ? glance::app::probe_preview_kind(file.path)
+                : (glance::app::can_decode_text_sample(file.path) ? glance::app::PreviewKind::text : glance::app::PreviewKind::generic);
             static_cast<void>(dispatcher.TryEnqueue(
                 [weak, file = std::move(file), kind, generation] {
                     const auto self = weak.get();
@@ -4540,13 +4533,17 @@ namespace winrt::Glance::App::implementation
         generic_preview_preferences_ = glance::app::load_generic_preview_preferences();
         GenericAdvancedInfoButton().IsChecked(generic_preview_preferences_.show_advanced_info);
         LoadCloudFileButton().Visibility(file.is_cloud_placeholder ? Visibility::Visible : Visibility::Collapsed);
-        generic_text_preview_allowed_ = allow_text_preview;
-        update_preview_as_text_button();
-        PreviewAsTextButton().IsEnabled(true);
         const bool advanced_info_available =
             allow_advanced_info && file.is_filesystem && !file.path.empty() &&
             !file.is_cloud_placeholder &&
             (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+        if (allow_text_preview && file.is_filesystem && !file.path.empty() &&
+            !file.is_cloud_placeholder && (file.attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
+            generic_probe_generation_ != content_generation_)
+        {
+            generic_probe_generation_ = content_generation_;
+            probe_preview_async(file, content_generation_);
+        }
         GenericAdvancedInfoButton().Visibility(
             advanced_info_available ? Visibility::Visible : Visibility::Collapsed);
         ErrorText().Visibility(Visibility::Collapsed);
@@ -4834,8 +4831,7 @@ namespace winrt::Glance::App::implementation
         bool markdown,
         bool web,
         std::uint64_t generation,
-        glance::app::TextEncoding encoding,
-        bool preview_as_text_attempt)
+        glance::app::TextEncoding encoding)
     {
         stop_text_monitor();
         glance::app::cancel_text_preview_read(current_text_reader_);
@@ -4848,17 +4844,16 @@ namespace winrt::Glance::App::implementation
         text_reader_monitored_ = monitor;
         co_await resume_background();
         const auto initial_bytes = markdown
-            ? static_cast<std::size_t>(maximum_preview_as_text_bytes)
+            ? static_cast<std::size_t>(initial_markdown_preview_bytes)
             : text_chunk_bytes;
         auto preview = glance::app::load_text_preview(path, initial_bytes, encoding, monitor);
         static_cast<void>(dispatcher.TryEnqueue(
-            [lifetime, preview = std::move(preview), markdown, web, generation, preview_as_text_attempt]() mutable {
+            [lifetime, preview = std::move(preview), markdown, web, generation]() mutable {
                 lifetime->apply_text_preview(
                     std::move(preview),
                     markdown,
                     web,
-                    generation,
-                    preview_as_text_attempt);
+                    generation);
             }));
     }
 
@@ -7213,8 +7208,7 @@ namespace winrt::Glance::App::implementation
         glance::app::TextPreview preview,
         bool markdown,
         bool web,
-        std::uint64_t generation,
-        bool preview_as_text_attempt)
+        std::uint64_t generation)
     {
         if (generation != content_generation_)
         {
@@ -7224,17 +7218,13 @@ namespace winrt::Glance::App::implementation
         if (!preview.error.empty())
         {
             set_text_loading(false);
-            if (text_reader_monitored_ && !preview_as_text_attempt)
+            if (text_reader_monitored_)
             {
                 show_text_preview_error(std::move(preview.error));
                 schedule_text_monitor();
                 return;
             }
-            if (preview_as_text_attempt)
-            {
-                PreviewAsTextButton().IsEnabled(true);
-            }
-            else if (web)
+            if (web)
             {
                 MarkdownCodeButton().IsEnabled(false);
                 MarkdownPreviewButton().IsEnabled(web_preview_available_);
@@ -7242,22 +7232,11 @@ namespace winrt::Glance::App::implementation
             }
             else if (current_index_ < files_.size())
             {
-                present_generic(files_[current_index_], true, true);
+                generic_probe_generation_ = generation;
+                present_generic(files_[current_index_], false, true);
             }
             show_text_preview_error(std::move(preview.error));
             return;
-        }
-
-        if (preview_as_text_attempt)
-        {
-            if (current_index_ >= files_.size())
-            {
-                return;
-            }
-            if (!prepare_text_preview(files_[current_index_], false))
-            {
-                return;
-            }
         }
 
         auto initial_content = std::move(preview.content);
@@ -9360,21 +9339,6 @@ namespace winrt::Glance::App::implementation
                 available && basic_info_mode_
                     ? L"PreviewModeShowContentTooltip"
                     : L"PreviewModeShowInfoTooltip")));
-    }
-
-    void MainWindow::update_preview_as_text_button()
-    {
-        const bool available =
-            generic_text_preview_allowed_ &&
-            !basic_info_mode_ &&
-            current_kind_ == glance::app::PreviewKind::generic &&
-            current_index_ < files_.size() &&
-            !files_[current_index_].path.empty() &&
-            !files_[current_index_].is_cloud_placeholder &&
-            (files_[current_index_].attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
-            files_[current_index_].size <= maximum_preview_as_text_bytes &&
-            glance::app::can_try_preview_as_text(files_[current_index_].path);
-        PreviewAsTextButton().Visibility(available ? Visibility::Visible : Visibility::Collapsed);
     }
 
     void MainWindow::show_provider_error(std::wstring message, std::uint64_t generation)
@@ -12031,39 +11995,6 @@ namespace winrt::Glance::App::implementation
         present_file(current_index_);
     }
 
-    void MainWindow::PreviewAsTextButton_Click(IInspectable const&, RoutedEventArgs const&)
-    {
-        if (basic_info_mode_ ||
-            !generic_text_preview_allowed_ ||
-            current_kind_ != glance::app::PreviewKind::generic ||
-            current_index_ >= files_.size())
-        {
-            return;
-        }
-
-        const auto& file = files_[current_index_];
-        if (file.path.empty() || file.is_cloud_placeholder ||
-            (file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
-            file.size > maximum_preview_as_text_bytes ||
-            !glance::app::can_try_preview_as_text(file.path))
-        {
-            return;
-        }
-
-        ++content_generation_;
-        dismiss_preview_info_bar();
-        PreviewAsTextButton().IsEnabled(false);
-        cancel_format_identification();
-        ErrorText().Visibility(Visibility::Collapsed);
-        load_text_async(
-            file.path,
-            false,
-            false,
-            content_generation_,
-            glance::app::TextEncoding::automatic,
-            true);
-    }
-
     void MainWindow::cancel_format_identification() noexcept
     {
         if (format_identification_cancellation_) format_identification_cancellation_->store(true);
@@ -12143,25 +12074,13 @@ namespace winrt::Glance::App::implementation
             self->update_generic_information();
             if (extension.empty() || ambiguous || !self->effective_extension_.empty()) return;
             self->guessed_extension_ = std::move(extension);
-            const auto old_position = self->PreviewAsTextButton().TransformToVisual(self->RootGrid()).TransformPoint({0, 0});
             self->PreviewAsGuessedFormatButton().Visibility(Visibility::Visible);
             self->GenericPreviewActions().UpdateLayout();
             BOOL animations = TRUE;
             SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animations, 0);
             if (!animations) return;
-            const auto new_position = self->PreviewAsTextButton().TransformToVisual(self->RootGrid()).TransformPoint({0, 0});
             using Microsoft::UI::Xaml::Hosting::ElementCompositionPreview;
-            ElementCompositionPreview::SetIsTranslationEnabled(self->PreviewAsTextButton(), true);
-            const auto visual = ElementCompositionPreview::GetElementVisual(self->PreviewAsTextButton());
-            const auto movement = visual.Compositor().CreateVector3KeyFrameAnimation();
-            movement.Duration(std::chrono::milliseconds(140));
-            movement.InsertKeyFrame(0, {old_position.X - new_position.X, 0, 0});
-            movement.InsertKeyFrame(1, {0, 0, 0});
-            visual.StartAnimation(L"Translation", movement);
             const auto button = ElementCompositionPreview::GetElementVisual(self->PreviewAsGuessedFormatButton());
-            ElementCompositionPreview::SetIsTranslationEnabled(self->PreviewAsGuessedFormatButton(), true);
-            if (self->PreviewAsTextButton().Visibility() == Visibility::Visible)
-                button.StartAnimation(L"Translation", movement);
             const auto fade = button.Compositor().CreateScalarKeyFrameAnimation();
             fade.Duration(std::chrono::milliseconds(140));
             fade.InsertKeyFrame(0, 0);

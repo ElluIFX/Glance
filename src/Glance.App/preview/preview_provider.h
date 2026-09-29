@@ -80,7 +80,7 @@ namespace glance::app
         const std::wstring& path);
     [[nodiscard]] std::vector<std::wstring> gallery_extensions(
         glance::contracts::components::GalleryMediaKind kind);
-    [[nodiscard]] bool can_try_preview_as_text(const std::wstring& path);
+    [[nodiscard]] bool can_decode_text_sample(const std::wstring& path);
     [[nodiscard]] MaterializedShellFile materialize_shell_file(
         std::wstring_view parsing_name,
         std::wstring_view display_name,

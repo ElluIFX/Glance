@@ -260,7 +260,6 @@ namespace winrt::Glance::App::implementation
             IInspectable const&,
             Microsoft::UI::Xaml::Input::RightTappedRoutedEventArgs const&);
         void LoadCloudFileButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void PreviewAsTextButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void GenericAdvancedInfoButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PreviewAsGuessedFormatButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void cancel_format_identification() noexcept;
@@ -403,8 +402,7 @@ namespace winrt::Glance::App::implementation
             bool markdown,
             bool web,
             std::uint64_t generation,
-            glance::app::TextEncoding encoding,
-            bool preview_as_text_attempt = false);
+            glance::app::TextEncoding encoding);
         winrt::fire_and_forget load_next_text_chunk_async(std::uint64_t generation);
         void stop_text_monitor();
         void schedule_text_monitor();
@@ -597,8 +595,7 @@ namespace winrt::Glance::App::implementation
             glance::app::TextPreview preview,
             bool markdown,
             bool web,
-            std::uint64_t generation,
-            bool preview_as_text_attempt);
+            std::uint64_t generation);
         winrt::fire_and_forget render_markdown();
         winrt::fire_and_forget initialize_markdown_web_view_async(std::uint64_t generation);
         winrt::fire_and_forget render_markdown_async(std::wstring html, std::uint64_t generation);
@@ -698,7 +695,6 @@ namespace winrt::Glance::App::implementation
         void update_generic_file_metadata();
         void request_footer_access_if_needed();
         void update_preview_mode_button();
-        void update_preview_as_text_button();
         void update_image_metadata_visibility();
         void set_image_zoom(float zoom, Windows::Foundation::Point anchor);
         void update_image_zoom_controls();
@@ -967,8 +963,8 @@ namespace winrt::Glance::App::implementation
         glance::app::PreviewKind current_kind_{ glance::app::PreviewKind::generic };
         glance::app::PreviewKind content_preview_kind_{ glance::app::PreviewKind::generic };
         bool basic_info_mode_{};
-        bool generic_text_preview_allowed_{};
         std::shared_ptr<std::atomic_bool> format_identification_cancellation_;
+        std::uint64_t generic_probe_generation_{};
         std::wstring generic_file_information_;
         std::wstring generic_file_header_;
         std::wstring format_identification_information_;

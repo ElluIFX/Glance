@@ -199,19 +199,6 @@
                         </Button.Content>
                     </Button>
                     <StackPanel x:Name="GenericPreviewActions" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" Margin="0,8,0,0">
-                    <Button
-                        x:Name="PreviewAsTextButton"
-                        Margin="0"
-                        HorizontalAlignment="Center"
-                        Click="PreviewAsTextButton_Click"
-                        Visibility="Collapsed">
-                        <Button.Content>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="14" Glyph="&#xE70F;" />
-                                <TextBlock x:Name="PreviewAsTextText" x:Uid="PreviewAsTextText" Text="Try preview as text" />
-                            </StackPanel>
-                        </Button.Content>
-                    </Button>
                     <Button x:Name="PreviewAsGuessedFormatButton" Visibility="Collapsed"
                         IsTabStop="False" AllowFocusOnInteraction="False"
                         Click="PreviewAsGuessedFormatButton_Click">

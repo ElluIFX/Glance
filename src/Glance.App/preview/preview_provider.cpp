@@ -402,15 +402,7 @@ namespace
             return glance::app::PreviewKind::media;
         }
 
-        if (!valid_utf8(bytes, true))
-        {
-            return glance::app::PreviewKind::generic;
-        }
-        const auto control_count = std::ranges::count_if(bytes, [](std::byte value) {
-            const auto character = std::to_integer<unsigned char>(value);
-            return character == 0 || (character < 0x09U) || (character > 0x0DU && character < 0x20U);
-        });
-        return static_cast<std::size_t>(control_count) * 100U <= bytes.size()
+        return glance::app::can_decode_text_sample(path)
             ? glance::app::PreviewKind::text
             : glance::app::PreviewKind::generic;
     }
@@ -1053,24 +1045,14 @@ namespace glance::app
         std::uint64_t anchor_offset_{};
     };
 
-    bool can_try_preview_as_text(const std::wstring& path)
+    bool can_decode_text_sample(const std::wstring& path)
     {
-        const auto extension = lower_extension(path);
-        static constexpr std::array excluded_extensions{
-            std::wstring_view(L".exe"), std::wstring_view(L".dll"),
-            std::wstring_view(L".sys"), std::wstring_view(L".com"),
-            std::wstring_view(L".scr"), std::wstring_view(L".cpl"),
-            std::wstring_view(L".ocx"), std::wstring_view(L".msi"),
-            std::wstring_view(L".msp"), std::wstring_view(L".msix"),
-            std::wstring_view(L".appx"), std::wstring_view(L".appxbundle"),
-            std::wstring_view(L".msixbundle"), std::wstring_view(L".obj"),
-            std::wstring_view(L".lib"), std::wstring_view(L".pdb"),
-            std::wstring_view(L".ilk"), std::wstring_view(L".pyc"),
-            std::wstring_view(L".class"), std::wstring_view(L".ttf"),
-            std::wstring_view(L".otf"), std::wstring_view(L".woff"),
-            std::wstring_view(L".woff2"), std::wstring_view(L".iso"),
-            std::wstring_view(L".vhd"), std::wstring_view(L".vhdx") };
-        return !contains(extension, excluded_extensions);
+        try
+        {
+            const auto sample = load_text_preview(path, maximum_encoding_detection_bytes);
+            return sample.error.empty() && sample.undecodable_bytes.empty();
+        }
+        catch (...) { return false; }
     }
 
     MaterializedShellFile materialize_shell_file(

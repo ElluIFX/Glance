@@ -289,6 +289,22 @@ int run_text_monitor_tests()
     const auto replacement = directory / L"replacement.log";
     try
     {
+        const auto unknown = directory / L"sample.unknown";
+        write_file(unknown, "");
+        require(probe_preview_kind(unknown) == PreviewKind::text, "Empty unknown file is text");
+        write_file(unknown, std::string("\xff\xfeH\0i\0\n\0", 8));
+        require(probe_preview_kind(unknown) == PreviewKind::text, "UTF-16 unknown file is text");
+        std::string legacy;
+        for (int i = 0; i < 100; ++i) legacy += "\xd6\xd0\xce\xc4\xb2\xe2\xca\xd4\n";
+        write_file(unknown, legacy);
+        require(probe_preview_kind(unknown) == PreviewKind::text, "GBK unknown file is text");
+        write_file(unknown, std::string(16383, 'a') + "\xe4\xb8\xad");
+        require(probe_preview_kind(unknown) == PreviewKind::text, "Split UTF-8 sample boundary is text");
+        write_file(unknown, std::string(9 * 1024 * 1024, 'a'));
+        require(probe_preview_kind(unknown) == PreviewKind::text, "Large unknown text has no size exclusion");
+        write_file(unknown, std::string(4096, '\0'));
+        require(probe_preview_kind(unknown) == PreviewKind::generic, "Binary data stays generic");
+        std::filesystem::remove(unknown);
         write_file(path, "start\n");
         Preview preview;
         preview.apply(load_text_preview(path, chunk_size, TextEncoding::utf8, true));
