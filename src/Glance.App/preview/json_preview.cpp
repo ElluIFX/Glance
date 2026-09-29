@@ -68,6 +68,12 @@ namespace
             return offset_;
         }
 
+        [[nodiscard]] bool at_end() const
+        {
+            refill();
+            return finished_ && position_ >= content_.size();
+        }
+
         Ch* PutBegin() noexcept { return nullptr; }
         void Put(Ch) noexcept {}
         void Flush() noexcept {}
@@ -614,6 +620,12 @@ namespace glance::app
 
         void fail_document()
         {
+            if (reader_->GetParseErrorCode() == rapidjson::kParseErrorDocumentEmpty &&
+                source_.error().empty() && source_.at_end())
+            {
+                complete_ = true;
+                return;
+            }
             fatal_error_ = true;
             source_error_ = source_.error();
             error_line_ = source_.line();
