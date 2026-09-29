@@ -11,6 +11,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <thread>
+#include <icu.h>
 
 // Only application services unrelated to text decoding are substituted.
 namespace glance::app
@@ -290,6 +291,25 @@ int run_text_monitor_tests()
     try
     {
         const auto unknown = directory / L"sample.unknown";
+        for (const auto& descriptor : text_encodings)
+        {
+            if (descriptor.encoding == TextEncoding::system) continue;
+            UErrorCode status = U_ZERO_ERROR;
+            char encoded[256]{};
+            const auto count = ucnv_convert(descriptor.converter_name, "UTF-8", encoded,
+                sizeof(encoded), "Encoding test\n", -1, &status);
+            require(U_SUCCESS(status), "Selectable encoding converter is available");
+            write_file(unknown, std::string_view(encoded, count));
+            const auto decoded = load_text_preview(unknown, chunk_size, descriptor.encoding);
+            require(decoded.error.empty() && decoded.content == L"Encoding test\n",
+                "Selectable encoding decodes its content without a BOM");
+        }
+        write_file(unknown, std::string("\x93\xfa\x96\x7b\x8c\xea", 6));
+        require(load_text_preview(unknown, chunk_size, TextEncoding::shift_jis).content == L"\u65e5\u672c\u8a9e",
+            "Shift JIS decodes Japanese text");
+        write_file(unknown, std::string("\xcf\xf0\xe8\xe2\xe5\xf2", 6));
+        require(load_text_preview(unknown, chunk_size, TextEncoding::windows1251).content == L"\u041f\u0440\u0438\u0432\u0435\u0442",
+            "Windows-1251 decodes Cyrillic text");
         write_file(unknown, "");
         require(probe_preview_kind(unknown) == PreviewKind::text, "Empty unknown file is text");
         write_file(unknown, std::string("\xff\xfeH\0i\0\n\0", 8));

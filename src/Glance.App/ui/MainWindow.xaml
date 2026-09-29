@@ -1057,22 +1057,13 @@
                     FontSize="11"
                     Content="Detecting...">
                     <DropDownButton.Flyout>
-                        <MenuFlyout>
-                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="utf8" Text="UTF-8" />
-                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="utf16_le" Text="UTF-16 LE" />
-                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="utf16_be" Text="UTF-16 BE" />
-                            <MenuFlyoutSeparator />
-                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="gb2312" Text="GB2312" />
-                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="gbk" Text="GBK" />
-                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="gb18030" Text="GB18030" />
-                            <MenuFlyoutItem Click="EncodingOption_Click" Tag="big5" Text="Big5" />
-                            <MenuFlyoutSeparator />
-                            <MenuFlyoutItem
-                                x:Name="SystemAnsiItem"
-                                x:Uid="SystemAnsiItem"
-                                Click="EncodingOption_Click"
-                                Tag="system"
-                                Text="System ANSI" />
+                        <MenuFlyout x:Name="EncodingMenu">
+                            <MenuFlyout.MenuFlyoutPresenterStyle>
+                                <Style TargetType="MenuFlyoutPresenter">
+                                    <Setter Property="MaxHeight" Value="360" />
+                                    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+                                </Style>
+                            </MenuFlyout.MenuFlyoutPresenterStyle>
                         </MenuFlyout>
                     </DropDownButton.Flyout>
                 </DropDownButton>

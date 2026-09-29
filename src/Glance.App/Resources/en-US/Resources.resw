@@ -84,7 +84,6 @@
   <data name="ArchiveUnavailableNotice" xml:space="preserve"><value>The archive is damaged or encrypted and cannot be previewed</value></data>
   <data name="PreviewErrorInfoBar.Title" xml:space="preserve"><value>Unable to preview as text</value></data>
   <data name="GenericAdvancedInfoButton.ToolTipService.ToolTip" xml:space="preserve"><value>Show advanced information</value></data>
-  <data name="SystemAnsiItem.Text" xml:space="preserve"><value>System ANSI</value></data>
   <data name="MediaPlayPauseButton.ToolTipService.ToolTip" xml:space="preserve"><value>Play or pause</value></data>
   <data name="MediaMuteButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mute or unmute</value></data>
   <data name="GalleryModeButton.ToolTipService.ToolTip" xml:space="preserve"><value>Gallery mode&#xA;Right-click: same extension</value></data>
@@ -466,4 +465,44 @@
   <data name="FileFormatIdentifying" xml:space="preserve"><value>Identifying...</value></data>
   <data name="FileFormatIdentificationFailed" xml:space="preserve"><value>Unable to identify this file</value></data>
   <data name="PreviewAsIdentifiedFormatText.Text" xml:space="preserve"><value>Preview as identified format</value></data>
+  <data name="Encoding_utf8" xml:space="preserve"><value>UTF-8</value></data>
+  <data name="Encoding_utf16_le" xml:space="preserve"><value>UTF-16 LE</value></data>
+  <data name="Encoding_utf16_be" xml:space="preserve"><value>UTF-16 BE</value></data>
+  <data name="Encoding_utf32_le" xml:space="preserve"><value>UTF-32 LE</value></data>
+  <data name="Encoding_utf32_be" xml:space="preserve"><value>UTF-32 BE</value></data>
+  <data name="Encoding_system" xml:space="preserve"><value>System ANSI</value></data>
+  <data name="Encoding_gb2312" xml:space="preserve"><value>GB2312</value></data>
+  <data name="Encoding_gbk" xml:space="preserve"><value>GBK</value></data>
+  <data name="Encoding_gb18030" xml:space="preserve"><value>GB18030</value></data>
+  <data name="Encoding_big5" xml:space="preserve"><value>Big5</value></data>
+  <data name="Encoding_shift_jis" xml:space="preserve"><value>Shift JIS (CP932)</value></data>
+  <data name="Encoding_euc_jp" xml:space="preserve"><value>EUC-JP</value></data>
+  <data name="Encoding_iso2022_jp" xml:space="preserve"><value>ISO-2022-JP</value></data>
+  <data name="Encoding_euc_kr" xml:space="preserve"><value>EUC-KR</value></data>
+  <data name="Encoding_windows949" xml:space="preserve"><value>Korean (CP949)</value></data>
+  <data name="Encoding_windows1250" xml:space="preserve"><value>Windows-1250</value></data>
+  <data name="Encoding_windows1251" xml:space="preserve"><value>Windows-1251</value></data>
+  <data name="Encoding_windows1252" xml:space="preserve"><value>Windows-1252</value></data>
+  <data name="Encoding_windows1253" xml:space="preserve"><value>Windows-1253</value></data>
+  <data name="Encoding_windows1254" xml:space="preserve"><value>Windows-1254</value></data>
+  <data name="Encoding_windows1255" xml:space="preserve"><value>Windows-1255</value></data>
+  <data name="Encoding_windows1256" xml:space="preserve"><value>Windows-1256</value></data>
+  <data name="Encoding_windows1257" xml:space="preserve"><value>Windows-1257</value></data>
+  <data name="Encoding_windows1258" xml:space="preserve"><value>Windows-1258</value></data>
+  <data name="Encoding_iso8859_1" xml:space="preserve"><value>ISO-8859-1</value></data>
+  <data name="Encoding_iso8859_2" xml:space="preserve"><value>ISO-8859-2</value></data>
+  <data name="Encoding_iso8859_5" xml:space="preserve"><value>ISO-8859-5</value></data>
+  <data name="Encoding_iso8859_6" xml:space="preserve"><value>ISO-8859-6</value></data>
+  <data name="Encoding_iso8859_7" xml:space="preserve"><value>ISO-8859-7</value></data>
+  <data name="Encoding_iso8859_8" xml:space="preserve"><value>ISO-8859-8</value></data>
+  <data name="Encoding_iso8859_9" xml:space="preserve"><value>ISO-8859-9</value></data>
+  <data name="Encoding_iso8859_15" xml:space="preserve"><value>ISO-8859-15</value></data>
+  <data name="Encoding_koi8_r" xml:space="preserve"><value>KOI8-R</value></data>
+  <data name="Encoding_koi8_u" xml:space="preserve"><value>KOI8-U</value></data>
+  <data name="Encoding_tis620" xml:space="preserve"><value>TIS-620</value></data>
+  <data name="Encoding_ibm437" xml:space="preserve"><value>OEM 437</value></data>
+  <data name="Encoding_ibm850" xml:space="preserve"><value>OEM 850</value></data>
+  <data name="Encoding_ibm866" xml:space="preserve"><value>OEM 866</value></data>
+  <data name="Encoding_mac_roman" xml:space="preserve"><value>Mac Roman</value></data>
+  <data name="Encoding_ascii" xml:space="preserve"><value>ASCII</value></data>
 </root>

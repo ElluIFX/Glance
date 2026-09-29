@@ -639,21 +639,13 @@ namespace
         {
             return EncodingPlan{ "UTF-16BE", L"UTF-16 BE", utf16_be_bom ? 2U : 0U };
         }
-        if (encoding == glance::app::TextEncoding::gb2312)
+        if (encoding == glance::app::TextEncoding::utf32_le)
         {
-            return EncodingPlan{ "windows-936", L"GB2312", 0 };
+            return EncodingPlan{ "UTF-32LE", L"UTF-32 LE", utf32_le_bom ? 4U : 0U };
         }
-        if (encoding == glance::app::TextEncoding::gbk)
+        if (encoding == glance::app::TextEncoding::utf32_be)
         {
-            return EncodingPlan{ "windows-936", L"GBK", 0 };
-        }
-        if (encoding == glance::app::TextEncoding::gb18030)
-        {
-            return EncodingPlan{ "GB18030", L"GB18030", 0 };
-        }
-        if (encoding == glance::app::TextEncoding::big5)
-        {
-            return EncodingPlan{ "windows-950", L"Big5", 0 };
+            return EncodingPlan{ "UTF-32BE", L"UTF-32 BE", utf32_be_bom ? 4U : 0U };
         }
         if (encoding == glance::app::TextEncoding::system)
         {
@@ -661,6 +653,11 @@ namespace
                 "windows-" + std::to_string(GetACP()),
                 glance::app::localize(L"SystemCodePage"),
                 0 };
+        }
+        for (const auto& descriptor : glance::app::text_encodings)
+        {
+            if (descriptor.encoding == encoding)
+                return EncodingPlan{ descriptor.converter_name, glance::app::localize(descriptor.label_key), 0 };
         }
         if (utf8_bom)
         {
@@ -1397,7 +1394,7 @@ namespace glance::app
             std::to_integer<unsigned char>(payload[0]) == 0xFE &&
             std::to_integer<unsigned char>(payload[1]) == 0xFF;
 
-        if (looks_like_binary_payload(
+        if (encoding == TextEncoding::automatic && looks_like_binary_payload(
                 payload,
                 utf8_bom,
                 utf16_le_bom || utf16_be_bom || utf32_le_bom || utf32_be_bom))

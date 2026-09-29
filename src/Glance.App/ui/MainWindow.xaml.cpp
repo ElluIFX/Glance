@@ -2083,7 +2083,19 @@ namespace winrt::Glance::App::implementation
         PasswordPromptSubmitButton().Content(
             box_value(glance::app::localize(L"PasswordPromptSubmitButton.Content")));
         update_archive_header_state();
-        SystemAnsiItem().Text(glance::app::localize(L"SystemAnsiItem.Text"));
+        EncodingMenu().Items().Clear();
+        for (const auto& descriptor : glance::app::text_encodings)
+        {
+            if (descriptor.encoding == glance::app::TextEncoding::gb2312)
+                EncodingMenu().Items().Append(MenuFlyoutSeparator{});
+            MenuFlyoutItem item;
+            item.Text(glance::app::localize(descriptor.label_key));
+            item.Tag(box_value(static_cast<std::int32_t>(descriptor.encoding)));
+            item.IsTabStop(false);
+            item.AllowFocusOnInteraction(false);
+            item.Click({this, &MainWindow::EncodingOption_Click});
+            EncodingMenu().Items().Append(item);
+        }
         set_tooltip(SyntaxHighlightButton(), L"SyntaxHighlightButton.ToolTipService.ToolTip");
         set_tooltip(TextMonitorButton(), L"TextMonitorButton.ToolTipService.ToolTip");
         set_tooltip(ImageZoomButton(), L"ImageZoomButton.ToolTipService.ToolTip");
@@ -10359,43 +10371,12 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
-        const auto tag = unbox_value_or<hstring>(option.Tag(), L"");
-        if (tag == L"utf8")
-        {
-            current_text_encoding_ = glance::app::TextEncoding::utf8;
-        }
-        else if (tag == L"utf16_le")
-        {
-            current_text_encoding_ = glance::app::TextEncoding::utf16_le;
-        }
-        else if (tag == L"utf16_be")
-        {
-            current_text_encoding_ = glance::app::TextEncoding::utf16_be;
-        }
-        else if (tag == L"gb2312")
-        {
-            current_text_encoding_ = glance::app::TextEncoding::gb2312;
-        }
-        else if (tag == L"gbk")
-        {
-            current_text_encoding_ = glance::app::TextEncoding::gbk;
-        }
-        else if (tag == L"gb18030")
-        {
-            current_text_encoding_ = glance::app::TextEncoding::gb18030;
-        }
-        else if (tag == L"big5")
-        {
-            current_text_encoding_ = glance::app::TextEncoding::big5;
-        }
-        else if (tag == L"system")
-        {
-            current_text_encoding_ = glance::app::TextEncoding::system;
-        }
-        else
-        {
-            return;
-        }
+        const auto selected = static_cast<glance::app::TextEncoding>(
+            unbox_value_or<std::int32_t>(option.Tag(), -1));
+        const auto descriptor = std::ranges::find(glance::app::text_encodings, selected,
+            &glance::app::TextEncodingDescriptor::encoding);
+        if (descriptor == glance::app::text_encodings.end()) return;
+        current_text_encoding_ = selected;
 
         EncodingSelector().Content(box_value(option.Text()));
         glance::app::cancel_text_preview_read(current_text_reader_);
