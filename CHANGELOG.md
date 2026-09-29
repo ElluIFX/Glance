@@ -4,6 +4,22 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.30] - 2026-09-30
+
+### Added
+
+- Configure the default Markdown and JSON views, Markdown font, font size and rendering theme.
+- Select from more common international text encodings in a height-limited, scrollable menu.
+
+### Improved
+
+- Automatically preview decodable unknown files as text using a bounded content sample.
+- Show file format identification progress and allow more time and resources for identification, with a separate startup budget.
+
+### Fixed
+
+- Synchronize text and Markdown preview visibility to prevent stale content and startup flicker.
+
 ## [2026.09.29.2] - 2026-09-29
 
 ### Added
