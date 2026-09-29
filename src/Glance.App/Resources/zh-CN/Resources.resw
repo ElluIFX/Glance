@@ -505,4 +505,25 @@
   <data name="Encoding_ibm866" xml:space="preserve"><value>OEM 866</value></data>
   <data name="Encoding_mac_roman" xml:space="preserve"><value>Mac Roman</value></data>
   <data name="Encoding_ascii" xml:space="preserve"><value>ASCII</value></data>
+  <data name="MarkdownPreviewSectionTitle.Text" xml:space="preserve"><value>Markdown 预览</value></data>
+  <data name="MarkdownDefaultPreviewLabel.Text" xml:space="preserve"><value>默认预览渲染结果</value></data>
+  <data name="MarkdownFontLabel.Text" xml:space="preserve"><value>渲染字体</value></data>
+  <data name="MarkdownSizeLabel.Text" xml:space="preserve"><value>渲染字号</value></data>
+  <data name="MarkdownStyleLabel.Text" xml:space="preserve"><value>渲染风格</value></data>
+  <data name="JsonPreviewSectionTitle.Text" xml:space="preserve"><value>JSON 预览</value></data>
+  <data name="JsonDefaultTreeLabel.Text" xml:space="preserve"><value>默认预览结构化视图</value></data>
+  <data name="MarkdownStyleAutomatic" xml:space="preserve"><value>自动</value></data>
+  <data name="MarkdownStyleGitHubLight" xml:space="preserve"><value>GitHub Light</value></data>
+  <data name="MarkdownStyleGitHubDark" xml:space="preserve"><value>GitHub Dark</value></data>
+  <data name="MarkdownStyleSolarizedLight" xml:space="preserve"><value>Solarized Light</value></data>
+  <data name="MarkdownStyleSolarizedDark" xml:space="preserve"><value>Solarized Dark</value></data>
+  <data name="MarkdownStyleNord" xml:space="preserve"><value>Nord</value></data>
+  <data name="MarkdownStyleDracula" xml:space="preserve"><value>Dracula</value></data>
+  <data name="MarkdownDefaultPreviewEnabledDescription.Text" xml:space="preserve"><value>打开 Markdown 文件时显示渲染结果</value></data>
+  <data name="MarkdownDefaultPreviewDisabledDescription.Text" xml:space="preserve"><value>打开 Markdown 文件时显示源代码</value></data>
+  <data name="MarkdownFontDescription.Text" xml:space="preserve"><value>Markdown 渲染正文使用的字体</value></data>
+  <data name="MarkdownSizeDescription.Text" xml:space="preserve"><value>正文字号，单位为像素，标题按比例缩放</value></data>
+  <data name="MarkdownStyleDescription.Text" xml:space="preserve"><value>Markdown 渲染配色，自动时跟随应用主题</value></data>
+  <data name="JsonDefaultTreeEnabledDescription.Text" xml:space="preserve"><value>打开 JSON 文件时显示结构化视图</value></data>
+  <data name="JsonDefaultTreeDisabledDescription.Text" xml:space="preserve"><value>打开 JSON 文件时显示原始文本</value></data>
 </root>

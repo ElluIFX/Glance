@@ -36,6 +36,11 @@ namespace glance::app
         bool word_wrap{ true };
         bool syntax_highlighting{ true };
         bool line_numbers{ true };
+        bool markdown_default_preview{ true };
+        std::wstring markdown_font_family{ L"Segoe UI" };
+        double markdown_font_size{ 16.0 };
+        std::uint32_t markdown_style{};
+        bool json_default_tree{ true };
     };
 
     [[nodiscard]] TextPreferences load_text_preferences();

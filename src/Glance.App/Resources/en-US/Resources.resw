@@ -505,4 +505,25 @@
   <data name="Encoding_ibm866" xml:space="preserve"><value>OEM 866</value></data>
   <data name="Encoding_mac_roman" xml:space="preserve"><value>Mac Roman</value></data>
   <data name="Encoding_ascii" xml:space="preserve"><value>ASCII</value></data>
+  <data name="MarkdownPreviewSectionTitle.Text" xml:space="preserve"><value>Markdown preview</value></data>
+  <data name="MarkdownDefaultPreviewLabel.Text" xml:space="preserve"><value>Show rendered preview by default</value></data>
+  <data name="MarkdownFontLabel.Text" xml:space="preserve"><value>Rendering font</value></data>
+  <data name="MarkdownSizeLabel.Text" xml:space="preserve"><value>Rendering font size</value></data>
+  <data name="MarkdownStyleLabel.Text" xml:space="preserve"><value>Rendering style</value></data>
+  <data name="JsonPreviewSectionTitle.Text" xml:space="preserve"><value>JSON preview</value></data>
+  <data name="JsonDefaultTreeLabel.Text" xml:space="preserve"><value>Show structured view by default</value></data>
+  <data name="MarkdownStyleAutomatic" xml:space="preserve"><value>Automatic</value></data>
+  <data name="MarkdownStyleGitHubLight" xml:space="preserve"><value>GitHub Light</value></data>
+  <data name="MarkdownStyleGitHubDark" xml:space="preserve"><value>GitHub Dark</value></data>
+  <data name="MarkdownStyleSolarizedLight" xml:space="preserve"><value>Solarized Light</value></data>
+  <data name="MarkdownStyleSolarizedDark" xml:space="preserve"><value>Solarized Dark</value></data>
+  <data name="MarkdownStyleNord" xml:space="preserve"><value>Nord</value></data>
+  <data name="MarkdownStyleDracula" xml:space="preserve"><value>Dracula</value></data>
+  <data name="MarkdownDefaultPreviewEnabledDescription.Text" xml:space="preserve"><value>Open Markdown files in rendered view</value></data>
+  <data name="MarkdownDefaultPreviewDisabledDescription.Text" xml:space="preserve"><value>Open Markdown files in source view</value></data>
+  <data name="MarkdownFontDescription.Text" xml:space="preserve"><value>Font used for rendered Markdown text</value></data>
+  <data name="MarkdownSizeDescription.Text" xml:space="preserve"><value>Base text size in pixels; headings scale proportionally</value></data>
+  <data name="MarkdownStyleDescription.Text" xml:space="preserve"><value>Color theme for rendered Markdown; Automatic follows the app theme</value></data>
+  <data name="JsonDefaultTreeEnabledDescription.Text" xml:space="preserve"><value>Open JSON files in structured view</value></data>
+  <data name="JsonDefaultTreeDisabledDescription.Text" xml:space="preserve"><value>Open JSON files as raw text</value></data>
 </root>

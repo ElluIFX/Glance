@@ -4754,7 +4754,8 @@ namespace winrt::Glance::App::implementation
         current_text_json_ = !markdown && !web && json_preview_path(format_path);
         current_text_json_lines_ = current_text_json_ && json_lines_path(format_path);
         json_tree_available_ = current_text_json_;
-        json_tree_mode_ = current_text_json_;
+        text_preferences_ = glance::app::load_text_preferences();
+        json_tree_mode_ = current_text_json_ && text_preferences_.json_default_tree;
         web_preview_available_ =
             (markdown || web) && glance::app::webview_runtime_available();
         if (web_preview_ != nullptr)
@@ -4771,7 +4772,7 @@ namespace winrt::Glance::App::implementation
         current_text_has_more_ = false;
         text_chunk_loading_ = true;
         current_text_encoding_ = glance::app::TextEncoding::automatic;
-        markdown_preview_ = web_preview_available_;
+        markdown_preview_ = web_preview_available_ && (!markdown || text_preferences_.markdown_default_preview);
         EncodingSelector().Content(box_value(glance::app::localize(L"EncodingDetecting")));
         apply_text_preferences();
         text_editor_->clear();
@@ -4791,10 +4792,10 @@ namespace winrt::Glance::App::implementation
             current_text_json_ ? Visibility::Visible : Visibility::Collapsed);
         MarkdownPreviewButton().IsEnabled(web_preview_available_);
         MarkdownCodeButton().IsEnabled(true);
-        set_markdown_preview_mode(web_preview_available_);
+        set_markdown_preview_mode(markdown_preview_);
         if (current_text_json_)
         {
-            set_json_tree_mode(true);
+            set_json_tree_mode(text_preferences_.json_default_tree);
         }
         if (web_preview_available_)
         {
@@ -8025,13 +8026,16 @@ namespace winrt::Glance::App::implementation
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         const auto markdown = current_text_;
+        const auto preferences = text_preferences_;
+        const auto render_generation = ++markdown_render_generation_;
         const bool dark_theme = RootGrid().ActualTheme() == ElementTheme::Dark;
         const auto generation = content_generation_;
         co_await resume_background();
-        auto html = glance::app::render_markdown_html(markdown, dark_theme);
+        auto html = glance::app::render_markdown_html(markdown, dark_theme, preferences);
         static_cast<void>(dispatcher.TryEnqueue(
-            [lifetime, html = std::move(html), generation]() mutable {
+            [lifetime, html = std::move(html), generation, render_generation]() mutable {
                 if (generation == lifetime->content_generation_ &&
+                    render_generation == lifetime->markdown_render_generation_ &&
                     lifetime->web_view_ready_)
                 {
                     lifetime->render_markdown_async(std::move(html), generation);
@@ -8612,6 +8616,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::apply_text_preferences()
     {
+        const auto previous = text_preferences_;
         text_preferences_ = glance::app::load_text_preferences();
         line_numbers_visible_ = text_preferences_.line_numbers;
         syntax_highlighting_ = text_preferences_.syntax_highlighting;
@@ -8620,6 +8625,11 @@ namespace winrt::Glance::App::implementation
         WordWrapButton().IsChecked(word_wrap_);
         update_text_layout();
         update_line_number_visibility();
+        if (current_text_markdown_ && !current_text_has_more_ &&
+            (previous.markdown_font_family != text_preferences_.markdown_font_family ||
+             previous.markdown_font_size != text_preferences_.markdown_font_size ||
+             previous.markdown_style != text_preferences_.markdown_style))
+            render_markdown();
     }
 
     void MainWindow::apply_text_font_metrics()

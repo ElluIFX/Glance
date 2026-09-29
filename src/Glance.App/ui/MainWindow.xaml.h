@@ -756,6 +756,7 @@ namespace winrt::Glance::App::implementation
         bool updating_media_position_{};
         std::uint32_t media_controls_idle_ticks_{};
         bool markdown_preview_{};
+        std::uint64_t markdown_render_generation_{};
         bool current_text_json_{};
         bool current_text_json_lines_{};
         bool json_tree_mode_{};

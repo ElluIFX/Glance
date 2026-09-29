@@ -39,21 +39,60 @@ namespace
         static_cast<std::string*>(context)->append(text, size);
     }
 
-    std::string document_prefix(bool dark_theme)
+    std::string document_prefix(bool dark_theme, const glance::app::TextPreferences& preferences)
     {
+        if (preferences.markdown_style == 1 || preferences.markdown_style == 3) dark_theme = false;
+        if (preferences.markdown_style == 2 || preferences.markdown_style >= 4) dark_theme = true;
         const char* colors = dark_theme
             ? "color-scheme:dark;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--surface:#151b23;--accent:#4493f8;"
             : "color-scheme:light;--fg:#1f2328;--muted:#59636e;--border:#d1d9e0;--surface:#f6f8fa;--accent:#0969da;";
+        const char* background = dark_theme ? "#0d1117" : "#ffffff";
+        switch (preferences.markdown_style)
+        {
+        case 3:
+            colors = "color-scheme:light;--fg:#657b83;--muted:#839496;--border:#93a1a1;--surface:#eee8d5;--accent:#268bd2;";
+            background = "#fdf6e3";
+            break;
+        case 4:
+            colors = "color-scheme:dark;--fg:#839496;--muted:#657b83;--border:#586e75;--surface:#073642;--accent:#268bd2;";
+            background = "#002b36";
+            break;
+        case 5:
+            colors = "color-scheme:dark;--fg:#eceff4;--muted:#d8dee9;--border:#4c566a;--surface:#3b4252;--accent:#88c0d0;";
+            background = "#2e3440";
+            break;
+        case 6:
+            colors = "color-scheme:dark;--fg:#f8f8f2;--muted:#bd93f9;--border:#6272a4;--surface:#44475a;--accent:#8be9fd;";
+            background = "#282a36";
+            break;
+        }
         std::string result =
             "<!doctype html><html><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             "<base href=\"https://glance-markdown-assets.invalid/\">"
             "<style>:root{";
         result += colors;
+        result += "font-family:'";
+        for (const unsigned char character : to_utf8(preferences.markdown_font_family))
+        {
+            if (character == '\'' || character == '\\' || character == '<' || character == '>' || character < 32)
+            {
+                constexpr char digits[] = "0123456789abcdef";
+                result += '\\';
+                result += digits[character >> 4];
+                result += digits[character & 15];
+                result += ' ';
+            }
+            else result += static_cast<char>(character);
+        }
+        result += "','Segoe UI','Arial',sans-serif;font-size:";
+        result += std::to_string(static_cast<int>(std::clamp(preferences.markdown_font_size, 8.0, 48.0)));
+        result += "px;}html{background:";
+        result += preferences.markdown_style == 0 ? "transparent" : background;
+        result += ";}";
         result +=
-            "font-family:'Segoe UI','Arial',sans-serif;font-size:16px;}"
             "*{box-sizing:border-box;}"
-            "html{background:transparent;color:var(--fg);}"
+            "html{color:var(--fg);}"
             "body{margin:0 auto;padding:32px;max-width:1012px;line-height:1.5;overflow-wrap:break-word;}"
             "body>*:first-child{margin-top:0!important;}body>*:last-child{margin-bottom:0!important;}"
             "h1,h2,h3,h4,h5,h6{line-height:1.25;margin:24px 0 16px;font-weight:600;}"
@@ -84,10 +123,10 @@ namespace
 
 namespace glance::app
 {
-    std::wstring render_markdown_html(std::wstring_view markdown, bool dark_theme)
+    std::wstring render_markdown_html(std::wstring_view markdown, bool dark_theme, const TextPreferences& preferences)
     {
         const std::string input = to_utf8(markdown);
-        std::string html = document_prefix(dark_theme);
+        std::string html = document_prefix(dark_theme, preferences);
         const int result = md_html(
             input.data(),
             static_cast<MD_SIZE>(std::min<std::size_t>(input.size(), std::numeric_limits<MD_SIZE>::max())),

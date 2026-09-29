@@ -833,6 +833,59 @@
                         </StackPanel>
                         </Border>
                     </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="MarkdownPreviewSectionTitle" x:Uid="MarkdownPreviewSectionTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="Markdown preview" />
+                        <Border Style="{StaticResource SettingsGroupStyle}"><StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="MarkdownDefaultPreviewLabel" x:Uid="MarkdownDefaultPreviewLabel" Text="Show rendered preview by default" />
+                                    <TextBlock x:Name="MarkdownDefaultPreviewDescription" x:Uid="MarkdownDefaultPreviewEnabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Open Markdown files in rendered view" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="MarkdownDefaultPreviewToggle" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" OffContent="{x:Null}" OnContent="{x:Null}" Toggled="TextPreferenceToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="MarkdownFontLabel" x:Uid="MarkdownFontLabel" Text="Rendering font" />
+                                    <TextBlock x:Name="MarkdownFontDescription" x:Uid="MarkdownFontDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Font used for rendered Markdown text" />
+                                </StackPanel>
+                                <ComboBox x:Name="MarkdownFontComboBox" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" SelectionChanged="FontFamilyComboBox_SelectionChanged" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="MarkdownSizeLabel" x:Uid="MarkdownSizeLabel" Text="Rendering font size" />
+                                    <TextBlock x:Name="MarkdownSizeDescription" x:Uid="MarkdownSizeDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Base text size in pixels; headings scale proportionally" />
+                                </StackPanel>
+                                <NumberBox x:Name="MarkdownSizeNumberBox" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" Minimum="8" Maximum="48" SmallChange="1" SpinButtonPlacementMode="Inline" Loaded="NumberBox_Loaded" ValueChanged="MarkdownSizeNumberBox_ValueChanged" />
+                            </Grid>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="MarkdownStyleLabel" x:Uid="MarkdownStyleLabel" Text="Rendering style" />
+                                    <TextBlock x:Name="MarkdownStyleDescription" x:Uid="MarkdownStyleDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Color theme for rendered Markdown; Automatic follows the app theme" />
+                                </StackPanel>
+                                <ComboBox x:Name="MarkdownStyleComboBox" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" SelectionChanged="FontFamilyComboBox_SelectionChanged" />
+                            </Grid>
+                        </StackPanel></Border>
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="JsonPreviewSectionTitle" x:Uid="JsonPreviewSectionTitle" Style="{StaticResource SettingsGroupTitleStyle}" Text="JSON preview" />
+                        <Border Style="{StaticResource SettingsGroupStyle}"><StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock x:Name="JsonDefaultTreeLabel" x:Uid="JsonDefaultTreeLabel" Text="Show structured view by default" />
+                                    <TextBlock x:Name="JsonDefaultTreeDescription" x:Uid="JsonDefaultTreeEnabledDescription" Style="{StaticResource SettingsDescriptionStyle}" Text="Open JSON files in structured view" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="JsonDefaultTreeToggle" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" OffContent="{x:Null}" OnContent="{x:Null}" Toggled="TextPreferenceToggle_Toggled" />
+                            </Grid>
+                        </StackPanel></Border>
+                    </StackPanel>
                     <StackPanel x:Name="ComponentDocumentSettingsPanel" Spacing="24" />
                 </StackPanel>
             </ScrollViewer>

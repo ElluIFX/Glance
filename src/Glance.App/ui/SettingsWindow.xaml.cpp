@@ -736,6 +736,25 @@ namespace winrt::Glance::App::implementation
         set_text(TextPreviewPageTitle(), L"TextPreviewPageTitle.Text");
         set_text(TextPreviewPageDescription(), L"TextPreviewPageDescription.Text");
         set_text(PlainTextPreviewSectionTitle(), L"PlainTextPreviewSectionTitle.Text");
+        set_text(MarkdownPreviewSectionTitle(), L"MarkdownPreviewSectionTitle.Text");
+        set_text(MarkdownDefaultPreviewLabel(), L"MarkdownDefaultPreviewLabel.Text");
+        set_text(MarkdownFontLabel(), L"MarkdownFontLabel.Text");
+        set_text(MarkdownSizeLabel(), L"MarkdownSizeLabel.Text");
+        set_text(MarkdownStyleLabel(), L"MarkdownStyleLabel.Text");
+        set_text(MarkdownFontDescription(), L"MarkdownFontDescription.Text");
+        set_text(MarkdownSizeDescription(), L"MarkdownSizeDescription.Text");
+        set_text(MarkdownStyleDescription(), L"MarkdownStyleDescription.Text");
+        set_text(JsonPreviewSectionTitle(), L"JsonPreviewSectionTitle.Text");
+        set_text(JsonDefaultTreeLabel(), L"JsonDefaultTreeLabel.Text");
+        const bool initializing_markdown = initializing_;
+        initializing_ = true;
+        const int markdown_style = MarkdownStyleComboBox().SelectedIndex();
+        MarkdownStyleComboBox().Items().Clear();
+        for (const auto key : { L"MarkdownStyleAutomatic", L"MarkdownStyleGitHubLight", L"MarkdownStyleGitHubDark",
+            L"MarkdownStyleSolarizedLight", L"MarkdownStyleSolarizedDark", L"MarkdownStyleNord", L"MarkdownStyleDracula" })
+            MarkdownStyleComboBox().Items().Append(box_value(glance::app::localize(key)));
+        MarkdownStyleComboBox().SelectedIndex(markdown_style);
+        initializing_ = initializing_markdown;
         set_text(FontFamilyLabel(), L"FontFamilyLabel.Text");
         set_text(FontFamilyDescription(), L"FontFamilyDescription.Text");
         set_text(FontSizeLabel(), L"FontSizeLabel.Text");
@@ -1616,6 +1635,7 @@ namespace winrt::Glance::App::implementation
     {
         initializing_ = true;
         FontFamilyComboBox().Items().Clear();
+        MarkdownFontComboBox().Items().Clear();
         appearance_preferences_ = glance::app::load_appearance_preferences();
         LanguageComboBox().SelectedIndex(appearance_preferences_.language == L"zh-CN" ? 1 : 0);
         ThemeComboBox().SelectedIndex(static_cast<int>(appearance_preferences_.theme));
@@ -1688,6 +1708,23 @@ namespace winrt::Glance::App::implementation
             FontFamilyComboBox().Items().Append(box_value(text_preferences_.font_family));
         }
         FontFamilyComboBox().SelectedIndex(selected_font);
+        int markdown_font = -1;
+        for (std::size_t index = 0; index < font_families.size(); ++index)
+        {
+            MarkdownFontComboBox().Items().Append(box_value(font_families[index]));
+            if (_wcsicmp(font_families[index].c_str(), text_preferences_.markdown_font_family.c_str()) == 0)
+                markdown_font = static_cast<int>(index);
+        }
+        if (markdown_font < 0)
+        {
+            markdown_font = static_cast<int>(font_families.size());
+            MarkdownFontComboBox().Items().Append(box_value(text_preferences_.markdown_font_family));
+        }
+        MarkdownFontComboBox().SelectedIndex(markdown_font);
+        MarkdownSizeNumberBox().Value(text_preferences_.markdown_font_size);
+        MarkdownStyleComboBox().SelectedIndex(static_cast<int>(text_preferences_.markdown_style));
+        MarkdownDefaultPreviewToggle().IsOn(text_preferences_.markdown_default_preview);
+        JsonDefaultTreeToggle().IsOn(text_preferences_.json_default_tree);
         FontSizeNumberBox().Value(text_preferences_.font_size);
         SyntaxHighlightingToggle().IsOn(text_preferences_.syntax_highlighting);
         SyntaxThemeComboBox().SelectedIndex(static_cast<int>(text_preferences_.syntax_theme));
@@ -1944,6 +1981,8 @@ namespace winrt::Glance::App::implementation
             LineNumbersToggle(),
             L"LineNumbers");
         set_description(WordWrapDescription(), WordWrapToggle(), L"WordWrap");
+        set_description(MarkdownDefaultPreviewDescription(), MarkdownDefaultPreviewToggle(), L"MarkdownDefaultPreview");
+        set_description(JsonDefaultTreeDescription(), JsonDefaultTreeToggle(), L"JsonDefaultTree");
         set_description(
             AutoplayAudioDescription(),
             AutoplayAudioToggle(),
@@ -2688,11 +2727,33 @@ namespace winrt::Glance::App::implementation
         SyntaxThemeComboBox().IsEnabled(text_preferences_.syntax_highlighting);
         text_preferences_.line_numbers = LineNumbersToggle().IsOn();
         text_preferences_.word_wrap = WordWrapToggle().IsOn();
+        text_preferences_.markdown_default_preview = MarkdownDefaultPreviewToggle().IsOn();
+        text_preferences_.json_default_tree = JsonDefaultTreeToggle().IsOn();
+        if (MarkdownFontComboBox().SelectedItem())
+            text_preferences_.markdown_font_family = unbox_value<hstring>(MarkdownFontComboBox().SelectedItem());
+        if (std::isfinite(MarkdownSizeNumberBox().Value()))
+            text_preferences_.markdown_font_size = MarkdownSizeNumberBox().Value();
+        if (MarkdownStyleComboBox().SelectedIndex() >= 0)
+            text_preferences_.markdown_style = static_cast<std::uint32_t>(MarkdownStyleComboBox().SelectedIndex());
         glance::app::save_text_preferences(text_preferences_);
         if (text_preferences_changed_callback_)
         {
             text_preferences_changed_callback_();
         }
+    }
+
+    void SettingsWindow::MarkdownSizeNumberBox_ValueChanged(
+        IInspectable const&, Controls::NumberBoxValueChangedEventArgs const& args)
+    {
+        if (initializing_) return;
+        if (!std::isfinite(args.NewValue()))
+        {
+            initializing_ = true;
+            MarkdownSizeNumberBox().Value(text_preferences_.markdown_font_size);
+            initializing_ = false;
+            return;
+        }
+        save_text_preferences();
     }
 
     void SettingsWindow::FontFamilyComboBox_SelectionChanged(

@@ -17,6 +17,11 @@ namespace
         { L"TextPreview/WordWrap", L"boolean", L"1", 0, 1, L"", L"immediate" },
         { L"TextPreview/SyntaxHighlighting", L"boolean", L"1", 0, 1, L"", L"immediate" },
         { L"TextPreview/LineNumbers", L"boolean", L"1", 0, 1, L"", L"immediate" },
+        { L"TextPreview/MarkdownDefaultPreview", L"boolean", L"1", 0, 1, L"", L"next_preview" },
+        { L"TextPreview/MarkdownFontFamily", L"string", L"Segoe UI", 0, 31, L"", L"immediate" },
+        { L"TextPreview/MarkdownFontSize", L"integer", L"16", 8, 48, L"", L"immediate" },
+        { L"TextPreview/MarkdownStyle", L"integer", L"0", 0, 6, L"", L"immediate" },
+        { L"TextPreview/JsonDefaultTree", L"boolean", L"1", 0, 1, L"", L"next_preview" },
     };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\TextPreview";
 
@@ -115,6 +120,14 @@ namespace glance::app
         result.word_wrap = read_dword(L"WordWrap", 1) != 0;
         result.syntax_highlighting = read_dword(L"SyntaxHighlighting", 1) != 0;
         result.line_numbers = read_dword(L"LineNumbers", 1) != 0;
+        result.markdown_default_preview = read_dword(L"MarkdownDefaultPreview", 1) != 0;
+        result.json_default_tree = read_dword(L"JsonDefaultTree", 1) != 0;
+        result.markdown_font_size = std::clamp(static_cast<double>(read_dword(L"MarkdownFontSize", 16)), 8.0, 48.0);
+        result.markdown_style = std::min<DWORD>(read_dword(L"MarkdownStyle", 0), 6);
+        size = sizeof(font_family);
+        if (RegGetValueW(HKEY_CURRENT_USER, registry_path, L"MarkdownFontFamily", RRF_RT_REG_SZ,
+                nullptr, font_family, &size) == ERROR_SUCCESS && font_family[0])
+            result.markdown_font_family = font_family;
         return result;
     }
 
@@ -151,6 +164,16 @@ namespace glance::app
         RegSetValueExW(key, L"WordWrap", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&word_wrap), sizeof(word_wrap));
         RegSetValueExW(key, L"SyntaxHighlighting", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&syntax_highlighting), sizeof(syntax_highlighting));
         RegSetValueExW(key, L"LineNumbers", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&line_numbers), sizeof(line_numbers));
+        const auto write = [key](const wchar_t* name, DWORD value) {
+            RegSetValueExW(key, name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
+        };
+        write(L"MarkdownDefaultPreview", preferences.markdown_default_preview);
+        write(L"JsonDefaultTree", preferences.json_default_tree);
+        write(L"MarkdownFontSize", static_cast<DWORD>(std::clamp(preferences.markdown_font_size, 8.0, 48.0)));
+        write(L"MarkdownStyle", std::min<std::uint32_t>(preferences.markdown_style, 6));
+        RegSetValueExW(key, L"MarkdownFontFamily", 0, REG_SZ,
+            reinterpret_cast<const BYTE*>(preferences.markdown_font_family.c_str()),
+            static_cast<DWORD>((preferences.markdown_font_family.size() + 1) * sizeof(wchar_t)));
         RegCloseKey(key);
     }
 }

@@ -137,6 +137,7 @@ namespace winrt::Glance::App::implementation
         void ResetWindowPositionsButton_Click(
             IInspectable const&,
             Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void MarkdownSizeNumberBox_ValueChanged(IInspectable const&, Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
         void FontFamilyComboBox_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
