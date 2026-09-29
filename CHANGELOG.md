@@ -4,6 +4,17 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.09.29.2] - 2026-09-29
+
+### Added
+
+- Identify unknown file formats with the optional File Format Identification component, powered by bundled Siegfried data.
+- Show identified formats in generic preview details and open supported formats directly with the identified format.
+
+### Fixed
+
+- Display empty JSON files without a parse warning.
+
 ## [2026.09.29] - 2026-09-29
 
 ### Added
