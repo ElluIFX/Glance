@@ -81,7 +81,7 @@ namespace
             winrt::handle job(CreateJobObjectW(nullptr, nullptr));
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
             limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_PROCESS_MEMORY;
-            limits.ProcessMemoryLimit = 256ULL * 1024 * 1024;
+            limits.ProcessMemoryLimit = 512ULL * 1024 * 1024;
             if (!job || !SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &limits, sizeof(limits))) return PrepareStatus::failed;
             SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
             HANDLE read{}, write{};
@@ -120,13 +120,14 @@ namespace
             }
             if (ResumeThread(thread.get()) == DWORD(-1)) return PrepareStatus::failed;
             output.close();
-            const auto start = GetTickCount64();
+            auto start = GetTickCount64();
+            bool ready{};
             std::string text;
             bool finished{};
             for (;;)
             {
                 if (glance::components::preview_cancelled()) return PrepareStatus::cancelled;
-                if (GetTickCount64() - start >= 5000)
+                if (GetTickCount64() - start >= (ready ? 15000ULL : 30000ULL))
                 {
                     message(information, L"IdentificationLimited");
                     return PrepareStatus::success;
@@ -144,6 +145,12 @@ namespace
                     DWORD count{};
                     if (!ReadFile(input.get(), buffer, (std::min)(available, DWORD(sizeof(buffer))), &count, nullptr)) break;
                     text.append(buffer, count);
+                    if (!ready && text.starts_with("ready\n"))
+                    {
+                        text.erase(0, 6);
+                        ready = true;
+                        start = GetTickCount64();
+                    }
                     if (text.size() > 128 * 1024) return PrepareStatus::failed;
                     continue;
                 }

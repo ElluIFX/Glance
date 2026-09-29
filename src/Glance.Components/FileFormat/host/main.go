@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const readBudget = 64 << 20
+const readBudget = 256 << 20
 
 var errBudget = errors.New("read budget exceeded")
 
@@ -76,7 +76,7 @@ type response struct {
 	Candidates []candidate `json:"candidates"`
 }
 
-func identify(path, directory string) response {
+func identify(path, directory string, ready func() error) response {
 	result := response{Status: "failed"}
 	sf, err := siegfried.Load(filepath.Join(directory, "default.sig"))
 	if err != nil {
@@ -88,6 +88,9 @@ func identify(path, directory string) response {
 	}
 	extensions := make(map[string][]string)
 	if json.Unmarshal(data, &extensions) != nil {
+		return result
+	}
+	if ready() != nil {
 		return result
 	}
 	name, err := windows.UTF16PtrFromString(path)
@@ -158,7 +161,10 @@ func main() {
 	if err != nil {
 		os.Exit(2)
 	}
-	result := identify(os.Args[1], filepath.Dir(exe))
+	result := identify(os.Args[1], filepath.Dir(exe), func() error {
+		_, err := io.WriteString(os.Stdout, "ready\n")
+		return err
+	})
 	if json.NewEncoder(os.Stdout).Encode(result) != nil {
 		os.Exit(3)
 	}
