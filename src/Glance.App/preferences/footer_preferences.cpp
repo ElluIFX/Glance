@@ -7,8 +7,8 @@
 namespace
 {
     const glance::app::RegisterPublicSettings public_settings{
-        { L"Footer/EnabledFields", L"integer", L"19", 0, 255, L"", L"immediate" },
-        { L"Footer/FieldOrder", L"array", L"[0,1,5,2,3,4,6,7]", 0, 7, L"", L"immediate" },
+        { L"Footer/EnabledFields", L"integer", L"243", 0, 255, L"", L"immediate" },
+        { L"Footer/FieldOrder", L"array", L"[0,7,4,5,6,1,2,3]", 0, 7, L"", L"immediate" },
     };
     constexpr wchar_t registry_path[] = L"Software\\Glance\\Footer";
     constexpr std::size_t legacy_field_count = 4;
@@ -137,6 +137,8 @@ namespace glance::app
             if (valid)
             {
                 std::copy_n(order.begin(), 6, result.order.begin());
+                result.order[6] = FooterField::capture_parameters;
+                result.order[7] = FooterField::line_endings;
             }
         }
         else if (order_status == ERROR_SUCCESS &&
@@ -146,6 +148,8 @@ namespace glance::app
             std::copy_n(order.begin(), previous_order.size(), previous_order.begin());
             if (valid_previous_order(previous_order))
             {
+                result.order[6] = FooterField::capture_parameters;
+                result.order[7] = FooterField::line_endings;
                 std::size_t output_index{};
                 for (const auto field : previous_order)
                 {
@@ -174,6 +178,8 @@ namespace glance::app
                     }
                 }
                 result.order[output_index] = FooterField::media_info;
+                result.order[6] = FooterField::capture_parameters;
+                result.order[7] = FooterField::line_endings;
                 result.enabled_mask |= footer_field_bit(FooterField::media_info);
             }
         }

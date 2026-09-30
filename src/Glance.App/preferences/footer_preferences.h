@@ -24,18 +24,21 @@ namespace glance::app
     {
         std::array<FooterField, footer_field_count> order{
             FooterField::size,
-            FooterField::modified_time,
+            FooterField::line_endings,
+            FooterField::media_info,
             FooterField::taken_time,
+            FooterField::capture_parameters,
+            FooterField::modified_time,
             FooterField::creation_time,
             FooterField::permissions,
-            FooterField::media_info,
-            FooterField::capture_parameters,
-            FooterField::line_endings,
         };
         std::uint32_t enabled_mask{
             (1U << static_cast<std::uint32_t>(FooterField::size)) |
             (1U << static_cast<std::uint32_t>(FooterField::modified_time)) |
-            (1U << static_cast<std::uint32_t>(FooterField::media_info))
+            (1U << static_cast<std::uint32_t>(FooterField::media_info)) |
+            (1U << static_cast<std::uint32_t>(FooterField::line_endings)) |
+            (1U << static_cast<std::uint32_t>(FooterField::taken_time)) |
+            (1U << static_cast<std::uint32_t>(FooterField::capture_parameters))
         };
     };
 
