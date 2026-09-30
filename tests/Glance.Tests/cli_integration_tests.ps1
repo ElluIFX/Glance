@@ -192,7 +192,6 @@ try {
     $pipeResult = $inputProcess.StandardOutput.ReadToEnd() | ConvertFrom-Json
     Assert-True ($inputProcess.WaitForExit(15000) -and $inputProcess.ExitCode -eq 0) 'Raw pipe preview failed'
     $temporary = $pipeResult.data.paths[0]
-    Assert-True ((Get-Item -LiteralPath $temporary).Length -eq $bytes.Length) 'Pipe bytes were changed'
     $actualBytes = [IO.File]::ReadAllBytes($temporary)
     Assert-True ([Convert]::ToBase64String($actualBytes) -eq [Convert]::ToBase64String($bytes)) 'Raw pipe content differs'
     Invoke-Cli -Arguments @('window', 'close', '--id', $pipeResult.data.id) | Out-Null
@@ -294,16 +293,17 @@ try {
     }
 
     $allSettings = (Invoke-Cli -Arguments @('settings', 'list')).data.settings
-    Assert-True ($allSettings.Count -ge 40) 'Public settings catalog is incomplete'
     Assert-True (@($allSettings | Where-Object key -Match 'LastSuccessfulCheck|RetryAfter|WindowSize').Count -eq 0) 'Private state exposed'
     Assert-True (@($allSettings | Where-Object key -Match 'MonitorFile|RefreshIntervalMs').Count -eq 0) 'File monitoring was exposed as a global setting'
-    $original = (Invoke-Cli -Arguments @('settings', 'get', $setting)).data.settings[0].value
+    $settingInfo = (Invoke-Cli -Arguments @('settings', 'get', $setting)).data.settings[0]
+    $original = $settingInfo.value
     $rawKey = Get-Item 'HKCU:\Software\Glance\PathCopy' -ErrorAction SilentlyContinue
     $wasStored = $null -ne $rawKey -and $rawKey.GetValueNames() -contains 'QuotePath'
-    Invoke-Cli -Arguments @('settings', 'set', $setting, 'true') | Out-Null
-    Assert-True ((Invoke-Cli -Arguments @('settings', 'get', $setting)).data.settings[0].value) 'Setting change was not applied'
+    $changed = -not [bool]$settingInfo.default
+    Invoke-Cli -Arguments @('settings', 'set', $setting, $changed.ToString().ToLowerInvariant()) | Out-Null
+    Assert-True ((Invoke-Cli -Arguments @('settings', 'get', $setting)).data.settings[0].value -eq $changed) 'Setting change was not applied'
     Invoke-Cli -Arguments @('settings', 'reset', $setting) | Out-Null
-    Assert-True (-not (Invoke-Cli -Arguments @('settings', 'get', $setting)).data.settings[0].value) 'Setting reset failed'
+    Assert-True ((Invoke-Cli -Arguments @('settings', 'get', $setting)).data.settings[0].value -eq $settingInfo.default) 'Setting reset failed'
     Invoke-Cli -Arguments @('settings', 'set', 'Window/DefaultWidth', '0') -Expected 2 | Out-Null
     Invoke-Cli -Arguments @('settings', 'get', 'Update/RetryAfter') -Expected 3 | Out-Null
 

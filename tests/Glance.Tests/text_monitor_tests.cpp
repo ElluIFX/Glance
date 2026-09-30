@@ -357,7 +357,6 @@ int run_text_monitor_tests()
         const auto before_burst_characters = preview.text.size();
         write_file(path, burst, true);
         preview.poll();
-        require(preview.text.size() == before_burst_characters + burst.size(), "Multi-chunk burst has no duplicates or omissions");
         require(preview.text.substr(before_burst_characters) == std::wstring(burst.begin(), burst.end()),
             "Every burst line is in source order");
         require(preview.bytes - before_burst <= burst.size() + 8192, "Append reads only new data and bounded guards");
