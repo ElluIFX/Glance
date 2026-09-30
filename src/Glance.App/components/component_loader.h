@@ -11,6 +11,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <variant>
 
 namespace glance::app
 {
@@ -207,20 +208,26 @@ namespace glance::app
         std::wstring text;
     };
 
+    using ComponentSettingsEntry = std::variant<
+        glance::contracts::components::SettingsPageDescriptor,
+        glance::contracts::components::SettingsSectionDescriptor,
+        glance::contracts::components::ComponentSettingDescriptor,
+        glance::contracts::components::SettingsCustomItemDescriptor>;
+
+    struct ComponentSettingsRegistration
+    {
+        std::wstring component_id;
+        std::vector<ComponentSettingsEntry> entries;
+        std::shared_ptr<void> lease;
+    };
+
+    [[nodiscard]] std::vector<ComponentSettingsRegistration> component_settings_registrations();
+
     struct ComponentSetting
     {
         std::wstring component_id;
         std::wstring setting_id;
-        glance::contracts::components::ComponentSettingPage page{
-            glance::contracts::components::ComponentSettingPage::document_preview };
-        std::wstring group_id;
-        std::wstring group_title;
-        std::wstring row_id;
-        std::wstring row_title;
         std::wstring label;
-        std::wstring description;
-        std::wstring enabled_description;
-        std::wstring disabled_description;
         glance::contracts::components::ComponentSettingKind kind{
             glance::contracts::components::ComponentSettingKind::choice };
         std::int64_t default_value{};
@@ -228,8 +235,6 @@ namespace glance::app
         std::int64_t maximum_value{};
         std::int64_t small_change{ 1 };
         std::uint32_t decimal_places{};
-        std::uint32_t group_order{};
-        std::uint32_t setting_order{};
         std::vector<ComponentSettingOption> options;
     };
 

@@ -66,10 +66,8 @@
   <data name="CoreNotRunning" xml:space="preserve"><value>未运行</value></data>
   <data name="AdministratorAccessAvailable" xml:space="preserve"><value>已获取</value></data>
   <data name="AdministratorAccessUnavailable" xml:space="preserve"><value>未获取 · 管理员权限程序中的预览可能不可用</value></data>
-  <data name="SizesReset" xml:space="preserve"><value>已重置保存的窗口尺寸</value></data>
-  <data name="SizesResetFailed" xml:space="preserve"><value>无法重置保存的窗口尺寸</value></data>
-  <data name="PositionsReset" xml:space="preserve"><value>已重置保存的窗口位置</value></data>
-  <data name="PositionsResetFailed" xml:space="preserve"><value>无法重置保存的窗口位置</value></data>
+  <data name="WindowResetCompleted" xml:space="preserve"><value>已重置</value></data>
+  <data name="WindowResetFailed" xml:space="preserve"><value>重置失败</value></data>
 
   <data name="TopmostButton.ToolTipService.ToolTip" xml:space="preserve"><value>始终显示</value></data>
   <data name="PinButton.ToolTipService.ToolTip" xml:space="preserve"><value>钉住文件</value></data>

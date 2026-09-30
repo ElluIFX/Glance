@@ -180,28 +180,20 @@ namespace
 
     const HostRendererApi native_media_api{ .query_host = query_host };
 
-    BOOL WINAPI enumerate_settings(
-        ComponentSettingDescriptor* descriptors,
-        std::uint32_t capacity,
-        std::uint32_t* count) noexcept
+    BOOL WINAPI register_settings(const SettingsRegistrar* registrar) noexcept
     {
-        if (count == nullptr)
-        {
-            return FALSE;
-        }
-        *count = static_cast<std::uint32_t>(panorama_settings.size());
-        if (descriptors == nullptr ||
-            capacity < static_cast<std::uint32_t>(panorama_settings.size()))
-        {
-            return descriptors == nullptr && capacity == 0;
-        }
+        if (registrar == nullptr || registrar->register_section == nullptr || registrar->register_item == nullptr) return FALSE;
+        SettingsSectionDescriptor section;
+        wcscpy_s(section.id, L"panorama-preview");
+        wcscpy_s(section.page, L"media");
+        if (!glance::components::copy_resource_key(settings_group_key, section.name_key) ||
+            !registrar->register_section(registrar->context, &section)) return FALSE;
         for (std::size_t index = 0; index < panorama_settings.size(); ++index)
         {
             const auto& definition = panorama_settings[index];
             ComponentSettingDescriptor setting;
             wcscpy_s(setting.setting_id, definition.id);
-            setting.page = ComponentSettingPage::media_preview;
-            wcscpy_s(setting.group_id, L"panorama-preview");
+            wcscpy_s(setting.parent, L"panorama-preview");
             wcscpy_s(setting.row_id, definition.row_id);
             setting.kind = ComponentSettingKind::number;
             setting.default_value = definition.default_value;
@@ -209,12 +201,7 @@ namespace
             setting.maximum_value = definition.maximum_value;
             setting.small_change = 1;
             setting.decimal_places = 1;
-            setting.group_order = 1000;
-            setting.setting_order = static_cast<std::uint32_t>(index);
             if (!glance::components::copy_resource_key(
-                    settings_group_key,
-                    setting.group_title_key) ||
-                !glance::components::copy_resource_key(
                     definition.row_title_key,
                     setting.row_title_key) ||
                 !glance::components::copy_resource_key(
@@ -223,13 +210,13 @@ namespace
             {
                 return FALSE;
             }
-            descriptors[index] = setting;
+            if (!registrar->register_item(registrar->context, &setting)) return FALSE;
         }
         return TRUE;
     }
 
     const SettingsContributionApi settings_api{
-        .enumerate_settings = enumerate_settings };
+        .register_settings = register_settings };
 
     BOOL WINAPI enumerate_shortcuts(
         StatusBarShortcutDescriptor* descriptors,

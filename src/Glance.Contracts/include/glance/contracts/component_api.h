@@ -23,7 +23,7 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t component_view_api_version = 2;
     inline constexpr GUID component_view_api_id{
         0xdd72b6a1, 0xf3a9, 0x42f2, {0xa6, 0x35, 0x73, 0x60, 0x36, 0xab, 0x90, 0x51}};
-    inline constexpr std::uint32_t settings_contribution_api_version = 3;
+    inline constexpr std::uint32_t settings_contribution_api_version = 4;
     inline constexpr std::uint32_t file_directory_preview_api_version = 2;
     inline constexpr std::uint32_t image_metadata_api_version = 1;
     inline constexpr std::uint32_t information_provider_api_version = 4;
@@ -163,12 +163,6 @@ namespace glance::contracts::components
     {
         deny_cors = 0,
         allow = 1,
-    };
-
-    enum class ComponentSettingPage : std::uint32_t
-    {
-        document_preview = 1,
-        media_preview = 2,
     };
 
     enum class ComponentSettingKind : std::uint32_t
@@ -357,21 +351,28 @@ namespace glance::contracts::components
         wchar_t text_key[setting_option_text_capacity]{};
     };
 
+    struct SettingsItemState
+    {
+        std::uint32_t size{ sizeof(SettingsItemState) };
+        BOOL visible{ TRUE };
+        BOOL enabled{ TRUE };
+        BOOL busy{};
+        wchar_t description_key[setting_text_capacity]{};
+        std::uint32_t argument_count{};
+        wchar_t arguments[4][setting_text_capacity]{};
+    };
+
     struct ComponentSettingDescriptor
     {
         std::uint32_t size{ sizeof(ComponentSettingDescriptor) };
         wchar_t setting_id[setting_id_capacity]{};
-        ComponentSettingPage page{ ComponentSettingPage::document_preview };
-        wchar_t group_id[setting_group_id_capacity]{};
-        wchar_t group_title_key[setting_text_capacity]{};
+        wchar_t parent[setting_id_capacity]{};
         wchar_t label_key[setting_text_capacity]{};
         wchar_t description_key[setting_text_capacity]{};
         wchar_t enabled_description_key[setting_text_capacity]{};
         wchar_t disabled_description_key[setting_text_capacity]{};
         ComponentSettingKind kind{ ComponentSettingKind::choice };
         std::int64_t default_value{};
-        std::uint32_t group_order{};
-        std::uint32_t setting_order{};
         std::uint32_t option_count{};
         ComponentSettingOption options[maximum_setting_options]{};
         wchar_t row_id[setting_group_id_capacity]{};
@@ -380,6 +381,8 @@ namespace glance::contracts::components
         std::int64_t maximum_value{};
         std::int64_t small_change{ 1 };
         std::uint32_t decimal_places{};
+        wchar_t icon[8]{};
+        BOOL (WINAPI* query_state)(const wchar_t* setting_id, SettingsItemState* state) noexcept{};
     };
 
     struct FileDirectoryValue
@@ -565,10 +568,6 @@ namespace glance::contracts::components
     using QueryRendererHostFunction = BOOL(WINAPI*)(
         PreviewHostProtocol protocol,
         RendererHostDescriptor* descriptor) noexcept;
-    using EnumerateComponentSettingsFunction = BOOL(WINAPI*)(
-        ComponentSettingDescriptor* descriptors,
-        std::uint32_t capacity,
-        std::uint32_t* count) noexcept;
     using OpenFileDirectoryFunction = FileDirectoryOpenStatus(WINAPI*)(
         std::uint64_t lease_token,
         const wchar_t* password,
@@ -676,7 +675,56 @@ namespace glance::contracts::components
     {
         std::uint32_t size{ sizeof(SettingsContributionApi) };
         std::uint32_t version{ settings_contribution_api_version };
-        EnumerateComponentSettingsFunction enumerate_settings{};
+        BOOL (WINAPI* register_settings)(const struct SettingsRegistrar* registrar) noexcept{};
+    };
+
+    struct SettingsPageDescriptor
+    {
+        std::uint32_t size{ sizeof(SettingsPageDescriptor) };
+        wchar_t id[setting_id_capacity]{};
+        wchar_t name_key[setting_text_capacity]{};
+        wchar_t description_key[setting_text_capacity]{};
+        wchar_t icon[8]{};
+        BOOL bottom{};
+    };
+
+    struct SettingsSectionDescriptor
+    {
+        std::uint32_t size{ sizeof(SettingsSectionDescriptor) };
+        wchar_t id[setting_id_capacity]{};
+        wchar_t page[setting_id_capacity]{};
+        wchar_t name_key[setting_text_capacity]{};
+        wchar_t description_key[setting_text_capacity]{};
+    };
+
+    struct SettingsViewHost
+    {
+        std::uint32_t size{ sizeof(SettingsViewHost) };
+        void* context{};
+        std::int64_t (WINAPI* read_value)(void*, const wchar_t* id, std::int64_t fallback) noexcept{};
+        BOOL (WINAPI* write_value)(void*, const wchar_t* id, std::int64_t value) noexcept{};
+        void (WINAPI* refresh)(void*) noexcept{};
+    };
+
+    struct SettingsCustomItemDescriptor
+    {
+        std::uint32_t size{ sizeof(SettingsCustomItemDescriptor) };
+        wchar_t id[setting_id_capacity]{};
+        wchar_t parent[setting_id_capacity]{};
+        HRESULT (WINAPI* create)(const wchar_t* language, const SettingsViewHost* host,
+            IUnknown** element, std::uint64_t* session) noexcept{};
+        void (WINAPI* refresh)(std::uint64_t session, const wchar_t* language) noexcept{};
+        void (WINAPI* close)(std::uint64_t session) noexcept{};
+    };
+
+    struct SettingsRegistrar
+    {
+        std::uint32_t size{ sizeof(SettingsRegistrar) };
+        void* context{};
+        BOOL (WINAPI* register_page)(void*, const SettingsPageDescriptor*) noexcept{};
+        BOOL (WINAPI* register_section)(void*, const SettingsSectionDescriptor*) noexcept{};
+        BOOL (WINAPI* register_item)(void*, const ComponentSettingDescriptor*) noexcept{};
+        BOOL (WINAPI* register_custom_item)(void*, const SettingsCustomItemDescriptor*) noexcept{};
     };
 
     struct FileDirectoryPreviewApi

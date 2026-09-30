@@ -2020,20 +2020,32 @@ int wmain(int argument_count, wchar_t* arguments[])
                     {
                         const auto settings =
                             static_cast<const SettingsContributionApi*>(interface_pointer);
-                        std::uint32_t setting_count{};
+                        struct Contributions
+                        {
+                            SettingsSectionDescriptor section;
+                            ComponentSettingDescriptor setting;
+                            std::uint32_t count{};
+                        } contributions;
+                        SettingsRegistrar settings_registrar;
+                        settings_registrar.context = &contributions;
+                        settings_registrar.register_section = [](void* context, const SettingsSectionDescriptor* section) noexcept -> BOOL {
+                            static_cast<Contributions*>(context)->section = *section;
+                            return TRUE;
+                        };
+                        settings_registrar.register_item = [](void* context, const ComponentSettingDescriptor* setting) noexcept -> BOOL {
+                            auto& result = *static_cast<Contributions*>(context);
+                            result.setting = *setting;
+                            ++result.count;
+                            return TRUE;
+                        };
+                        expect(settings->register_settings(&settings_registrar) != FALSE && contributions.count == 1,
+                            "PDF component registers one setting");
+                        const auto& setting = contributions.setting;
                         expect(
-                            settings->enumerate_settings(
-                                nullptr, 0, &setting_count) != FALSE &&
-                                setting_count == 1,
-                            "PDF component setting count");
-                        ComponentSettingDescriptor setting;
-                        expect(
-                            settings->enumerate_settings(
-                                &setting, 1, &setting_count) != FALSE &&
-                                std::wstring_view(setting.setting_id) ==
+                            std::wstring_view(setting.setting_id) ==
                                     L"render-dimension" &&
-                                std::wstring_view(setting.group_id) == L"pdf-preview" &&
-                                std::wstring_view(setting.group_title_key) ==
+                                std::wstring_view(setting.parent) == L"pdf-preview" &&
+                                std::wstring_view(contributions.section.name_key) ==
                                     L"Settings.GroupTitle" &&
                                 std::wstring_view(setting.label_key) ==
                                     L"Settings.RenderResolution.Label" &&

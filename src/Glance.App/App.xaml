@@ -43,6 +43,53 @@
                 <Setter Property="HorizontalContentAlignment" Value="Center" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
             </Style>
+            <Style x:Key="SettingsGroupStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+            </Style>
+            <Style x:Key="SettingsDividerStyle" TargetType="Rectangle">
+                <Setter Property="Height" Value="1" />
+                <Setter Property="Fill" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+            </Style>
+            <Style x:Key="SettingsFieldCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+            </Style>
+            <Style x:Key="SettingsDisabledFieldCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource ControlAltFillColorTertiaryBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+            </Style>
+            <Style x:Key="SettingsRowStyle" TargetType="Grid">
+                <Setter Property="MinHeight" Value="56" />
+                <Setter Property="Padding" Value="16,10" />
+            </Style>
+            <Style x:Key="SettingsListRowStyle" TargetType="Grid" BasedOn="{StaticResource SettingsRowStyle}">
+                <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+            </Style>
+            <Style x:Key="SettingsDescriptionStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style x:Key="SettingsToggleStyle" TargetType="ToggleSwitch">
+                <Setter Property="Width" Value="52" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="HorizontalAlignment" Value="Right" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="OffContent" Value="{x:Null}" />
+                <Setter Property="OnContent" Value="{x:Null}" />
+            </Style>
+            <Style x:Key="SettingsPageTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="24" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+            <Style x:Key="SettingsGroupTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>

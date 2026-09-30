@@ -9,6 +9,9 @@
 
 
 #include <algorithm>
+#include <set>
+#include <map>
+#include <stdexcept>
 #include <cwctype>
 #include <filesystem>
 #include <fstream>
@@ -605,7 +608,7 @@ namespace
             if (interface_api->size >= sizeof(SettingsContributionApi) &&
                 interface_api->version ==
                     glance::contracts::components::settings_contribution_api_version &&
-                interface_api->enumerate_settings != nullptr)
+                interface_api->register_settings != nullptr)
             {
                 component->settings_contribution = *interface_api;
             }
@@ -2474,189 +2477,143 @@ namespace glance::app
         return std::nullopt;
     }
 
-    std::vector<ComponentSetting> component_settings(
-        std::wstring_view language_tag) noexcept
+    std::vector<ComponentSettingsRegistration> component_settings_registrations()
     {
+        using namespace glance::contracts::components;
         std::vector<std::shared_ptr<LoadedComponent>> components;
         {
             initialize_components();
             std::scoped_lock lock(registry_mutex);
             components = registered_components;
         }
-
-        std::vector<ComponentSetting> settings;
-        static_cast<void>(language_tag);
+        std::vector<ComponentSettingsRegistration> result;
         for (const auto& component : components)
         {
-            if (!component->active || !component->settings_contribution.has_value())
+            if (!component->active || !component->settings_contribution) continue;
+            struct Transaction
             {
-                continue;
-            }
-            try
-            {
-                std::uint32_t count{};
-                if (!component->settings_contribution->enumerate_settings(
-                        nullptr, 0, &count) ||
-                    count == 0 || count > 64)
+                ComponentSettingsRegistration result;
+                std::map<std::wstring, bool> parents{
+                    {L"general", true}, {L"window", true}, {L"footer", true},
+                    {L"text", true}, {L"media", true}, {L"components", true}, {L"maintenance", true}};
+                std::set<std::wstring> ids;
+                bool failed{};
+            } transaction;
+            transaction.result.component_id = component->id;
+            transaction.result.lease = component;
+            const auto append = []<typename T>(void* context, const T* value) noexcept -> BOOL {
+                auto& transaction = *static_cast<Transaction*>(context);
+                try
                 {
-                    continue;
-                }
-                std::vector<glance::contracts::components::ComponentSettingDescriptor>
-                    descriptors(count);
-                std::uint32_t written = count;
-                if (!component->settings_contribution->enumerate_settings(
-                        descriptors.data(), count, &written) ||
-                    written != count)
-                {
-                    continue;
-                }
-                for (const auto& descriptor : descriptors)
-                {
-                    const auto setting_id = bounded_string(descriptor.setting_id);
-                    const auto group_id = bounded_string(descriptor.group_id);
-                    const auto group_title_key =
-                        bounded_string(descriptor.group_title_key);
-                    const auto row_id = bounded_string(descriptor.row_id);
-                    const auto row_title_key =
-                        bounded_string(descriptor.row_title_key);
-                    const auto label_key = bounded_string(descriptor.label_key);
-                    const auto description_key =
-                        bounded_string(descriptor.description_key);
-                    const auto enabled_description_key =
-                        bounded_string(descriptor.enabled_description_key);
-                    const auto disabled_description_key =
-                        bounded_string(descriptor.disabled_description_key);
-                    if (descriptor.size < sizeof(descriptor) ||
-                        !setting_id.has_value() || !valid_setting_id(*setting_id) ||
-                        !group_id.has_value() || !valid_setting_id(*group_id) ||
-                        !group_title_key.has_value() ||
-                        !valid_resource_key(*group_title_key) ||
-                        !row_id.has_value() ||
-                        !row_title_key.has_value() ||
-                        !label_key.has_value() ||
-                        !valid_resource_key(*label_key) ||
-                        !description_key.has_value() ||
-                        !enabled_description_key.has_value() ||
-                        !disabled_description_key.has_value() ||
-                        (descriptor.kind !=
-                             glance::contracts::components::ComponentSettingKind::toggle &&
-                         descriptor.kind !=
-                             glance::contracts::components::ComponentSettingKind::choice &&
-                         descriptor.kind !=
-                             glance::contracts::components::ComponentSettingKind::number) ||
-                        (descriptor.page != glance::contracts::components::
-                                ComponentSettingPage::document_preview &&
-                         descriptor.page != glance::contracts::components::
-                                ComponentSettingPage::media_preview) ||
-                        descriptor.option_count >
-                            glance::contracts::components::maximum_setting_options ||
-                        (descriptor.kind ==
-                             glance::contracts::components::ComponentSettingKind::choice &&
-                         (descriptor.option_count == 0 ||
-                          !valid_resource_key(*description_key))) ||
-                        (descriptor.kind ==
-                             glance::contracts::components::ComponentSettingKind::toggle &&
-                         (!valid_resource_key(*enabled_description_key) ||
-                          !valid_resource_key(*disabled_description_key))) ||
-                        (descriptor.kind ==
-                             glance::contracts::components::ComponentSettingKind::number &&
-                         (row_id->empty() || !valid_setting_id(*row_id) ||
-                          row_title_key->empty() ||
-                          !valid_resource_key(*row_title_key) ||
-                          descriptor.minimum_value > descriptor.default_value ||
-                          descriptor.default_value > descriptor.maximum_value ||
-                          descriptor.small_change <= 0 ||
-                          descriptor.decimal_places > 3)))
+                    if (value == nullptr || value->size < sizeof(T) || transaction.result.entries.size() >= 256)
+                        throw std::invalid_argument("Invalid component settings descriptor");
+                    const auto id = [&] {
+                        if constexpr (std::is_same_v<T, ComponentSettingDescriptor>) return bounded_string(value->setting_id);
+                        else return bounded_string(value->id);
+                    }();
+                    if (!id || !valid_setting_id(*id) || transaction.parents.contains(*id) || !transaction.ids.insert(*id).second)
+                        throw std::invalid_argument("Duplicate component settings ID");
+                    if constexpr (std::is_same_v<T, SettingsPageDescriptor>)
                     {
-                        continue;
+                        if (!bounded_string(value->icon) || !bounded_string(value->description_key) ||
+                            !bounded_string(value->name_key) || !valid_resource_key(value->name_key))
+                            throw std::invalid_argument("Invalid component settings page");
+                        transaction.parents.emplace(*id, true);
                     }
-                    ComponentSetting setting{
-                        .component_id = component->id,
-                        .setting_id = std::move(*setting_id),
-                        .page = descriptor.page,
-                        .group_id = std::move(*group_id),
-                        .group_title = localize_component_key(
-                            *component,
-                            *group_title_key),
-                        .row_id = std::move(*row_id),
-                        .row_title = descriptor.kind ==
-                                glance::contracts::components::ComponentSettingKind::number
-                            ? localize_component_key(*component, *row_title_key)
-                            : L"",
-                        .label = localize_component_key(*component, *label_key),
-                        .description = descriptor.kind ==
-                                glance::contracts::components::ComponentSettingKind::choice
-                            ? localize_component_key(*component, *description_key)
-                            : L"",
-                        .enabled_description = descriptor.kind ==
-                                glance::contracts::components::ComponentSettingKind::toggle
-                            ? localize_component_key(
-                                *component,
-                                *enabled_description_key)
-                            : L"",
-                        .disabled_description = descriptor.kind ==
-                                glance::contracts::components::ComponentSettingKind::toggle
-                            ? localize_component_key(
-                                *component,
-                                *disabled_description_key)
-                            : L"",
-                        .kind = descriptor.kind,
-                        .default_value = descriptor.default_value,
-                        .minimum_value = descriptor.minimum_value,
-                        .maximum_value = descriptor.maximum_value,
-                        .small_change = descriptor.small_change,
-                        .decimal_places = descriptor.decimal_places,
-                        .group_order = descriptor.group_order,
-                        .setting_order = descriptor.setting_order };
-                    for (std::uint32_t index = 0;
-                         index < descriptor.option_count;
-                         ++index)
+                    else
                     {
-                        const auto text_key =
-                            bounded_string(descriptor.options[index].text_key);
-                        if (!text_key.has_value() ||
-                            !valid_resource_key(*text_key))
+                        const auto parent = [&] {
+                            if constexpr (std::is_same_v<T, SettingsSectionDescriptor>) return bounded_string(value->page);
+                            else return bounded_string(value->parent);
+                        }();
+                        if (!parent || !transaction.parents.contains(*parent))
+                            throw std::invalid_argument("Unknown component settings parent");
+                        if constexpr (std::is_same_v<T, SettingsSectionDescriptor>)
                         {
-                            setting.options.clear();
-                            break;
+                            if (!transaction.parents.at(*parent) || !bounded_string(value->name_key) ||
+                                !valid_resource_key(value->name_key) || !bounded_string(value->description_key))
+                                throw std::invalid_argument("Invalid component settings section");
+                            transaction.parents.emplace(*id, false);
                         }
-                        setting.options.push_back(ComponentSettingOption{
-                            .value = descriptor.options[index].value,
-                            .text = localize_component_key(
-                                *component,
-                                *text_key) });
+                        else if constexpr (std::is_same_v<T, SettingsCustomItemDescriptor>)
+                        {
+                            if (!value->create || !value->refresh || !value->close)
+                                throw std::invalid_argument("Incomplete component settings view");
+                        }
+                        else
+                        {
+                            if (!bounded_string(value->icon) || !bounded_string(value->label_key) || !valid_resource_key(value->label_key) ||
+                                !bounded_string(value->description_key) || !bounded_string(value->enabled_description_key) ||
+                                !bounded_string(value->disabled_description_key) || !bounded_string(value->row_id) ||
+                                !bounded_string(value->row_title_key) || value->option_count > maximum_setting_options ||
+                                (value->kind != ComponentSettingKind::toggle && value->kind != ComponentSettingKind::choice &&
+                                 value->kind != ComponentSettingKind::number))
+                                throw std::invalid_argument("Invalid component setting");
+                            if (value->kind == ComponentSettingKind::number &&
+                                (value->minimum_value > value->default_value || value->default_value > value->maximum_value ||
+                                 value->small_change <= 0 || value->decimal_places > 3))
+                                throw std::invalid_argument("Invalid component number range");
+                            if (value->kind == ComponentSettingKind::choice && value->option_count == 0)
+                                throw std::invalid_argument("Empty component choices");
+                            for (std::uint32_t index = 0; index < value->option_count; ++index)
+                                if (!bounded_string(value->options[index].text_key) || !valid_resource_key(value->options[index].text_key))
+                                    throw std::invalid_argument("Invalid component choice label");
+                        }
                     }
-                    if (descriptor.kind ==
-                            glance::contracts::components::ComponentSettingKind::toggle ||
-                        descriptor.kind ==
-                            glance::contracts::components::ComponentSettingKind::number ||
-                        !setting.options.empty())
-                    {
-                        settings.push_back(std::move(setting));
-                    }
+                    transaction.result.entries.emplace_back(*value);
+                    return TRUE;
                 }
-            }
-            catch (...)
+                catch (...)
+                {
+                    transaction.failed = true;
+                    return FALSE;
+                }
+            };
+            const SettingsRegistrar registrar{
+                .context = &transaction,
+                .register_page = static_cast<BOOL(WINAPI*)(void*, const SettingsPageDescriptor*) noexcept>(append),
+                .register_section = static_cast<BOOL(WINAPI*)(void*, const SettingsSectionDescriptor*) noexcept>(append),
+                .register_item = static_cast<BOOL(WINAPI*)(void*, const ComponentSettingDescriptor*) noexcept>(append),
+                .register_custom_item = static_cast<BOOL(WINAPI*)(void*, const SettingsCustomItemDescriptor*) noexcept>(append) };
+            if (component->settings_contribution->register_settings(&registrar) && !transaction.failed)
+                result.push_back(std::move(transaction.result));
+            else contracts::log_event(L"Component settings registration failed: " + component->id);
+        }
+        return result;
+    }
+
+    std::vector<ComponentSetting> component_settings(std::wstring_view language_tag) noexcept
+    {
+        using namespace glance::contracts::components;
+        static_cast<void>(language_tag);
+        std::vector<ComponentSetting> result;
+        try
+        {
+            for (const auto& registration : component_settings_registrations())
             {
+                for (const auto& entry : registration.entries)
+                {
+                    const auto* descriptor = std::get_if<ComponentSettingDescriptor>(&entry);
+                    if (!descriptor) continue;
+                    ComponentSetting setting;
+                    setting.component_id = registration.component_id;
+                    setting.setting_id = descriptor->setting_id;
+                    setting.label = localize_component(registration.component_id, descriptor->label_key);
+                    setting.kind = descriptor->kind;
+                    setting.default_value = descriptor->default_value;
+                    setting.minimum_value = descriptor->minimum_value;
+                    setting.maximum_value = descriptor->maximum_value;
+                    setting.small_change = descriptor->small_change;
+                    setting.decimal_places = descriptor->decimal_places;
+                    for (std::uint32_t index = 0; index < descriptor->option_count; ++index)
+                        setting.options.push_back({descriptor->options[index].value,
+                            localize_component(registration.component_id, descriptor->options[index].text_key)});
+                    result.push_back(std::move(setting));
+                }
             }
         }
-        std::ranges::sort(settings, [](const auto& left, const auto& right) {
-            return std::tie(
-                       left.page,
-                       left.group_order,
-                       left.component_id,
-                       left.group_id,
-                       left.setting_order,
-                       left.setting_id) <
-                std::tie(
-                       right.page,
-                       right.group_order,
-                       right.component_id,
-                       right.group_id,
-                       right.setting_order,
-                       right.setting_id);
-        });
-        return settings;
+        catch (...) { contracts::log_event(L"Component settings query failed"); }
+        return result;
     }
 
     std::int64_t component_setting_value(

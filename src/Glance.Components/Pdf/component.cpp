@@ -194,34 +194,21 @@ namespace
         return TRUE;
     }
 
-    BOOL WINAPI enumerate_settings(
-        ComponentSettingDescriptor* descriptors,
-        std::uint32_t capacity,
-        std::uint32_t* count) noexcept
+    BOOL WINAPI register_settings(const SettingsRegistrar* registrar) noexcept
     {
-        if (count == nullptr)
-        {
-            return FALSE;
-        }
-        *count = 1;
-        if (descriptors == nullptr || capacity < 1)
-        {
-            return descriptors == nullptr && capacity == 0;
-        }
-
+        if (registrar == nullptr || registrar->register_section == nullptr || registrar->register_item == nullptr) return FALSE;
+        SettingsSectionDescriptor section;
+        wcscpy_s(section.id, L"pdf-preview");
+        wcscpy_s(section.page, L"text");
+        if (!glance::components::copy_resource_key(settings_group_key, section.name_key) ||
+            !registrar->register_section(registrar->context, &section)) return FALSE;
         ComponentSettingDescriptor setting;
         wcscpy_s(setting.setting_id, L"render-dimension");
-        setting.page = ComponentSettingPage::document_preview;
-        wcscpy_s(setting.group_id, L"pdf-preview");
+        wcscpy_s(setting.parent, L"pdf-preview");
         setting.kind = ComponentSettingKind::choice;
         setting.default_value = 4096;
-        setting.group_order = 1000;
-        setting.setting_order = 0;
         setting.option_count = static_cast<std::uint32_t>(setting_option_values.size());
         if (!glance::components::copy_resource_key(
-                settings_group_key,
-                setting.group_title_key) ||
-            !glance::components::copy_resource_key(
                 settings_label_key,
                 setting.label_key) ||
             !glance::components::copy_resource_key(
@@ -240,14 +227,14 @@ namespace
                 return FALSE;
             }
         }
-        descriptors[0] = setting;
+        if (!registrar->register_item(registrar->context, &setting)) return FALSE;
         return TRUE;
     }
 
     const HostRendererApi paged_document_api{
         .query_host = query_host };
     const SettingsContributionApi settings_api{
-        .enumerate_settings = enumerate_settings };
+        .register_settings = register_settings };
 
     BOOL WINAPI query_interface(
         const GUID* interface_id,
