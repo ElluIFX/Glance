@@ -1325,12 +1325,17 @@ int wmain(int argument_count, wchar_t* arguments[])
         "gallery media preference defaults");
     const glance::app::FooterPreferences default_footer_preferences;
     expect(
-        default_footer_preferences.order[2] == glance::app::FooterField::taken_time &&
-            default_footer_preferences.order[5] == glance::app::FooterField::media_info &&
-            !glance::app::footer_field_enabled(
-                default_footer_preferences,
-                glance::app::FooterField::taken_time),
-        "capture time footer preference defaults");
+        default_footer_preferences.order == std::array{
+            glance::app::FooterField::size,
+            glance::app::FooterField::line_endings,
+            glance::app::FooterField::media_info,
+            glance::app::FooterField::taken_time,
+            glance::app::FooterField::capture_parameters,
+            glance::app::FooterField::modified_time,
+            glance::app::FooterField::creation_time,
+            glance::app::FooterField::permissions} &&
+            default_footer_preferences.enabled_mask == 243U,
+        "footer field preference defaults");
 
     std::wstring executable_path(32768, L'\0');
     const DWORD executable_length = GetModuleFileNameW(
