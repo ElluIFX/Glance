@@ -4,6 +4,18 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.10.08] - 2026-10-08
+
+### Added
+
+- Install an optional administrator access service, selected by default when administrator authorization is available.
+
+### Improved
+
+- Keep the installed application and Core at ordinary permissions while supporting previews from elevated applications without repeated startup or update authorization prompts.
+- Preserve the access service during upgrades and clean up matching legacy Core scheduled tasks through the installer.
+- Improve portable authorization cancellation, process recovery and elevated 32-bit file dialog previews.
+
 ## [2026.09.30] - 2026-09-30
 
 ### Added
