@@ -74,12 +74,30 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.FontComponent", "src
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.FontHost", "src\Glance.Components\Font\host\Glance.FontHost.vcxproj", "{4A5E65AF-A6D3-479A-B8AB-06A142F17DBC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.Input", "src\Glance.Input\Glance.Input.vcxproj", "{D671CC82-6975-4479-AC02-9C218A1E2041}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.AccessService", "src\Glance.AccessService\Glance.AccessService.vcxproj", "{D671CC82-6975-4479-AC02-9C218A1E2042}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glance.AccessHost", "src\Glance.AccessHost\Glance.AccessHost.vcxproj", "{D671CC82-6975-4479-AC02-9C218A1E2043}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D671CC82-6975-4479-AC02-9C218A1E2041}.Debug|x64.ActiveCfg = Debug|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2041}.Debug|x64.Build.0 = Debug|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2041}.Release|x64.ActiveCfg = Release|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2041}.Release|x64.Build.0 = Release|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2042}.Debug|x64.ActiveCfg = Debug|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2042}.Debug|x64.Build.0 = Debug|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2042}.Release|x64.ActiveCfg = Release|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2042}.Release|x64.Build.0 = Release|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2043}.Debug|x64.ActiveCfg = Debug|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2043}.Debug|x64.Build.0 = Debug|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2043}.Release|x64.ActiveCfg = Release|x64
+		{D671CC82-6975-4479-AC02-9C218A1E2043}.Release|x64.Build.0 = Release|x64
 		{4F23C960-A1F7-46C3-8AD4-C01C276E9FB2}.Debug|x64.ActiveCfg = Debug|x64
 		{4F23C960-A1F7-46C3-8AD4-C01C276E9FB2}.Debug|x64.Build.0 = Debug|x64
 		{4F23C960-A1F7-46C3-8AD4-C01C276E9FB2}.Release|x64.ActiveCfg = Release|x64

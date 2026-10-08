@@ -7,6 +7,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6640E098-67F4-45F8-9DBE-C71EF2FE6F22}</ProjectGuid>
     <RootNamespace>Glance.Contracts</RootNamespace>
+    <ProjectName>Glance.Contracts</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
@@ -22,6 +23,8 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\glance\contracts\access_protocol.h" />
+    <ClInclude Include="include\glance\contracts\access_runtime.h" />
     <ClInclude Include="include\glance\contracts\component_api.h" />
     <ClInclude Include="include\glance\contracts\dependency_runtime.h" />
     <ClInclude Include="include\glance\contracts\dependency_api.h" />
@@ -36,6 +39,7 @@
     <ClInclude Include="include\glance\contracts\source_api.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\access_runtime.cpp" />
     <ClCompile Include="src\contracts.cpp" />
     <ClCompile Include="src\dependency_runtime.cpp" />
     <ClCompile Include="src\diagnostics.cpp" />

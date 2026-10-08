@@ -417,6 +417,8 @@ namespace glance::core
                 return false;
             }
         }
+        if (response.status == glance::dialog_broker::Status::hook_failed)
+            log_hook_failure(L"the 32-bit dialog hook failed (error " + std::to_wstring(response.error) + L")");
         return response.status == glance::dialog_broker::Status::success ||
             response.status == glance::dialog_broker::Status::no_selection;
     }

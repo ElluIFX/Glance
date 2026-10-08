@@ -17,7 +17,6 @@ namespace glance::app
         failed,
     };
 
-    [[nodiscard]] bool managed_installation() noexcept;
     [[nodiscard]] UpdateLaunchStatus launch_update_installer(
         const std::filesystem::path& installer_path) noexcept;
 }

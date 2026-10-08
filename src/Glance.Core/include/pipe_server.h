@@ -29,7 +29,7 @@ namespace glance::core
         PipeServer(const PipeServer&) = delete;
         PipeServer& operator=(const PipeServer&) = delete;
 
-        [[nodiscard]] bool start();
+        [[nodiscard]] bool start(DWORD app_process_id = 0);
         void stop() noexcept;
         [[nodiscard]] bool send(
             glance::contracts::MessageType type,
@@ -55,5 +55,6 @@ namespace glance::core
         std::atomic<DWORD> peer_process_id_{};
         std::mutex write_mutex_;
         std::atomic_uint64_t correlation_id_{};
+        std::wstring app_user_sid_;
     };
 }

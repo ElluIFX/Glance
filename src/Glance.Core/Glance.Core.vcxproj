@@ -27,6 +27,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\access_client.h" />
+    <ClInclude Include="include\access_wire.h" />
     <ClInclude Include="include\core_application.h" />
     <ClInclude Include="include\dialog_hook_client.h" />
     <ClInclude Include="include\explorer_selection.h" />
@@ -39,10 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\core_application.cpp" />
-    <ClCompile Include="src\dialog_hook_client.cpp" />
-    <ClCompile Include="src\explorer_selection.cpp" />
-    <ClCompile Include="src\external_host_provider.cpp" />
-    <ClCompile Include="src\keyboard_hook.cpp" />
+    <ClCompile Include="src\access_client.cpp" />
     <ClCompile Include="src\download_service.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\network_service.cpp" />
@@ -56,6 +55,9 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Glance.Input\Glance.Input.vcxproj">
+      <Project>{D671CC82-6975-4479-AC02-9C218A1E2041}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Glance.DialogHook\Glance.DialogHook.vcxproj">
       <Project>{A4D28F61-59DA-45DA-B4F6-16C53B027E5C}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windows.h>
+#include "glance/contracts/access_protocol.h"
 
 #include <atomic>
 #include <cstdint>
@@ -14,13 +15,7 @@ namespace glance::core
         close_preview = 2,
     };
 
-    struct InputDecisionState
-    {
-        std::atomic_bool ui_connected{};
-        std::atomic_bool eligible_selection{};
-        std::atomic_bool preview_active{};
-        std::atomic_bool text_input_active{};
-    };
+    using InputDecisionState = glance::contracts::access::InputState;
 
     class KeyboardHookService
     {

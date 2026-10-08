@@ -50,7 +50,9 @@ english.AdditionalTasks=Additional options:
 english.CreateStartMenuShortcut=Create a Start Menu shortcut
 english.CreateDesktopShortcut=Create a desktop shortcut
 english.StartAtSignIn=Start Glance when signing in to Windows
-english.CoreTaskSetupFailed=Glance was installed, but administrator access could not be configured. Use Enable / repair in Settings. Install in a protected folder such as Program Files.
+english.AccessServiceTask=Install service (administrator access)
+english.CloseGlanceFailed=Glance could not be closed
+english.AccessServiceSetupFailed=Glance was installed, but the access service could not be configured. Use Enable / repair in Settings. Install in a protected folder such as Program Files.
 english.DeleteUserData=Also delete Glance settings, logs, crash dumps, and cached previews?
 english.FullInstallation=Full installation
 english.CoreInstallation=Core only
@@ -61,7 +63,9 @@ chinesesimplified.AdditionalTasks=其他选项：
 chinesesimplified.CreateStartMenuShortcut=创建开始菜单快捷方式
 chinesesimplified.CreateDesktopShortcut=创建桌面快捷方式
 chinesesimplified.StartAtSignIn=登录 Windows 时启动 Glance
-chinesesimplified.CoreTaskSetupFailed=Glance 已安装，但管理员权限配置失败。请在设置中点击“启用／修复”，并确认安装目录为 Program Files 等受保护位置。
+chinesesimplified.AccessServiceTask=安装服务（管理员权限）
+chinesesimplified.CloseGlanceFailed=无法关闭 Glance
+chinesesimplified.AccessServiceSetupFailed=Glance 已安装，但权限服务配置失败。请在设置中点击“启用／修复”，并确认安装目录为 Program Files 等受保护位置。
 chinesesimplified.DeleteUserData=同时删除 Glance 设置、日志、崩溃转储和预览缓存吗？
 chinesesimplified.FullInstallation=完整安装
 chinesesimplified.CoreInstallation=仅核心程序
@@ -82,6 +86,7 @@ Name: "custom"; Description: "{cm:CustomInstallation}"; Flags: iscustom
 Name: "startmenuicon"; Description: "{cm:CreateStartMenuShortcut}"; GroupDescription: "{cm:AdditionalTasks}"
 Name: "desktopicon"; Description: "{cm:CreateDesktopShortcut}"; GroupDescription: "{cm:AdditionalTasks}"; Flags: unchecked
 Name: "startup"; Description: "{cm:StartAtSignIn}"; GroupDescription: "{cm:AdditionalTasks}"
+Name: "accessservice"; Description: "{cm:AccessServiceTask}"; GroupDescription: "{cm:AdditionalTasks}"; Check: IsAdmin
 
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Excludes: "*.exp,*.ilk,*.lib,*.pdb,Glance.Tests.exe,components\*,sources\*"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -99,6 +104,7 @@ Name: "{autodesktop}\Glance"; Filename: "{app}\Glance.exe"; Tasks: desktopicon
 [InstallDelete]
 #include PayloadDir + "\..\sdk-cleanup.iss"
 Type: filesandordirs; Name: "{app}\plugins"
+Type: files; Name: "{app}\Glance.portable"
 #include ComponentInnoDir + "\component-delete.iss"
 Type: files; Name: "{group}\Glance.lnk"; Tasks: not startmenuicon
 Type: files; Name: "{autodesktop}\Glance.lnk"; Tasks: not desktopicon
@@ -110,8 +116,11 @@ Filename: "{app}\Glance.exe"; Description: "{cm:LaunchProgram,Glance}"; Flags: n
 Filename: "{app}\Glance.exe"; Flags: runasoriginaluser runhidden nowait; Check: IsAutomaticUpdate
 
 [UninstallRun]
-Filename: "{app}\Glance.exe"; Parameters: "--remove-core-tasks"; RunOnceId: "RemoveGlanceCoreTasks"; Flags: runhidden skipifdoesntexist
+Filename: "{app}\Glance.AccessService.exe"; Parameters: "--uninstall"; RunOnceId: "RemoveGlanceCoreTasks"; Flags: runhidden skipifdoesntexist
 Filename: "{app}\Glance.exe"; Parameters: "--cleanup-startup"; RunOnceId: "CleanupGlanceStartup"; Flags: runhidden skipifdoesntexist
+
+[UninstallDelete]
+Type: files; Name: "{app}\Glance.installed"
 
 [Code]
 const
@@ -126,6 +135,111 @@ var
   UpdatingComponentSelection: Boolean;
   ComponentSelectionSnapshot: String;
   ComponentsListClickCheckPrevious: TNotifyEvent;
+  ExistingAccessService: Boolean;
+  AccessServiceSetupFailed: Boolean;
+
+type
+  TAccessServiceStatus = record
+    ServiceType, CurrentState, ControlsAccepted, Win32ExitCode,
+    ServiceSpecificExitCode, CheckPoint, WaitHint: LongWord;
+  end;
+
+function OpenSCManager(MachineName, DatabaseName: LongWord; DesiredAccess: LongWord): THandle;
+  external 'OpenSCManagerW@advapi32.dll stdcall';
+function OpenService(Manager: THandle; ServiceName: String; DesiredAccess: LongWord): THandle;
+  external 'OpenServiceW@advapi32.dll stdcall';
+function CloseServiceHandle(Handle: THandle): Boolean;
+  external 'CloseServiceHandle@advapi32.dll stdcall';
+function QueryServiceStatus(Service: THandle; var Status: TAccessServiceStatus): Boolean;
+  external 'QueryServiceStatus@advapi32.dll stdcall';
+function ControlService(Service: THandle; Control: LongWord; var Status: TAccessServiceStatus): Boolean;
+  external 'ControlService@advapi32.dll stdcall';
+
+function AccessServiceExists: Boolean;
+begin
+  Result := RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\Glance.Access');
+end;
+
+function StopAccessService: Boolean;
+var
+  Manager, Service: THandle;
+  Status: TAccessServiceStatus;
+  Attempt: Integer;
+begin
+  Result := True;
+  Manager := OpenSCManager(0, 0, 1);
+  if Manager = 0 then
+  begin
+    Result := False;
+    Exit;
+  end;
+  try
+    Service := OpenService(Manager, 'Glance.Access', $24);
+    if Service = 0 then
+    begin
+      Result := not AccessServiceExists;
+      Exit;
+    end;
+    try
+      Result := QueryServiceStatus(Service, Status);
+      if not Result then Exit;
+      if (Status.CurrentState <> 1) and (Status.CurrentState <> 3) then
+        ControlService(Service, 1, Status);
+      for Attempt := 1 to 150 do
+      begin
+        Result := QueryServiceStatus(Service, Status) and (Status.CurrentState = 1);
+        if Result then Exit;
+        Sleep(100);
+      end;
+      Result := False;
+    finally
+      CloseServiceHandle(Service);
+    end;
+  finally
+    CloseServiceHandle(Manager);
+  end;
+end;
+
+procedure RemoveLegacyCoreTasks;
+var
+  Scheduler, Folder, Tasks, Task, Actions, Action: Variant;
+  Index: Integer;
+  ExpectedPath: String;
+begin
+  ExpectedPath := ExpandConstant('{app}\Glance.Core.exe');
+  try
+    Scheduler := CreateOleObject('Schedule.Service');
+    Scheduler.Connect;
+    Folder := Scheduler.GetFolder('\Glance');
+    Tasks := Folder.GetTasks(1);
+    for Index := Tasks.Count downto 1 do
+    begin
+      Task := Tasks.Item(Index);
+      if Pos('Core-', String(Task.Name)) = 1 then
+      begin
+        Actions := Task.Definition.Actions;
+        if Actions.Count = 1 then
+        begin
+          try
+            Action := Actions.Item(1);
+            if (CompareText(ExpandFileName(String(Action.Path)), ExpandFileName(ExpectedPath)) = 0) and
+               (Trim(String(Action.Arguments)) = '--scheduled') then
+            begin
+              Folder.DeleteTask(Task.Name, 0);
+              Log('Removed legacy Core task: ' + String(Task.Name));
+            end;
+          except
+            Log('Legacy Core task was retained: ' + String(Task.Name));
+          end;
+        end;
+      end;
+    end;
+    if Folder.GetTasks(1).Count = 0 then
+      Scheduler.GetFolder('\').DeleteFolder('Glance', 0);
+  except
+    Log('Legacy Core task cleanup: ' + GetExceptionMessage);
+  end;
+end;
 
 function HasCommandLineParameter(const Value: String): Boolean;
 var
@@ -266,6 +380,19 @@ begin
     PreviousDataKey, 'KnownSources', '{#CurrentSourceCatalog}');
 end;
 
+procedure CurPageChanged(CurPageID: Integer);
+var
+  Index: Integer;
+begin
+  if (CurPageID = wpSelectTasks) and AccessServiceExists then
+    for Index := 0 to WizardForm.TasksList.Items.Count - 1 do
+      if WizardForm.TasksList.ItemCaption[Index] = CustomMessage('AccessServiceTask') then
+      begin
+        WizardForm.TasksList.Checked[Index] := True;
+        WizardForm.TasksList.ItemEnabled[Index] := False;
+      end;
+end;
+
 function WaitForGlanceExit: Boolean;
 var
   Attempt: Integer;
@@ -310,8 +437,14 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   NormalizeComponentDependencies('');
-  RequestGlanceShutdown;
   Result := '';
+  if not RequestGlanceShutdown then
+  begin
+    Result := CustomMessage('CloseGlanceFailed');
+    Exit;
+  end;
+  ExistingAccessService := AccessServiceExists;
+  if not StopAccessService then Result := CustomMessage('AccessServiceSetupFailed');
 end;
 
 procedure ScheduleTreeDeletion(const Path: String);
@@ -372,14 +505,24 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    if not Exec(ExpandConstant('{app}\Glance.exe'), '--register-core-task',
-      ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+    SaveStringToFile(ExpandConstant('{app}\Glance.installed'), '', False);
+    RemoveLegacyCoreTasks;
+    ResultCode := 1;
+    if (ExistingAccessService or WizardIsTaskSelected('accessservice')) and
+      (not Exec(ExpandConstant('{app}\Glance.AccessService.exe'), '--install',
+        ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0)) then
     begin
-      Log(Format('Core task registration failed: %d', [ResultCode]));
+      AccessServiceSetupFailed := True;
+      Log(Format('Access service configuration failed: %d', [ResultCode]));
       if not WizardSilent then
-        SuppressibleMsgBox(CustomMessage('CoreTaskSetupFailed'), mbInformation, MB_OK, IDOK);
+        SuppressibleMsgBox(CustomMessage('AccessServiceSetupFailed'), mbInformation, MB_OK, IDOK);
     end;
   end;
+end;
+
+function GetCustomSetupExitCode: Integer;
+begin
+  if AccessServiceSetupFailed then Result := 1 else Result := 0;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -387,6 +530,8 @@ begin
   if CurUninstallStep = usUninstall then
   begin
     RequestGlanceShutdown;
+    StopAccessService;
+    RemoveLegacyCoreTasks;
     DeleteUserData := HasCommandLineParameter('/PURGEUSERDATA');
     if not DeleteUserData and not UninstallSilent then
     begin

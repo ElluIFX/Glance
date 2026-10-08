@@ -27,6 +27,7 @@ namespace glance::contracts
         gallery_response = 16,
         source_status_request = 17,
         source_status_response = 18,
+        privileged_access_state = 19,
         shutdown = 20,
         terminate_unresponsive = 21,
         update_check_request = 22,

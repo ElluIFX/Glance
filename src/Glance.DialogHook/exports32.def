@@ -1,0 +1,4 @@
+EXPORTS
+    GlanceDialogHookPrepare=_GlanceDialogHookPrepare@8
+    GlanceDialogHookReadPath=_GlanceDialogHookReadPath@8
+    GlanceDialogHookProc=_GlanceDialogHookProc@12

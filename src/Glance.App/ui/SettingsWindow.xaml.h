@@ -68,6 +68,7 @@ namespace winrt::Glance::App::implementation
         void ReloadPreferences(std::wstring_view page = {});
         void ApplyLocalizedResources();
         void ShowAndActivate();
+        void refresh_runtime_statuses();
         void ShowUpdateDownload(glance::app::UpdateInstallerAsset asset);
         static winrt::Windows::Foundation::IAsyncOperation<std::int32_t>
             ShowUpdateResultDialog(
@@ -307,7 +308,6 @@ namespace winrt::Glance::App::implementation
         };
 
         void configure_window();
-        void refresh_runtime_statuses();
         void refresh_component_statuses();
         void refresh_dependency_statuses();
         winrt::fire_and_forget uninstall_dependency(std::wstring id);

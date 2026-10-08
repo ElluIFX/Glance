@@ -133,6 +133,16 @@ namespace glance::core
             return false;
         }
 
+        const auto valid_until = state_.valid_until.load(std::memory_order_acquire);
+        const bool connected = state_.ui_connected.load(std::memory_order_acquire) &&
+            state_.enabled.load(std::memory_order_acquire) &&
+            (valid_until == 0 || GetTickCount64() <= valid_until);
+        if (!connected)
+        {
+            down->store(key_down, std::memory_order_release);
+            captured->store(false, std::memory_order_release);
+            return false;
+        }
         if (key_down)
         {
             if (down->exchange(true, std::memory_order_acq_rel))
@@ -140,7 +150,6 @@ namespace glance::core
                 return captured->load(std::memory_order_acquire);
             }
 
-            const bool connected = state_.ui_connected.load(std::memory_order_acquire);
             const bool active = state_.preview_active.load(std::memory_order_acquire);
             const bool eligible = state_.eligible_selection.load(std::memory_order_acquire);
             const bool text_input_active =

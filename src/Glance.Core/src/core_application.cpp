@@ -1,4 +1,5 @@
 #include "core_application.h"
+#include "access_client.h"
 #include "explorer_selection.h"
 #include "glance/contracts/diagnostics.h"
 
@@ -346,6 +347,7 @@ namespace glance::core
 {
     struct SelectionWorkerContext
     {
+        std::shared_ptr<AccessClient> access;
         unique_handle stop_event;
         unique_handle gallery_event;
         std::atomic<HWND> window{};
@@ -400,9 +402,9 @@ namespace glance::core
         pipe_server_.stop();
     }
 
-    int CoreApplication::run(HINSTANCE instance, DWORD app_process_id, bool scheduled)
+    int CoreApplication::run(HINSTANCE instance, DWORD app_process_id)
     {
-        if (scheduled) scheduled_launch_deadline_ = GetTickCount64() +
+        if (app_process_id) initial_connection_deadline_ = GetTickCount64() +
             glance::contracts::process_watchdog_connect_grace_ms;
         single_instance_mutex_.reset(CreateMutexW(nullptr, FALSE, L"Local\\Glance.Core"));
         if (!single_instance_mutex_ || GetLastError() == ERROR_ALREADY_EXISTS)
@@ -442,7 +444,9 @@ namespace glance::core
                 L"RegisterRawInputDevices failed with error " + std::to_wstring(GetLastError()) + L".");
         }
 
-        static_cast<void>(pipe_server_.start());
+        static_cast<void>(pipe_server_.start(elevated_ ? app_process_id : 0));
+        if (!elevated_ && contracts::access::installation_mode() == contracts::access::InstallationMode::installed)
+            access_client_ = std::make_shared<AccessClient>(window_);
         keyboard_hook_ = new KeyboardHookService(window_, hook_action_message, input_state_);
         if (!keyboard_hook_->start())
         {
@@ -520,18 +524,29 @@ namespace glance::core
             if (wparam == selection_timer_id)
             {
                 const auto now = GetTickCount64();
+                self->input_state_.valid_until.store(now + 500, std::memory_order_release);
                 if (self->selection_.timestamp_ms == 0 ||
                     now - self->selection_.timestamp_ms > selection_stale_after_ms)
                 {
                     self->input_state_.eligible_selection.store(false, std::memory_order_release);
                 }
                 self->monitor_selection_worker();
+                const bool access_ready = self->access_client_ && self->access_client_->ready();
+                if (!access_ready && self->access_client_)
+                    self->access_client_->update_input(self->input_state_);
+                self->input_state_.enabled.store(!access_ready, std::memory_order_release);
+                if (access_ready) self->access_client_->update_input(self->input_state_);
+                if (self->access_ready_ != access_ready)
+                {
+                    self->access_ready_ = access_ready;
+                    static_cast<void>(self->pipe_server_.send(contracts::MessageType::privileged_access_state, {}, self->elevated_ || access_ready ? 1 : 0));
+                }
                 return 0;
             }
             if (wparam == hook_refresh_timer_id && self->keyboard_hook_ != nullptr)
             {
                 const auto raw_count = self->raw_input_count_.load(std::memory_order_relaxed);
-                const auto hook_count = self->keyboard_hook_->event_count();
+                const auto hook_count = self->access_ready_ ? self->access_client_->hook_events() : self->keyboard_hook_->event_count();
                 const bool stalled = raw_count != self->previous_raw_input_count_ &&
                     hook_count == self->previous_hook_event_count_;
                 self->previous_raw_input_count_ = raw_count;
@@ -596,7 +611,7 @@ namespace glance::core
             self->reset_app_health();
             if (wparam != 0)
             {
-                self->scheduled_launch_deadline_ = 0;
+                self->initial_connection_deadline_ = 0;
                 self->capture_app_process(static_cast<DWORD>(lparam));
                 self->app_connection_grace_until_ms_ = 0;
                 if (self->keyboard_hook_ != nullptr)
@@ -622,6 +637,7 @@ namespace glance::core
 
     void CoreApplication::recover_keyboard_hook(std::wstring_view reason)
     {
+        if (access_client_ && access_client_->ready()) { access_client_->request_hook_refresh(); return; }
         if (keyboard_hook_ == nullptr)
         {
             return;
@@ -659,10 +675,10 @@ namespace glance::core
         const DWORD connected_process_id = pipe_server_.connected()
             ? pipe_server_.peer_process_id()
             : 0;
-        // A delayed task must not resurrect an App that exited before connecting.
-        if (scheduled_launch_deadline_ != 0 && connected_process_id == 0)
+        // A delayed Core launch must not restore an App that exited before connecting.
+        if (initial_connection_deadline_ != 0 && connected_process_id == 0)
         {
-            if (GetTickCount64() >= scheduled_launch_deadline_)
+            if (GetTickCount64() >= initial_connection_deadline_)
             {
                 shutting_down_.store(true, std::memory_order_release);
                 PostMessageW(window_, WM_CLOSE, 0, 0);
@@ -913,6 +929,7 @@ namespace glance::core
     bool CoreApplication::start_selection_worker()
     {
         auto context = std::make_shared<SelectionWorkerContext>();
+        context->access = access_client_;
         context->stop_event.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
         context->gallery_event.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
         if (!context->stop_event || !context->gallery_event)
@@ -968,6 +985,7 @@ namespace glance::core
         try
         {
             ExplorerSelectionService selection_service;
+            std::unordered_set<std::uint64_t> privileged_galleries;
             while (WaitForSingleObject(context->stop_event.get(), 0) == WAIT_TIMEOUT &&
                    context->generation.load(std::memory_order_acquire) == generation)
             {
@@ -990,7 +1008,26 @@ namespace glance::core
                     };
                     if (is_latest())
                     {
-                        auto response = selection_service.handle_gallery_command(
+                        const bool privileged = context->access &&
+                            (privileged_galleries.contains(gallery_command->window_id) ||
+                             (gallery_command->operation == GalleryOperation::open &&
+                              AccessClient::requires_access(reinterpret_cast<HWND>(gallery_command->source_window))));
+                        GalleryResponse response;
+                        if (privileged)
+                        {
+                            try { response = context->access->gallery(*gallery_command); }
+                            catch (...) {
+                                response.operation = gallery_command->operation;
+                                response.window_id = gallery_command->window_id;
+                                response.request_id = gallery_command->request_id;
+                                response.error = L"source unavailable";
+                            }
+                            if (response.success && gallery_command->operation == GalleryOperation::open)
+                                privileged_galleries.insert(gallery_command->window_id);
+                            if (gallery_command->operation == GalleryOperation::close)
+                                privileged_galleries.erase(gallery_command->window_id);
+                        }
+                        else response = selection_service.handle_gallery_command(
                             *gallery_command,
                             [context, generation, is_latest] {
                                 return context->generation.load(std::memory_order_acquire) != generation ||
@@ -1040,9 +1077,18 @@ namespace glance::core
                 }
 
                 const auto query_started = std::chrono::steady_clock::now();
-                auto next = selection_service.query_foreground();
-                const bool suppress_preview_update =
-                    selection_service.consume_gallery_selection_sync(next);
+                contracts::SelectionSnapshot next;
+                bool suppress_preview_update{};
+                if (context->access && AccessClient::requires_access(GetForegroundWindow()))
+                {
+                    try { next = context->access->selection(suppress_preview_update); }
+                    catch (...) { next.text_input_active = true; }
+                }
+                else
+                {
+                    next = selection_service.query_foreground();
+                    suppress_preview_update = selection_service.consume_gallery_selection_sync(next);
+                }
                 const auto query_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - query_started);
                 if (context->generation.load(std::memory_order_acquire) != generation ||
@@ -1546,6 +1592,7 @@ namespace glance::core
         if (type == glance::contracts::MessageType::hello)
         {
             static_cast<void>(pipe_server_.send(glance::contracts::MessageType::hello_ack));
+            static_cast<void>(pipe_server_.send(contracts::MessageType::privileged_access_state, {}, elevated_ || (access_client_ && access_client_->ready()) ? 1 : 0));
             return;
         }
         if (type == glance::contracts::MessageType::preview_state_changed)

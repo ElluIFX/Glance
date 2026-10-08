@@ -969,6 +969,7 @@ int run_text_monitor_tests();
 int run_office_package_tests();
 int run_executable_tests();
 int run_font_tests();
+int run_access_tests();
 int run_window_memory_tests();
 int run_dependency_runtime_tests();
 int run_dependency_service_tests();
@@ -977,6 +978,8 @@ int run_dependency_child(int count, wchar_t* arguments[]);
 
 int wmain(int argument_count, wchar_t* arguments[])
 {
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--access-tests") return run_access_tests();
+    if (argument_count == 1 && run_access_tests() != 0) return 1;
     if (argument_count > 1 && (std::wstring_view(arguments[1]) == L"--software-media-tests" ||
         std::wstring_view(arguments[1]) == L"--software-media-fallback-tests" ||
         std::wstring_view(arguments[1]) == L"--software-media-composition-tests"))

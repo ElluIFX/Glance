@@ -26,11 +26,13 @@
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
+      <ModuleDefinitionFile>$(ProjectDir)exports32.def</ModuleDefinitionFile>
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>Ole32.lib;Shell32.lib;User32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include="exports32.def" />
     <ClInclude Include="include\dialog_hook_api.h" />
   </ItemGroup>
   <ItemGroup>

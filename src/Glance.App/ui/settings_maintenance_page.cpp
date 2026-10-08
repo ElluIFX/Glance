@@ -2,7 +2,7 @@
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include "SettingsWindow.xaml.h"
 #include "App.xaml.h"
-#include "core_task.h"
+#include "access_setup.h"
 #include "appearance_preferences.h"
 #include "component_loader.h"
 #include "dependencies/dependency_service.h"
@@ -423,8 +423,7 @@ namespace winrt::Glance::App::implementation
             HWND owner{};
             check_hresult(this->try_as<::IWindowNative>()->get_WindowHandle(&owner));
             co_await resume_background();
-            result = glance::app::managed_installation() ? glance::app::repair_core_task(owner)
-                                                         : glance::app::CoreAccessResult::success;
+            result = glance::app::repair_access_service(owner);
             co_await ui;
             if (result == glance::app::CoreAccessResult::success)
             {

@@ -116,6 +116,8 @@ $requiredFiles = @(
     "Glance.exe",
     "Glance.CLI.exe",
     "Glance.Core.exe",
+    "Glance.AccessService.exe",
+    "Glance.AccessHost.exe",
     "Glance.MediaHost.exe",
     "Glance.DialogBroker32.exe",
     "Glance.DialogHook.dll",

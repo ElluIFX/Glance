@@ -85,8 +85,9 @@ namespace winrt::Glance::App::implementation
         std::uint64_t last_core_launch_attempt_ms_{};
         bool core_launch_in_flight_{};
         bool core_access_repair_in_flight_{};
-        bool core_task_unavailable_{};
-        bool portable_elevation_unavailable_{};
+        bool portable_elevation_attempted_{};
+        bool portable_elevation_requested_{};
+        std::atomic_bool privileged_access_ready_{};
         HRESULT core_elevation_result_{ E_FAIL };
         Glance::App::MainWindow active_window_{ nullptr };
         Glance::App::SettingsWindow settings_window_{ nullptr };

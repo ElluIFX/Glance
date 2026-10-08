@@ -5,7 +5,7 @@
 namespace glance::dialog_broker
 {
     inline constexpr std::uint32_t protocol_magic = 0x474C4442;
-    inline constexpr std::uint32_t protocol_version = 1;
+    inline constexpr std::uint32_t protocol_version = 2;
     inline constexpr std::uint32_t maximum_path_length = 32767;
 
     enum class Command : std::uint32_t
@@ -40,8 +40,9 @@ namespace glance::dialog_broker
         std::uint32_t version{ protocol_version };
         Status status{ Status::invalid_request };
         std::uint32_t path_length{};
+        std::uint32_t error{};
     };
 
     static_assert(sizeof(Request) == 32);
-    static_assert(sizeof(Response) == 16);
+    static_assert(sizeof(Response) == 20);
 }

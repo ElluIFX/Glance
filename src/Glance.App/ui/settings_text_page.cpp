@@ -2,7 +2,6 @@
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include "SettingsWindow.xaml.h"
 #include "App.xaml.h"
-#include "core_task.h"
 #include "appearance_preferences.h"
 #include "component_loader.h"
 #include "dependencies/dependency_service.h"

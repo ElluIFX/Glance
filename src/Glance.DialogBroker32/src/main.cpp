@@ -234,11 +234,14 @@ namespace
             }
             else if (request.command == glance::dialog_broker::Command::query)
             {
+                SetLastError(ERROR_SUCCESS);
                 response.status = hook.query(
                     reinterpret_cast<HWND>(static_cast<std::uintptr_t>(request.window)),
                     request.process_id,
                     request.thread_id,
                     path);
+                if (response.status == glance::dialog_broker::Status::hook_failed)
+                    response.error = GetLastError() ? GetLastError() : ERROR_TIMEOUT;
                 response.path_length = static_cast<std::uint32_t>(path.size());
             }
             else if (request.command == glance::dialog_broker::Command::detach)

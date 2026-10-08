@@ -21,6 +21,7 @@
 
 namespace glance::core
 {
+    class AccessClient;
     struct SelectionWorkerContext;
     struct GalleryResponse;
 
@@ -33,7 +34,7 @@ namespace glance::core
         CoreApplication(const CoreApplication&) = delete;
         CoreApplication& operator=(const CoreApplication&) = delete;
 
-        [[nodiscard]] int run(HINSTANCE instance, DWORD app_process_id, bool scheduled = false);
+        [[nodiscard]] int run(HINSTANCE instance, DWORD app_process_id);
 
     private:
         static constexpr UINT hook_action_message = WM_APP + 1;
@@ -101,7 +102,7 @@ namespace glance::core
         unique_handle app_token_;
         DWORD app_process_id_{};
         bool elevated_{};
-        std::uint64_t scheduled_launch_deadline_{};
+        std::uint64_t initial_connection_deadline_{};
         std::atomic_bool shutting_down_{};
         std::uint32_t heartbeat_sequence_{};
         std::uint32_t pending_heartbeat_{};
@@ -110,6 +111,8 @@ namespace glance::core
         std::uint64_t app_connection_grace_until_ms_{};
         std::uint64_t last_app_launch_attempt_ms_{};
         InputDecisionState input_state_;
+        std::shared_ptr<AccessClient> access_client_;
+        bool access_ready_{};
         glance::contracts::SelectionSnapshot selection_;
         std::shared_ptr<SelectionWorkerContext> selection_worker_context_;
         std::thread selection_worker_;

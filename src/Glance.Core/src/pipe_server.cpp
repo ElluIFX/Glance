@@ -1,5 +1,6 @@
 #include "pipe_server.h"
 #include "unique_handle.h"
+#include "glance/contracts/access_runtime.h"
 
 #include <sddl.h>
 
@@ -53,7 +54,7 @@ namespace
         return std::filesystem::path(module).parent_path() / L"Glance.exe";
     }
 
-    bool authorize_client(HANDLE pipe, DWORD& client_process_id)
+    bool authorize_client(HANDLE pipe, DWORD& client_process_id, const std::wstring& app_user_sid)
     {
         ULONG queried_process_id{};
         if (!GetNamedPipeClientProcessId(pipe, &queried_process_id))
@@ -86,25 +87,14 @@ namespace
         }
         const auto* server_token = reinterpret_cast<const TOKEN_USER*>(server_user.data());
         const auto* client_token = reinterpret_cast<const TOKEN_USER*>(client_user.data());
-        if (!EqualSid(server_token->User.Sid, client_token->User.Sid))
+        const auto peer_sid = glance::contracts::access::process_sid(client.get());
+        if (!EqualSid(server_token->User.Sid, client_token->User.Sid) &&
+            (app_user_sid.empty() || peer_sid != app_user_sid))
         {
             return false;
         }
 
-        std::wstring client_path(32768, L'\0');
-        DWORD client_path_length = static_cast<DWORD>(client_path.size());
-        if (!QueryFullProcessImageNameW(client.get(), 0, client_path.data(), &client_path_length))
-        {
-            return false;
-        }
-        client_path.resize(client_path_length);
-        const auto expected = expected_client_path().wstring();
-        return CompareStringOrdinal(
-                   client_path.c_str(),
-                   static_cast<int>(client_path.size()),
-                   expected.c_str(),
-                   static_cast<int>(expected.size()),
-                   TRUE) == CSTR_EQUAL;
+        return glance::contracts::access::process_image(client.get(), expected_client_path());
     }
 }
 
@@ -120,11 +110,31 @@ namespace glance::core
         stop();
     }
 
-    bool PipeServer::start()
+    bool PipeServer::start(DWORD app_process_id)
     {
         if (thread_.joinable())
         {
             return true;
+        }
+        if (app_process_id)
+        {
+            unique_handle app(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, app_process_id));
+            DWORD app_session{}, core_session{};
+            if (app && ProcessIdToSessionId(app_process_id, &app_session) &&
+                ProcessIdToSessionId(GetCurrentProcessId(), &core_session) && app_session == core_session &&
+                contracts::access::process_image(app.get(), expected_client_path()))
+                app_user_sid_ = contracts::access::process_sid(app.get());
+        }
+        if (!app_user_sid_.empty())
+        {
+            const auto security = L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;" + current_user_sid() +
+                L")(A;;0x101000;;;" + app_user_sid_ + L")";
+            PSECURITY_DESCRIPTOR descriptor{};
+            if (ConvertStringSecurityDescriptorToSecurityDescriptorW(security.c_str(), SDDL_REVISION_1, &descriptor, nullptr))
+            {
+                static_cast<void>(SetKernelObjectSecurity(GetCurrentProcess(), DACL_SECURITY_INFORMATION, descriptor));
+                LocalFree(descriptor);
+            }
         }
         stopping_.store(false, std::memory_order_release);
         thread_ = std::thread([this] { run(); });
@@ -271,7 +281,8 @@ namespace glance::core
             return;
         }
         const std::wstring security_definition =
-            L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;" + user_sid + L")";
+            L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;" + user_sid + L")" +
+            (app_user_sid_.empty() ? L"" : L"(A;;GRGW;;;" + app_user_sid_ + L")") + L"S:(ML;;NW;;;ME)";
         PSECURITY_DESCRIPTOR descriptor{};
         if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
                 security_definition.c_str(),
@@ -335,7 +346,7 @@ namespace glance::core
             }
             DWORD client_process_id{};
             if (!connected || stopping_.load(std::memory_order_acquire) ||
-                !authorize_client(pipe, client_process_id))
+                !authorize_client(pipe, client_process_id, app_user_sid_))
             {
                 {
                     std::scoped_lock lock(write_mutex_);

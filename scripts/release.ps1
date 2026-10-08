@@ -41,7 +41,10 @@ Copy-Item -LiteralPath $installer.FullName -Destination $releaseDirectory -Force
 $portableName = "Glance-$($version.Version)-$Platform"
 $portableRoot = Join-Path $stagingDirectory $portableName
 New-Item -ItemType Directory -Path $portableRoot -Force | Out-Null
-Copy-Item -Path (Join-Path $payloadDirectory "*") -Destination $portableRoot -Recurse -Force
+Get-ChildItem -LiteralPath $payloadDirectory | Where-Object {
+    $_.Name -notin @('Glance.AccessService.exe', 'Glance.AccessHost.exe', 'Glance.installed')
+} | Copy-Item -Destination $portableRoot -Recurse -Force
+New-Item -ItemType File -Path (Join-Path $portableRoot 'Glance.portable') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "LICENSE") -Destination $portableRoot -Force
 $portableArchive = Join-Path $releaseDirectory "$portableName.zip"
 Compress-Archive -Path $portableRoot -DestinationPath $portableArchive -CompressionLevel Optimal
