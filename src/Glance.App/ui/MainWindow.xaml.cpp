@@ -1247,6 +1247,7 @@ namespace winrt::Glance::App::implementation
         });
         initialize_media_player();
         initialize_text_search();
+        initialize_gallery_controls();
         web_view_idle_timer_ = DispatcherTimer();
         web_view_idle_timer_.Interval(web_view_idle_timeout);
         web_view_idle_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
@@ -1405,6 +1406,8 @@ namespace winrt::Glance::App::implementation
     void MainWindow::leave_gallery(bool show_notice, bool notify_core)
     {
         const bool was_gallery = gallery_mode_ != GalleryMode::inactive;
+        gallery_slider_dragging_ = false;
+        gallery_slider_target_.reset();
         if (was_gallery && notify_core && gallery_request_callback_)
         {
             const auto request_id = ++gallery_request_sequence_;
@@ -1483,9 +1486,11 @@ namespace winrt::Glance::App::implementation
         }
         if (!gallery_items_.contains(target_index))
         {
+            gallery_select_request_id_ = 0;
             request_gallery_page(target_index);
             return;
         }
+        gallery_page_select_after_load_ = false;
         gallery_pending_target_ = target_index;
         gallery_select_request_id_ = ++gallery_request_sequence_;
         if (!send_gallery_request(L"select", gallery_select_request_id_, 0, target_index))
@@ -1498,7 +1503,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::navigate_gallery(int steps)
     {
         if (gallery_mode_ != GalleryMode::active ||
-            gallery_total_count_ <= 1 || steps == 0)
+            (gallery_total_known_ && gallery_total_count_ <= 1) || steps == 0)
         {
             return;
         }
@@ -1530,6 +1535,7 @@ namespace winrt::Glance::App::implementation
         gallery_desired_index_ = target;
         gallery_pending_navigation_steps_ += steps;
         request_gallery_selection(gallery_desired_index_);
+        update_gallery_controls();
     }
 
     bool MainWindow::handle_gallery_wheel(int delta)
@@ -1725,21 +1731,8 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_title_text()
     {
-        if (current_index_ >= files_.size())
-        {
-            TitleText().Text(L"");
-            return;
-        }
-        auto title = files_[current_index_].display_name;
-        if (gallery_mode_ == GalleryMode::active &&
-            gallery_total_known_ &&
-            gallery_total_count_ != 0 &&
-            gallery_current_index_ < gallery_total_count_)
-        {
-            title = L"(" + std::to_wstring(gallery_current_index_ + 1) + L"/" +
-                std::to_wstring(gallery_total_count_) + L") " + title;
-        }
-        TitleText().Text(std::move(title));
+        TitleText().Text(current_index_ < files_.size() ? files_[current_index_].display_name : L"");
+        update_gallery_controls();
     }
 
     std::wstring MainWindow::gallery_image_cache_key(
@@ -2136,6 +2129,7 @@ namespace winrt::Glance::App::implementation
         FileListCountText().Text(glance::app::localize_format(L"ItemCount", {std::to_wstring(files_.size())}));
         update_preview_navigation_ui();
         update_generic_file_metadata();
+        update_gallery_controls();
         update_footer_metadata();
         refresh_realized_json_rows();
         rebuild_component_contributions();
@@ -2325,6 +2319,7 @@ namespace winrt::Glance::App::implementation
         update_text_editor_visibility();
         try
         {
+            update_gallery_controls();
             if (web_preview_ != nullptr)
             {
                 web_preview_.Visibility(
@@ -2622,7 +2617,7 @@ namespace winrt::Glance::App::implementation
         const auto host = PreviewContentHost();
         while (current != nullptr && get_abi(current) != get_abi(host))
         {
-            if (current == FileListResizeHandle() ||
+            if (current == FileListResizeHandle() || current == GalleryProgressPanel() ||
                 current.try_as<Controls::Primitives::ButtonBase>() != nullptr ||
                 current.try_as<Controls::Primitives::RangeBase>() != nullptr ||
                 current.try_as<Controls::Primitives::SelectorItem>() != nullptr ||
@@ -2995,6 +2990,10 @@ namespace winrt::Glance::App::implementation
             preview_mouse_content_bounds_ = bounds(PreviewContentHost());
             preview_mouse_title_bounds_ = bounds(PreviewTitleBar());
             preview_mouse_footer_bounds_ = bounds(PreviewFooterBar());
+            preview_mouse_control_bounds_.clear();
+            for (FrameworkElement const& element : {GalleryPreviousButton().as<FrameworkElement>(),
+                GalleryNextButton().as<FrameworkElement>(), GalleryProgressPanel().as<FrameworkElement>()})
+                if (element.Visibility() == Visibility::Visible) preview_mouse_control_bounds_.push_back(bounds(element));
             preview_mouse_bounds_valid_ = true;
         }
         catch (...) {}
@@ -3004,6 +3003,8 @@ namespace winrt::Glance::App::implementation
     {
         return preview_mouse_bounds_valid_ && ScreenToClient(window_, &point) &&
             PtInRect(&preview_mouse_content_bounds_, point) &&
+            std::none_of(preview_mouse_control_bounds_.begin(), preview_mouse_control_bounds_.end(),
+                [&](const RECT& bounds) { return PtInRect(&bounds, point); }) &&
             !((!fullscreen_ || fullscreen_title_visible_) && PtInRect(&preview_mouse_title_bounds_, point)) &&
             !((!fullscreen_ || fullscreen_footer_visible_) && PtInRect(&preview_mouse_footer_bounds_, point));
     }
@@ -8830,6 +8831,7 @@ namespace winrt::Glance::App::implementation
                 ? Visibility::Visible
                 : Visibility::Collapsed);
         GalleryModeButton().IsChecked(gallery_mode_ != GalleryMode::inactive);
+        update_gallery_controls();
         TextStatusControls().Visibility(
             text && !component_web ? Visibility::Visible : Visibility::Collapsed);
         TextFindButton().Visibility(TextStatusControls().Visibility());

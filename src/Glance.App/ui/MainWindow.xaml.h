@@ -599,6 +599,7 @@ namespace winrt::Glance::App::implementation
         RECT preview_mouse_content_bounds_{};
         RECT preview_mouse_title_bounds_{};
         RECT preview_mouse_footer_bounds_{};
+        std::vector<RECT> preview_mouse_control_bounds_;
         bool preview_mouse_bounds_valid_{};
         void update_preview_navigation_hook(bool active);
         static LRESULT CALLBACK preview_navigation_mouse_hook(int code, WPARAM message, LPARAM data) noexcept;
@@ -805,6 +806,17 @@ namespace winrt::Glance::App::implementation
         bool middle_click_gallery_enabled_{ true };
         bool loop_gallery_enabled_{ true };
         bool gallery_same_extension_only_{};
+        bool gallery_slider_updating_{};
+        bool gallery_slider_dragging_{};
+        std::optional<std::uint32_t> gallery_slider_target_;
+        void initialize_gallery_controls();
+        void update_gallery_controls();
+        void update_gallery_position_text();
+        void update_gallery_popup_layout();
+        std::array<Microsoft::UI::Xaml::Controls::Primitives::Popup, 3> gallery_popups_{nullptr, nullptr, nullptr};
+        void commit_gallery_slider();
+        void finish_gallery_slider_drag();
+        void emphasize_gallery_control(Microsoft::UI::Xaml::FrameworkElement const& element, bool emphasized);
         bool gallery_same_extension_override_{};
         std::uint64_t gallery_session_id_{};
         std::uint64_t gallery_request_sequence_{};

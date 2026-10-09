@@ -569,4 +569,8 @@
   <data name="FileListExpand" xml:space="preserve"><value>Expand item list</value></data>
   <data name="FileListCollapse" xml:space="preserve"><value>Collapse item list</value></data>
   <data name="FileListResize" xml:space="preserve"><value>Drag to resize item list</value></data>
+  <data name="GalleryPrevious" xml:space="preserve"><value>Previous item</value></data>
+  <data name="GalleryNext" xml:space="preserve"><value>Next item</value></data>
+  <data name="GalleryPosition" xml:space="preserve"><value>{0} / {1}</value></data>
+  <data name="GalleryUnknownPosition" xml:space="preserve"><value>Item {0}</value></data>
 </root>

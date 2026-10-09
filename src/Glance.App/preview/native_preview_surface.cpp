@@ -387,14 +387,16 @@ namespace glance::app
         }
         POINT origin{ x, y };
         ClientToScreen(parent_, &origin);
+        const auto insert_after = GetWindow(parent_, GW_HWNDPREV);
         SetWindowPos(
             host_,
-            HWND_TOP,
+            insert_after,
             origin.x,
             origin.y,
             static_cast<int>(width_),
             static_cast<int>(height_),
-            SWP_NOACTIVATE | (visible_ ? SWP_SHOWWINDOW : 0));
+            SWP_NOACTIVATE | (insert_after == host_ ? SWP_NOZORDER : 0) |
+                (visible_ ? SWP_SHOWWINDOW : 0));
         if (content_ != nullptr)
         {
             SetWindowPos(

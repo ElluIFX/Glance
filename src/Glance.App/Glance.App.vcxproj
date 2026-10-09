@@ -142,6 +142,7 @@
     <ClCompile Include="App.xaml.cpp"><DependentUpon>App.xaml</DependentUpon></ClCompile>
     <ClCompile Include="ui\MainWindow.xaml.cpp"><DependentUpon>MainWindow.xaml</DependentUpon></ClCompile>
     <ClCompile Include="ui\main_window_search.cpp" />
+    <ClCompile Include="ui\main_window_gallery.cpp" />
     <ClCompile Include="ui\SettingsWindow.xaml.cpp"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClCompile>
     <ClCompile Include="ui\settings_registry.cpp" />
     <ClCompile Include="ui\settings_builtin.cpp" />

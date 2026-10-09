@@ -197,7 +197,7 @@
             <Border x:Name="FileListResizeHandle" Grid.Column="0" Width="6"
                 HorizontalAlignment="Right" Background="Transparent" Visibility="Collapsed" />
 
-            <Grid Grid.Column="1">
+            <Grid Grid.Column="1" x:Name="PreviewCanvas">
                 <Grid
                     x:Name="GenericPanel"
                     Padding="28"
@@ -1481,5 +1481,35 @@
                 </ResourceDictionary>
             </StackPanel.Resources>
         </StackPanel>
+        <Grid Grid.Row="1" IsHitTestVisible="False" Visibility="Collapsed" x:Name="GalleryControlStorage">
+            <Button x:Name="GalleryPreviousButton" Width="40" Height="48" CornerRadius="8"
+                Style="{StaticResource IconButtonStyle}" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                Opacity="0.6" Visibility="Collapsed">
+                <FontIcon FontSize="18" Glyph="&#xE76B;" />
+            </Button>
+            <Button x:Name="GalleryNextButton" Width="40" Height="48" CornerRadius="8"
+                Style="{StaticResource IconButtonStyle}" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                Opacity="0.6" Visibility="Collapsed">
+                <FontIcon FontSize="18" Glyph="&#xE76C;" />
+            </Button>
+            <Border x:Name="GalleryProgressPanel" Padding="12,4" CornerRadius="8"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                Opacity="0.6" Visibility="Collapsed">
+                <StackPanel>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="GalleryPositionText" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock x:Name="GalleryFileNameText" Grid.Column="1" FontSize="12"
+                            VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                            ToolTipService.ToolTip="{Binding Text, ElementName=GalleryFileNameText}" />
+                    </Grid>
+                    <Slider x:Name="GalleryPositionSlider" MinWidth="100" StepFrequency="1"
+                        IsThumbToolTipEnabled="False" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
