@@ -383,6 +383,7 @@ namespace winrt::Glance::App::implementation
             std::shared_ptr<glance::app::NativePreviewSurface> surface,
             glance::contracts::native_preview::PreviewVisuals visuals);
         void update_native_preview_bounds() noexcept;
+        void update_native_preview_visibility() noexcept;
         void update_native_preview_occlusions() noexcept;
         void reset_hidden_window_size() noexcept;
         void present_file(

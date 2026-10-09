@@ -2333,14 +2333,7 @@ namespace winrt::Glance::App::implementation
         catch (...)
         {
         }
-        if (native_preview_surface_ != nullptr)
-        {
-            native_preview_surface_->set_visible(
-                visible_ && !active &&
-                (current_kind_ == glance::app::PreviewKind::native_document ||
-                 (current_kind_ == glance::app::PreviewKind::media &&
-                  native_media_active_)));
-        }
+        update_native_preview_visibility();
     }
 
     void MainWindow::configure_window()
@@ -3531,6 +3524,7 @@ namespace winrt::Glance::App::implementation
         BOOL cloaked = TRUE;
         const bool cloak_applied = SUCCEEDED(
             DwmSetWindowAttribute(window_, DWMWA_CLOAK, &cloaked, sizeof(cloaked)));
+        update_native_preview_visibility();
         ShowWindow(window_, SW_SHOWNOACTIVATE);
         UpdateWindow(window_);
         update_text_editor_bounds();
@@ -3547,6 +3541,7 @@ namespace winrt::Glance::App::implementation
                         const BOOL uncloaked = FALSE;
                         static_cast<void>(DwmSetWindowAttribute(
                             self->window_, DWMWA_CLOAK, &uncloaked, sizeof(uncloaked)));
+                        self->update_native_preview_visibility();
                     }
                 });
             if (!queued)
@@ -3554,7 +3549,12 @@ namespace winrt::Glance::App::implementation
                 cloaked = FALSE;
                 static_cast<void>(
                     DwmSetWindowAttribute(window_, DWMWA_CLOAK, &cloaked, sizeof(cloaked)));
+                update_native_preview_visibility();
             }
+        }
+        else
+        {
+            update_native_preview_visibility();
         }
     }
 
@@ -3778,7 +3778,6 @@ namespace winrt::Glance::App::implementation
         native_media_dimensions_applied_ = false;
         native_media_state_ = {};
         active_native_media_component_id_.clear();
-        NativeMediaLoadingOverlay().Visibility(Visibility::Collapsed);
         auto surface = std::exchange(native_preview_surface_, nullptr);
         if (surface == nullptr)
         {
@@ -3851,8 +3850,7 @@ namespace winrt::Glance::App::implementation
                 lifetime->auto_fit_window_to_content(content_size->width * scale, content_size->height * scale);
             }
             lifetime->update_native_preview_bounds();
-            surface->set_visible(
-                lifetime->visible_ && !lifetime->xaml_modal_overlay_active_);
+            lifetime->update_native_preview_visibility();
         }));
     }
 
@@ -3919,8 +3917,7 @@ namespace winrt::Glance::App::implementation
             }
             lifetime->native_preview_ready_ = true;
             lifetime->update_native_preview_bounds();
-            surface->set_visible(
-                lifetime->visible_ && !lifetime->xaml_modal_overlay_active_);
+            lifetime->update_native_preview_visibility();
             lifetime->media_timer_.Start();
         }));
     }
@@ -3996,8 +3993,6 @@ namespace winrt::Glance::App::implementation
                 glance::contracts::native_preview::media_state_ready) != 0;
             if (ready)
             {
-                lifetime->NativeMediaLoadingOverlay().Visibility(Visibility::Collapsed);
-                lifetime->update_native_preview_occlusions();
                 if (!lifetime->native_media_dimensions_applied_)
                 {
                     lifetime->native_media_dimensions_applied_ = true;
@@ -4014,12 +4009,6 @@ namespace winrt::Glance::App::implementation
                     }
                     lifetime->reveal_deferred_preview();
                 }
-            }
-            else if (lifetime->NativeMediaLoadingOverlay().Visibility() !=
-                Visibility::Visible)
-            {
-                lifetime->NativeMediaLoadingOverlay().Visibility(Visibility::Visible);
-                lifetime->update_native_preview_occlusions();
             }
 
             const double duration = std::max(
@@ -4044,6 +4033,7 @@ namespace winrt::Glance::App::implementation
                 playing ? L"\xE769" : L"\xE768");
             lifetime->MediaMuteIcon().Glyph(
                 muted || state->volume_percent == 0 ? L"\xE74F" : L"\xE767");
+            lifetime->update_native_preview_visibility();
             if (playing && lifetime->MediaControlsOverlay().Opacity() > 0.0 &&
                 !interacted)
             {
@@ -4131,6 +4121,18 @@ namespace winrt::Glance::App::implementation
     {
         co_await resume_background();
         surface->set_visuals(visuals, glance::app::current_ui_language());
+    }
+
+    void MainWindow::update_native_preview_visibility() noexcept
+    {
+        if (!native_preview_surface_) return;
+        DWORD cloaked{};
+        static_cast<void>(DwmGetWindowAttribute(window_, DWMWA_CLOAKED, &cloaked, sizeof(cloaked)));
+        const bool media_ready = !native_media_active_ ||
+            (native_media_state_.flags & glance::contracts::native_preview::media_state_ready) != 0;
+        native_preview_surface_->set_visible(visible_ && !defer_auto_fit_show_ &&
+            !xaml_modal_overlay_active_ && native_preview_ready_ && media_ready &&
+            IsWindowVisible(window_) && cloaked == 0);
     }
 
     void MainWindow::update_native_preview_bounds() noexcept
@@ -4223,7 +4225,6 @@ namespace winrt::Glance::App::implementation
             if (native_media_active_)
             {
                 append(MediaControlsOverlay());
-                append(NativeMediaLoadingOverlay());
             }
             if (fullscreen_ && fullscreen_title_visible_)
             {
@@ -4550,7 +4551,6 @@ namespace winrt::Glance::App::implementation
         case glance::app::PreviewKind::media:
             show_content_panel(kind);
             native_media_active_ = false;
-            NativeMediaLoadingOverlay().Visibility(Visibility::Collapsed);
             media_is_audio_ = gallery_media_kind_ ==
                 glance::contracts::components::GalleryMediaKind::audio;
             media_seek_wheel_delta_ = 0;
@@ -6912,7 +6912,6 @@ namespace winrt::Glance::App::implementation
             media_controls_idle_ticks_ = 0;
             show_media_controls();
             update_media_surface_background();
-            NativeMediaLoadingOverlay().Visibility(Visibility::Visible);
             ComponentLoadingText().Visibility(Visibility::Collapsed);
 
             auto surface = std::make_shared<glance::app::NativePreviewSurface>(
@@ -9084,11 +9083,6 @@ namespace winrt::Glance::App::implementation
                 native_preview_surface_,
                 NativeMediaControl::view_mode,
                 activation.checked ? 1 : 0);
-            if (!activation.checked)
-            {
-                NativeMediaLoadingOverlay().Visibility(Visibility::Visible);
-                update_native_preview_occlusions();
-            }
             button.IsChecked(activation.checked);
             return;
         }

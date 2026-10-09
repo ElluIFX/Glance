@@ -665,13 +665,6 @@
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
-                    <StackPanel
-                        x:Name="NativeMediaLoadingOverlay"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Visibility="Collapsed">
-                        <ProgressRing Width="32" Height="32" IsActive="True" />
-                    </StackPanel>
                     <Border
                         x:Name="MediaPausedOverlay"
                         Width="72"
