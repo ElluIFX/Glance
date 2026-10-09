@@ -25,12 +25,20 @@ namespace glance::app
     };
 
 
+    struct ComponentMetadata
+    {
+        std::wstring summary;
+        std::wstring capabilities;
+        std::wstring dependencies;
+        std::shared_ptr<void> lease;
+    };
     struct ComponentStatus
     {
         std::wstring id;
         std::wstring display_name;
         std::wstring detail;
         ComponentState state{ ComponentState::error };
+        ComponentMetadata metadata;
     };
 
     enum class ComponentStatusBarShortcutState

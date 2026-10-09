@@ -1,3 +1,4 @@
+#include "../Common/component_text.h"
 #include "../Common/preview_cancellation.h"
 #include "../../version.h"
 #include "view.h"
@@ -79,6 +80,7 @@ void WINAPI shutdown() noexcept
 }
 BOOL WINAPI query(const GUID *id, std::uint32_t version, void **output) noexcept
 {
+        if (glance::components::query_metadata_interface(id, version, output)) return TRUE;
     if (!output)
         return FALSE;
     *output = nullptr;

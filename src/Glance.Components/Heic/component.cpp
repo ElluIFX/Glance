@@ -188,6 +188,7 @@ namespace
         std::uint32_t minimum_version,
         void** interface_pointer) noexcept
     {
+        if (glance::components::query_metadata_interface(interface_id, minimum_version, interface_pointer)) return TRUE;
         if (interface_pointer == nullptr)
         {
             return FALSE;

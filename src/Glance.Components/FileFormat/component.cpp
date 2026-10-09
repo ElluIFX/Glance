@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "../Common/component_text.h"
 #include "glance/contracts/component_api.h"
 #include "../Common/preview_cancellation.h"
 #include "../../version.h"
@@ -196,6 +197,7 @@ namespace
     const InformationProviderApi information_api{.identify_format = identify};
     BOOL WINAPI query_interface(const GUID* id, std::uint32_t version, void** output) noexcept
     {
+        if (glance::components::query_metadata_interface(id, version, output)) return TRUE;
         if (!output) return FALSE;
         *output = nullptr;
         if (id && IsEqualGUID(*id, information_provider_api_id) && version <= information_provider_api_version)

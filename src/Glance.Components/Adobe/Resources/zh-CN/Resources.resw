@@ -19,4 +19,7 @@
   <data name="Preview.LowResolutionOnly" xml:space="preserve"><value>大型文件只支持低清预览</value></data>
   <data name="Preview.Unavailable" xml:space="preserve"><value>文件未包含兼容预览且未安装对应 Adobe 软件</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>无法准备此 Adobe 文档</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>预览 Adobe 图像与文档</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>PSD、PSB 内嵌预览，PSD 高清图像，包含 PDF 兼容数据的 AI</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>无需额外下载；AI 预览需要 PDF 组件</value></data>
 </root>

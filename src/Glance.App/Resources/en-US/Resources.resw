@@ -574,4 +574,8 @@
   <data name="GalleryPosition" xml:space="preserve"><value>{0} / {1}</value></data>
   <data name="GalleryUnknownPosition" xml:space="preserve"><value>Item {0}</value></data>
   <data name="GenericPropertiesTitle" xml:space="preserve"><value>File properties</value></data>
+  <data name="AddonMetadataSummary" xml:space="preserve"><value>Summary</value></data>
+  <data name="AddonMetadataCapabilities" xml:space="preserve"><value>Supported formats or capabilities</value></data>
+  <data name="AddonMetadataDependencies" xml:space="preserve"><value>Dependencies</value></data>
+  <data name="AddonMetadataShow" xml:space="preserve"><value>View add-on information</value></data>
 </root>

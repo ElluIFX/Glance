@@ -88,6 +88,7 @@ namespace
         HMODULE module{};
         ComponentApi api;
         ComponentRegistration registration;
+        std::array<std::wstring, 3> metadata_keys;
         std::optional<ProgressivePreviewApi> progressive_preview;
         std::optional<WebPreviewApi> web_preview;
         std::optional<HostRendererApi> host_renderer;
@@ -535,6 +536,37 @@ namespace
         component->gallery_kinds = std::move(collector.gallery_kinds);
         component->renderers = std::move(collector.renderers);
         void* interface_pointer{};
+        using glance::contracts::components::ComponentMetadataApi;
+        if (!component->api.query_interface(&glance::contracts::components::component_metadata_api_id,
+            glance::contracts::components::component_metadata_api_version, &interface_pointer) || !interface_pointer)
+        {
+            glance::contracts::log_event(L"Component metadata interface is missing: " + component->id);
+            return {};
+        }
+        const auto* metadata = static_cast<const ComponentMetadataApi*>(interface_pointer);
+        if (metadata->size < sizeof(ComponentMetadataApi) || metadata->version != glance::contracts::components::component_metadata_api_version)
+        {
+            glance::contracts::log_event(L"Component metadata interface is invalid: " + component->id);
+            return {};
+        }
+        const auto keys = std::array{bounded_string(metadata->summary_key), bounded_string(metadata->capabilities_key),
+            bounded_string(metadata->dependencies_key)};
+        for (std::size_t index = 0; index < keys.size(); ++index)
+        {
+            if (!keys[index] || !valid_resource_key(*keys[index]))
+            {
+                glance::contracts::log_event(L"Component metadata resource key is invalid: " + component->id);
+                return {};
+            }
+            for (const auto* language : {L"en-US", L"zh-CN"})
+                if (!glance::app::has_component_translation(component->id, *keys[index], language))
+                {
+                    glance::contracts::log_event(L"Component metadata translation is missing: " + component->id + L" / " + *keys[index] + L" / " + language);
+                    return {};
+                }
+            component->metadata_keys[index] = *keys[index];
+        }
+        interface_pointer = nullptr;
         if (component->api.query_interface(
                 &glance::contracts::components::progressive_preview_api_id,
                 glance::contracts::components::progressive_preview_api_version,
@@ -2096,7 +2128,10 @@ namespace glance::app
                     .display_name =
                         localize_component_key(*component, *display_name_key),
                     .detail = std::move(detail),
-                    .state = state });
+                    .state = state,
+                    .metadata = {localize_component_key(*component, component->metadata_keys[0]),
+                        localize_component_key(*component, component->metadata_keys[1]),
+                        localize_component_key(*component, component->metadata_keys[2]), component} });
             }
             catch (...)
             {

@@ -17,4 +17,7 @@
   <data name="Preview.Unavailable" xml:space="preserve"><value>This AVIF image is not supported</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Could not prepare this AVIF image</value></data>
   <data name="Preview.Refining" xml:space="preserve"><value>Preparing full-resolution image...</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Preview AVIF images</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>AVIF images, transparency and orientation</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>No additional downloads</value></data>
 </root>

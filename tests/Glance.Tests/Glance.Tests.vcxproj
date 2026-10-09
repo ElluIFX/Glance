@@ -46,6 +46,7 @@
     <ClCompile Include="executable_tests.cpp" />
     <ClCompile Include="font_tests.cpp" />
     <ClCompile Include="text_search_tests.cpp" />
+    <ClCompile Include="component_metadata_tests.cpp" />
     <ClCompile Include="..\..\src\Glance.App\preview\text_search.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Font\client.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Executable\host\pe_reader.cpp" />
@@ -88,6 +89,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.5" />
+    <PackageReference Include="Microsoft.Windows.CppWinRT" Version="3.0.260715.1" />
     <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
     <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.3" />
     <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.3.1" />

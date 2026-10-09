@@ -17,4 +17,7 @@
   <data name="IdentificationFailed" xml:space="preserve"><value>无法识别此文件</value></data>
   <data name="IdentificationLimited" xml:space="preserve"><value>识别已达到资源限制</value></data>
   <data name="IdentificationUnknown" xml:space="preserve"><value>未识别出文件格式</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>通过文件内容识别未知格式</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>基于 PRONOM 签名识别文件格式，并在支持时按识别格式预览</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>无需额外下载；识别程序和签名库随组件提供</value></data>
 </root>

@@ -38,4 +38,7 @@
   <data name="InstallRequested" xml:space="preserve"><value>已交由 Windows 安装字体</value></data>
   <data name="InstallCancelled" xml:space="preserve"><value>已取消字体安装</value></data>
   <data name="InstallFailed" xml:space="preserve"><value>无法安装此字体</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>查看字体并试写文本</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>TTF、OTF、TTC、OTC、WOFF、WOFF2 字体预览与字符信息</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>无</value></data>
 </root>

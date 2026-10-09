@@ -617,6 +617,20 @@ namespace
     const FocusChangeApi focus_change_api{
         .focus = focus_item };
 
+    BOOL WINAPI query_metadata(const wchar_t* language_tag, SourceMetadataResult* result) noexcept
+    {
+        if (!result || result->size < sizeof(SourceMetadataResult)) return FALSE;
+        SourceMetadataResult metadata;
+        if (!resources.copy(L"SourceMeta.Summary", language_tag, metadata.summary, std::size(metadata.summary)) ||
+            !resources.copy(L"SourceMeta.Capabilities", language_tag, metadata.capabilities, std::size(metadata.capabilities)) ||
+            !resources.copy(L"SourceMeta.Dependencies", language_tag, metadata.dependencies, std::size(metadata.dependencies)))
+            return FALSE;
+        *result = metadata;
+        return TRUE;
+    }
+
+    const SourceMetadataApi source_metadata_api{ .query = query_metadata };
+
     BOOL WINAPI query_interface(
         const GUID* interface_id,
         std::uint32_t minimum_version,
@@ -627,6 +641,11 @@ namespace
             return FALSE;
         }
         *interface_pointer = nullptr;
+        if (IsEqualGUID(*interface_id, source_metadata_api_id) && minimum_version <= source_metadata_api_version)
+        {
+            *interface_pointer = const_cast<SourceMetadataApi*>(&source_metadata_api);
+            return TRUE;
+        }
         if (IsEqualGUID(*interface_id, item_list_api_id) &&
             minimum_version <= item_list_api_version)
         {

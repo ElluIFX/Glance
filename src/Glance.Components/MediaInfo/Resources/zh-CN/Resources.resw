@@ -53,4 +53,7 @@
   <data name="MediaType.Subtitle" xml:space="preserve"><value>字幕</value></data>
   <data name="MediaType.Attachment" xml:space="preserve"><value>附件</value></data>
   <data name="MediaType.Data" xml:space="preserve"><value>数据</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>查看高级媒体信息</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>音视频流、编码、色彩、标签与容器信息</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>FFprobe 可选依赖</value></data>
 </root>

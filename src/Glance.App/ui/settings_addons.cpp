@@ -3,6 +3,8 @@
 #include "dependencies/dependency_service.h"
 #include "localization.h"
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
+#include <winrt/Windows.UI.Xaml.Interop.h>
+#include <winrt/Microsoft.UI.Xaml.Automation.h>
 
 using namespace winrt;
 using namespace Windows::Foundation;
@@ -31,7 +33,7 @@ namespace
             panel.Children().RemoveAtEnd();
     }
 
-    void set_health(FontIcon const &icon, unsigned severity)
+    void set_health(FontIcon const &icon, unsigned severity, std::wstring_view detail = {})
     {
         const auto key = severity == 0   ? L"ComponentStateHealthy"
                          : severity == 1 ? L"ComponentStateWarning"
@@ -41,7 +43,9 @@ namespace
         icon.Foreground(Media::SolidColorBrush(severity == 0   ? Windows::UI::Color{255, 16, 124, 16}
                                                : severity == 1 ? Windows::UI::Color{255, 157, 93, 0}
                                                                : Windows::UI::Color{255, 196, 43, 28}));
-        ToolTipService::SetToolTip(icon, box_value(glance::app::localize(key)));
+        std::wstring text(glance::app::localize(key));
+        if (!detail.empty() && detail != text) text += L"\n" + std::wstring(detail);
+        ToolTipService::SetToolTip(icon, box_value(text));
     }
 } // namespace
 
@@ -202,20 +206,152 @@ namespace winrt::Glance::App::implementation
         for (const auto &status : statuses)
         {
             auto &row = component_rows_[status.id];
-            if (!row.view.root)
-            {
-                row.icon = FontIcon();
-                row.view = glance::app::make_settings_row(row.icon);
-            }
+            initialize_addon_row(row);
+            row.metadata = status.metadata;
+            update_addon_metadata(row);
             row.view.title.Text(status.display_name);
-            row.view.description.Text(status.detail);
+            row.view.description.Text(status.id);
             const auto severity = status.state == glance::app::ComponentState::healthy   ? 0U
                                   : status.state == glance::app::ComponentState::warning ? 1U
                                                                                          : 2U;
-            set_health(row.icon, severity);
+            set_health(row.icon, severity, status.detail);
             rows.push_back(row.view.root);
         }
         show_rows(ComponentStatusList(), rows);
+    }
+
+    void SettingsWindow::initialize_addon_row(AddonRow& row)
+    {
+        if (row.view.root) return;
+        row.icon = FontIcon();
+        row.information = Button();
+        row.information.Style(Application::Current().Resources().Lookup(box_value(L"IconButtonStyle")).as<Style>());
+        FontIcon information;
+        information.Glyph(L"\xE946");
+        information.FontSize(16);
+        row.information.Content(information);
+        StackPanel actions;
+        actions.Orientation(Orientation::Horizontal);
+        actions.Spacing(12);
+        actions.Children().Append(row.information);
+        actions.Children().Append(row.icon);
+        row.view = glance::app::make_settings_row(actions);
+        row.information_flyout = Flyout();
+        row.information_flyout.Placement(Primitives::FlyoutPlacementMode::RightEdgeAlignedTop);
+        StackPanel panel;
+        panel.Spacing(6);
+        for (std::size_t index = 0; index < row.information_text.size(); ++index)
+        {
+            auto& text = row.information_text[index];
+            text = TextBlock();
+            text.FontSize(12);
+            text.TextWrapping(TextWrapping::Wrap);
+            text.IsTextSelectionEnabled(true);
+            if (index % 2 == 0)
+            {
+                text.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
+                if (index != 0) text.Margin({0, 6, 0, 0});
+            }
+            panel.Children().Append(text);
+        }
+        ScrollViewer scroller;
+        scroller.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
+        scroller.HorizontalScrollMode(ScrollMode::Disabled);
+        scroller.HorizontalContentAlignment(HorizontalAlignment::Stretch);
+        scroller.VerticalScrollBarVisibility(ScrollBarVisibility::Auto);
+        scroller.Content(panel);
+        row.information_flyout.Content(scroller);
+        const auto weak = get_weak();
+        const auto target = &row;
+        row.information.PointerEntered([weak, target](auto const&, auto const&) {
+            if (const auto self = weak.get()) self->schedule_addon_metadata(target, true);
+        });
+        row.information.PointerExited([weak, target](auto const&, auto const&) {
+            if (const auto self = weak.get()) self->schedule_addon_metadata(target, false);
+        });
+        panel.PointerEntered([weak](auto const&, auto const&) {
+            if (const auto self = weak.get(); self && self->addon_metadata_timer_) self->addon_metadata_timer_.Stop();
+        });
+        panel.PointerExited([weak, target](auto const&, auto const&) {
+            if (const auto self = weak.get()) self->schedule_addon_metadata(target, false);
+        });
+        row.information.Click([weak, target](auto const&, auto const&) {
+            if (const auto self = weak.get()) self->show_addon_metadata(target, true);
+        });
+        row.information_flyout.Closed([weak, target](auto const&, auto const&) {
+            if (const auto self = weak.get(); self && self->addon_metadata_row_ == target)
+            {
+                self->addon_metadata_row_ = nullptr;
+                self->addon_metadata_pinned_ = false;
+                if (self->addon_metadata_timer_) self->addon_metadata_timer_.Stop();
+            }
+        });
+    }
+
+    void SettingsWindow::update_addon_metadata(AddonRow& row)
+    {
+        const std::array strings{glance::app::localize(L"AddonMetadataSummary"), row.metadata.summary,
+            glance::app::localize(L"AddonMetadataCapabilities"), row.metadata.capabilities,
+            glance::app::localize(L"AddonMetadataDependencies"), row.metadata.dependencies};
+        for (std::size_t index = 0; index < strings.size(); ++index)
+            if (row.information_text[index].Text() != strings[index]) row.information_text[index].Text(strings[index]);
+        ToolTipService::SetToolTip(row.information, nullptr);
+        Automation::AutomationProperties::SetName(row.information, glance::app::localize(L"AddonMetadataShow"));
+        row.information.IsEnabled(!row.metadata.summary.empty() && !row.metadata.capabilities.empty() &&
+            !row.metadata.dependencies.empty());
+    }
+
+    void SettingsWindow::schedule_addon_metadata(AddonRow* row, bool show)
+    {
+        if (addon_metadata_pinned_) return;
+        if (!show && addon_metadata_row_ != row) return;
+        if (show && addon_metadata_row_ != row) close_addon_metadata();
+        addon_metadata_row_ = row;
+        addon_metadata_show_ = show;
+        if (!addon_metadata_timer_)
+        {
+            addon_metadata_timer_ = DispatcherTimer();
+            addon_metadata_timer_.Tick([weak = get_weak()](auto const&, auto const&) {
+                if (const auto self = weak.get())
+                {
+                    self->addon_metadata_timer_.Stop();
+                    if (self->addon_metadata_show_) self->show_addon_metadata(self->addon_metadata_row_, false);
+                    else self->close_addon_metadata();
+                }
+            });
+        }
+        addon_metadata_timer_.Stop();
+        addon_metadata_timer_.Interval(std::chrono::milliseconds(show ? 200 : 150));
+        addon_metadata_timer_.Start();
+    }
+
+    void SettingsWindow::show_addon_metadata(AddonRow* target, bool pinned)
+    {
+        if (!target || !target->information.IsEnabled()) return;
+        if (addon_metadata_row_ != target) close_addon_metadata();
+        if (addon_metadata_timer_) addon_metadata_timer_.Stop();
+        auto& row = *target;
+        addon_metadata_row_ = target;
+        addon_metadata_pinned_ = pinned;
+        row.information_flyout.ShowMode(pinned ? Primitives::FlyoutShowMode::Standard : Primitives::FlyoutShowMode::Transient);
+        const double width = std::max(180.0, std::min(420.0, RootGrid().ActualWidth() - 48.0));
+        row.information_flyout.Content().as<ScrollViewer>().MaxWidth(width - 32.0);
+        Style style(xaml_typename<FlyoutPresenter>());
+        style.Setters().Append(Setter(FrameworkElement::MaxWidthProperty(), box_value(width)));
+        style.Setters().Append(Setter(FrameworkElement::MaxHeightProperty(), box_value(std::max(120.0, RootGrid().ActualHeight() - 80.0))));
+        style.Setters().Append(Setter(ScrollViewer::HorizontalScrollBarVisibilityProperty(), box_value(ScrollBarVisibility::Disabled)));
+        style.Setters().Append(Setter(ScrollViewer::HorizontalScrollModeProperty(), box_value(ScrollMode::Disabled)));
+        row.information_flyout.FlyoutPresenterStyle(style);
+        if (!row.information_flyout.IsOpen()) row.information_flyout.ShowAt(row.information);
+    }
+
+    void SettingsWindow::close_addon_metadata()
+    {
+        if (addon_metadata_timer_) addon_metadata_timer_.Stop();
+        const auto row = addon_metadata_row_;
+        addon_metadata_row_ = nullptr;
+        addon_metadata_pinned_ = false;
+        if (row) row->information_flyout.Hide();
     }
 
     void SettingsWindow::HandleSourceStatuses(std::string_view payload)
@@ -231,18 +367,20 @@ namespace winrt::Glance::App::implementation
             for (std::uint32_t index = 0; index < sources.Size(); ++index)
             {
                 const auto status = sources.GetObjectAt(index);
-                auto &row = source_rows_[std::wstring(status.GetNamedString(L"id"))];
-                if (!row.view.root)
-                {
-                    row.icon = FontIcon();
-                    row.view = glance::app::make_settings_row(row.icon);
-                }
+                const auto id = status.GetNamedString(L"id");
+                auto &row = source_rows_[std::wstring(id)];
+                initialize_addon_row(row);
+                const auto metadata = status.GetNamedObject(L"metadata");
+                row.metadata.summary = metadata.GetNamedString(L"summary");
+                row.metadata.capabilities = metadata.GetNamedString(L"capabilities");
+                row.metadata.dependencies = metadata.GetNamedString(L"dependencies");
+                update_addon_metadata(row);
                 row.view.title.Text(status.GetNamedString(L"name"));
                 auto detail = status.GetNamedString(L"detail", L"");
                 if (detail.empty() && status.GetNamedNumber(L"code", 0) == 1)
                     detail = glance::app::localize(L"SourceLoadError");
-                row.view.description.Text(detail);
-                set_health(row.icon, static_cast<unsigned>(status.GetNamedNumber(L"severity", 2)));
+                row.view.description.Text(id);
+                set_health(row.icon, static_cast<unsigned>(status.GetNamedNumber(L"severity", 2)), detail);
                 rows.push_back(row.view.root);
             }
             show_rows(SourceStatusList(), rows);

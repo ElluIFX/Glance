@@ -198,6 +198,11 @@ namespace
             entry.SetNamedValue(L"detail", JsonValue::CreateStringValue(status.detail));
             entry.SetNamedValue(L"severity", JsonValue::CreateNumberValue(status.severity));
             entry.SetNamedValue(L"code", JsonValue::CreateNumberValue(status.code));
+            JsonObject metadata;
+            metadata.SetNamedValue(L"summary", JsonValue::CreateStringValue(status.metadata[0]));
+            metadata.SetNamedValue(L"capabilities", JsonValue::CreateStringValue(status.metadata[1]));
+            metadata.SetNamedValue(L"dependencies", JsonValue::CreateStringValue(status.metadata[2]));
+            entry.SetNamedValue(L"metadata", metadata);
             entry.SetNamedValue(
                 L"capabilities",
                 JsonValue::CreateStringValue(std::to_wstring(status.capabilities)));

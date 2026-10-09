@@ -14,4 +14,7 @@
   <data name="Settings.OsvRow" xml:space="preserve"><value>OSV preview</value></data>
   <data name="Settings.ViewAngle" xml:space="preserve"><value>View angle (°)</value></data>
   <data name="Settings.Overlap" xml:space="preserve"><value>Overlap (°)</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Interactively preview panoramic videos</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>Insta360 INSV and DJI OSV with panoramic projection and view switching</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>Windows media decoding support</value></data>
 </root>

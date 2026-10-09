@@ -14,4 +14,7 @@
   <data name="Settings.OsvRow" xml:space="preserve"><value>OSV 预览</value></data>
   <data name="Settings.ViewAngle" xml:space="preserve"><value>视角 (°)</value></data>
   <data name="Settings.Overlap" xml:space="preserve"><value>重叠区 (°)</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>交互预览全景视频</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>影石 INSV、大疆 OSV，支持全景投影与视图切换</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>Windows 媒体解码支持</value></data>
 </root>

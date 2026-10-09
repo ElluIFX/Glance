@@ -144,4 +144,7 @@
   <data name="Parameters" xml:space="preserve"><value>Parameters</value></data>
   <data name="MetadataToken" xml:space="preserve"><value>Metadata token</value></data>
   <data name="PublicType" xml:space="preserve"><value>Public type</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Inspect Windows executable files</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>Version, dependency and program information for EXE, DLL, SYS, OCX, CPL and related PE files</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>None</value></data>
 </root>

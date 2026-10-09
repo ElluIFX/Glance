@@ -23,4 +23,7 @@
   <data name="Viewer.Fit" xml:space="preserve"><value>Fit model</value></data>
   <data name="Viewer.Grid" xml:space="preserve"><value>Show grid</value></data>
   <data name="Viewer.Wireframe" xml:space="preserve"><value>Show wireframe</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Interactively preview 3D models</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>STL, 3MF, OBJ, PLY, glTF, GLB, FBX, STEP, IGES and BREP</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>WebView2 Runtime</value></data>
 </root>

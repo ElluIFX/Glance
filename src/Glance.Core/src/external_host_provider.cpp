@@ -9,6 +9,7 @@
 #include <winrt/base.h>
 
 #include <algorithm>
+#include <cwchar>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -54,6 +55,7 @@ namespace
         UniqueModule module;
         SourceApi api;
         SourceRegistration registration;
+        SourceMetadataApi metadata;
         std::optional<ItemListApi> item_list;
         std::optional<FocusChangeApi> focus_change;
     };
@@ -249,6 +251,14 @@ namespace
         return capabilities & source.registration.capability_mask;
     }
 
+    bool valid_metadata(const SourceMetadataResult& result)
+    {
+        if (result.size < sizeof(SourceMetadataResult)) return false;
+        for (const auto* text : {result.summary, result.capabilities, result.dependencies})
+            if (text[0] == L'\0' || !std::wmemchr(text, L'\0', metadata_text_capacity)) return false;
+        return true;
+    }
+
     LoadedSource* ensure_loaded(SourceDescriptor& descriptor)
     {
         if (descriptor.loaded)
@@ -291,6 +301,28 @@ namespace
         }
 
         void* optional{};
+        if (!source->api.query_interface(&source_metadata_api_id, source_metadata_api_version, &optional) || !optional)
+        {
+            descriptor.load_error = L"Source metadata interface is missing";
+            return nullptr;
+        }
+        source->metadata = *static_cast<const SourceMetadataApi*>(optional);
+        if (source->metadata.size < sizeof(SourceMetadataApi) || source->metadata.version != source_metadata_api_version ||
+            !source->metadata.query)
+        {
+            descriptor.load_error = L"Source metadata interface is invalid";
+            return nullptr;
+        }
+        for (const auto* language : {L"en-US", L"zh-CN"})
+        {
+            SourceMetadataResult metadata;
+            if (!source->metadata.query(language, &metadata) || !valid_metadata(metadata))
+            {
+                descriptor.load_error = L"Source metadata is missing for " + std::wstring(language);
+                return nullptr;
+            }
+        }
+        optional = nullptr;
         if (source->api.query_interface(
                 &item_list_api_id, item_list_api_version, &optional) && optional != nullptr)
         {
@@ -474,7 +506,8 @@ namespace glance::core
                     {},
                     static_cast<std::uint32_t>(HealthSeverity::error),
                     1,
-                    0 });
+                    0,
+                    {} });
                 continue;
             }
             SourceStatusResult result;
@@ -484,13 +517,20 @@ namespace glance::core
             {
                 continue;
             }
+            SourceMetadataResult metadata;
+            if (!source->metadata.query(language.c_str(), &metadata) || !valid_metadata(metadata))
+            {
+                glance::contracts::log_event(L"Source metadata query failed: " + descriptor.manifest.id);
+                continue;
+            }
             statuses.push_back(ExternalHostStatus{
                 descriptor.manifest.id,
                 result.display_name,
                 result.detail,
                 static_cast<std::uint32_t>(result.severity),
                 result.code,
-                result.capability_mask });
+                result.capability_mask,
+                {std::wstring(metadata.summary), std::wstring(metadata.capabilities), std::wstring(metadata.dependencies)} });
         }
         std::ranges::sort(statuses, {}, &ExternalHostStatus::display_name);
         return statuses;

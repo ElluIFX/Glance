@@ -19,4 +19,7 @@
   <data name="Preview.LowResolutionOnly" xml:space="preserve"><value>Large files support low-resolution preview only</value></data>
   <data name="Preview.Unavailable" xml:space="preserve"><value>This file has no compatible embedded preview or installed Adobe application</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Could not prepare this Adobe document</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Preview Adobe images and documents</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>Embedded PSD and PSB previews, full-resolution PSD images, and AI files with PDF-compatible data</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>No additional downloads; AI preview requires the PDF component</value></data>
 </root>

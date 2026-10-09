@@ -16,6 +16,10 @@ namespace glance::contracts::sources
     inline constexpr std::size_t path_capacity = 32768;
     inline constexpr std::uint32_t item_list_api_version = 1;
     inline constexpr std::uint32_t focus_change_api_version = 1;
+    inline constexpr std::uint32_t source_metadata_api_version = 1;
+    inline constexpr std::size_t metadata_text_capacity = 1024;
+    inline constexpr GUID source_metadata_api_id{
+        0x4aa764ae, 0x9ce0, 0x4fe4, {0x91, 0x1e, 0xf2, 0x2d, 0xad, 0x96, 0x7d, 0x1a}};
 
     inline constexpr GUID item_list_api_id{
         0xf6819698,
@@ -151,6 +155,25 @@ namespace glance::contracts::sources
         QueryStatusFunction query_status{};
         QueryInterfaceFunction query_interface{};
         ShutdownFunction shutdown{};
+    };
+
+    struct SourceMetadataResult
+    {
+        std::uint32_t size{ sizeof(SourceMetadataResult) };
+        wchar_t summary[metadata_text_capacity]{};
+        wchar_t capabilities[metadata_text_capacity]{};
+        wchar_t dependencies[metadata_text_capacity]{};
+    };
+
+    using QueryMetadataFunction = BOOL(WINAPI*)(
+        const wchar_t* language_tag,
+        SourceMetadataResult* result) noexcept;
+
+    struct SourceMetadataApi
+    {
+        std::uint32_t size{ sizeof(SourceMetadataApi) };
+        std::uint32_t version{ source_metadata_api_version };
+        QueryMetadataFunction query{};
     };
 
     using GetApiFunction = BOOL(WINAPI*)(

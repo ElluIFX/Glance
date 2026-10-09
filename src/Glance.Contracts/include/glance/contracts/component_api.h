@@ -8,7 +8,7 @@
 
 namespace glance::contracts::components
 {
-    inline constexpr std::uint32_t abi_version = 14;
+    inline constexpr std::uint32_t abi_version = 15;
     inline constexpr char get_api_export[] = "GlanceComponentGetApi";
     inline constexpr std::size_t component_id_capacity = 64;
     inline constexpr std::size_t target_app_version_capacity = 32;
@@ -30,6 +30,17 @@ namespace glance::contracts::components
     inline constexpr std::uint32_t status_bar_shortcut_api_version = 3;
     inline constexpr std::size_t component_resource_path_capacity = 260;
     inline constexpr std::size_t resource_key_capacity = 256;
+    inline constexpr std::uint32_t component_metadata_api_version = 1;
+    inline constexpr GUID component_metadata_api_id{
+        0x4496dd86, 0xf3d0, 0x49aa, {0xad, 0x10, 0x9c, 0x53, 0x58, 0xaa, 0xf4, 0xd8}};
+    struct ComponentMetadataApi
+    {
+        std::uint32_t size{ sizeof(ComponentMetadataApi) };
+        std::uint32_t version{ component_metadata_api_version };
+        wchar_t summary_key[resource_key_capacity]{};
+        wchar_t capabilities_key[resource_key_capacity]{};
+        wchar_t dependencies_key[resource_key_capacity]{};
+    };
     inline constexpr std::size_t web_resource_host_capacity = 64;
     inline constexpr std::size_t maximum_web_resource_mappings = 4;
     inline constexpr std::size_t maximum_web_localized_parameters = 8;

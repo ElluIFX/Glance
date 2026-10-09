@@ -126,6 +126,7 @@ namespace winrt::Glance::App::implementation
                 self->acrylic_backdrop_.reset();
                 if (self->size_reset_timer_) self->size_reset_timer_.Stop();
                 if (self->position_reset_timer_) self->position_reset_timer_.Stop();
+                self->close_addon_metadata();
                 self->cancel_update_download();
             }
         });
@@ -335,6 +336,7 @@ namespace winrt::Glance::App::implementation
             ? L"general"
             : unbox_value_or<hstring>(selected.Tag(), L"general");
         const bool first_visit = !settings_registry_.page_created(tag.c_str());
+        if (tag != L"components") close_addon_metadata();
         const bool was_initializing = initializing_;
         initializing_ = true;
         settings_registry_.show_page(tag.c_str());

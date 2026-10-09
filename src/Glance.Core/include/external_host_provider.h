@@ -5,6 +5,7 @@
 #include <windows.h>
 
 #include <cstdint>
+#include <array>
 #include <memory>
 #include <optional>
 #include <string>
@@ -46,6 +47,7 @@ namespace glance::core
         std::uint32_t severity{};
         std::uint32_t code{};
         std::uint64_t capabilities{};
+        std::array<std::wstring, 3> metadata;
     };
 
     class ExternalHostProviderRegistry final

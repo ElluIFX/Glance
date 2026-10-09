@@ -38,4 +38,7 @@
   <data name="InstallRequested" xml:space="preserve"><value>Font installation handed to Windows</value></data>
   <data name="InstallCancelled" xml:space="preserve"><value>Font installation cancelled</value></data>
   <data name="InstallFailed" xml:space="preserve"><value>Unable to install this font</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Preview fonts and try sample text</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>Font previews and character information for TTF, OTF, TTC, OTC, WOFF and WOFF2</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>None</value></data>
 </root>

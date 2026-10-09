@@ -144,4 +144,7 @@
   <data name="Parameters" xml:space="preserve"><value>参数</value></data>
   <data name="MetadataToken" xml:space="preserve"><value>元数据标记</value></data>
   <data name="PublicType" xml:space="preserve"><value>公开类型</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>查看 Windows 可执行文件的详细信息</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>EXE、DLL、SYS、OCX、CPL 等 PE 文件的版本、依赖和程序信息</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>无</value></data>
 </root>

@@ -17,4 +17,7 @@
   <data name="IdentificationFailed" xml:space="preserve"><value>Unable to identify this file</value></data>
   <data name="IdentificationLimited" xml:space="preserve"><value>Identification reached its resource limit</value></data>
   <data name="IdentificationUnknown" xml:space="preserve"><value>File format not identified</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Identify unknown formats from file contents</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>PRONOM signature-based format identification and preview using the identified format when supported</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>No additional downloads; identification program and signatures are bundled</value></data>
 </root>

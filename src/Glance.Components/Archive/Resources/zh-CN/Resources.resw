@@ -21,4 +21,7 @@
   <data name="Value.File" xml:space="preserve"><value>文件</value></data>
   <data name="Info.ScannedFileCount" xml:space="preserve"><value>已扫描文件</value></data>
   <data name="Info.ScannedOriginalSize" xml:space="preserve"><value>已扫描原始大小</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>查看压缩包和磁盘映像中的文件目录</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>ZIP、7Z、RAR、TAR、GZ、BZ2、XZ、ZST、CAB、ISO、UDF、WIM 等格式，无需解压</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>无需额外下载</value></data>
 </root>

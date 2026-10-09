@@ -11,4 +11,7 @@
   <data name="Settings.RenderResolution.2048" xml:space="preserve"><value>2048 px</value></data>
   <data name="Settings.RenderResolution.4096" xml:space="preserve"><value>4096 px</value></data>
   <data name="Settings.RenderResolution.8192" xml:space="preserve"><value>8192 px</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>预览 PDF 文档</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>多页 PDF、页面缩略图、目录和加密文档</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>无需额外下载</value></data>
 </root>

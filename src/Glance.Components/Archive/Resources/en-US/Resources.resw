@@ -21,4 +21,7 @@
   <data name="Value.File" xml:space="preserve"><value>File</value></data>
   <data name="Info.ScannedFileCount" xml:space="preserve"><value>Scanned files</value></data>
   <data name="Info.ScannedOriginalSize" xml:space="preserve"><value>Scanned original size</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Browse archive and disk image contents</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>ZIP, 7Z, RAR, TAR, GZ, BZ2, XZ, ZST, CAB, ISO, UDF, WIM and related formats without extraction</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>No additional downloads</value></data>
 </root>

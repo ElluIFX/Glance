@@ -15,6 +15,7 @@
 #include "window_acrylic_backdrop.h"
 
 #include <atomic>
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -392,8 +393,22 @@ namespace winrt::Glance::App::implementation
             Microsoft::UI::Xaml::Controls::Button action{ nullptr };
             Microsoft::UI::Xaml::Controls::ProgressBar progress{ nullptr };
             std::weak_ptr<void> observed_transfer;
+            Microsoft::UI::Xaml::Controls::Button information{ nullptr };
+            Microsoft::UI::Xaml::Controls::Flyout information_flyout{ nullptr };
+            std::array<Microsoft::UI::Xaml::Controls::TextBlock, 6> information_text{
+                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+            glance::app::ComponentMetadata metadata;
         };
         std::map<std::wstring, AddonRow> dependency_rows_, component_rows_, source_rows_;
+        void initialize_addon_row(AddonRow& row);
+        void update_addon_metadata(AddonRow& row);
+        void schedule_addon_metadata(AddonRow* row, bool show);
+        void show_addon_metadata(AddonRow* row, bool pinned);
+        void close_addon_metadata();
+        Microsoft::UI::Xaml::DispatcherTimer addon_metadata_timer_{ nullptr };
+        AddonRow* addon_metadata_row_{};
+        bool addon_metadata_pinned_{};
+        bool addon_metadata_show_{};
         UpdatePreferencesChangedCallback update_preferences_changed_callback_;
     };
 }

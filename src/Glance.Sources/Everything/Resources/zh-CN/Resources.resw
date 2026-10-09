@@ -4,4 +4,7 @@
   <data name="Status.Ready" xml:space="preserve"><value>已就绪，等待 Everything</value></data>
   <data name="Status.Connected" xml:space="preserve"><value>已连接 Everything {0}</value></data>
   <data name="Status.Limited" xml:space="preserve"><value>已连接 Everything {0}，画廊滚动不可用</value></data>
+  <data name="SourceMeta.Summary" xml:space="preserve"><value>预览 Everything 中选中的文件</value></data>
+  <data name="SourceMeta.Capabilities" xml:space="preserve"><value>选中文件预览，结果列表可用时支持画廊浏览和焦点同步</value></data>
+  <data name="SourceMeta.Dependencies" xml:space="preserve"><value>需要安装并运行 Everything，无需额外下载</value></data>
 </root>

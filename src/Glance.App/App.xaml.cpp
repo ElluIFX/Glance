@@ -347,6 +347,11 @@ namespace winrt::Glance::App::implementation
             }
         }
         const auto appearance = glance::app::load_appearance_preferences();
+        if (!duplicate_instance)
+        {
+            glance::app::initialize_webview_availability();
+            glance::app::initialize_components();
+        }
         glance::app::apply_ui_language(appearance.language);
         glance::app::apply_accent_resources(appearance);
         if (duplicate_instance)
@@ -360,8 +365,6 @@ namespace winrt::Glance::App::implementation
             ResetEvent(shutdown_event_);
         }
 
-        glance::app::initialize_webview_availability();
-        glance::app::initialize_components();
         glance::app::dependencies::register_media_dependency();
         glance::app::dependencies::migrate_legacy_installations();
         glance::contracts::log_event(L"Creating the initial preview window.");

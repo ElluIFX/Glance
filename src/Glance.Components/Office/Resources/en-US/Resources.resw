@@ -17,4 +17,7 @@
   <data name="Status.Partial" xml:space="preserve"><value>Some Office preview handlers are unavailable</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>Loading Office document...</value></data>
   <data name="Preview.ProtectedSourceNotice" xml:space="preserve"><value>Previewing a blocked network file</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Preview Office documents</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>DOCX, PPTX, XLSX, plus DOC, PPT and XLS supported by a system preview handler</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>WebView2 Runtime; DOC, PPT and XLS require a system Office preview handler</value></data>
 </root>

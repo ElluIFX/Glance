@@ -84,6 +84,20 @@ namespace
             return resolved;
         }
 
+        bool has_translation(std::wstring_view key, std::wstring_view language)
+        {
+            auto context = manager_.CreateResourceContext();
+            const auto qualifier = winrt::Microsoft::Windows::ApplicationModel::Resources::KnownResourceQualifierName::Language();
+            context.QualifierValues().Insert(qualifier, winrt::hstring(language));
+            std::wstring resource_id(key);
+            std::ranges::replace(resource_id, L'.', L'/');
+            const auto candidate = resources_.TryGetValue(resource_id, context);
+            if (!candidate || candidate.ValueAsString().empty()) return false;
+            const auto values = candidate.QualifierValues();
+            return values.HasKey(qualifier) && CompareStringOrdinal(values.Lookup(qualifier).c_str(), -1,
+                std::wstring(language).c_str(), -1, TRUE) == CSTR_EQUAL;
+        }
+
     private:
         winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceManager manager_;
         winrt::Microsoft::Windows::ApplicationModel::Resources::ResourceMap resources_;
@@ -156,6 +170,13 @@ namespace
             return match == components_.end()
                 ? std::wstring(key)
                 : match->second->get(key);
+        }
+
+        bool has_component_translation(std::wstring_view component_id, std::wstring_view key, std::wstring_view language)
+        {
+            std::scoped_lock lock(mutex_);
+            const auto found = components_.find(std::wstring(component_id));
+            return found != components_.end() && found->second->has_translation(key, language);
         }
 
     private:
@@ -283,6 +304,12 @@ namespace glance::app
         {
             return std::wstring(key);
         }
+    }
+
+    bool has_component_translation(std::wstring_view component_id, std::wstring_view key, std::wstring_view language) noexcept
+    {
+        try { return resource_store().has_component_translation(component_id, key, language); }
+        catch (...) { return false; }
     }
 
 }

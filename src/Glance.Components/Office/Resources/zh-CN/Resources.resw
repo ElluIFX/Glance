@@ -17,4 +17,7 @@
   <data name="Status.Partial" xml:space="preserve"><value>部分 Office 预览处理器不可用</value></data>
   <data name="Preview.Loading" xml:space="preserve"><value>正在加载 Office 文档...</value></data>
   <data name="Preview.ProtectedSourceNotice" xml:space="preserve"><value>正在预览被阻止的网络文件</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>预览 Office 文档</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>DOCX、PPTX、XLSX，以及系统预览处理器支持的 DOC、PPT、XLS</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>WebView2 运行时；DOC、PPT、XLS 需要系统 Office 预览处理器</value></data>
 </root>

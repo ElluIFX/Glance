@@ -4,4 +4,7 @@
   <data name="Status.Ready" xml:space="preserve"><value>Ready for Everything</value></data>
   <data name="Status.Connected" xml:space="preserve"><value>Connected to Everything {0}</value></data>
   <data name="Status.Limited" xml:space="preserve"><value>Connected to Everything {0}; gallery scrolling is unavailable</value></data>
+  <data name="SourceMeta.Summary" xml:space="preserve"><value>Preview files selected in Everything</value></data>
+  <data name="SourceMeta.Capabilities" xml:space="preserve"><value>Selected-file preview, gallery browsing and focus synchronization when the result list is available</value></data>
+  <data name="SourceMeta.Dependencies" xml:space="preserve"><value>Everything must be installed and running; no additional downloads</value></data>
 </root>

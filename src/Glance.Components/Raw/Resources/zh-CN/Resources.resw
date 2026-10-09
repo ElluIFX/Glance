@@ -17,4 +17,7 @@
   <data name="Preview.Unavailable" xml:space="preserve"><value>不支持该相机 RAW 文件</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>无法准备该相机 RAW 文件</value></data>
   <data name="Preview.Refining" xml:space="preserve"><value>正在准备高清图片...</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>快速预览相机 RAW 图像</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>CR2、CR3、NEF、ARW、RAF、DNG 等常见 RAW 文件的内嵌图像</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>无需额外下载</value></data>
 </root>

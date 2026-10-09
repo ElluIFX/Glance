@@ -17,4 +17,7 @@
   <data name="Preview.Unavailable" xml:space="preserve"><value>This camera RAW file is not supported</value></data>
   <data name="Preview.Failed" xml:space="preserve"><value>Could not prepare this camera RAW file</value></data>
   <data name="Preview.Refining" xml:space="preserve"><value>Preparing full-resolution image...</value></data>
+  <data name="ComponentMeta.Summary" xml:space="preserve"><value>Quickly preview camera RAW images</value></data>
+  <data name="ComponentMeta.Capabilities" xml:space="preserve"><value>Embedded images in CR2, CR3, NEF, ARW, RAF, DNG and other common RAW files</value></data>
+  <data name="ComponentMeta.Dependencies" xml:space="preserve"><value>No additional downloads</value></data>
 </root>
