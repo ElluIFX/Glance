@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "generic_preview_preferences.h"
 #include "public_settings.h"
 
@@ -26,29 +27,10 @@ namespace glance::app
 
     void save_generic_preview_preferences(const GenericPreviewPreferences& preferences) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
 
         const DWORD show_advanced_info = preferences.show_advanced_info;
-        RegSetValueExW(
-            key,
-            L"ShowAdvancedInfo",
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&show_advanced_info),
-            sizeof(show_advanced_info));
-        RegCloseKey(key);
+        key.set(L"ShowAdvancedInfo", REG_DWORD, reinterpret_cast<const BYTE*>(&show_advanced_info), sizeof(show_advanced_info));
+        static_cast<void>(key.commit());
     }
 }

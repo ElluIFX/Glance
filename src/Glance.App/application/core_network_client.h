@@ -39,7 +39,8 @@ namespace glance::app
         [[nodiscard]] glance::contracts::NetworkDownloadResult download(
             const glance::contracts::NetworkDownloadRequest& request,
             const std::atomic_bool& cancelled,
-            const DownloadProgressCallback& progress);
+            const DownloadProgressCallback& progress,
+            const std::function<bool()>& cancellation_check = {});
         [[nodiscard]] bool handle_message(
             glance::contracts::MessageType type,
             std::string_view payload) noexcept;

@@ -3,6 +3,9 @@ param(
     [ValidateSet("x64")]
     [string] $Platform = "x64",
 
+    [ValidateSet("Installed", "Portable")]
+    [string] $Distribution = "Installed",
+
     [switch] $RunTests
 )
 
@@ -88,15 +91,16 @@ function Copy-MsvcRuntime {
 
 $repositoryRoot = Get-GlanceRepositoryRoot
 $artifactsDirectory = Join-Path $repositoryRoot "artifacts"
-$payloadDirectory = Join-Path $artifactsDirectory "package\payload"
-$symbolsDirectory = Join-Path $artifactsDirectory "package\symbols"
+$packageDirectory = Join-Path $artifactsDirectory "package-$Distribution"
+$payloadDirectory = Join-Path $packageDirectory "payload"
+$symbolsDirectory = Join-Path $packageDirectory "symbols"
 $installerOutputDirectory = Join-Path $artifactsDirectory "installer"
-$componentOutputDirectory = Join-Path $artifactsDirectory "components"
+$componentOutputDirectory = Join-Path $packageDirectory "components"
 $installerScript = Join-Path $repositoryRoot "installer\Glance.iss"
 $version = Get-GlanceVersion
 
-Remove-GlanceWorkspaceItem -Path (Join-Path $artifactsDirectory "package")
-Remove-GlanceWorkspaceItem -Path $installerOutputDirectory
+Remove-GlanceWorkspaceItem -Path $packageDirectory
+if ($Distribution -eq 'Installed') { Remove-GlanceWorkspaceItem -Path $installerOutputDirectory }
 New-Item -ItemType Directory -Path $payloadDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $symbolsDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $installerOutputDirectory -Force | Out-Null
@@ -104,6 +108,7 @@ New-Item -ItemType Directory -Path $installerOutputDirectory -Force | Out-Null
 & (Join-Path $PSScriptRoot "build.ps1") `
     -Configuration Release `
     -Platform $Platform `
+    -Distribution $Distribution `
     -SelfContained `
     -OutputDirectory $payloadDirectory
 
@@ -116,8 +121,6 @@ $requiredFiles = @(
     "Glance.exe",
     "Glance.CLI.exe",
     "Glance.Core.exe",
-    "Glance.AccessService.exe",
-    "Glance.AccessHost.exe",
     "Glance.MediaHost.exe",
     "Glance.DialogBroker32.exe",
     "Glance.DialogHook.dll",
@@ -132,6 +135,17 @@ $requiredFiles = @(
     "MainWindow.xbf",
     "SettingsWindow.xbf"
 )
+if ($Distribution -eq 'Installed') {
+    $requiredFiles += @('Glance.AccessService.exe', 'Glance.AccessHost.exe')
+} else {
+    foreach ($name in @('Glance.AccessService.exe', 'Glance.AccessHost.exe')) {
+        Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory $name)
+    }
+}
+$compiledDistribution = (& (Join-Path $payloadDirectory 'Glance.CLI.exe') --internal-distribution) -join ''
+if ($LASTEXITCODE -ne 0 -or $compiledDistribution -ne $Distribution) { throw 'Package distribution does not match compiled binaries' }
+& (Join-Path $payloadDirectory 'Glance.CLI.exe') --internal-package-check $version.Version
+if ($LASTEXITCODE -ne 0) { throw 'Package contains incompatible App, Core, or CLI binaries' }
 foreach ($file in $requiredFiles) {
     $path = Join-Path $payloadDirectory $file
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -215,7 +229,7 @@ $upgradeCleanup = foreach ($file in $unusedSdkFiles) {
     # excluded from portable packages, without deleting unrelated user content.
     'Type: files; Name: "{app}\' + $file + '"'
 }
-$upgradeCleanup | Set-Content -LiteralPath (Join-Path $artifactsDirectory "package\sdk-cleanup.iss") -Encoding utf8
+$upgradeCleanup | Set-Content -LiteralPath (Join-Path $packageDirectory "sdk-cleanup.iss") -Encoding utf8
 Write-Host "Removed $removedBytes bytes of unused SDK payload."
 
 if ($RunTests) {
@@ -254,6 +268,12 @@ if ($forbiddenRuntimeFiles) {
     throw "Unused Windows App SDK AI, ML, or Widgets files entered the package payload: $($relativePaths -join ', ')"
 }
 
+if ($Distribution -eq 'Portable') {
+    Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory 'data')
+    Remove-GlanceWorkspaceItem -Path (Join-Path $payloadDirectory '.glance-maintenance')
+    Write-Host "Portable payload: $payloadDirectory"
+    return
+}
 $compiler = Get-InnoSetupCompiler
 $environment = @{
     GLANCE_SOURCE_DIR = $payloadDirectory

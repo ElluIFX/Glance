@@ -1,4 +1,5 @@
 #pragma once
+#include "glance/contracts/storage.h"
 #include <windows.h>
 #include <algorithm>
 #include <cstdint>
@@ -45,7 +46,7 @@ namespace glance::app
             const auto& definitions = public_setting_definitions();
             const auto definition = std::find_if(definitions.begin(), definitions.end(), [&](const auto& item) { return item.key == key; });
             DWORD value = fallback, bytes = sizeof(value);
-            if (RegGetValueW(HKEY_CURRENT_USER, registry_path, name, RRF_RT_REG_DWORD, nullptr, &value, &bytes) != ERROR_SUCCESS)
+            if (glance::contracts::storage::read_value(registry_path, name, REG_DWORD, &value, &bytes) != ERROR_SUCCESS)
                 value = fallback; // Preserve module-specific migration and environment defaults.
             if (definition != definitions.end())
                 value = static_cast<DWORD>(std::clamp<std::int64_t>(value, definition->minimum, definition->maximum));

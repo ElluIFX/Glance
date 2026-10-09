@@ -68,7 +68,12 @@ namespace winrt::Glance::App::implementation
         void ReloadPreferences(std::wstring_view page = {});
         void ApplyLocalizedResources();
         void ShowAndActivate();
+        void ShowMaintenance();
+        winrt::fire_and_forget MigrateInstalledData();
+        winrt::fire_and_forget ShowMaintenanceFailure();
         void refresh_runtime_statuses();
+        bool migration_in_progress_{};
+        bool maintenance_error_dialog_open_{};
         void ShowUpdateDownload(glance::app::UpdateInstallerAsset asset);
         static winrt::Windows::Foundation::IAsyncOperation<std::int32_t>
             ShowUpdateResultDialog(

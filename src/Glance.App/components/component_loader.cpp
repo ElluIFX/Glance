@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "component_loader.h"
 #include "dependencies/dependency_service.h"
 
@@ -2629,53 +2630,22 @@ namespace glance::app
         {
             const std::wstring key_path = L"Software\\Glance\\Components\\" +
                 std::wstring(component_id);
-            HKEY key{};
-            if (RegOpenKeyExW(HKEY_CURRENT_USER, key_path.c_str(), 0, KEY_QUERY_VALUE, &key) ==
-                ERROR_SUCCESS)
+            ULONGLONG value{};
+            DWORD size = sizeof(value);
+            if (contracts::storage::read_value(key_path, setting_id, REG_QWORD, &value, &size) == ERROR_SUCCESS && size == sizeof(value))
             {
-                ULONGLONG value{};
-                DWORD type{};
-                DWORD size = sizeof(value);
-                const auto status = RegQueryValueExW(
-                    key,
-                    std::wstring(setting_id).c_str(),
-                    nullptr,
-                    &type,
-                    reinterpret_cast<BYTE*>(&value),
-                    &size);
-                RegCloseKey(key);
-                if (status == ERROR_SUCCESS && type == REG_QWORD && size == sizeof(value))
-                {
-                    return static_cast<std::int64_t>(value);
-                }
+                return static_cast<std::int64_t>(value);
             }
 
             if (component_id == L"pdf" && setting_id == L"render-dimension")
             {
-                HKEY legacy_key{};
-                if (RegOpenKeyExW(
-                        HKEY_CURRENT_USER,
-                        L"Software\\Glance\\MediaPreview",
-                        0,
-                        KEY_QUERY_VALUE,
-                        &legacy_key) == ERROR_SUCCESS)
+                DWORD legacy_value{};
+                size = sizeof(legacy_value);
+                if (contracts::storage::read_value(L"MediaPreview", L"PdfPreviewRenderDimension", REG_DWORD,
+                    &legacy_value, &size) == ERROR_SUCCESS && size == sizeof(legacy_value))
                 {
-                    DWORD value{};
-                    DWORD type{};
-                    DWORD size = sizeof(value);
-                    const auto status = RegQueryValueExW(
-                        legacy_key,
-                        L"PdfPreviewRenderDimension",
-                        nullptr,
-                        &type,
-                        reinterpret_cast<BYTE*>(&value),
-                        &size);
-                    RegCloseKey(legacy_key);
-                    if (status == ERROR_SUCCESS && type == REG_DWORD && size == sizeof(value))
-                    {
-                        save_component_setting_value(component_id, setting_id, value);
-                        return value;
-                    }
+                    save_component_setting_value(component_id, setting_id, legacy_value);
+                    return legacy_value;
                 }
             }
         }
@@ -2698,29 +2668,10 @@ namespace glance::app
         {
             const std::wstring key_path = L"Software\\Glance\\Components\\" +
                 std::wstring(component_id);
-            HKEY key{};
-            if (RegCreateKeyExW(
-                    HKEY_CURRENT_USER,
-                    key_path.c_str(),
-                    0,
-                    nullptr,
-                    0,
-                    KEY_SET_VALUE,
-                    nullptr,
-                    &key,
-                    nullptr) != ERROR_SUCCESS)
-            {
-                return;
-            }
+            contracts::storage::Batch key(key_path, contracts::storage::settings());
             const auto stored = static_cast<ULONGLONG>(value);
-            static_cast<void>(RegSetValueExW(
-                key,
-                std::wstring(setting_id).c_str(),
-                0,
-                REG_QWORD,
-                reinterpret_cast<const BYTE*>(&stored),
-                sizeof(stored)));
-            RegCloseKey(key);
+            key.set(setting_id, REG_QWORD, &stored, sizeof(stored));
+            static_cast<void>(key.commit());
         }
         catch (...)
         {

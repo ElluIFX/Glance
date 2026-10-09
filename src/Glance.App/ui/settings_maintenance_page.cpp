@@ -1,4 +1,6 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
+#include "glance/contracts/maintenance.h"
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include "SettingsWindow.xaml.h"
 #include "App.xaml.h"
@@ -287,6 +289,30 @@ namespace winrt::Glance::App::implementation
         }
         settings_registry_.register_section(
             {L"MaintenanceActionsGroupTitle", L"maintenance", L"MaintenanceActionsGroupTitle.Text", {}});
+        if constexpr (glance::contracts::storage::portable)
+        {
+            glance::app::SettingsItemDefinition definition;
+            definition.id = L"MigrateInstalledData";
+            definition.parent = L"MaintenanceActionsGroupTitle";
+            definition.name_key = L"MigrateInstalledDataTitle";
+            definition.description_key = L"MigrateInstalledDataDescription";
+            definition.visible = [] { return glance::contracts::maintenance::installed_data_available(); };
+            definition.enabled = [this] { return !migration_in_progress_; };
+            definition.refresh = [this] {
+                settings_registry_.control(L"MigrateInstalledDataButton").as<Controls::Button>().Content(
+                    box_value(glance::app::localize(migration_in_progress_ ? L"MigrateInstalledDataBusy"
+                                                                        : L"MigrateInstalledDataButton")));
+            };
+            definition.create_control = [this] {
+                auto button = glance::app::make_settings_button();
+                button.MinWidth(88);
+                settings_registry_.bind(L"MigrateInstalledDataButton", button);
+                const auto weak = get_weak();
+                button.Click([weak](auto const&, auto const&) { if (const auto self = weak.get()) self->MigrateInstalledData(); });
+                return button;
+            };
+            settings_registry_.register_item(std::move(definition));
+        }
         {
             glance::app::SettingsItemDefinition definition;
             definition.id = L"DiagnosticsTitle";
@@ -410,6 +436,104 @@ namespace winrt::Glance::App::implementation
         set_status_indicator(AdministratorAccessStatusIcon(), AdministratorAccessStatusText(), administrator_access,
                              L"AdministratorAccessAvailable", L"AdministratorAccessUnavailable");
         RepairCoreAccessButton().Visibility(administrator_access ? Visibility::Collapsed : Visibility::Visible);
+        if constexpr (glance::contracts::storage::portable)
+            settings_registry_.refresh_item(L"MigrateInstalledData");
+    }
+
+    fire_and_forget SettingsWindow::MigrateInstalledData()
+    {
+        const auto lifetime = get_strong();
+        if (migration_in_progress_ || !exit_callback_) co_return;
+        migration_in_progress_ = true;
+        settings_registry_.refresh_item(L"MigrateInstalledData");
+        const apartment_context ui;
+        std::wstring error;
+        try
+        {
+            Controls::ContentDialog dialog;
+            dialog.XamlRoot(RootGrid().XamlRoot());
+            dialog.Title(box_value(glance::app::localize(L"MigrateInstalledDataTitle")));
+            dialog.Content(box_value(glance::app::localize(L"MigrateInstalledDataConfirmation")));
+            dialog.PrimaryButtonText(glance::app::localize(L"MigrateInstalledDataButton"));
+            dialog.CloseButtonText(glance::app::localize(L"Cancel"));
+            dialog.DefaultButton(Controls::ContentDialogButton::Close);
+            if (co_await dialog.ShowAsync() == Controls::ContentDialogResult::Primary)
+            {
+                co_await resume_background();
+                const auto application = glance::contracts::storage::application_directory();
+                glance::contracts::maintenance::prepare_migration(application);
+                co_await ui;
+                Controls::ContentDialog cleanup;
+                cleanup.XamlRoot(lifetime->RootGrid().XamlRoot());
+                cleanup.Title(box_value(glance::app::localize(L"MigrationCleanupTitle")));
+                cleanup.Content(box_value(glance::app::localize(L"MigrationDeleteSourceMessage")));
+                cleanup.PrimaryButtonText(glance::app::localize(L"MigrationDeleteSourceButton"));
+                cleanup.CloseButtonText(glance::app::localize(L"MigrationKeepSourceButton"));
+                cleanup.DefaultButton(Controls::ContentDialogButton::Close);
+                glance::contracts::maintenance::MigrationOptions options;
+                options.remove_source = co_await cleanup.ShowAsync() == Controls::ContentDialogResult::Primary;
+                options.warning_title = glance::app::localize(L"MigrationCompletedTitle");
+                options.cleanup_failure_message = glance::app::localize(L"MigrationCleanupFailedMessage");
+                options.restart_failure_message = glance::app::localize(L"MigrationRestartFailedMessage");
+                co_await resume_background();
+                glance::contracts::maintenance::launch_worker(application, options);
+                co_await ui;
+                lifetime->exit_callback_();
+                co_return;
+            }
+        }
+        catch (const std::system_error& failure) { error = hresult_error(HRESULT_FROM_WIN32(failure.code().value())).message(); }
+        catch (const hresult_error& failure) { error = failure.message(); }
+        catch (...) { error = hresult_error(HRESULT_FROM_WIN32(ERROR_GEN_FAILURE)).message(); }
+        co_await ui;
+        lifetime->migration_in_progress_ = false;
+        lifetime->settings_registry_.refresh_item(L"MigrateInstalledData");
+        if (!error.empty())
+        {
+            try
+            {
+                Controls::ContentDialog dialog;
+                dialog.XamlRoot(lifetime->RootGrid().XamlRoot());
+                dialog.Title(box_value(glance::app::localize(L"MigrationFailedTitle")));
+                dialog.Content(box_value(glance::app::localize_format(L"MigrationFailedMessage", {error})));
+                dialog.CloseButtonText(glance::app::localize(L"OK"));
+                co_await dialog.ShowAsync();
+            }
+            catch (...) {}
+        }
+    }
+
+    fire_and_forget SettingsWindow::ShowMaintenanceFailure()
+    {
+        const auto lifetime = get_strong();
+        if (!RootGrid().IsLoaded() || maintenance_error_dialog_open_) co_return;
+        const apartment_context ui;
+        const auto application = glance::contracts::storage::application_directory();
+        DWORD failed = ERROR_SUCCESS;
+        try
+        {
+            failed = glance::contracts::maintenance::failure(application);
+        }
+        catch (const std::system_error& failure) { failed = static_cast<DWORD>(failure.code().value()); }
+        catch (...) { failed = ERROR_INVALID_DATA; }
+        if (failed != ERROR_SUCCESS)
+        {
+            maintenance_error_dialog_open_ = true;
+            try
+            {
+                Controls::ContentDialog dialog;
+                dialog.XamlRoot(RootGrid().XamlRoot());
+                dialog.Title(box_value(glance::app::localize(L"MaintenanceFailedTitle")));
+                dialog.Content(box_value(glance::app::localize_format(L"MaintenanceFailedMessage", {hresult_error(HRESULT_FROM_WIN32(failed)).message()})));
+                dialog.CloseButtonText(glance::app::localize(L"OK"));
+                co_await dialog.ShowAsync();
+                co_await resume_background();
+                glance::contracts::maintenance::finish_migration(application);
+            }
+            catch (...) {}
+            co_await ui;
+            lifetime->maintenance_error_dialog_open_ = false;
+        }
     }
 
     fire_and_forget SettingsWindow::RepairCoreAccessButton_Click(IInspectable const &, RoutedEventArgs const &)
@@ -586,7 +710,7 @@ namespace winrt::Glance::App::implementation
             co_return;
         }
 
-        const LSTATUS registry_result = RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\Glance");
+        const LSTATUS registry_result = glance::contracts::storage::clear_group(L"");
         const bool registry_cleared = registry_result == ERROR_SUCCESS || registry_result == ERROR_FILE_NOT_FOUND ||
                                       registry_result == ERROR_PATH_NOT_FOUND;
         if (registry_cleared)
@@ -742,8 +866,10 @@ namespace winrt::Glance::App::implementation
         lifetime->show_update_installing_card();
         glance::app::UpdateLaunchStatus launch_status{};
         co_await resume_background();
-        launch_status = glance::app::launch_update_installer(download_result.path);
+        launch_status = glance::app::launch_update_installer(download_result.path, asset.version);
         co_await ui_thread;
+        if (launch_status == glance::app::UpdateLaunchStatus::launched && glance::contracts::storage::portable && lifetime->exit_callback_)
+            lifetime->exit_callback_();
         if (launch_status == glance::app::UpdateLaunchStatus::launched || lifetime->RootGrid().XamlRoot() == nullptr)
         {
             co_return;

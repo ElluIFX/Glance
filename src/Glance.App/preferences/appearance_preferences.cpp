@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "appearance_preferences.h"
 #include "public_settings.h"
 #include "localization.h"
@@ -100,14 +101,7 @@ namespace glance::app
 
         wchar_t language[32]{};
         DWORD size = sizeof(language);
-        if (RegGetValueW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                L"Language",
-                RRF_RT_REG_SZ,
-                nullptr,
-                language,
-                &size) == ERROR_SUCCESS && language[0] != L'\0')
+        if (glance::contracts::storage::read_value(registry_path, L"Language", REG_SZ, language, &size) == ERROR_SUCCESS && language[0] != L'\0')
         {
             result.language = language;
         }
@@ -117,43 +111,18 @@ namespace glance::app
 
     void save_appearance_preferences(const AppearancePreferences& preferences) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
         const DWORD theme = static_cast<DWORD>(preferences.theme);
         const DWORD accent = static_cast<DWORD>(preferences.accent);
         const DWORD acrylic = preferences.acrylic_enabled ? 1 : 0;
         const DWORD acrylic_opacity = std::clamp<std::uint32_t>(
             preferences.acrylic_opacity_percent, 10, 100);
-        RegSetValueExW(key, L"Theme", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&theme), sizeof(theme));
-        RegSetValueExW(key, L"Accent", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&accent), sizeof(accent));
-        RegSetValueExW(key, L"Acrylic", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&acrylic), sizeof(acrylic));
-        RegSetValueExW(
-            key,
-            L"AcrylicOpacityPercent",
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&acrylic_opacity),
-            sizeof(acrylic_opacity));
-        RegSetValueExW(
-            key,
-            L"Language",
-            0,
-            REG_SZ,
-            reinterpret_cast<const BYTE*>(preferences.language.c_str()),
-            static_cast<DWORD>((preferences.language.size() + 1) * sizeof(wchar_t)));
-        RegCloseKey(key);
+        key.set(L"Theme", REG_DWORD, reinterpret_cast<const BYTE*>(&theme), sizeof(theme));
+        key.set(L"Accent", REG_DWORD, reinterpret_cast<const BYTE*>(&accent), sizeof(accent));
+        key.set(L"Acrylic", REG_DWORD, reinterpret_cast<const BYTE*>(&acrylic), sizeof(acrylic));
+        key.set(L"AcrylicOpacityPercent", REG_DWORD, reinterpret_cast<const BYTE*>(&acrylic_opacity), sizeof(acrylic_opacity));
+        key.set(L"Language", REG_SZ, reinterpret_cast<const BYTE*>(preferences.language.c_str()), static_cast<DWORD>((preferences.language.size() + 1) * sizeof(wchar_t)));
+        static_cast<void>(key.commit());
     }
 
     ElementTheme element_theme(ThemePreference preference) noexcept

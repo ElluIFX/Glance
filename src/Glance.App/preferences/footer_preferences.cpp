@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "footer_preferences.h"
 #include "public_settings.h"
 
@@ -71,28 +72,14 @@ namespace glance::app
         FooterPreferences result;
         DWORD mask = result.enabled_mask;
         DWORD mask_size = sizeof(mask);
-        if (RegGetValueW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                L"EnabledFields",
-                RRF_RT_REG_DWORD,
-                nullptr,
-                &mask,
-                &mask_size) == ERROR_SUCCESS)
+        if (glance::contracts::storage::read_value(registry_path, L"EnabledFields", REG_DWORD, &mask, &mask_size) == ERROR_SUCCESS)
         {
             result.enabled_mask = mask & all_fields_mask;
         }
 
         std::array<FooterField, 10> order{};
         DWORD order_size = static_cast<DWORD>(sizeof(order));
-        const LSTATUS order_status = RegGetValueW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                L"FieldOrder",
-                RRF_RT_REG_BINARY,
-                nullptr,
-                order.data(),
-                &order_size);
+        const LSTATUS order_status = glance::contracts::storage::read_value(registry_path, L"FieldOrder", REG_BINARY, order.data(), &order_size);
         if (order_status == ERROR_SUCCESS && order_size == sizeof(result.order))
         {
             std::array<FooterField, footer_field_count> current_order{};
@@ -193,36 +180,11 @@ namespace glance::app
             return;
         }
 
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
 
         const DWORD enabled_mask = preferences.enabled_mask & all_fields_mask;
-        RegSetValueExW(
-            key,
-            L"EnabledFields",
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&enabled_mask),
-            sizeof(enabled_mask));
-        RegSetValueExW(
-            key,
-            L"FieldOrder",
-            0,
-            REG_BINARY,
-            reinterpret_cast<const BYTE*>(preferences.order.data()),
-            static_cast<DWORD>(sizeof(preferences.order)));
-        RegCloseKey(key);
+        key.set(L"EnabledFields", REG_DWORD, reinterpret_cast<const BYTE*>(&enabled_mask), sizeof(enabled_mask));
+        key.set(L"FieldOrder", REG_BINARY, reinterpret_cast<const BYTE*>(preferences.order.data()), static_cast<DWORD>(sizeof(preferences.order)));
+        static_cast<void>(key.commit());
     }
 }

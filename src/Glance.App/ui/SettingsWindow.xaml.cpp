@@ -15,6 +15,7 @@
 #include "webview_availability.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
+#include "glance/contracts/maintenance.h"
 #include "../../version.h"
 #if __has_include("SettingsWindow.g.cpp")
 #include "SettingsWindow.g.cpp"
@@ -104,6 +105,10 @@ namespace winrt::Glance::App::implementation
         update_progress_timer_ = DispatcherTimer();
         update_progress_timer_.Interval(std::chrono::milliseconds(33));
         const auto weak = get_weak();
+        if constexpr (glance::contracts::storage::portable)
+            RootGrid().Loaded([weak](auto const&, auto const&) {
+                if (const auto self = weak.get()) self->ShowMaintenanceFailure();
+            });
         update_progress_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
             if (const auto self = weak.get())
             {
@@ -152,6 +157,7 @@ namespace winrt::Glance::App::implementation
             if (args.WindowActivationState() != WindowActivationState::Deactivated)
             {
                 refresh_launch_at_sign_in();
+                refresh_runtime_statuses();
             }
         });
     }
@@ -351,6 +357,20 @@ namespace winrt::Glance::App::implementation
             refresh_component_statuses();
             request_source_statuses();
         }
+    }
+
+    void SettingsWindow::ShowMaintenance()
+    {
+        for (const auto& item : SettingsNavigation().FooterMenuItems())
+        {
+            const auto navigation = item.try_as<Controls::NavigationViewItem>();
+            if (navigation && unbox_value_or<hstring>(navigation.Tag(), L"") == L"maintenance")
+            {
+                SettingsNavigation().SelectedItem(navigation);
+                break;
+            }
+        }
+        ShowMaintenanceFailure();
     }
 
     fire_and_forget SettingsWindow::ExitButton_Tapped(

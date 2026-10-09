@@ -971,6 +971,9 @@ int run_executable_tests();
 int run_font_tests();
 int run_access_tests();
 int run_window_memory_tests();
+int run_storage_tests();
+int run_maintenance_tests();
+int run_maintenance_command(int count, wchar_t* arguments[]);
 int run_dependency_runtime_tests();
 int run_dependency_service_tests();
 int run_software_media_tests(int count, wchar_t* arguments[]);
@@ -978,6 +981,12 @@ int run_dependency_child(int count, wchar_t* arguments[]);
 
 int wmain(int argument_count, wchar_t* arguments[])
 {
+    if (argument_count > 1 && (std::wstring_view(arguments[1]) == L"--prepare-portable-update" ||
+        std::wstring_view(arguments[1]) == L"--prepare-data-migration")) return run_maintenance_command(argument_count, arguments);
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--storage-tests") return run_storage_tests();
+    if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--maintenance-tests") return run_maintenance_tests();
+    if (argument_count == 1 && run_maintenance_tests() != 0) return 1;
+    if (argument_count == 1 && run_storage_tests() != 0) return 1;
     if (argument_count > 1 && std::wstring_view(arguments[1]) == L"--access-tests") return run_access_tests();
     if (argument_count == 1 && run_access_tests() != 0) return 1;
     if (argument_count > 1 && (std::wstring_view(arguments[1]) == L"--software-media-tests" ||

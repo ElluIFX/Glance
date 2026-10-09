@@ -524,4 +524,22 @@
   <data name="MarkdownStyleDescription.Text" xml:space="preserve"><value>Markdown 渲染配色，自动时跟随应用主题</value></data>
   <data name="JsonDefaultTreeEnabledDescription.Text" xml:space="preserve"><value>打开 JSON 文件时显示结构化视图</value></data>
   <data name="JsonDefaultTreeDisabledDescription.Text" xml:space="preserve"><value>打开 JSON 文件时显示原始文本</value></data>
+  <data name="StorageUnavailableTitle" xml:space="preserve"><value>无法访问程序数据</value></data>
+  <data name="StorageUnavailableMessage" xml:space="preserve"><value>请确认程序目录可写且 data/settings.json 内容有效\n{0}</value></data>
+  <data name="MigrateInstalledDataTitle" xml:space="preserve"><value>从安装版迁移</value></data>
+  <data name="MigrateInstalledDataDescription" xml:space="preserve"><value>导入当前用户的安装版设置和数据，覆盖当前便携数据</value></data>
+  <data name="MigrateInstalledDataButton" xml:space="preserve"><value>迁移</value></data>
+  <data name="MigrateInstalledDataBusy" xml:space="preserve"><value>迁移中...</value></data>
+  <data name="MigrateInstalledDataConfirmation" xml:space="preserve"><value>将安装版的设置和数据迁入当前便携版，覆盖现有便携数据并重启 Glance</value></data>
+  <data name="MigrationFailedTitle" xml:space="preserve"><value>数据迁移失败</value></data>
+  <data name="MigrationFailedMessage" xml:space="preserve"><value>原有数据已保留\n{0}</value></data>
+  <data name="MigrationCompletedTitle" xml:space="preserve"><value>数据迁移完成</value></data>
+  <data name="MigrationCleanupTitle" xml:space="preserve"><value>清理原始数据</value></data>
+  <data name="MigrationDeleteSourceMessage" xml:space="preserve"><value>迁移数据已准备好，是否在迁移完成后删除安装版的原始注册表设置和 AppData 数据？</value></data>
+  <data name="MigrationDeleteSourceButton" xml:space="preserve"><value>删除原始数据</value></data>
+  <data name="MigrationKeepSourceButton" xml:space="preserve"><value>保留原始数据</value></data>
+  <data name="MigrationCleanupFailedMessage" xml:space="preserve"><value>迁移已完成，原始数据清理未完成</value></data>
+  <data name="MigrationRestartFailedMessage" xml:space="preserve"><value>迁移已完成，请手动启动 Glance</value></data>
+  <data name="MaintenanceFailedTitle" xml:space="preserve"><value>数据替换失败</value></data>
+  <data name="MaintenanceFailedMessage" xml:space="preserve"><value>已恢复原有文件\n{0}</value></data>
 </root>

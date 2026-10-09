@@ -5,6 +5,7 @@
 #include "settings_commands.h"
 #include "localization.h"
 #include "appearance_preferences.h"
+#include "update_checker.h"
 #include "../version.h"
 #include "glance/contracts/cli_protocol.h"
 #include "glance/contracts/cli_input.h"
@@ -53,7 +54,7 @@ namespace winrt::Glance::App::implementation
                 return WaitForSingleObject(cancelled, 0) == WAIT_OBJECT_0 ||
                     !PeekNamedPipe(connection, nullptr, 0, nullptr, nullptr, nullptr) || GetTickCount64() >= deadline;
             };
-            const std::set<std::wstring> fields{ L"command", L"timeout_ms", L"paths", L"id", L"stdin_file", L"generation", L"size", L"position", L"center_offset", L"monitor", L"close_after", L"topmost", L"pin", L"enabled", L"key", L"value" };
+            const std::set<std::wstring> fields{ L"command", L"timeout_ms", L"paths", L"id", L"stdin_file", L"generation", L"size", L"position", L"center_offset", L"monitor", L"close_after", L"topmost", L"pin", L"enabled", L"key", L"value", L"install" };
             for (const auto& item : request) if (!fields.contains(std::wstring(item.Key()))) throw Error(2, "unknown_field", "Unknown request field");
             if (request.HasKey(L"position") && request.HasKey(L"center_offset")) throw Error(2, "position_conflict", "Position modes are mutually exclusive");
             std::vector<glance::app::PreviewFile> files;
@@ -132,6 +133,21 @@ namespace winrt::Glance::App::implementation
                 data.SetNamedValue(L"update_available", JsonValue::CreateBooleanValue(update.status == glance::contracts::UpdateCheckStatus::update_available));
                 data.SetNamedValue(L"release_url", JsonValue::CreateStringValue(update.release_url));
                 data.SetNamedValue(L"download_url", JsonValue::CreateStringValue(update.installer.download_url));
+                bool started{};
+                if (request.GetNamedBoolean(L"install", false) && update.status == glance::contracts::UpdateCheckStatus::update_available)
+                {
+                    if (!update.installer) throw Error(11, "update_asset_missing", "No compatible update package is available");
+                    std::atomic_bool cancellation{};
+                    const auto downloaded = core_network_client_.download({update.installer.download_url,
+                        update.installer.file_name, update.installer.sha256, update.installer.size}, cancellation, {}, interrupted);
+                    if (interrupted()) throw Error(5, "command_timeout", "Update cancelled or timed out");
+                    if (downloaded.status != glance::contracts::NetworkDownloadStatus::succeeded)
+                        throw Error(11, "update_download_failed", "Update download or verification failed");
+                    if (glance::app::launch_update_installer(downloaded.path, update.installer.version, false) != glance::app::UpdateLaunchStatus::launched)
+                        throw Error(11, "update_install_failed", "Could not start the update");
+                    started = true;
+                }
+                data.SetNamedValue(L"update_started", JsonValue::CreateBooleanValue(started));
             }
             else data = on_ui(request, std::move(files));
             return to_string(response(command, data).Stringify());

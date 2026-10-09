@@ -48,6 +48,10 @@ IDI_GLANCE_APP ICON "Glance.App\\Assets\\AppIcon.ico"
 #define GLANCE_FILE_DESCRIPTION "Glance Access Host"
 #define GLANCE_INTERNAL_NAME "Glance.AccessHost"
 #define GLANCE_ORIGINAL_FILENAME "Glance.AccessHost.exe"
+#elif GLANCE_BINARY_KIND == 12
+#define GLANCE_FILE_DESCRIPTION "Glance Command Line"
+#define GLANCE_INTERNAL_NAME "Glance.CLI"
+#define GLANCE_ORIGINAL_FILENAME "Glance.CLI.exe"
 #else
 #error GLANCE_BINARY_KIND must identify the target executable.
 #endif
@@ -77,6 +81,11 @@ BEGIN
             VALUE "OriginalFilename", GLANCE_ORIGINAL_FILENAME "\0"
             VALUE "ProductName", "Glance\0"
             VALUE "ProductVersion", GLANCE_VERSION_STRING "\0"
+#if GLANCE_PORTABLE
+            VALUE "Distribution", "Portable\0"
+#else
+            VALUE "Distribution", "Installed\0"
+#endif
         END
     END
     BLOCK "VarFileInfo"

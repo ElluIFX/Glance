@@ -208,11 +208,13 @@ namespace glance::cli
               "Glance.CLI.exe status [options]",
               "output:\n  Monitor indices can be used with --center-offset and --monitor.\n",
               "Glance.CLI.exe status --no-start --json" },
-            { "check-update", "Check for a newer release and show its download links.",
+            { "check-update", "Check for a newer release and optionally install it.",
               "Glance.CLI.exe check-update [options]",
+              "options:\n"
+              "  --install               Download, verify, and start a silent update\n\n"
               "notes:\n"
-              "  Checks only; downloading and installation remain separate actions.\n"
-              "  Finding no update is success. Default command timeout: 60 seconds.\n",
+              "  Uses an installer for installed builds and a ZIP for portable builds.\n"
+              "  Finding no update is success. Timeout: 60 seconds, or 10 minutes with --install.\n",
               "Glance.CLI.exe check-update --json" },
             { "quit", "Exit Glance and wait for App and Core to stop.",
               "Glance.CLI.exe quit [options]",

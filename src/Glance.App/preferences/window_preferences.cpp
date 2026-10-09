@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "window_preferences.h"
 #include "public_settings.h"
 
@@ -35,68 +36,35 @@ namespace
     {
         DWORD value{};
         DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   L"Software\\Glance",
-                   L"AutoFitWindowSize",
-                   RRF_RT_REG_DWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS
+        return glance::contracts::storage::read_value(L"Software\\Glance", L"AutoFitWindowSize", REG_DWORD, &value, &size) == ERROR_SUCCESS
             ? value != 0
             : true;
     }
 
-    void write_dword(HKEY key, const wchar_t* name, DWORD value) noexcept
+    void write_dword(glance::contracts::storage::Batch& key, const wchar_t* name, DWORD value) noexcept
     {
-        RegSetValueExW(
-            key,
-            name,
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&value),
-            sizeof(value));
+        key.set(name, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
     }
 
     std::wstring read_string(const wchar_t* name) noexcept
     {
         DWORD size{};
-        if (RegGetValueW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                name,
-                RRF_RT_REG_SZ,
-                nullptr,
-                nullptr,
-                &size) != ERROR_SUCCESS || size < sizeof(wchar_t))
+        if (glance::contracts::storage::read_value(registry_path, name, REG_SZ, nullptr, &size) != ERROR_SUCCESS || size < sizeof(wchar_t))
         {
             return {};
         }
 
         std::vector<wchar_t> buffer(size / sizeof(wchar_t));
-        if (RegGetValueW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                name,
-                RRF_RT_REG_SZ,
-                nullptr,
-                buffer.data(),
-                &size) != ERROR_SUCCESS)
+        if (glance::contracts::storage::read_value(registry_path, name, REG_SZ, buffer.data(), &size) != ERROR_SUCCESS)
         {
             return {};
         }
         return buffer.data();
     }
 
-    void write_string(HKEY key, const wchar_t* name, std::wstring_view value) noexcept
+    void write_string(glance::contracts::storage::Batch& key, const wchar_t* name, std::wstring_view value) noexcept
     {
-        RegSetValueExW(
-            key,
-            name,
-            0,
-            REG_SZ,
-            reinterpret_cast<const BYTE*>(value.data()),
-            static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
+        key.set(name, REG_SZ, reinterpret_cast<const BYTE*>(value.data()), static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
     }
 }
 
@@ -130,20 +98,7 @@ namespace glance::app
 
     void save_window_preferences(const WindowPreferences& preferences) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
 
         write_dword(key, L"DefaultWidth", std::clamp<std::uint32_t>(preferences.default_width, 480, 7680));
         write_dword(key, L"DefaultHeight", std::clamp<std::uint32_t>(preferences.default_height, 320, 4320));
@@ -168,7 +123,7 @@ namespace glance::app
             L"DoubleClickFullscreen",
             preferences.double_click_fullscreen ? 1U : 0U);
         write_dword(key, L"RightClickClose", preferences.right_click_close ? 1U : 0U);
-        RegCloseKey(key);
+        static_cast<void>(key.commit());
     }
 
     bool auto_fit_ignores_path(

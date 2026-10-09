@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "media_preview_preferences.h"
 #include "public_settings.h"
 
@@ -31,28 +32,16 @@ namespace
         return glance::app::read_public_dword(registry_path, name, fallback ? 1 : 0) != 0;
     }
 
-    void write_volume(HKEY key, const wchar_t* name, std::uint32_t volume) noexcept
+    void write_volume(glance::contracts::storage::Batch& key, const wchar_t* name, std::uint32_t volume) noexcept
     {
         const DWORD value = std::min<std::uint32_t>(volume, 100);
-        RegSetValueExW(
-            key,
-            name,
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&value),
-            sizeof(value));
+        key.set(name, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
     }
 
-    void write_bool(HKEY key, const wchar_t* name, bool enabled) noexcept
+    void write_bool(glance::contracts::storage::Batch& key, const wchar_t* name, bool enabled) noexcept
     {
         const DWORD value = enabled ? 1U : 0U;
-        RegSetValueExW(
-            key,
-            name,
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&value),
-            sizeof(value));
+        key.set(name, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
     }
 
 }
@@ -78,20 +67,7 @@ namespace glance::app
 
     void save_media_preview_preferences(const MediaPreviewPreferences& preferences) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
 
         write_volume(key, L"AudioVolume", preferences.audio_volume_percent);
         write_volume(key, L"VideoVolume", preferences.video_volume_percent);
@@ -104,6 +80,6 @@ namespace glance::app
         write_bool(key, L"LoopGalleryScrolling", preferences.loop_gallery_scrolling);
         write_bool(key, L"GallerySameExtensionOnly", preferences.gallery_same_extension_only);
         write_bool(key, L"ShowImageZoomMap", preferences.show_image_zoom_map);
-        RegCloseKey(key);
+        static_cast<void>(key.commit());
     }
 }

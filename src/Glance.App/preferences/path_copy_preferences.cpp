@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "path_copy_preferences.h"
 #include "public_settings.h"
 
@@ -28,37 +29,12 @@ namespace glance::app
 
     void save_path_copy_preferences(const PathCopyPreferences& preferences) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
 
         const DWORD quote_path = preferences.quote_path;
         const DWORD use_unix_separators = preferences.use_unix_separators;
-        RegSetValueExW(
-            key,
-            L"QuotePath",
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&quote_path),
-            sizeof(quote_path));
-        RegSetValueExW(
-            key,
-            L"UseUnixSeparators",
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&use_unix_separators),
-            sizeof(use_unix_separators));
-        RegCloseKey(key);
+        key.set(L"QuotePath", REG_DWORD, reinterpret_cast<const BYTE*>(&quote_path), sizeof(quote_path));
+        key.set(L"UseUnixSeparators", REG_DWORD, reinterpret_cast<const BYTE*>(&use_unix_separators), sizeof(use_unix_separators));
+        static_cast<void>(key.commit());
     }
 }

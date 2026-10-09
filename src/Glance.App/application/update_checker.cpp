@@ -1,17 +1,25 @@
 #include "pch.h"
 #include "update_checker.h"
+#include "glance/contracts/maintenance.h"
 #include <shellapi.h>
 
 namespace glance::app
 {
     UpdateLaunchStatus launch_update_installer(
-        const std::filesystem::path& installer_path) noexcept
+        const std::filesystem::path& installer_path, std::wstring_view version, bool wait_for_completion) noexcept
     {
         try
         {
             if (!std::filesystem::is_regular_file(installer_path))
             {
                 return UpdateLaunchStatus::failed;
+            }
+            if constexpr (contracts::storage::portable)
+            {
+                const auto application = contracts::storage::application_directory();
+                contracts::maintenance::prepare_update(application, installer_path, version);
+                contracts::maintenance::launch_worker(application);
+                return UpdateLaunchStatus::launched;
             }
             constexpr wchar_t parameters[] =
                 L"/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /GLANCEUPDATE";
@@ -30,6 +38,11 @@ namespace glance::app
             if (execute.hProcess == nullptr)
             {
                 return UpdateLaunchStatus::failed;
+            }
+            if (!wait_for_completion)
+            {
+                CloseHandle(execute.hProcess);
+                return UpdateLaunchStatus::launched;
             }
 
             const DWORD wait_result = WaitForSingleObject(execute.hProcess, INFINITE);

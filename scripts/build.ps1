@@ -6,6 +6,9 @@ param(
     [ValidateSet("x64")]
     [string] $Platform = "x64",
 
+    [ValidateSet("Installed", "Portable")]
+    [string] $Distribution = "Portable",
+
     [switch] $Rebuild,
     [switch] $Clean,
     [switch] $SelfContained,
@@ -35,6 +38,7 @@ $arguments = @(
     "/t:$target"
     "/p:Configuration=$Configuration"
     "/p:Platform=$Platform"
+    "/p:GlanceDistribution=$Distribution"
     "/nr:false"
     "/v:minimal"
 )
@@ -44,6 +48,9 @@ if ($SelfContained) {
 }
 
 $outputRoot = Join-Path $repositoryRoot "bin\$Configuration\$Platform"
+if ($Distribution -eq 'Portable') {
+    $outputRoot = Join-Path $repositoryRoot "bin\Portable\$Configuration\$Platform"
+}
 if ($OutputDirectory) {
     $outputRoot = Resolve-GlanceWorkspacePath -Path $OutputDirectory
     New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null

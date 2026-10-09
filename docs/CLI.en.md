@@ -35,6 +35,7 @@ Use `-h` at any level to see the relevant commands and options:
 | Close the most recent preview | `window close` |
 | Show app status and monitor indices | `status` |
 | Check for a new release | `check-update` |
+| Check and update silently | `check-update --install` |
 | Exit Glance | `quit` |
 
 A file manager can invoke this command, replacing the final argument with the selected file's full path:
@@ -188,7 +189,7 @@ if ($LASTEXITCODE -ne 0) {
 
 By default, commands wait for content readiness or control completion. `--timeout 0` returns after the request is applied. A positive timeout returns current state with `wait_completed: false` when the wait expires; completion returns `wait_completed: true`. `--wait` waits for window closure. Combining it with `--timeout` applies one total waiting limit.
 
-Connection allows 15 seconds, ordinary request transport and execution allow 10 seconds, and update checks allow 60 seconds. Failures at these stages return errors. Reading stdin is separate from content waiting. Accepted previews and controls continue when the CLI exits or Ctrl+C interrupts its wait.
+Connection allows 15 seconds, ordinary request transport and execution allow 10 seconds, update checks allow 60 seconds, and `check-update --install` allows 10 minutes. Silent updates use an installer or portable ZIP matching the distribution; `update_started` indicates that the update has started. Failures at these stages return errors. Reading stdin is separate from content waiting. Accepted previews and controls continue when the CLI exits or Ctrl+C interrupts its wait.
 
 ### Exit codes
 
@@ -205,5 +206,5 @@ Connection allows 15 seconds, ordinary request transport and execution allow 10 
 | `8` | State conflict, such as disabling topmost on a pinned window |
 | `9` | Preview loading failed |
 | `10` | Preview replaced/closed or request cancelled |
-| `11` | Update check failed |
+| `11` | Update check, download verification, or installation launch failed |
 | `130` | Interrupted with Ctrl+C or Ctrl+Break |

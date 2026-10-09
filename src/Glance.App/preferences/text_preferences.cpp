@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "text_preferences.h"
 #include "public_settings.h"
 #include "text_font_fallback.h"
@@ -97,14 +98,7 @@ namespace glance::app
         TextPreferences result;
         wchar_t font_family[LF_FACESIZE]{};
         DWORD size = sizeof(font_family);
-        if (RegGetValueW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                L"FontFamily",
-                RRF_RT_REG_SZ,
-                nullptr,
-                font_family,
-                &size) == ERROR_SUCCESS && font_family[0] != L'\0')
+        if (glance::contracts::storage::read_value(registry_path, L"FontFamily", REG_SZ, font_family, &size) == ERROR_SUCCESS && font_family[0] != L'\0')
         {
             result.font_family = font_family;
         }
@@ -125,55 +119,33 @@ namespace glance::app
         result.markdown_font_size = std::clamp(static_cast<double>(read_dword(L"MarkdownFontSize", 16)), 8.0, 48.0);
         result.markdown_style = std::min<DWORD>(read_dword(L"MarkdownStyle", 0), 6);
         size = sizeof(font_family);
-        if (RegGetValueW(HKEY_CURRENT_USER, registry_path, L"MarkdownFontFamily", RRF_RT_REG_SZ,
-                nullptr, font_family, &size) == ERROR_SUCCESS && font_family[0])
+        if (glance::contracts::storage::read_value(registry_path, L"MarkdownFontFamily", REG_SZ, font_family, &size) == ERROR_SUCCESS && font_family[0])
             result.markdown_font_family = font_family;
         return result;
     }
 
     void save_text_preferences(const TextPreferences& preferences) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
         const auto font_size = static_cast<DWORD>(std::clamp(preferences.font_size, 7.0, 32.0));
         const DWORD syntax_theme = static_cast<DWORD>(preferences.syntax_theme);
         const DWORD word_wrap = preferences.word_wrap;
         const DWORD syntax_highlighting = preferences.syntax_highlighting;
         const DWORD line_numbers = preferences.line_numbers;
-        RegSetValueExW(
-            key,
-            L"FontFamily",
-            0,
-            REG_SZ,
-            reinterpret_cast<const BYTE*>(preferences.font_family.c_str()),
-            static_cast<DWORD>((preferences.font_family.size() + 1) * sizeof(wchar_t)));
-        RegSetValueExW(key, L"FontSize", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&font_size), sizeof(font_size));
-        RegSetValueExW(key, L"SyntaxTheme", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&syntax_theme), sizeof(syntax_theme));
-        RegSetValueExW(key, L"WordWrap", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&word_wrap), sizeof(word_wrap));
-        RegSetValueExW(key, L"SyntaxHighlighting", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&syntax_highlighting), sizeof(syntax_highlighting));
-        RegSetValueExW(key, L"LineNumbers", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&line_numbers), sizeof(line_numbers));
-        const auto write = [key](const wchar_t* name, DWORD value) {
-            RegSetValueExW(key, name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
+        key.set(L"FontFamily", REG_SZ, reinterpret_cast<const BYTE*>(preferences.font_family.c_str()), static_cast<DWORD>((preferences.font_family.size() + 1) * sizeof(wchar_t)));
+        key.set(L"FontSize", REG_DWORD, reinterpret_cast<const BYTE*>(&font_size), sizeof(font_size));
+        key.set(L"SyntaxTheme", REG_DWORD, reinterpret_cast<const BYTE*>(&syntax_theme), sizeof(syntax_theme));
+        key.set(L"WordWrap", REG_DWORD, reinterpret_cast<const BYTE*>(&word_wrap), sizeof(word_wrap));
+        key.set(L"SyntaxHighlighting", REG_DWORD, reinterpret_cast<const BYTE*>(&syntax_highlighting), sizeof(syntax_highlighting));
+        key.set(L"LineNumbers", REG_DWORD, reinterpret_cast<const BYTE*>(&line_numbers), sizeof(line_numbers));
+        const auto write = [&key](const wchar_t* name, DWORD value) {
+            key.set(name, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
         };
         write(L"MarkdownDefaultPreview", preferences.markdown_default_preview);
         write(L"JsonDefaultTree", preferences.json_default_tree);
         write(L"MarkdownFontSize", static_cast<DWORD>(std::clamp(preferences.markdown_font_size, 8.0, 48.0)));
         write(L"MarkdownStyle", std::min<std::uint32_t>(preferences.markdown_style, 6));
-        RegSetValueExW(key, L"MarkdownFontFamily", 0, REG_SZ,
-            reinterpret_cast<const BYTE*>(preferences.markdown_font_family.c_str()),
-            static_cast<DWORD>((preferences.markdown_font_family.size() + 1) * sizeof(wchar_t)));
-        RegCloseKey(key);
+        key.set(L"MarkdownFontFamily", REG_SZ, reinterpret_cast<const BYTE*>(preferences.markdown_font_family.c_str()), static_cast<DWORD>((preferences.markdown_font_family.size() + 1) * sizeof(wchar_t)));
+        static_cast<void>(key.commit());
     }
 }

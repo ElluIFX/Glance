@@ -93,7 +93,8 @@ namespace glance::app
     glance::contracts::NetworkDownloadResult CoreNetworkClient::download(
         const glance::contracts::NetworkDownloadRequest& request,
         const std::atomic_bool& cancelled,
-        const DownloadProgressCallback& progress)
+        const DownloadProgressCallback& progress,
+        const std::function<bool()>& cancellation_check)
     {
         const auto request_id = next_request_id();
         const auto waiter = std::make_shared<DownloadWaitState>();
@@ -126,7 +127,8 @@ namespace glance::app
         while (!waiter->completed)
         {
             static_cast<void>(waiter->condition.wait_for(lock, std::chrono::milliseconds(100)));
-            if (!cancel_sent && cancelled.load(std::memory_order_acquire))
+            if (!cancel_sent && (cancelled.load(std::memory_order_acquire) ||
+                (cancellation_check && cancellation_check())))
             {
                 cancel_sent = true;
                 lock.unlock();

@@ -1,4 +1,5 @@
 #include "glance/contracts/diagnostics.h"
+#include "glance/contracts/storage.h"
 
 #include <windows.h>
 #include <dbghelp.h>
@@ -16,15 +17,7 @@ namespace
 
     std::filesystem::path diagnostics_root_directory()
     {
-        std::wstring local_app_data(32768, L'\0');
-        const DWORD length = GetEnvironmentVariableW(
-            L"LOCALAPPDATA", local_app_data.data(), static_cast<DWORD>(local_app_data.size()));
-        local_app_data.resize(length < local_app_data.size() ? length : 0);
-        std::filesystem::path result = local_app_data.empty()
-            ? std::filesystem::temp_directory_path()
-            : std::filesystem::path(local_app_data);
-        result /= L"Glance";
-        return result;
+        return glance::contracts::storage::data_directory();
     }
 
     std::filesystem::path diagnostics_directory(std::wstring_view child)
@@ -59,6 +52,8 @@ namespace
         {
             return EXCEPTION_EXECUTE_HANDLER;
         }
+        try
+        {
         const auto path = diagnostics_directory(L"Dumps") /
             (process_name + L"-" + timestamp() + L".dmp");
         const HANDLE file = CreateFileW(
@@ -86,6 +81,8 @@ namespace
             CloseHandle(file);
         }
         glance::contracts::log_event(L"Unhandled exception; crash dump requested.");
+        }
+        catch (...) {}
         return EXCEPTION_EXECUTE_HANDLER;
     }
 }
@@ -94,17 +91,7 @@ namespace glance::contracts
 {
     bool diagnostics_enabled() noexcept
     {
-        DWORD enabled{};
-        DWORD size = sizeof(enabled);
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            registry_path,
-            L"Enabled",
-            RRF_RT_REG_DWORD,
-            nullptr,
-            &enabled,
-            &size);
-        return enabled != 0;
+        return storage::read_dword(registry_path, L"Enabled", 0) != 0;
     }
 
     std::wstring diagnostics_root_path() noexcept
@@ -126,23 +113,10 @@ namespace glance::contracts
 
     void set_diagnostics_enabled(bool enabled) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        storage::Batch key(registry_path);
         const DWORD value = enabled;
-        RegSetValueExW(key, L"Enabled", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
-        RegCloseKey(key);
+        key.set(L"Enabled", REG_DWORD, &value, sizeof(value));
+        static_cast<void>(key.commit());
     }
 
     void initialize_diagnostics(std::wstring_view name) noexcept
@@ -158,6 +132,8 @@ namespace glance::contracts
         {
             return;
         }
+        try
+        {
         std::scoped_lock lock(log_mutex);
         const auto path = diagnostics_directory(L"Logs") / (process_name + L".log");
         FILE* file{};
@@ -168,5 +144,7 @@ namespace glance::contracts
         fwprintf(file, L"[%s] [pid:%lu] %.*s\n", timestamp().c_str(), GetCurrentProcessId(),
             static_cast<int>(message.size()), message.data());
         fclose(file);
+        }
+        catch (...) {}
     }
 }

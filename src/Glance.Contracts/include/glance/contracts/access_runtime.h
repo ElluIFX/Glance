@@ -6,7 +6,7 @@
 
 namespace glance::contracts::access
 {
-    enum class InstallationMode { installed, portable, unknown };
+    enum class InstallationMode { installed, portable };
 
     [[nodiscard]] std::filesystem::path executable_directory();
     [[nodiscard]] bool same_directory(const std::filesystem::path& left, const std::filesystem::path& right) noexcept;

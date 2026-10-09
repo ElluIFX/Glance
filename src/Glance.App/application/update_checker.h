@@ -18,5 +18,6 @@ namespace glance::app
     };
 
     [[nodiscard]] UpdateLaunchStatus launch_update_installer(
-        const std::filesystem::path& installer_path) noexcept;
+        const std::filesystem::path& installer_path, std::wstring_view version,
+        bool wait_for_completion = true) noexcept;
 }

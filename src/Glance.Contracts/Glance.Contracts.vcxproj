@@ -19,12 +19,14 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..\Glance.App\third_party\rapidjson\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\glance\contracts\access_protocol.h" />
     <ClInclude Include="include\glance\contracts\access_runtime.h" />
+    <ClInclude Include="include\glance\contracts\storage.h" />
+    <ClInclude Include="include\glance\contracts\maintenance.h" />
     <ClInclude Include="include\glance\contracts\component_api.h" />
     <ClInclude Include="include\glance\contracts\dependency_runtime.h" />
     <ClInclude Include="include\glance\contracts\dependency_api.h" />
@@ -40,6 +42,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\access_runtime.cpp" />
+    <ClCompile Include="src\storage.cpp" />
+    <ClCompile Include="src\maintenance.cpp" />
     <ClCompile Include="src\contracts.cpp" />
     <ClCompile Include="src\dependency_runtime.cpp" />
     <ClCompile Include="src\diagnostics.cpp" />

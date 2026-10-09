@@ -1,4 +1,5 @@
 #include "network_service.h"
+#include "glance/contracts/storage.h"
 #include "../../version.h"
 
 #include <windows.h>
@@ -332,7 +333,9 @@ namespace glance::core
             }
 
             const auto version = normalized_version(latest_version);
-            const auto expected_name = L"Glance-Setup-" + version + L"-x64.exe";
+            const auto expected_name = glance::contracts::storage::portable
+                ? L"Glance-" + version + L"-x64.zip"
+                : L"Glance-Setup-" + version + L"-x64.exe";
             std::optional<glance::contracts::UpdateInstallerAsset> installer;
             for (const auto& value : json.GetNamedArray(L"assets"))
             {

@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "window_size_store.h"
 #include <cstdint>
 
@@ -11,24 +12,20 @@ namespace
     {
         std::uint64_t value{};
         DWORD bytes = sizeof(value);
-        if (RegGetValueW(HKEY_CURRENT_USER, path, name.c_str(), RRF_RT_REG_QWORD,
-            nullptr, &value, &bytes) != ERROR_SUCCESS) return std::nullopt;
+        if (glance::contracts::storage::read_value(path, name.c_str(), REG_QWORD, &value, &bytes) != ERROR_SUCCESS) return std::nullopt;
         return value;
     }
     void write(const wchar_t* path, const std::wstring& name, LONG x, LONG y) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(HKEY_CURRENT_USER, path, 0, nullptr, 0, KEY_SET_VALUE,
-            nullptr, &key, nullptr) != ERROR_SUCCESS) return;
+        glance::contracts::storage::Batch key(path);
         const std::uint64_t value = (std::uint64_t(static_cast<std::uint32_t>(x)) << 32U) |
             static_cast<std::uint32_t>(y);
-        RegSetValueExW(key, name.c_str(), 0, REG_QWORD,
-            reinterpret_cast<const BYTE*>(&value), sizeof(value));
-        RegCloseKey(key);
+        key.set(name.c_str(), REG_QWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
+        static_cast<void>(key.commit());
     }
     bool clear(const wchar_t* path) noexcept
     {
-        const auto result = RegDeleteTreeW(HKEY_CURRENT_USER, path);
+        const auto result = glance::contracts::storage::clear_group(path);
         return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
     }
 }

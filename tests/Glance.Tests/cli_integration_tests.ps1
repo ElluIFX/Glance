@@ -5,6 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $cli = Join-Path $BuildOutputDirectory 'Glance.CLI.exe'
+$portable = ((& $cli --internal-distribution) -join '') -eq 'Portable'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $fixture = Join-Path $root ('.tmp\cli-tests-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
@@ -31,6 +32,8 @@ function Assert-True([bool] $Condition, [string] $Message) {
 $setting = 'PathCopy/QuotePath'
 $original = $null
 $wasStored = $false
+$portableSettings = Join-Path $BuildOutputDirectory 'data\settings.json'
+$portableOriginal = if ($portable -and (Test-Path -LiteralPath $portableSettings)) { [IO.File]::ReadAllBytes($portableSettings) } else { $null }
 try {
     Invoke-Cli -Arguments @('quit') | Out-Null
     Invoke-Cli -Arguments @('status', '--no-start') -Expected 4 | Out-Null
@@ -315,11 +318,15 @@ try {
     Write-Host 'CLI integration tests passed'
 }
 finally {
-    if ($null -ne $original) {
+    if (-not $portable -and $null -ne $original) {
         if ($wasStored) { Invoke-Cli -Arguments @('settings', 'set', $setting, $original.ToString().ToLowerInvariant()) | Out-Null }
         else { Invoke-Cli -Arguments @('settings', 'reset', $setting) | Out-Null }
     }
     Invoke-Cli -Arguments @('quit') | Out-Null
+    if ($portable) {
+        if ($null -ne $portableOriginal) { [IO.File]::WriteAllBytes($portableSettings, $portableOriginal) }
+        elseif (Test-Path -LiteralPath $portableSettings) { Remove-Item -LiteralPath $portableSettings -Force }
+    }
     $resolved = [IO.Path]::GetFullPath($fixture)
     $allowed = [IO.Path]::GetFullPath((Join-Path $root '.tmp')) + [IO.Path]::DirectorySeparatorChar
     if (-not $resolved.StartsWith($allowed, [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid fixture cleanup path' }

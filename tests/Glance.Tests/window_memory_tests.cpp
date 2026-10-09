@@ -1,9 +1,29 @@
 #include "window_size_store.h"
+#include "glance/contracts/storage.h"
 #include <iostream>
 
 int run_window_memory_tests()
 {
     using namespace glance::app;
+    namespace storage = glance::contracts::storage;
+    storage::Snapshot portable_original;
+    const auto portable_file = storage::data_directory() / L"settings.json";
+    const bool portable_existed = storage::portable && std::filesystem::exists(portable_file);
+    if (storage::portable && storage::settings().snapshot(portable_original) != ERROR_SUCCESS) return 1;
+    struct RestorePortable
+    {
+        storage::Snapshot& original;
+        std::filesystem::path file;
+        bool existed;
+        ~RestorePortable()
+        {
+            if (!storage::portable) return;
+            if (existed) static_cast<void>(storage::write_snapshot(file, original));
+            else { std::error_code error; std::filesystem::remove(file, error); }
+            storage::settings().invalidate();
+        }
+    } restore{portable_original, portable_file, portable_existed};
+    if (storage::portable && storage::settings().clear(L"") != ERROR_SUCCESS) return 1;
     const auto path = L"Software\\Glance\\Tests\\WindowMemory." + std::to_wstring(GetCurrentProcessId());
     HKEY isolated{};
     if (RegCreateKeyExW(HKEY_CURRENT_USER, path.c_str(), 0, nullptr, 0, KEY_ALL_ACCESS,
@@ -37,6 +57,8 @@ int run_window_memory_tests()
         "component sizes remain independent");
     check(a.center_offset && a.center_offset->x == -120 && b.center_offset && b.center_offset->y == -60,
         "component positions remain independent and preserve negative offsets");
+    if (!a.center_offset || !b.center_offset || a.center_offset->x != -120 || b.center_offset->y != -60)
+        std::cout << "Offsets: " << (a.center_offset ? a.center_offset->x : 0) << ", " << (b.center_offset ? b.center_offset->y : 0) << '\n';
     check(!load_window_placement(office).size, "unseen component does not inherit another document size");
     save_window_placement(web, {SIZE{800, 600}, std::nullopt});
     check(!load_window_placement(model).size, "web component does not inherit built-in web size");

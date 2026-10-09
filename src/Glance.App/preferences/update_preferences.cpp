@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "update_preferences.h"
 #include "public_settings.h"
 
@@ -21,14 +22,7 @@ namespace
     {
         std::uint64_t value{};
         DWORD size = sizeof(value);
-        return RegGetValueW(
-                   HKEY_CURRENT_USER,
-                   registry_path,
-                   name,
-                   RRF_RT_REG_QWORD,
-                   nullptr,
-                   &value,
-                   &size) == ERROR_SUCCESS
+        return glance::contracts::storage::read_value(registry_path, name, REG_QWORD, &value, &size) == ERROR_SUCCESS
             ? value
             : 0;
     }
@@ -37,51 +31,26 @@ namespace
     {
         wchar_t value[128]{};
         DWORD size = sizeof(value);
-        if (RegGetValueW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                name,
-                RRF_RT_REG_SZ,
-                nullptr,
-                value,
-                &size) != ERROR_SUCCESS)
+        if (glance::contracts::storage::read_value(registry_path, name, REG_SZ, value, &size) != ERROR_SUCCESS)
         {
             return {};
         }
         return value;
     }
 
-    void write_dword(HKEY key, const wchar_t* name, DWORD value) noexcept
+    void write_dword(glance::contracts::storage::Batch& key, const wchar_t* name, DWORD value) noexcept
     {
-        RegSetValueExW(
-            key,
-            name,
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&value),
-            sizeof(value));
+        key.set(name, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
     }
 
-    void write_qword(HKEY key, const wchar_t* name, std::uint64_t value) noexcept
+    void write_qword(glance::contracts::storage::Batch& key, const wchar_t* name, std::uint64_t value) noexcept
     {
-        RegSetValueExW(
-            key,
-            name,
-            0,
-            REG_QWORD,
-            reinterpret_cast<const BYTE*>(&value),
-            sizeof(value));
+        key.set(name, REG_QWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
     }
 
-    void write_string(HKEY key, const wchar_t* name, std::wstring_view value) noexcept
+    void write_string(glance::contracts::storage::Batch& key, const wchar_t* name, std::wstring_view value) noexcept
     {
-        RegSetValueExW(
-            key,
-            name,
-            0,
-            REG_SZ,
-            reinterpret_cast<const BYTE*>(value.data()),
-            static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
+        key.set(name, REG_SZ, reinterpret_cast<const BYTE*>(value.data()), static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
     }
 }
 
@@ -102,26 +71,13 @@ namespace glance::app
 
     void save_update_preferences(const UpdatePreferences& preferences) noexcept
     {
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
         write_dword(key, L"AutomaticCheckEnabled", preferences.automatic_check_enabled ? 1U : 0U);
         write_dword(key, L"CheckFrequency", static_cast<DWORD>(preferences.frequency));
         write_qword(key, L"LastSuccessfulCheck", preferences.last_successful_check);
         write_qword(key, L"RetryAfter", preferences.retry_after);
         write_string(key, L"SkippedVersion", preferences.skipped_version);
-        RegCloseKey(key);
+        static_cast<void>(key.commit());
     }
 
 }

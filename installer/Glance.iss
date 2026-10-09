@@ -505,7 +505,6 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    SaveStringToFile(ExpandConstant('{app}\Glance.installed'), '', False);
     RemoveLegacyCoreTasks;
     ResultCode := 1;
     if (ExistingAccessService or WizardIsTaskSelected('accessservice')) and

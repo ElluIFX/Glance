@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "webview_availability.h"
 
 #include <shlobj.h>
@@ -10,14 +11,6 @@
 
 namespace
 {
-    struct CoTaskMemDeleter
-    {
-        void operator()(void* value) const noexcept
-        {
-            CoTaskMemFree(value);
-        }
-    };
-
     std::atomic_bool runtime_available{};
     winrt::Microsoft::Web::WebView2::Core::CoreWebView2Environment shared_environment{
         nullptr
@@ -63,16 +56,7 @@ namespace glance::app
             co_return shared_environment;
         }
 
-        PWSTR local_app_data_raw = nullptr;
-        winrt::check_hresult(SHGetKnownFolderPath(
-            FOLDERID_LocalAppData,
-            KF_FLAG_CREATE,
-            nullptr,
-            &local_app_data_raw));
-        const std::unique_ptr<wchar_t, CoTaskMemDeleter> local_app_data(
-            local_app_data_raw);
-        const std::filesystem::path user_data_folder =
-            std::filesystem::path(local_app_data.get()) / L"Glance" / L"WebView2";
+        const auto user_data_folder = contracts::storage::data_directory() / L"WebView2";
         std::filesystem::create_directories(user_data_folder);
 
         const auto environment =

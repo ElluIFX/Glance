@@ -2,6 +2,7 @@
 #include "glance/contracts/cli_input.h"
 #include "../version.h"
 #include "help.h"
+#include "glance/contracts/maintenance.h"
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -188,6 +189,27 @@ namespace
 
 int wmain(int argc, wchar_t** argv)
 {
+    if (argc == 2 && std::wstring_view(argv[1]) == L"--internal-distribution")
+    {
+        std::puts(glance::contracts::storage::portable ? "Portable" : "Installed");
+        return 0;
+    }
+    if (argc == 3 && std::wstring_view(argv[1]) == L"--internal-package-check")
+    {
+        using namespace glance::contracts::storage;
+        if (std::wstring_view(argv[2]) != GLANCE_VERSION_WSTRING) return 1;
+        const auto directory = application_directory();
+        for (const auto name : {L"Glance.exe", L"Glance.Core.exe", L"Glance.CLI.exe"})
+            if (!binary_matches(directory / name, portable, argv[2])) return 1;
+        return 0;
+    }
+    if (argc == 4 && std::wstring_view(argv[1]) == L"--internal-maintenance")
+    {
+        wchar_t* end{};
+        const auto parent = wcstoul(argv[3], &end, 10);
+        if (!parent || *end || !glance::contracts::storage::portable) return ERROR_INVALID_PARAMETER;
+        return glance::contracts::maintenance::run_worker(argv[2], parent);
+    }
     using namespace glance::cli;
     bool json = false;
     std::string command;
@@ -229,6 +251,7 @@ int wmain(int argc, wchar_t** argv)
             if (arg == L"--json") continue;
             if (arg == L"--quiet") continue;
             if (arg == L"--no-start") { no_start = true; continue; }
+            if (arg == L"--install") { request.AddMember("install", true, allocator); continue; }
             if (arg == L"--wait") { wait = true; continue; }
             if (arg == L"--name") { input_name = next(); continue; }
             if (arg == L"--raw") continue;
@@ -313,6 +336,7 @@ int wmain(int argc, wchar_t** argv)
         if (!known.contains(command)) throw Error(2, "unknown_command", "Unknown command: " + command);
         std::set<std::wstring> allowed{ L"--json", L"--quiet", L"--no-start" };
         if (command == "preview" || command.starts_with("window.")) allowed.insert(L"--timeout");
+        if (command == "check-update") allowed.insert(L"--install");
         if (command.starts_with("window.")) allowed.insert(L"--id");
         if (command.starts_with("window.") && command != "window.close") allowed.insert(L"--wait");
         if (command == "preview") allowed.insert({ L"--raw", L"--name", L"--size", L"--position", L"--center-offset", L"--monitor", L"--topmost", L"--pin", L"--close-after", L"--wait" });
@@ -412,7 +436,7 @@ int wmain(int argc, wchar_t** argv)
             request.AddMember("enabled", words[0] == L"on", allocator);
         }
         else if (!words.empty()) throw Error(2, "argument_count", "Unexpected positional arguments");
-        const DWORD transport_timeout = command == "check-update" ? 60000 : 10000;
+        const DWORD transport_timeout = command == "check-update" ? (seen.contains(L"--install") ? 600000 : 60000) : 10000;
         request.AddMember("timeout_ms", static_cast<unsigned>(transport_timeout), allocator);
         string_member(request, "command", command);
         const auto payload = serialize(request);

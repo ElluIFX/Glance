@@ -1,5 +1,6 @@
 #include "glance/contracts/access_runtime.h"
 #include "glance/contracts/access_protocol.h"
+#include "glance/contracts/storage.h"
 
 #include <aclapi.h>
 #include <sddl.h>
@@ -110,20 +111,7 @@ namespace glance::contracts::access
 
     InstallationMode installation_mode() noexcept
     {
-        try
-        {
-            const auto directory = executable_directory();
-            wchar_t location[32768]{};
-            DWORD size = sizeof(location);
-            const auto status = RegGetValueW(HKEY_LOCAL_MACHINE,
-                L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{F4A2E1FC-BA77-4A24-83BF-A1D5B90A3E13}_is1",
-                L"InstallLocation", RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ | RRF_SUBKEY_WOW6464KEY, nullptr, location, &size);
-            if (status == ERROR_SUCCESS && same_directory(directory, location)) return InstallationMode::installed;
-            if (std::filesystem::is_regular_file(directory / L"Glance.installed")) return InstallationMode::installed;
-            if (std::filesystem::is_regular_file(directory / L"Glance.portable")) return InstallationMode::portable;
-        }
-        catch (...) {}
-        return InstallationMode::unknown;
+        return storage::portable ? InstallationMode::portable : InstallationMode::installed;
     }
 
     DWORD start_service() noexcept

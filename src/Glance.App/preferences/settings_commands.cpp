@@ -9,6 +9,7 @@
 #include "localization.h"
 #include "glance/contracts/cli_protocol.h"
 #include "glance/contracts/diagnostics.h"
+#include "glance/contracts/storage.h"
 #include <charconv>
 #include <set>
 
@@ -108,10 +109,10 @@ namespace
         {
             DWORD bytes{};
             std::wstring text = definition.default_value;
-            if (RegGetValueW(HKEY_CURRENT_USER, path.c_str(), name.c_str(), RRF_RT_REG_SZ, nullptr, nullptr, &bytes) == ERROR_SUCCESS && bytes <= 65536)
+            if (glance::contracts::storage::read_value(path, name, REG_SZ, nullptr, &bytes) == ERROR_SUCCESS && bytes <= 65536)
             {
                 std::vector<wchar_t> buffer(bytes / sizeof(wchar_t) + 1);
-                if (RegGetValueW(HKEY_CURRENT_USER, path.c_str(), name.c_str(), RRF_RT_REG_SZ, nullptr, buffer.data(), &bytes) == ERROR_SUCCESS) text = buffer.data();
+                if (glance::contracts::storage::read_value(path, name, REG_SZ, buffer.data(), &bytes) == ERROR_SUCCESS) text = buffer.data();
             }
             return JsonValue::CreateStringValue(text);
         }
@@ -140,30 +141,26 @@ namespace
             return;
         }
         auto [path, name] = registry_location(definition.key);
-        HKEY key{};
-        if (RegCreateKeyExW(HKEY_CURRENT_USER, path.c_str(), 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS)
-            throw Error(7, "setting_write_failed", "Cannot open settings registry key");
-        struct Close { HKEY key; ~Close() { RegCloseKey(key); } } close{ key };
-        LSTATUS status{};
+        glance::contracts::storage::Batch key(path);
         // An explicit default must override the legacy root-level auto-fit value.
-        if (reset && definition.key != L"Window/AutoFitMedia") status = RegDeleteValueW(key, name.c_str());
+        if (reset && definition.key != L"Window/AutoFitMedia") key.erase(name);
         else if (definition.type == L"string")
         {
             auto text = value.GetString();
-            status = RegSetValueExW(key, name.c_str(), 0, REG_SZ, reinterpret_cast<const BYTE*>(text.c_str()), static_cast<DWORD>((text.size() + 1) * sizeof(wchar_t)));
+            key.set(name, REG_SZ, text.c_str(), static_cast<DWORD>((text.size() + 1) * sizeof(wchar_t)));
         }
         else if (definition.type == L"array")
         {
             std::vector<DWORD> values;
             for (auto item : value.GetArray()) values.push_back(static_cast<DWORD>(item.GetNumber()));
-            status = RegSetValueExW(key, name.c_str(), 0, REG_BINARY, reinterpret_cast<const BYTE*>(values.data()), static_cast<DWORD>(values.size() * sizeof(DWORD)));
+            key.set(name, REG_BINARY, values.data(), static_cast<DWORD>(values.size() * sizeof(DWORD)));
         }
         else
         {
             DWORD number = definition.type == L"boolean" ? value.GetBoolean() : static_cast<DWORD>(value.GetNumber());
-            status = RegSetValueExW(key, name.c_str(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&number), sizeof(number));
+            key.set(name, REG_DWORD, &number, sizeof(number));
         }
-        if (status != ERROR_SUCCESS && !(reset && status == ERROR_FILE_NOT_FOUND)) throw Error(7, "setting_write_failed", "Cannot save setting");
+        if (key.commit() != ERROR_SUCCESS) throw Error(7, "setting_write_failed", "Cannot save setting");
     }
 }
 
@@ -171,6 +168,9 @@ namespace glance::app
 {
     JsonObject execute_settings_command(std::wstring_view command, JsonObject const& request)
     {
+        glance::contracts::storage::Snapshot snapshot;
+        if (glance::contracts::storage::settings().snapshot(snapshot) != ERROR_SUCCESS)
+            throw Error(7, "setting_read_failed", "Cannot read settings storage");
         auto definitions = public_setting_definitions();
         for (const auto& setting : component_settings(current_ui_language()))
         {

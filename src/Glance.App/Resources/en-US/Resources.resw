@@ -524,4 +524,22 @@
   <data name="MarkdownStyleDescription.Text" xml:space="preserve"><value>Color theme for rendered Markdown; Automatic follows the app theme</value></data>
   <data name="JsonDefaultTreeEnabledDescription.Text" xml:space="preserve"><value>Open JSON files in structured view</value></data>
   <data name="JsonDefaultTreeDisabledDescription.Text" xml:space="preserve"><value>Open JSON files as raw text</value></data>
+  <data name="StorageUnavailableTitle" xml:space="preserve"><value>Cannot access application data</value></data>
+  <data name="StorageUnavailableMessage" xml:space="preserve"><value>Make sure the application directory is writable and data/settings.json is valid\n{0}</value></data>
+  <data name="MigrateInstalledDataTitle" xml:space="preserve"><value>Migrate from installed version</value></data>
+  <data name="MigrateInstalledDataDescription" xml:space="preserve"><value>Import this user's installed settings and data, overwriting portable data</value></data>
+  <data name="MigrateInstalledDataButton" xml:space="preserve"><value>Migrate</value></data>
+  <data name="MigrateInstalledDataBusy" xml:space="preserve"><value>Migrating...</value></data>
+  <data name="MigrateInstalledDataConfirmation" xml:space="preserve"><value>Import the installed settings and data, overwrite existing portable data, and restart Glance</value></data>
+  <data name="MigrationFailedTitle" xml:space="preserve"><value>Data migration failed</value></data>
+  <data name="MigrationFailedMessage" xml:space="preserve"><value>Existing data has been preserved\n{0}</value></data>
+  <data name="MigrationCompletedTitle" xml:space="preserve"><value>Data migration complete</value></data>
+  <data name="MigrationCleanupTitle" xml:space="preserve"><value>Clean up original data</value></data>
+  <data name="MigrationDeleteSourceMessage" xml:space="preserve"><value>The migration data is ready. Delete the installed version's original registry settings and AppData files after migration completes?</value></data>
+  <data name="MigrationDeleteSourceButton" xml:space="preserve"><value>Delete original data</value></data>
+  <data name="MigrationKeepSourceButton" xml:space="preserve"><value>Keep original data</value></data>
+  <data name="MigrationCleanupFailedMessage" xml:space="preserve"><value>Migration is complete, but source cleanup could not finish</value></data>
+  <data name="MigrationRestartFailedMessage" xml:space="preserve"><value>Migration is complete. Start Glance manually</value></data>
+  <data name="MaintenanceFailedTitle" xml:space="preserve"><value>Data replacement failed</value></data>
+  <data name="MaintenanceFailedMessage" xml:space="preserve"><value>Previous files have been restored\n{0}</value></data>
 </root>

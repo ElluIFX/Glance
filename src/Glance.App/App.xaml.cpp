@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/maintenance.h"
 #include "App.xaml.h"
 #include "appearance_preferences.h"
 #include "localization.h"
@@ -301,6 +302,50 @@ namespace winrt::Glance::App::implementation
         }
         const bool duplicate_instance = GetLastError() == ERROR_ALREADY_EXISTS;
         dispatcher_ = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        if (!duplicate_instance && glance::contracts::storage::portable)
+        {
+            try
+            {
+                const auto application = glance::contracts::storage::application_directory();
+                if (glance::contracts::maintenance::recovery_required(application))
+                {
+                    glance::contracts::maintenance::launch_worker(application);
+                    Application::Current().Exit(); return;
+                }
+                glance::contracts::maintenance::recover(application);
+                glance::contracts::storage::Snapshot snapshot;
+                check_hresult(HRESULT_FROM_WIN32(glance::contracts::storage::settings().snapshot(snapshot)));
+                const auto data = glance::contracts::storage::data_directory();
+                std::filesystem::create_directories(data);
+                const auto probe = data / (L".write-check-" + std::to_wstring(GetCurrentProcessId()));
+                const HANDLE file = CreateFileW(probe.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                    FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
+                if (file == INVALID_HANDLE_VALUE) throw hresult_error(HRESULT_FROM_WIN32(GetLastError()));
+                CloseHandle(file);
+            }
+            catch (const std::system_error& error)
+            {
+                if (error.code().value() == ERROR_BUSY)
+                {
+                    Application::Current().Exit(); return;
+                }
+                MessageBoxW(nullptr, glance::app::localize_format(L"StorageUnavailableMessage", {hresult_error(HRESULT_FROM_WIN32(error.code().value())).message()}).c_str(),
+                    glance::app::localize(L"StorageUnavailableTitle").c_str(), MB_OK | MB_ICONERROR);
+                Application::Current().Exit(); return;
+            }
+            catch (const hresult_error& error)
+            {
+                MessageBoxW(nullptr, glance::app::localize_format(L"StorageUnavailableMessage", {error.message()}).c_str(),
+                    glance::app::localize(L"StorageUnavailableTitle").c_str(), MB_OK | MB_ICONERROR);
+                Application::Current().Exit(); return;
+            }
+            catch (...)
+            {
+                MessageBoxW(nullptr, glance::app::localize_format(L"StorageUnavailableMessage", {hresult_error(HRESULT_FROM_WIN32(ERROR_INVALID_DATA)).message()}).c_str(),
+                    glance::app::localize(L"StorageUnavailableTitle").c_str(), MB_OK | MB_ICONERROR);
+                Application::Current().Exit(); return;
+            }
+        }
         const auto appearance = glance::app::load_appearance_preferences();
         glance::app::apply_ui_language(appearance.language);
         glance::app::apply_accent_resources(appearance);
@@ -341,9 +386,17 @@ namespace winrt::Glance::App::implementation
             },
             [this](std::string_view response) {
                 const auto result = Windows::Data::Json::JsonObject::Parse(to_hstring(response));
-                if (result.GetNamedString(L"command", L"") == L"quit" && result.GetNamedBoolean(L"ok", false))
+                const auto command = result.GetNamedString(L"command", L"");
+                if (result.GetNamedBoolean(L"ok", false) && (command == L"quit" ||
+                    (command == L"check-update" && result.GetNamedObject(L"data").GetNamedBoolean(L"update_started", false))))
                     dispatcher_.TryEnqueue([this] { exit_application(); });
             });
+        if (glance::contracts::storage::portable && (std::ranges::any_of(command_line_arguments(), [](const auto& argument) { return argument == L"--maintenance"; }) ||
+            glance::contracts::maintenance::failure(glance::contracts::storage::application_directory()) != ERROR_SUCCESS))
+        {
+            show_settings();
+            get_self<implementation::SettingsWindow>(settings_window_)->ShowMaintenance();
+        }
     }
 
     void App::show_duplicate_instance_notice()

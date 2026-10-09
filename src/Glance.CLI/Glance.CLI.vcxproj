@@ -10,10 +10,11 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile><RuntimeLibrary>MultiThreaded</RuntimeLibrary><Optimization Condition="'$(Configuration)'=='Release'">MinSpace</Optimization><FunctionLevelLinking>true</FunctionLevelLinking><AdditionalIncludeDirectories>$(ProjectDir)..\Glance.Contracts\include;$(ProjectDir)..\Glance.App\third_party\rapidjson\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
-    <Link><SubSystem>Console</SubSystem><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><AdditionalDependencies>Advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+    <Link><SubSystem>Console</SubSystem><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><AdditionalDependencies>Advapi32.lib;Bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
-  <ItemGroup><ClCompile Include="main.cpp" /></ItemGroup>
+  <ItemGroup><ClCompile Include="main.cpp" /><ClCompile Include="..\Glance.Contracts\src\storage.cpp" /><ClCompile Include="..\Glance.Contracts\src\maintenance.cpp" /></ItemGroup>
   <ItemGroup><ClInclude Include="help.h" /></ItemGroup>
   <ItemGroup><Manifest Include="app.manifest" /></ItemGroup>
+  <ItemGroup><ResourceCompile Include="..\version.rc"><PreprocessorDefinitions>GLANCE_BINARY_KIND=12;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

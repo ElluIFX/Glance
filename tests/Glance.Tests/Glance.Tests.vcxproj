@@ -34,6 +34,8 @@
     <ClCompile Include="input_decision_tests.cpp" />
     <ClCompile Include="access_tests.cpp" />
     <ClCompile Include="window_memory_tests.cpp" />
+    <ClCompile Include="storage_tests.cpp" />
+    <ClCompile Include="maintenance_tests.cpp" />
     <ClCompile Include="dependency_runtime_tests.cpp" />
     <ClCompile Include="dependency_service_tests.cpp" />
     <ClCompile Include="software_media_tests.cpp" />

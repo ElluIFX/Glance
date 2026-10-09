@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "folder_preview_preferences.h"
 #include "public_settings.h"
 
@@ -41,36 +42,11 @@ namespace glance::app
             return;
         }
 
-        HKEY key{};
-        if (RegCreateKeyExW(
-                HKEY_CURRENT_USER,
-                registry_path,
-                0,
-                nullptr,
-                0,
-                KEY_SET_VALUE,
-                nullptr,
-                &key,
-                nullptr) != ERROR_SUCCESS)
-        {
-            return;
-        }
+        glance::contracts::storage::Batch key(registry_path);
 
         const DWORD ascending = preferences.ascending;
-        RegSetValueExW(
-            key,
-            L"SortField",
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&raw_field),
-            sizeof(raw_field));
-        RegSetValueExW(
-            key,
-            L"SortAscending",
-            0,
-            REG_DWORD,
-            reinterpret_cast<const BYTE*>(&ascending),
-            sizeof(ascending));
-        RegCloseKey(key);
+        key.set(L"SortField", REG_DWORD, reinterpret_cast<const BYTE*>(&raw_field), sizeof(raw_field));
+        key.set(L"SortAscending", REG_DWORD, reinterpret_cast<const BYTE*>(&ascending), sizeof(ascending));
+        static_cast<void>(key.commit());
     }
 }

@@ -5,10 +5,15 @@
     <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
     <PlatformToolset>v145</PlatformToolset>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <GlanceDistribution Condition="'$(GlanceDistribution)'==''">Portable</GlanceDistribution>
+    <GlancePortable Condition="'$(GlanceDistribution)'=='Portable'">1</GlancePortable>
+    <GlancePortable Condition="'$(GlancePortable)'==''">0</GlancePortable>
+    <GlanceOutputRoot Condition="'$(GlanceOutputRoot)'=='' and '$(GlanceDistribution)'=='Portable'">$(SolutionDir)bin\Portable\$(Configuration)\x64\</GlanceOutputRoot>
     <GlanceOutputRoot Condition="'$(GlanceOutputRoot)'=='' and '$(Platform)'=='Win32'">$(SolutionDir)bin\$(Configuration)\x64\</GlanceOutputRoot>
     <GlanceOutputRoot Condition="'$(GlanceOutputRoot)'==''">$(SolutionDir)bin\$(Configuration)\$(Platform)\</GlanceOutputRoot>
     <OutDir>$(GlanceOutputRoot)</OutDir>
-    <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
+    <IntDir>$(SolutionDir)obj\$(ProjectName)\$(GlanceDistribution)\$(Configuration)\$(Platform)\</IntDir>
+    <GeneratedFilesDir>$(IntDir)Generated Files\</GeneratedFilesDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -17,7 +22,13 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <PreprocessorDefinitions>UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>GLANCE_PORTABLE=$(GlancePortable);UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>GLANCE_PORTABLE=$(GlancePortable);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
+  <Target Name="ValidateGlanceDistribution" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(GlanceDistribution)'!='Installed' and '$(GlanceDistribution)'!='Portable'" Text="GlanceDistribution must be Installed or Portable" />
+  </Target>
 </Project>

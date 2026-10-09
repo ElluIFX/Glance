@@ -20,15 +20,15 @@ if ($ExpectedTag -and $ExpectedTag -ne $tag) {
 $artifactsDirectory = Join-Path $repositoryRoot "artifacts"
 $releaseDirectory = Join-Path $artifactsDirectory "release"
 $stagingDirectory = Join-Path $artifactsDirectory "release-staging"
-$payloadDirectory = Join-Path $artifactsDirectory "package\payload"
-$symbolsDirectory = Join-Path $artifactsDirectory "package\symbols"
+$payloadDirectory = Join-Path $artifactsDirectory "package-Portable\payload"
 
 Remove-GlanceWorkspaceItem -Path $stagingDirectory
 Remove-GlanceWorkspaceItem -Path $releaseDirectory
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
 
-& (Join-Path $PSScriptRoot "package.ps1") -Platform $Platform -RunTests
+& (Join-Path $PSScriptRoot "package.ps1") -Platform $Platform -Distribution Installed -RunTests
+& (Join-Path $PSScriptRoot "package.ps1") -Platform $Platform -Distribution Portable -RunTests
 
 $installer = Get-ChildItem -LiteralPath (Join-Path $artifactsDirectory "installer") `
     -Filter "Glance-Setup-$($version.Version)-$Platform.exe" |
@@ -41,22 +41,21 @@ Copy-Item -LiteralPath $installer.FullName -Destination $releaseDirectory -Force
 $portableName = "Glance-$($version.Version)-$Platform"
 $portableRoot = Join-Path $stagingDirectory $portableName
 New-Item -ItemType Directory -Path $portableRoot -Force | Out-Null
-Get-ChildItem -LiteralPath $payloadDirectory | Where-Object {
-    $_.Name -notin @('Glance.AccessService.exe', 'Glance.AccessHost.exe', 'Glance.installed')
-} | Copy-Item -Destination $portableRoot -Recurse -Force
-New-Item -ItemType File -Path (Join-Path $portableRoot 'Glance.portable') -Force | Out-Null
+Get-ChildItem -LiteralPath $payloadDirectory | Copy-Item -Destination $portableRoot -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "LICENSE") -Destination $portableRoot -Force
 $portableArchive = Join-Path $releaseDirectory "$portableName.zip"
 Compress-Archive -Path $portableRoot -DestinationPath $portableArchive -CompressionLevel Optimal
 
-$symbolFiles = Get-ChildItem -LiteralPath $symbolsDirectory -Recurse -File
-if (-not $symbolFiles) {
-    throw "No symbol files were collected from the release build."
-}
 $symbolsName = "Glance-$($version.Version)-$Platform-symbols"
 $symbolsRoot = Join-Path $stagingDirectory $symbolsName
 New-Item -ItemType Directory -Path $symbolsRoot -Force | Out-Null
-Copy-Item -Path (Join-Path $symbolsDirectory "*") -Destination $symbolsRoot -Recurse -Force
+foreach ($distribution in @('Installed', 'Portable')) {
+    $symbolsDirectory = Join-Path $artifactsDirectory "package-$distribution\symbols"
+    if (-not (Get-ChildItem -LiteralPath $symbolsDirectory -Recurse -File)) { throw "No $distribution symbols were collected" }
+    $destination = Join-Path $symbolsRoot $distribution
+    New-Item -ItemType Directory -Path $destination -Force | Out-Null
+    Copy-Item -Path (Join-Path $symbolsDirectory '*') -Destination $destination -Recurse -Force
+}
 $symbolsArchive = Join-Path $releaseDirectory "$symbolsName.zip"
 Compress-Archive -Path $symbolsRoot -DestinationPath $symbolsArchive -CompressionLevel Optimal
 

@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "glance/contracts/storage.h"
 #include "dependency_service.h"
 #include <shlobj.h>
 #include <wil/resource.h>
@@ -330,10 +331,7 @@ namespace glance::app::dependencies
 
     std::filesystem::path storage_root()
     {
-        PWSTR path{};
-        winrt::check_hresult(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &path));
-        const wil::unique_cotaskmem_string owner(path);
-        return std::filesystem::path(path) / L"Glance" / L"Dependencies";
+        return contracts::storage::data_directory() / L"Dependencies";
     }
 
     void unregister_consumer(std::wstring_view consumer)
