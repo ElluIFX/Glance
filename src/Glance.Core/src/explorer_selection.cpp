@@ -1100,6 +1100,53 @@ namespace glance::core
                     gallery_sessions_[command.window_id] = std::move(session);
                     }
                 }
+                else if (command.source_window == 0)
+                {
+                    const auto folder_path = std::filesystem::path(command.current_path).parent_path();
+                    if (!folder_path.is_absolute() || command.extensions.empty())
+                    {
+                        return fail(L"unsupported");
+                    }
+                    std::unordered_set<std::wstring> extensions;
+                    for (auto extension : command.extensions)
+                    {
+                        std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+                            return std::towlower(value);
+                        });
+                        extensions.insert(std::move(extension));
+                    }
+
+                    GallerySession session;
+                    std::size_t scanned{};
+                    for (const auto& entry : std::filesystem::directory_iterator(folder_path))
+                    {
+                        if ((scanned++ & 63U) == 0)
+                        {
+                            report_progress();
+                            if (canceled()) return fail(L"canceled");
+                        }
+                        auto extension = entry.path().extension().wstring();
+                        std::ranges::transform(extension, extension.begin(), [](wchar_t value) {
+                            return std::towlower(value);
+                        });
+                        if (extensions.contains(extension) && entry.is_regular_file())
+                        {
+                            session.items.push_back(GallerySessionItem{ entry.path().wstring() });
+                        }
+                    }
+                    std::ranges::sort(session.items, [](const auto& left, const auto& right) {
+                        return _wcsicmp(left.path.c_str(), right.path.c_str()) < 0;
+                    });
+                    const auto current = std::ranges::find_if(session.items, [&](const auto& item) {
+                        return _wcsicmp(item.path.c_str(), command.current_path.c_str()) == 0;
+                    });
+                    if (current == session.items.end()) return fail(L"current_not_found");
+                    session.current_index = static_cast<std::uint32_t>(current - session.items.begin());
+                    session.id = ++next_gallery_session_id_;
+                    if (session.id == 0) session.id = ++next_gallery_session_id_;
+                    response.session_id = session.id;
+                    gallery_sessions_[command.window_id] = std::move(session);
+                }
                 else
                 {
                 ComPtr<IFolderView2> folder_view;
@@ -1378,6 +1425,19 @@ namespace glance::core
                     return fail(L"stale");
                 }
                 const auto& target = active_session.items[command.target_index];
+                if (active_session.source_window == 0)
+                {
+                    const auto attributes = GetFileAttributesW(target.path.c_str());
+                    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+                    {
+                        gallery_sessions_.erase(session);
+                        return fail(L"stale");
+                    }
+                    active_session.current_index = command.target_index;
+                    response.current_index = command.target_index;
+                    response.success = true;
+                    return response;
+                }
                 if (!active_session.source_id.empty())
                 {
                     if (!external_hosts_.focus_item(

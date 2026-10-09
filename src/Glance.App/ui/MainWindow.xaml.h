@@ -637,6 +637,7 @@ namespace winrt::Glance::App::implementation
         void leave_gallery(bool show_notice, bool notify_core = true);
         void navigate_gallery(int steps);
         [[nodiscard]] bool handle_gallery_wheel(int delta);
+        [[nodiscard]] bool gallery_uses_folder_source() const noexcept;
         [[nodiscard]] bool gallery_source_available() const noexcept;
         void request_gallery_page(std::uint32_t target_index, bool select_after_load = true);
         void request_gallery_selection(std::uint32_t target_index);

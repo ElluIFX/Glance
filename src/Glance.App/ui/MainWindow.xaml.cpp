@@ -1241,10 +1241,12 @@ namespace winrt::Glance::App::implementation
         root.SetNamedValue(L"windowId", JsonValue::CreateStringValue(std::to_wstring(instance_id_)));
         root.SetNamedValue(L"requestId", JsonValue::CreateStringValue(std::to_wstring(request_id)));
         root.SetNamedValue(L"sessionId", JsonValue::CreateStringValue(std::to_wstring(gallery_session_id_)));
+        const bool folder_source = gallery_uses_folder_source();
         root.SetNamedValue(
             L"sourceWindow",
-            JsonValue::CreateStringValue(std::to_wstring(reinterpret_cast<std::uintptr_t>(source_window_))));
-        root.SetNamedValue(L"sourceId", JsonValue::CreateStringValue(source_id_));
+            JsonValue::CreateStringValue(std::to_wstring(
+                folder_source ? 0 : reinterpret_cast<std::uintptr_t>(source_window_))));
+        root.SetNamedValue(L"sourceId", JsonValue::CreateStringValue(folder_source ? L"" : source_id_));
         root.SetNamedValue(L"pageStart", JsonValue::CreateNumberValue(page_start));
         root.SetNamedValue(L"pageCount", JsonValue::CreateNumberValue(64));
         root.SetNamedValue(L"targetIndex", JsonValue::CreateNumberValue(target_index));
@@ -1277,7 +1279,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::open_gallery(bool preserve_navigation)
     {
-        if (!gallery_source_available() || source_window_ == nullptr ||
+        if (!gallery_source_available() || (!gallery_uses_folder_source() && source_window_ == nullptr) ||
             current_index_ >= files_.size() ||
             gallery_media_kind_ ==
                 glance::contracts::components::GalleryMediaKind::none)
@@ -1328,9 +1330,15 @@ namespace winrt::Glance::App::implementation
         }
     }
 
+    bool MainWindow::gallery_uses_folder_source() const noexcept
+    {
+        return !preview_navigation_.empty() && current_index_ < files_.size() &&
+            files_[current_index_].is_filesystem;
+    }
+
     bool MainWindow::gallery_source_available() const noexcept
     {
-        if (source_kind_ == 1)
+        if (gallery_uses_folder_source() || source_kind_ == 1)
         {
             return true;
         }
@@ -3005,6 +3013,7 @@ namespace winrt::Glance::App::implementation
         }
 
         if (fullscreen_) set_fullscreen(false);
+        leave_gallery(false);
         destination.push_back(capture_preview_navigation());
         auto parent = std::move(source.back());
         source.pop_back();

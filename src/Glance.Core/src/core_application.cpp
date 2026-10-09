@@ -1008,6 +1008,8 @@ namespace glance::core
                     };
                     if (is_latest())
                     {
+                        if (gallery_command->operation == GalleryOperation::open)
+                            privileged_galleries.erase(gallery_command->window_id);
                         const bool privileged = context->access &&
                             (privileged_galleries.contains(gallery_command->window_id) ||
                              (gallery_command->operation == GalleryOperation::open &&
