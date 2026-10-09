@@ -250,6 +250,9 @@ namespace winrt::Glance::App::implementation
         void FileList_SelectionChanged(
             IInspectable const&,
             Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+        void FileList_ContainerContentChanging(
+            Microsoft::UI::Xaml::Controls::ListViewBase const&,
+            Microsoft::UI::Xaml::Controls::ContainerContentChangingEventArgs const&);
         void CopyPathButton_Click(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         winrt::fire_and_forget CopyPathButton_RightTapped(
             IInspectable const&,
@@ -393,6 +396,12 @@ namespace winrt::Glance::App::implementation
             bool is_folder,
             bool use_file_attributes,
             std::uint64_t generation);
+        winrt::fire_and_forget load_file_list_icon_async(
+            std::wstring path,
+            bool is_folder,
+            std::uint32_t index,
+            std::uint64_t generation,
+            winrt::weak_ref<Microsoft::UI::Xaml::Controls::Grid> row);
         winrt::fire_and_forget load_generic_file_info_async(std::wstring path, std::uint64_t generation);
         winrt::fire_and_forget load_footer_access_async(std::wstring path, std::uint64_t generation);
         bool prepare_text_preview(const glance::app::PreviewFile& file, bool markdown, bool web = false);
@@ -717,6 +726,7 @@ namespace winrt::Glance::App::implementation
         StateCallback state_callback_;
         GalleryRequestCallback gallery_request_callback_;
         std::vector<glance::app::PreviewFile> files_;
+        std::uint64_t file_list_generation_{};
         std::uint32_t current_index_{};
         std::uint32_t source_kind_{};
         HWND source_window_{};

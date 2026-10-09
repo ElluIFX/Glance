@@ -114,13 +114,83 @@
                 <ColumnDefinition x:Name="FileListColumn" Width="0" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <ListView
-                x:Name="FileList"
+            <Border
+                x:Name="FileListPanel"
                 Grid.Column="0"
-                Margin="8"
-                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                SelectionChanged="FileList_SelectionChanged"
-                Visibility="Collapsed" />
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,1,0"
+                Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock
+                        x:Name="FileListCountText"
+                        Margin="12,8,12,6"
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ListView
+                        x:Name="FileList"
+                        Grid.Row="1"
+                        Margin="4,0,4,6"
+                        Padding="0"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                        ScrollViewer.HorizontalScrollMode="Disabled"
+                        SelectionMode="Single"
+                        ContainerContentChanging="FileList_ContainerContentChanging"
+                        SelectionChanged="FileList_SelectionChanged">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="MinHeight" Value="32" />
+                                <Setter Property="Height" Value="32" />
+                                <Setter Property="Padding" Value="8,0" />
+                                <Setter Property="CornerRadius" Value="4" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Width="16" Height="16">
+                                        <FontIcon
+                                            x:Name="FileListFallbackIcon"
+                                            FontSize="16"
+                                            Glyph="&#xE8A5;"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <Image
+                                            x:Name="FileListIcon"
+                                            Stretch="Uniform"
+                                            Visibility="Collapsed" />
+                                    </Grid>
+                                    <TextBlock
+                                        x:Name="FileListNameText"
+                                        Grid.Column="1"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="12"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        x:Name="FileListExtensionText"
+                                        Grid.Column="2"
+                                        MaxWidth="52"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Border>
 
             <Grid Grid.Column="1">
                 <Grid

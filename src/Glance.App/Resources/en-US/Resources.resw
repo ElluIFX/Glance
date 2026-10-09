@@ -54,6 +54,7 @@
   <data name="FileType" xml:space="preserve"><value>File</value></data>
   <data name="ExtensionFileType" xml:space="preserve"><value>{0} file</value></data>
   <data name="FileCount" xml:space="preserve"><value>{0} files</value></data>
+  <data name="ItemCount" xml:space="preserve"><value>{0} items</value></data>
   <data name="TotalSize" xml:space="preserve"><value>Total {0}</value></data>
   <data name="PartialTotalSize" xml:space="preserve"><value>Total &gt; {0}</value></data>
   <data name="ArchiveCompressedSize" xml:space="preserve"><value>Compressed {0}</value></data>

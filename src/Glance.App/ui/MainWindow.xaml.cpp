@@ -37,6 +37,7 @@
 #include <windowsx.h>
 #include <winrt/Microsoft.Web.WebView2.Core.h>
 #include <winrt/Windows.Data.Json.h>
+#include <winrt/Microsoft.UI.Xaml.Automation.h>
 
 #include <algorithm>
 #include <array>
@@ -395,48 +396,6 @@ namespace
         }
     }
 
-    std::wstring compact_file_list_name(std::wstring_view name)
-    {
-        constexpr std::size_t maximum_units = 24;
-        constexpr std::wstring_view ellipsis = L"...";
-        const auto units = [](wchar_t character) noexcept
-        {
-            return character < 0x80 ? 1U : 2U;
-        };
-
-        std::size_t total_units{};
-        for (const auto character : name)
-        {
-            total_units += units(character);
-        }
-        if (total_units <= maximum_units)
-        {
-            return std::wstring(name);
-        }
-
-        constexpr std::size_t prefix_units = 14;
-        constexpr std::size_t suffix_units = maximum_units - prefix_units - ellipsis.size();
-        std::size_t prefix_length{};
-        std::size_t used_units{};
-        while (prefix_length < name.size() &&
-            used_units + units(name[prefix_length]) <= prefix_units)
-        {
-            used_units += units(name[prefix_length++]);
-        }
-
-        std::size_t suffix_start = name.size();
-        used_units = 0;
-        while (suffix_start > prefix_length &&
-            used_units + units(name[suffix_start - 1]) <= suffix_units)
-        {
-            used_units += units(name[--suffix_start]);
-        }
-
-        std::wstring compacted(name.substr(0, prefix_length));
-        compacted.append(ellipsis);
-        compacted.append(name.substr(suffix_start));
-        return compacted;
-    }
     constexpr std::uint32_t folder_thumbnail_pixel_size = 32;
     constexpr std::size_t thumbnail_update_batch_size = 8;
     constexpr auto web_view_idle_timeout = std::chrono::minutes(1);
@@ -1556,6 +1515,7 @@ namespace winrt::Glance::App::implementation
         }
         files_.assign(1, std::move(file));
         current_index_ = 0;
+        ++file_list_generation_;
         FileList().Items().Clear();
         update_preview_navigation_ui();
         present_file(0, kind);
@@ -2112,6 +2072,7 @@ namespace winrt::Glance::App::implementation
             EncodingSelector().Content(box_value(glance::app::localize(L"EncodingSelector.Content")));
         }
         update_line_number_visibility();
+        FileListCountText().Text(glance::app::localize_format(L"ItemCount", {std::to_wstring(files_.size())}));
         update_generic_file_metadata();
         update_footer_metadata();
         refresh_realized_json_rows();
@@ -2796,10 +2757,11 @@ namespace winrt::Glance::App::implementation
             should_defer_auto_fit_show(current_kind);
         visible_ = true;
 
+        ++file_list_generation_;
         FileList().Items().Clear();
-        for (const auto& file : files_)
+        for (std::uint32_t index = 0; index < files_.size(); ++index)
         {
-            FileList().Items().Append(box_value(compact_file_list_name(file.display_name)));
+            FileList().Items().Append(box_value(index));
         }
         if (files_.size() > 1)
         {
@@ -3076,7 +3038,8 @@ namespace winrt::Glance::App::implementation
         FileListColumn().Width(GridLength{
             show_file_list ? 220.0 : 0.0,
             GridUnitType::Pixel });
-        FileList().Visibility(show_file_list ? Visibility::Visible : Visibility::Collapsed);
+        FileListPanel().Visibility(show_file_list ? Visibility::Visible : Visibility::Collapsed);
+        FileListCountText().Text(glance::app::localize_format(L"ItemCount", {std::to_wstring(files_.size())}));
     }
 
     const glance::app::ArchiveEntry* MainWindow::selected_folder_entry() noexcept
@@ -3197,8 +3160,9 @@ namespace winrt::Glance::App::implementation
         pending_folder_scroll_offset_valid_ = false;
         BackButton().Visibility(Visibility::Collapsed);
         update_preview_navigation_hook(false);
+        ++file_list_generation_;
         FileList().Items().Clear();
-        FileList().Visibility(Visibility::Collapsed);
+        FileListPanel().Visibility(Visibility::Collapsed);
         FileListColumn().Width(GridLength{ 0, GridUnitType::Pixel });
 
         TitleText().Text(L"");
@@ -11807,6 +11771,79 @@ namespace winrt::Glance::App::implementation
         {
             focus_timer_.Stop();
         }
+    }
+
+    void MainWindow::FileList_ContainerContentChanging(
+        ListViewBase const&, ContainerContentChangingEventArgs const& args)
+    {
+        try
+        {
+            const auto container = args.ItemContainer();
+            const auto row = container.ContentTemplateRoot().try_as<Grid>();
+            if (!row) return;
+            row.Tag(nullptr);
+            ToolTipService::SetToolTip(row, nullptr);
+            const auto image = row.FindName(L"FileListIcon").as<Image>();
+            const auto fallback = row.FindName(L"FileListFallbackIcon").as<FontIcon>();
+            image.Source(nullptr);
+            image.Visibility(Visibility::Collapsed);
+            fallback.Visibility(Visibility::Visible);
+            if (args.InRecycleQueue()) return;
+            const auto index = unbox_value_or<std::uint32_t>(args.Item(), std::numeric_limits<std::uint32_t>::max());
+            if (index >= files_.size()) return;
+            const auto& file = files_[index];
+            const bool folder = (file.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+            const std::filesystem::path name(file.display_name);
+            const auto extension = folder ? std::wstring{} : name.extension().wstring();
+            row.Tag(box_value(index));
+            row.FindName(L"FileListNameText").as<TextBlock>().Text(
+                extension.empty() ? file.display_name : name.stem().wstring());
+            const auto extension_text = row.FindName(L"FileListExtensionText").as<TextBlock>();
+            extension_text.Text(extension);
+            extension_text.Visibility(extension.empty() ? Visibility::Collapsed : Visibility::Visible);
+            fallback.Glyph(folder ? L"\xE8B7" : L"\xE8A5");
+            ToolTipService::SetToolTip(row, box_value(file.display_name));
+            Automation::AutomationProperties::SetName(container, file.display_name);
+            args.Handled(true);
+            load_file_list_icon_async(file.display_name, folder, index, file_list_generation_, make_weak(row));
+        }
+        catch (const hresult_error&)
+        {
+            glance::contracts::log_event(L"File list row presentation failed.");
+        }
+    }
+
+    fire_and_forget MainWindow::load_file_list_icon_async(
+        std::wstring path, bool is_folder, std::uint32_t index, std::uint64_t generation, weak_ref<Grid> row)
+    {
+        try
+        {
+            const auto weak = get_weak();
+            const auto dispatcher = DispatcherQueue();
+            const auto root = FileList().XamlRoot();
+            const auto pixel_size = static_cast<std::uint32_t>(std::ceil(16.0 * (root ? root.RasterizationScale() : 1.0)));
+            co_await resume_background();
+            auto bitmap = glance::app::load_shell_icon(path, is_folder, pixel_size, true);
+            if (!bitmap) co_return;
+            static_cast<void>(dispatcher.TryEnqueue([weak, row, bitmap = std::move(bitmap), index, generation] {
+                try
+                {
+                    const auto self = weak.get();
+                    const auto target = row.get();
+                    if (!self || !target || generation != self->file_list_generation_ ||
+                        unbox_value_or<std::uint32_t>(target.Tag(), std::numeric_limits<std::uint32_t>::max()) != index)
+                        return;
+                    const auto source = glance::app::create_shell_icon_source(*bitmap);
+                    if (!source) return;
+                    const auto image = target.FindName(L"FileListIcon").as<Image>();
+                    image.Source(source);
+                    image.Visibility(Visibility::Visible);
+                    target.FindName(L"FileListFallbackIcon").as<FontIcon>().Visibility(Visibility::Collapsed);
+                }
+                catch (const hresult_error&) {}
+            }));
+        }
+        catch (const hresult_error&) {}
     }
 
     void MainWindow::FileList_SelectionChanged(IInspectable const&, SelectionChangedEventArgs const&)
