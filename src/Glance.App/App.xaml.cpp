@@ -1136,15 +1136,17 @@ namespace winrt::Glance::App::implementation
         }
         for (const auto& window : detached_windows_)
         {
-            window.Close();
+            get_self<implementation::MainWindow>(window)->CloseForReplacement();
         }
         detached_windows_.clear();
         if (active_window_ != nullptr)
         {
-            active_window_.Close();
+            get_self<implementation::MainWindow>(active_window_)->CloseForReplacement();
             active_window_ = nullptr;
         }
+        glance::contracts::log_event(L"Preview windows released for shutdown.");
         glance::app::shutdown_components();
+        glance::contracts::log_event(L"Component shutdown complete.");
         Microsoft::UI::Xaml::Application::Current().Exit();
     }
 
