@@ -1961,8 +1961,7 @@ namespace winrt::Glance::App::implementation
         }
         else if (media_is_audio_)
         {
-            MediaPanel().Background(Application::Current().Resources().Lookup(
-                box_value(L"SolidBackgroundFillColorBaseBrush")).as<Media::Brush>());
+            MediaPanel().ClearValue(Panel::BackgroundProperty());
         }
         else
         {
@@ -2451,11 +2450,10 @@ namespace winrt::Glance::App::implementation
             return;
         }
 
-        const auto resource_key = acrylic_enabled_
-            ? L"AcrylicInAppFillColorBaseBrush"
-            : L"SolidBackgroundFillColorBaseBrush";
-        const auto brush = Application::Current().Resources().Lookup(
-            box_value(resource_key)).as<Media::Brush>();
+        const auto brush = acrylic_enabled_
+            ? Application::Current().Resources().Lookup(
+                box_value(L"AcrylicInAppFillColorBaseBrush")).as<Media::Brush>()
+            : RootGrid().Background();
         PreviewTitleBar().Background(brush);
         PreviewFooterBar().Background(brush);
     }
@@ -5032,14 +5030,15 @@ namespace winrt::Glance::App::implementation
             MediaPreview().Visibility(media_is_audio_ ? Visibility::Collapsed : Visibility::Visible);
             if (media_is_audio_)
             {
-                MediaControlsOverlay().Background(Application::Current().Resources().Lookup(
-                    box_value(L"LayerFillColorDefaultBrush")).as<Media::Brush>());
+                MediaControlsOverlay().RequestedTheme(ElementTheme::Default);
+                MediaControlsOverlay().ClearValue(Border::BackgroundProperty());
                 MediaPlayPauseIcon().ClearValue(IconElement::ForegroundProperty());
                 MediaMuteIcon().ClearValue(IconElement::ForegroundProperty());
                 MediaTimeText().ClearValue(TextBlock::ForegroundProperty());
             }
             else
             {
+                MediaControlsOverlay().RequestedTheme(ElementTheme::Dark);
                 MediaControlsOverlay().Background(Media::SolidColorBrush(Windows::UI::Color{ 153, 0, 0, 0 }));
                 const auto white = Media::SolidColorBrush(Windows::UI::Color{ 255, 255, 255, 255 });
                 MediaPlayPauseIcon().Foreground(white);
@@ -6802,6 +6801,7 @@ namespace winrt::Glance::App::implementation
             MediaPreview().SetMediaPlayer(nullptr);
             MediaPreview().Visibility(Visibility::Collapsed);
             AudioMetadataPanel().Visibility(Visibility::Collapsed);
+            MediaControlsOverlay().RequestedTheme(ElementTheme::Dark);
             MediaControlsOverlay().Background(
                 Media::SolidColorBrush(Windows::UI::Color{ 153, 0, 0, 0 }));
             const auto white = Media::SolidColorBrush(

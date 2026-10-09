@@ -580,7 +580,6 @@
 
                 <Grid
                     x:Name="MediaPanel"
-                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                     Loaded="NativeDocumentPanel_Loaded"
                     PointerMoved="MediaPanel_PointerMoved"
                     PointerPressed="MediaPanel_PointerPressed"
@@ -588,6 +587,11 @@
                     PointerWheelChanged="MediaPanel_PointerWheelChanged"
                     SizeChanged="NativeDocumentPanel_SizeChanged"
                     Visibility="Collapsed">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+                        </Style>
+                    </Grid.Style>
                     <MediaPlayerElement
                         x:Name="MediaPreview"
                         AreTransportControlsEnabled="False"
@@ -673,8 +677,12 @@
                         x:Name="MediaControlsOverlay"
                         Height="56"
                         Padding="10,0"
-                        VerticalAlignment="Bottom"
-                        Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        VerticalAlignment="Bottom">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{ThemeResource LayerFillColorDefaultBrush}" />
+                            </Style>
+                        </Border.Style>
                         <Border.OpacityTransition>
                             <ScalarTransition Duration="0:0:0.18" />
                         </Border.OpacityTransition>
