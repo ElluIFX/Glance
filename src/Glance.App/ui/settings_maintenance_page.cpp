@@ -344,6 +344,7 @@ namespace winrt::Glance::App::implementation
             definition.id = L"DiagnosticBundleLabel";
             definition.parent = L"MaintenanceActionsGroupTitle";
             definition.name_key = L"DiagnosticBundleLabel.Text";
+            definition.description_key = L"DiagnosticBundleDescription";
             definition.create_control = [this] {
                 auto control =
                     Markup::XamlReader::Load(
@@ -399,6 +400,7 @@ namespace winrt::Glance::App::implementation
             definition.id = L"CliPathLabel";
             definition.parent = L"MaintenanceActionsGroupTitle";
             definition.name_key = L"CliPathLabel.Text";
+            definition.description_key = L"CliPathDescription.Text";
             definition.create_control = [this] {
                 auto control =
                     Markup::XamlReader::Load(

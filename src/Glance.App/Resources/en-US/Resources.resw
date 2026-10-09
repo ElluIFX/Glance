@@ -260,7 +260,7 @@
   <data name="AdministratorAccessLabel.Text" xml:space="preserve"><value>Administrator access</value></data>
   <data name="DiagnosticBundleLabel.Text" xml:space="preserve"><value>Export diagnostic package</value></data>
   <data name="ExportDiagnosticBundleButton.Content" xml:space="preserve"><value>Export</value></data>
-  <data name="DiagnosticBundleDescription" xml:space="preserve"><value>Package all diagnostic logs and crash dumps</value></data>
+  <data name="DiagnosticBundleDescription" xml:space="preserve"><value>For issue reports (may contain sensitive data)</value></data>
   <data name="DiagnosticBundlePickerTitle" xml:space="preserve"><value>Select diagnostic package output folder</value></data>
   <data name="DiagnosticBundlePackaging" xml:space="preserve"><value>Creating diagnostic package...</value></data>
   <data name="DiagnosticBundleCreated" xml:space="preserve"><value>Saved to {0}</value></data>
@@ -431,6 +431,7 @@
   <data name="CoreAccessAdministratorRequired" xml:space="preserve"><value>Installing the access service requires administrator approval</value></data>
   <data name="CoreAccessRepairFailed" xml:space="preserve"><value>Administrator access could not be enabled · Check the access service or repair the installation</value></data>
   <data name="CliPathLabel.Text" xml:space="preserve"><value>CLI executable path</value></data>
+  <data name="CliPathDescription.Text" xml:space="preserve"><value>Copy the CLI executable path for controlling Glance</value></data>
   <data name="CopyCliPathButton.Content" xml:space="preserve"><value>Copy path</value></data>
   <data name="CliPathCopied" xml:space="preserve"><value>Copied</value></data>
   <data name="CliPathCopyFailed" xml:space="preserve"><value>Copy failed, retry</value></data>
