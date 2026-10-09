@@ -4,6 +4,26 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.10.09] - 2026-10-09
+
+### Added
+
+- Keep portable settings, dependencies and application data in the application directory, separate from installed settings and data.
+- Migrate installed settings and data into a portable copy from Maintenance, with an optional cleanup of the original data before restarting.
+- Update portable copies from ZIP packages while preserving user data and restoring the previous version if replacement fails.
+- Show the installed or portable distribution beside the version on the About page.
+
+### Improved
+
+- Use a compact multi-file list with file icons, separate extensions and an item count.
+- Show folder navigation hints and full filenames when hovering over folder entries.
+- Add descriptions to maintenance actions and hide migration when no installed data is available.
+
+### Fixed
+
+- Restore About page interaction after switching settings pages.
+- Use the current folder's media list when opening gallery mode from a folder preview.
+
 ## [2026.10.08] - 2026-10-08
 
 ### Added
