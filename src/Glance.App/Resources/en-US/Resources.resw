@@ -333,17 +333,17 @@
   <data name="AttributeSparse" xml:space="preserve"><value>Sparse</value></data>
   <data name="AttributeReparsePoint" xml:space="preserve"><value>Reparse point</value></data>
   <data name="AttributeNormal" xml:space="preserve"><value>Normal</value></data>
-  <data name="GenericOwner" xml:space="preserve"><value>Owner: {0}</value></data>
+  <data name="GenericOwner" xml:space="preserve"><value>Owner</value></data>
   <data name="AccessRead" xml:space="preserve"><value>Read</value></data>
   <data name="AccessWrite" xml:space="preserve"><value>Write</value></data>
   <data name="AccessExecute" xml:space="preserve"><value>Execute</value></data>
   <data name="AccessDelete" xml:space="preserve"><value>Delete</value></data>
-  <data name="GenericAccess" xml:space="preserve"><value>Access: {0}</value></data>
-  <data name="GenericAttributes" xml:space="preserve"><value>Attributes: {0}</value></data>
+  <data name="GenericAccess" xml:space="preserve"><value>Access</value></data>
+  <data name="GenericAttributes" xml:space="preserve"><value>Attributes</value></data>
   <data name="GenericModifiedAt" xml:space="preserve"><value>Modified at {0}</value></data>
   <data name="GenericCreatedAt" xml:space="preserve"><value>Created at {0}</value></data>
-  <data name="GenericVolumeId" xml:space="preserve"><value>Volume ID: {0}</value></data>
-  <data name="GenericFileId" xml:space="preserve"><value>File ID: {0}</value></data>
+  <data name="GenericVolumeId" xml:space="preserve"><value>Volume ID</value></data>
+  <data name="GenericFileId" xml:space="preserve"><value>File ID</value></data>
   <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>Modified at {0}</value></data>
   <data name="FooterCreationTimeFormat" xml:space="preserve"><value>Created at {0}</value></data>
   <data name="FooterTakenTimeFormat" xml:space="preserve"><value>Taken at {0}</value></data>
@@ -573,4 +573,5 @@
   <data name="GalleryNext" xml:space="preserve"><value>Next item</value></data>
   <data name="GalleryPosition" xml:space="preserve"><value>{0} / {1}</value></data>
   <data name="GalleryUnknownPosition" xml:space="preserve"><value>Item {0}</value></data>
+  <data name="GenericPropertiesTitle" xml:space="preserve"><value>File properties</value></data>
 </root>

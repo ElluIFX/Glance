@@ -198,14 +198,18 @@
                 HorizontalAlignment="Right" Background="Transparent" Visibility="Collapsed" />
 
             <Grid Grid.Column="1" x:Name="PreviewCanvas">
-                <Grid
+                <ScrollViewer
                     x:Name="GenericPanel"
                     Padding="28"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    HorizontalScrollBarVisibility="Disabled"
+                    HorizontalScrollMode="Disabled"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center">
+                    <Grid MaxWidth="720" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel Grid.Row="0" Spacing="10">
@@ -239,26 +243,36 @@
                     <TextBlock
                         x:Name="FileMetadataText"
                         HorizontalAlignment="Center"
+                        TextAlignment="Center"
+                        TextTrimming="CharacterEllipsis"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
-                    <ScrollViewer
-                        x:Name="GenericAdvancedInfoScroller"
+                    <StackPanel
+                        x:Name="GenericAdvancedInfoPanel"
                         Grid.Row="1"
                         Margin="0,8,0,0"
-                        MaxWidth="720"
-                        MaxHeight="240"
-                        HorizontalAlignment="Center"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollBarVisibility="Auto"
+                        Spacing="12"
                         Visibility="Collapsed">
-                        <TextBlock
-                            x:Name="GenericAdvancedInfoText"
-                            FontFamily="Cascadia Mono, Consolas"
-                            FontSize="12"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            IsTextSelectionEnabled="True"
-                            TextWrapping="NoWrap" />
-                    </ScrollViewer>
+                        <StackPanel x:Name="GenericPropertiesSection" Spacing="6">
+                                <TextBlock x:Name="GenericPropertiesTitleText" FontSize="12" FontWeight="SemiBold" />
+                                <Grid x:Name="GenericPropertiesRows" RowSpacing="6" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                </Grid>
+                        </StackPanel>
+                        <StackPanel x:Name="GenericFormatSection" Spacing="6">
+                                <Border x:Name="GenericFormatSeparator" Height="1" Margin="0,0,0,6"
+                                    Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <TextBlock x:Name="GenericFormatTitleText" FontSize="12" FontWeight="SemiBold" />
+                                <TextBlock x:Name="GenericFormatInfoText" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                        </StackPanel>
+                        <StackPanel x:Name="GenericHeaderSection" Spacing="6">
+                                <Border x:Name="GenericHeaderSeparator" Height="1" Margin="0,0,0,6"
+                                    Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <TextBlock x:Name="GenericHeaderTitleText" FontSize="12" FontWeight="SemiBold" />
+                                <TextBlock x:Name="GenericHeaderInfoText" FontFamily="Cascadia Mono, Consolas"
+                                    FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                        </StackPanel>
+                    </StackPanel>
                     <StackPanel Grid.Row="2" Spacing="10">
                     <Button
                         x:Name="LoadCloudFileButton"
@@ -298,7 +312,8 @@
                         TextWrapping="Wrap"
                         Visibility="Collapsed" />
                     </StackPanel>
-                </Grid>
+                    </Grid>
+                </ScrollViewer>
 
                 <Grid x:Name="TextPanel" Visibility="Collapsed">
                     <Grid

@@ -13,7 +13,7 @@
 
 namespace
 {
-    std::wstring file_header(std::wstring_view path)
+    std::pair<std::wstring, std::uint32_t> file_header(std::wstring_view path)
     {
         const HANDLE file = CreateFileW(
             std::wstring(path).c_str(),
@@ -37,10 +37,10 @@ namespace
         }
 
         std::wostringstream output;
-        output << glance::app::localize_format(L"GenericHeader", { std::to_wstring(count) });
         for (DWORD offset = 0; offset < count; offset += 16)
         {
-            output << L'\n' << std::hex << std::uppercase << std::setfill(L'0')
+            if (offset != 0) output << L'\n';
+            output << std::hex << std::uppercase << std::setfill(L'0')
                    << std::setw(4) << offset << L"  ";
             for (DWORD index = 0; index < 16; ++index)
             {
@@ -60,10 +60,10 @@ namespace
                 output << static_cast<wchar_t>(value >= 0x20 && value <= 0x7E ? value : '.');
             }
         }
-        return output.str();
+        return {output.str(), count};
     }
 
-    std::wstring file_attributes(std::wstring_view path)
+    std::vector<std::wstring> file_attributes(std::wstring_view path)
     {
         const DWORD attributes = GetFileAttributesW(std::wstring(path).c_str());
         if (attributes == INVALID_FILE_ATTRIBUTES)
@@ -86,16 +86,16 @@ namespace
             { FILE_ATTRIBUTE_SPARSE_FILE, L"AttributeSparse" },
             { FILE_ATTRIBUTE_REPARSE_POINT, L"AttributeReparsePoint" },
         };
-        std::wstring result;
+        std::vector<std::wstring> result;
         for (const auto& entry : names)
         {
             if ((attributes & entry.flag) != 0)
             {
-                const auto name = glance::app::localize(entry.name);
-                result += result.empty() ? name : L", " + name;
+                result.emplace_back(entry.name);
             }
         }
-        return result.empty() ? glance::app::localize(L"AttributeNormal") : result;
+        if (result.empty()) result.emplace_back(L"AttributeNormal");
+        return result;
     }
 
     std::wstring owner_name(PSID owner)
@@ -206,7 +206,7 @@ namespace
         return (rights & DELETE) != 0 || parent_allows_child_delete(path);
     }
 
-    std::wstring file_identity(std::wstring_view path)
+    std::vector<glance::app::GenericInformationField> file_identity(std::wstring_view path)
     {
         const HANDLE file = CreateFileW(
             std::wstring(path).c_str(),
@@ -242,11 +242,10 @@ namespace
         {
             file_id << std::setw(2) << static_cast<unsigned int>(byte);
         }
-        return glance::app::localize_format(L"GenericVolumeId", { volume.str() }) + L"\n" +
-            glance::app::localize_format(L"GenericFileId", { file_id.str() });
+        return {{L"GenericVolumeId", volume.str(), {}}, {L"GenericFileId", file_id.str(), {}}};
     }
 
-    std::wstring security_info(std::wstring_view path)
+    std::vector<glance::app::GenericInformationField> security_info(std::wstring_view path)
     {
         PSID owner{};
         PACL dacl{};
@@ -264,13 +263,13 @@ namespace
             return {};
         }
 
-        std::wstring result;
+        std::vector<glance::app::GenericInformationField> result;
         if (owner != nullptr)
         {
             const auto owner_text = owner_name(owner);
             if (!owner_text.empty())
             {
-                result = glance::app::localize_format(L"GenericOwner", { owner_text });
+                result.push_back({L"GenericOwner", owner_text, {}});
             }
         }
 
@@ -288,10 +287,9 @@ namespace
                 ACCESS_MASK rights{};
                 if (GetEffectiveRightsFromAclW(dacl, &trustee, &rights) == ERROR_SUCCESS)
                 {
-                    std::wstring access;
+                    std::vector<std::wstring> access;
                     const auto append = [&access](wchar_t const* key) {
-                        const auto value = glance::app::localize(key);
-                        access += access.empty() ? value : L", " + value;
+                        access.emplace_back(key);
                     };
                     if ((rights & (FILE_READ_DATA | FILE_LIST_DIRECTORY | GENERIC_READ)) != 0) append(L"AccessRead");
                     if ((rights & (FILE_WRITE_DATA | FILE_ADD_FILE | GENERIC_WRITE)) != 0) append(L"AccessWrite");
@@ -299,8 +297,7 @@ namespace
                     if ((rights & DELETE) != 0) append(L"AccessDelete");
                     if (!access.empty())
                     {
-                        const auto access_text = glance::app::localize_format(L"GenericAccess", { access });
-                        result += result.empty() ? access_text : L"\n" + access_text;
+                        result.push_back({L"GenericAccess", {}, std::move(access)});
                     }
                 }
             }
@@ -317,23 +314,18 @@ namespace glance::app
     {
         try
         {
-            std::wstring result;
-            const auto attributes = file_attributes(path);
+            GenericFileInfo result;
+            auto attributes = file_attributes(path);
             if (!attributes.empty())
             {
-                result = glance::app::localize_format(L"GenericAttributes", { attributes });
+                result.fields.push_back({L"GenericAttributes", {}, std::move(attributes)});
             }
-            const auto identity = file_identity(path);
-            if (!identity.empty())
-            {
-                result += result.empty() ? identity : L"\n" + identity;
-            }
-            const auto security = security_info(path);
-            if (!security.empty())
-            {
-                result += result.empty() ? security : L"\n" + security;
-            }
-            return { std::move(result), file_header(path) };
+            for (auto& field : file_identity(path)) result.fields.push_back(std::move(field));
+            for (auto& field : security_info(path)) result.fields.push_back(std::move(field));
+            auto [header, size] = file_header(path);
+            result.header = std::move(header);
+            result.header_size = size;
+            return result;
         }
         catch (...)
         {

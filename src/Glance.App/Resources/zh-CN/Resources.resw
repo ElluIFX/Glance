@@ -333,17 +333,17 @@
   <data name="AttributeSparse" xml:space="preserve"><value>稀疏</value></data>
   <data name="AttributeReparsePoint" xml:space="preserve"><value>重解析点</value></data>
   <data name="AttributeNormal" xml:space="preserve"><value>常规</value></data>
-  <data name="GenericOwner" xml:space="preserve"><value>所有者：{0}</value></data>
+  <data name="GenericOwner" xml:space="preserve"><value>所有者</value></data>
   <data name="AccessRead" xml:space="preserve"><value>读取</value></data>
   <data name="AccessWrite" xml:space="preserve"><value>写入</value></data>
   <data name="AccessExecute" xml:space="preserve"><value>执行</value></data>
   <data name="AccessDelete" xml:space="preserve"><value>删除</value></data>
-  <data name="GenericAccess" xml:space="preserve"><value>访问权限：{0}</value></data>
-  <data name="GenericAttributes" xml:space="preserve"><value>属性：{0}</value></data>
+  <data name="GenericAccess" xml:space="preserve"><value>访问权限</value></data>
+  <data name="GenericAttributes" xml:space="preserve"><value>属性</value></data>
   <data name="GenericModifiedAt" xml:space="preserve"><value>修改于 {0}</value></data>
   <data name="GenericCreatedAt" xml:space="preserve"><value>创建于 {0}</value></data>
-  <data name="GenericVolumeId" xml:space="preserve"><value>卷标识：{0}</value></data>
-  <data name="GenericFileId" xml:space="preserve"><value>文件 ID：{0}</value></data>
+  <data name="GenericVolumeId" xml:space="preserve"><value>卷标识</value></data>
+  <data name="GenericFileId" xml:space="preserve"><value>文件 ID</value></data>
   <data name="FooterModifiedTimeFormat" xml:space="preserve"><value>修改于 {0}</value></data>
   <data name="FooterCreationTimeFormat" xml:space="preserve"><value>创建于 {0}</value></data>
   <data name="FooterTakenTimeFormat" xml:space="preserve"><value>拍摄于 {0}</value></data>
@@ -573,4 +573,5 @@
   <data name="GalleryNext" xml:space="preserve"><value>下一个项目</value></data>
   <data name="GalleryPosition" xml:space="preserve"><value>{0} / {1}</value></data>
   <data name="GalleryUnknownPosition" xml:space="preserve"><value>第 {0} 个项目</value></data>
+  <data name="GenericPropertiesTitle" xml:space="preserve"><value>文件属性</value></data>
 </root>

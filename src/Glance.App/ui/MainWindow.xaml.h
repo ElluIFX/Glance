@@ -7,6 +7,7 @@
 #include "footer_preferences.h"
 #include "folder_preview_preferences.h"
 #include "generic_preview_preferences.h"
+#include "generic_file_info.h"
 #include "json_preview.h"
 #include "media_preview_preferences.h"
 #include "native_preview_surface.h"
@@ -1021,8 +1022,11 @@ namespace winrt::Glance::App::implementation
         bool basic_info_mode_{};
         std::shared_ptr<std::atomic_bool> format_identification_cancellation_;
         std::uint64_t generic_probe_generation_{};
-        std::wstring generic_file_information_;
+        std::vector<glance::app::GenericInformationField> generic_file_information_;
+        bool generic_file_information_ready_{};
+        bool generic_file_information_loading_{};
         std::wstring generic_file_header_;
+        std::uint32_t generic_file_header_size_{};
         std::wstring format_identification_information_;
         std::wstring guessed_extension_;
         std::wstring effective_extension_;

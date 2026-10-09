@@ -1136,7 +1136,10 @@ namespace winrt::Glance::App::implementation
         media_timer_.Interval(std::chrono::milliseconds(250));
         const auto weak = get_weak();
         PreviewContentHost().SizeChanged([weak](IInspectable const&, SizeChangedEventArgs const&) {
-            if (const auto self = weak.get()) self->update_preview_navigation_ui();
+            if (const auto self = weak.get())
+            {
+                self->update_preview_navigation_ui();
+            }
         });
         FileListToggleButton().Click([weak](IInspectable const&, RoutedEventArgs const&) {
             if (const auto self = weak.get())
@@ -2130,6 +2133,7 @@ namespace winrt::Glance::App::implementation
         update_preview_navigation_ui();
         update_generic_file_metadata();
         update_gallery_controls();
+        if (current_kind_ == glance::app::PreviewKind::generic) update_generic_information();
         update_footer_metadata();
         refresh_realized_json_rows();
         rebuild_component_contributions();
@@ -3256,8 +3260,14 @@ namespace winrt::Glance::App::implementation
         GenericFileIconImage().Source(nullptr);
         GenericFileIconImage().Visibility(Visibility::Collapsed);
         GenericFileFallbackIcon().Visibility(Visibility::Visible);
-        GenericAdvancedInfoText().Text(L"");
-        GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
+        GenericPropertiesRows().Children().Clear();
+        GenericPropertiesRows().RowDefinitions().Clear();
+        generic_file_information_.clear();
+        generic_file_header_.clear();
+        generic_file_header_size_ = 0;
+        generic_file_information_ready_ = false;
+        generic_file_information_loading_ = false;
+        GenericAdvancedInfoPanel().Visibility(Visibility::Collapsed);
         LoadCloudFileButton().Visibility(Visibility::Collapsed);
         GenericAdvancedInfoButton().Visibility(Visibility::Collapsed);
         ComponentStatusControls().Children().Clear();
@@ -4610,13 +4620,17 @@ namespace winrt::Glance::App::implementation
         GenericFileIconImage().Source(nullptr);
         GenericFileIconImage().Visibility(Visibility::Collapsed);
         GenericFileFallbackIcon().Visibility(Visibility::Visible);
-        GenericAdvancedInfoText().Text(L"");
+        GenericPropertiesRows().Children().Clear();
+        GenericPropertiesRows().RowDefinitions().Clear();
+        GenericPanel().ChangeView(0.0, 0.0, nullptr, true);
+        generic_file_information_ready_ = false;
+        generic_file_information_loading_ = false;
         generic_file_information_.clear();
         generic_file_header_.clear();
         if (effective_extension_.empty()) format_identification_information_.clear();
         guessed_extension_.clear();
         PreviewAsGuessedFormatButton().Visibility(Visibility::Collapsed);
-        GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
+        GenericAdvancedInfoPanel().Visibility(Visibility::Collapsed);
         generic_preview_preferences_ = glance::app::load_generic_preview_preferences();
         GenericAdvancedInfoButton().IsChecked(generic_preview_preferences_.show_advanced_info);
         LoadCloudFileButton().Visibility(file.is_cloud_placeholder ? Visibility::Visible : Visibility::Collapsed);
@@ -4758,20 +4772,23 @@ namespace winrt::Glance::App::implementation
 
     fire_and_forget MainWindow::load_generic_file_info_async(std::wstring path, std::uint64_t generation)
     {
+        if (generic_file_information_loading_ || generic_file_information_ready_) co_return;
+        generic_file_information_loading_ = true;
         const auto lifetime = get_strong();
         const auto dispatcher = DispatcherQueue();
         co_await resume_background();
         auto info = glance::app::load_generic_file_info(path);
         static_cast<void>(dispatcher.TryEnqueue([lifetime, generation, info = std::move(info)]() mutable {
             if (generation != lifetime->content_generation_ ||
-                lifetime->current_kind_ != glance::app::PreviewKind::generic ||
-                !lifetime->generic_preview_preferences_.show_advanced_info ||
-                (info.metadata.empty() && info.header.empty()))
+                lifetime->current_kind_ != glance::app::PreviewKind::generic)
             {
                 return;
             }
-            lifetime->generic_file_information_ = std::move(info.metadata);
+            lifetime->generic_file_information_loading_ = false;
+            lifetime->generic_file_information_ready_ = true;
+            lifetime->generic_file_information_ = std::move(info.fields);
             lifetime->generic_file_header_ = std::move(info.header);
+            lifetime->generic_file_header_size_ = info.header_size;
             lifetime->update_generic_information();
         }));
     }
@@ -12201,19 +12218,55 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::update_generic_information()
     {
-        auto info = generic_file_information_;
-        if (!format_identification_information_.empty())
+        const auto rows = GenericPropertiesRows();
+        if (rows.Children().Size() != generic_file_information_.size() * 2)
         {
-            if (!info.empty()) info += L"\n\n";
-            info += glance::app::localize(L"IdentifiedFileFormat") + L"\n" + format_identification_information_;
+            rows.Children().Clear();
+            rows.RowDefinitions().Clear();
+            for (std::uint32_t index = 0; index < generic_file_information_.size(); ++index)
+            {
+                RowDefinition row;
+                row.Height(GridLengthHelper::Auto());
+                rows.RowDefinitions().Append(row);
+                for (int column = 0; column < 2; ++column)
+                {
+                    TextBlock text;
+                    text.FontSize(12);
+                    text.TextWrapping(TextWrapping::Wrap);
+                    text.IsTextSelectionEnabled(true);
+                    if (column == 0)
+                    {
+                        text.MaxWidth(140);
+                        text.Opacity(0.72);
+                    }
+                    Grid::SetRow(text, index);
+                    Grid::SetColumn(text, column);
+                    rows.Children().Append(text);
+                }
+            }
         }
-        if (!generic_file_header_.empty())
+        for (std::uint32_t index = 0; index < generic_file_information_.size(); ++index)
         {
-            if (!info.empty()) info += L"\n\n";
-            info += generic_file_header_;
+            const auto& field = generic_file_information_[index];
+            rows.Children().GetAt(index * 2).as<TextBlock>().Text(glance::app::localize(field.label_key));
+            auto value = field.value;
+            for (const auto& key : field.value_keys)
+                value += (value.empty() ? L"" : L", ") + glance::app::localize(key);
+            const auto text = rows.Children().GetAt(index * 2 + 1).as<TextBlock>();
+            if (text.Text() != value) text.Text(value);
         }
-        GenericAdvancedInfoText().Text(info);
-        GenericAdvancedInfoScroller().Visibility(generic_preview_preferences_.show_advanced_info && !info.empty()
+        GenericPropertiesTitleText().Text(glance::app::localize(L"GenericPropertiesTitle"));
+        GenericFormatTitleText().Text(glance::app::localize(L"IdentifiedFileFormat"));
+        GenericHeaderTitleText().Text(glance::app::localize_format(L"GenericHeader", {std::to_wstring(generic_file_header_size_)}));
+        GenericFormatInfoText().Text(format_identification_information_);
+        GenericHeaderInfoText().Text(generic_file_header_);
+        GenericPropertiesSection().Visibility(generic_file_information_.empty() ? Visibility::Collapsed : Visibility::Visible);
+        GenericFormatSection().Visibility(format_identification_information_.empty() ? Visibility::Collapsed : Visibility::Visible);
+        GenericHeaderSection().Visibility(generic_file_header_.empty() ? Visibility::Collapsed : Visibility::Visible);
+        GenericFormatSeparator().Visibility(generic_file_information_.empty() ? Visibility::Collapsed : Visibility::Visible);
+        GenericHeaderSeparator().Visibility(generic_file_information_.empty() && format_identification_information_.empty()
+            ? Visibility::Collapsed : Visibility::Visible);
+        GenericAdvancedInfoPanel().Visibility(generic_preview_preferences_.show_advanced_info && generic_file_information_ready_
             ? Visibility::Visible : Visibility::Collapsed);
     }
 
@@ -12308,8 +12361,7 @@ namespace winrt::Glance::App::implementation
         update_generic_information();
         if (!generic_preview_preferences_.show_advanced_info)
         {
-            GenericAdvancedInfoText().Text(L"");
-            GenericAdvancedInfoScroller().Visibility(Visibility::Collapsed);
+            GenericAdvancedInfoPanel().Visibility(Visibility::Collapsed);
             return;
         }
 
