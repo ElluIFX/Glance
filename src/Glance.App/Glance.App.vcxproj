@@ -87,6 +87,7 @@
     <ClInclude Include="preview\preview_file.h" />
     <ClInclude Include="preview\preview_provider.h" />
     <ClInclude Include="preview\scintilla_text_view.h" />
+    <ClInclude Include="preview\text_search.h" />
     <ClInclude Include="preview\syntax_theme.h" />
     <ClInclude Include="preview\text_highlighting.h" />
     <ClInclude Include="application\startup_registration.h" />
@@ -140,6 +141,7 @@
     <ClCompile Include="common\pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="App.xaml.cpp"><DependentUpon>App.xaml</DependentUpon></ClCompile>
     <ClCompile Include="ui\MainWindow.xaml.cpp"><DependentUpon>MainWindow.xaml</DependentUpon></ClCompile>
+    <ClCompile Include="ui\main_window_search.cpp" />
     <ClCompile Include="ui\SettingsWindow.xaml.cpp"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClCompile>
     <ClCompile Include="ui\settings_registry.cpp" />
     <ClCompile Include="ui\settings_builtin.cpp" />
@@ -156,6 +158,7 @@
     <ClCompile Include="application\pipe_client.cpp" />
     <ClCompile Include="preview\preview_provider.cpp" />
     <ClCompile Include="preview\scintilla_text_view.cpp" />
+    <ClCompile Include="preview\text_search.cpp" />
     <ClCompile Include="preview\text_highlighting.cpp" />
     <ClCompile Include="preview\shell_icon_provider.cpp" />
     <ClCompile Include="preview\syntax_theme.cpp" />

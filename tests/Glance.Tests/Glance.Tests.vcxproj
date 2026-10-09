@@ -45,6 +45,8 @@
     <ClCompile Include="..\..\src\Glance.App\preferences\window_size_store.cpp" />
     <ClCompile Include="executable_tests.cpp" />
     <ClCompile Include="font_tests.cpp" />
+    <ClCompile Include="text_search_tests.cpp" />
+    <ClCompile Include="..\..\src\Glance.App\preview\text_search.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Font\client.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Executable\host\pe_reader.cpp" />
     <ClCompile Include="..\..\src\Glance.Components\Executable\host\resource_image.cpp" />

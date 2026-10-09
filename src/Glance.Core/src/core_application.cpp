@@ -1535,7 +1535,8 @@ namespace glance::core
         if (input_state_.preview_active.load(std::memory_order_acquire))
         {
             static_cast<void>(pipe_server_.send(
-                glance::contracts::MessageType::close_active_preview));
+                glance::contracts::MessageType::close_active_preview, {},
+                action == HookAction::close_preview ? glance::contracts::close_preview_escape_flag : 0));
             return;
         }
 

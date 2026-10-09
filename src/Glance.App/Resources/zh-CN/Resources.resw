@@ -547,4 +547,23 @@
   <data name="MigrationRestartFailedMessage" xml:space="preserve"><value>迁移已完成，请手动启动 Glance</value></data>
   <data name="MaintenanceFailedTitle" xml:space="preserve"><value>数据替换失败</value></data>
   <data name="MaintenanceFailedMessage" xml:space="preserve"><value>已恢复原有文件\n{0}</value></data>
+  <data name="SearchPlaceholder" xml:space="preserve"><value>查找</value></data>
+  <data name="SearchOpen" xml:space="preserve"><value>查找</value></data>
+  <data name="SearchMatchCase" xml:space="preserve"><value>区分大小写&#xA;Alt+C</value></data>
+  <data name="SearchWholeWord" xml:space="preserve"><value>整词匹配&#xA;Alt+W</value></data>
+  <data name="SearchRegex" xml:space="preserve"><value>使用正则表达式&#xA;Alt+R</value></data>
+  <data name="SearchPrevious" xml:space="preserve"><value>上一个匹配&#xA;Shift+Enter / Shift+F3</value></data>
+  <data name="SearchNext" xml:space="preserve"><value>下一个匹配&#xA;Enter / F3</value></data>
+  <data name="SearchClose" xml:space="preserve"><value>关闭查找并取消搜索&#xA;Esc</value></data>
+  <data name="SearchCount" xml:space="preserve"><value>{0} / {1}</value></data>
+  <data name="SearchPartialCount" xml:space="preserve"><value>{0} / {1} · 结果不完整</value></data>
+  <data name="SearchReading" xml:space="preserve"><value>读取全文（{0} KiB）...</value></data>
+  <data name="SearchSearching" xml:space="preserve"><value>查找中...</value></data>
+  <data name="SearchInvalidRegex" xml:space="preserve"><value>正则表达式无效</value></data>
+  <data name="SearchTimedOut" xml:space="preserve"><value>正则表达式耗时过长</value></data>
+  <data name="SearchFailed" xml:space="preserve"><value>查找失败</value></data>
+  <data name="JsonSearchScope" xml:space="preserve"><value>JSON 查找范围</value></data>
+  <data name="JsonSearchBoth" xml:space="preserve"><value>key 和 value</value></data>
+  <data name="JsonSearchKeys" xml:space="preserve"><value>仅 key</value></data>
+  <data name="JsonSearchValues" xml:space="preserve"><value>仅 value</value></data>
 </root>

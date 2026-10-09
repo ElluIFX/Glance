@@ -2,6 +2,7 @@
 
 #include "text_preferences.h"
 #include "text_highlighting.h"
+#include "text_search.h"
 
 #include <array>
 #include <functional>
@@ -9,6 +10,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace glance::app
 {
@@ -44,6 +46,16 @@ namespace glance::app
         void set_visible(bool visible) noexcept;
         void set_copy_callbacks(std::function<void(bool)> selection_changed, std::function<void()> copied);
         void copy_selection() noexcept;
+        void set_search_key_callback(std::function<bool(UINT, WPARAM)> callback);
+        struct SearchSnapshot
+        {
+            std::string text;
+            std::vector<std::pair<std::int64_t, std::int64_t>> offsets;
+            [[nodiscard]] std::int64_t display_position(std::int64_t position) const noexcept;
+        };
+        [[nodiscard]] SearchSnapshot search_snapshot() const;
+        void set_search_matches(std::vector<TextSearchMatch> matches);
+        void reveal_search_match(std::size_t index) noexcept;
         void clear() noexcept;
         void append_text(std::wstring_view text, std::span<const UndecodableByte> bytes = {});
         void refresh_text(std::wstring_view text, bool replace, bool auto_follow, bool has_more,
@@ -89,6 +101,7 @@ namespace glance::app
         void handle_notification(const NMHDR& header) noexcept;
         void update_copy_shortcut() noexcept;
         bool copy_decoded_selection() noexcept;
+        void update_search_highlights() noexcept;
 
         HWND parent_{};
         HWND host_{};
@@ -96,6 +109,9 @@ namespace glance::app
         NearEndCallback near_end_callback_;
         FontZoomCallback font_zoom_callback_;
         DoubleClickCallback double_click_callback_;
+        std::function<bool(UINT, WPARAM)> search_key_callback_;
+        std::vector<TextSearchMatch> search_matches_;
+        TextSearchMatch search_highlight_region_{-1, -1};
         std::function<void(bool)> selection_changed_callback_;
         std::function<void()> copied_callback_;
         bool selection_active_{};

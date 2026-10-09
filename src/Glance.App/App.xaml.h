@@ -60,7 +60,7 @@ namespace winrt::Glance::App::implementation
             std::uint64_t instance_id,
             glance::contracts::PreviewWindowState state);
         void open_preview(std::string_view payload);
-        void close_active_preview();
+        void close_active_preview(bool dismiss_overlay = false);
         std::string handle_cli_request(std::string payload, HANDLE cancelled, HANDLE connection);
         Windows::Data::Json::JsonObject execute_cli_command(
             Windows::Data::Json::JsonObject const& request,

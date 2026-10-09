@@ -44,6 +44,7 @@ namespace
     constexpr WPARAM idle_layout_threads = 1;
     constexpr int invalid_byte_box = 20;
     constexpr int invalid_byte_foreground = 21;
+    constexpr int search_match_indicator = 22;
     constexpr WORD scintilla_copy_menu_id = 13; // ScintillaBase::idcmdCopy in the pinned runtime.
 
     struct LexerDefinition
@@ -674,6 +675,94 @@ namespace glance::app
         if (visible_ && call(SCI_GETSELECTIONEMPTY) == FALSE) call(SCI_COPY);
     }
 
+    void ScintillaTextView::set_search_key_callback(std::function<bool(UINT, WPARAM)> callback)
+    {
+        search_key_callback_ = std::move(callback);
+    }
+
+    std::int64_t ScintillaTextView::SearchSnapshot::display_position(std::int64_t position) const noexcept
+    {
+        const auto found = std::upper_bound(offsets.begin(), offsets.end(), position,
+            [](std::int64_t value, const auto& offset) { return value < offset.first; });
+        if (found == offsets.begin()) return position;
+        const auto& offset = *std::prev(found);
+        return position + offset.second - offset.first;
+    }
+
+    ScintillaTextView::SearchSnapshot ScintillaTextView::search_snapshot() const
+    {
+        SearchSnapshot result;
+        const auto length = call(SCI_GETLENGTH);
+        std::string display(static_cast<std::size_t>(length) + 1, '\0');
+        call(SCI_GETTEXT, display.size(), reinterpret_cast<LPARAM>(display.data()));
+        display.resize(static_cast<std::size_t>(length));
+        if (!has_undecodable_bytes_) { result.text = std::move(display); return result; }
+        for (LRESULT position = 0; position < length;)
+        {
+            const auto invalid = call(SCI_INDICATORVALUEAT, invalid_byte_box, position);
+            const auto boundary = std::min(length, call(SCI_INDICATOREND, invalid_byte_box, position));
+            if (boundary <= position) break;
+            if (invalid)
+            {
+                while (position < boundary)
+                {
+                    result.offsets.emplace_back(result.text.size(), position);
+                    result.text += "\xEF\xBF\xBD";
+                    position += 2;
+                    result.offsets.emplace_back(result.text.size(), position);
+                }
+            }
+            else
+            {
+                result.text.append(display, static_cast<std::size_t>(position), static_cast<std::size_t>(boundary - position));
+                position = boundary;
+            }
+        }
+        return result;
+    }
+
+    void ScintillaTextView::set_search_matches(std::vector<TextSearchMatch> matches)
+    {
+        call(SCI_SETINDICATORCURRENT, search_match_indicator);
+        call(SCI_INDICATORCLEARRANGE, 0, call(SCI_GETLENGTH));
+        search_highlight_region_ = {-1, -1};
+        search_matches_ = std::move(matches);
+        update_search_highlights();
+    }
+
+    void ScintillaTextView::update_search_highlights() noexcept
+    {
+        call(SCI_INDICSETSTYLE, search_match_indicator, INDIC_ROUNDBOX);
+        call(SCI_INDICSETFORE, search_match_indicator, RGB(210, 145, 20));
+        call(SCI_INDICSETALPHA, search_match_indicator, 75);
+        call(SCI_INDICSETOUTLINEALPHA, search_match_indicator, 160);
+        call(SCI_SETINDICATORCURRENT, search_match_indicator);
+        const auto first = call(SCI_DOCLINEFROMVISIBLE, call(SCI_GETFIRSTVISIBLELINE));
+        const auto last = call(SCI_DOCLINEFROMVISIBLE, call(SCI_GETFIRSTVISIBLELINE) + call(SCI_LINESONSCREEN) + 1);
+        const auto begin = call(SCI_POSITIONFROMLINE, first);
+        auto end = call(SCI_POSITIONFROMLINE, last + 1);
+        if (end < 0) end = call(SCI_GETLENGTH);
+        if (search_highlight_region_.start == begin && search_highlight_region_.end == end) return;
+        if (search_highlight_region_.start >= 0)
+            call(SCI_INDICATORCLEARRANGE, static_cast<WPARAM>(search_highlight_region_.start),
+                static_cast<LPARAM>(search_highlight_region_.end - search_highlight_region_.start));
+        search_highlight_region_ = {begin, end};
+        const auto found = std::lower_bound(search_matches_.begin(), search_matches_.end(), begin,
+            [](const auto& match, LRESULT position) { return match.end < position; });
+        for (auto iterator = found; iterator != search_matches_.end() && iterator->start <= end; ++iterator)
+            call(SCI_INDICATORFILLRANGE, static_cast<WPARAM>(std::max(iterator->start, static_cast<std::int64_t>(begin))),
+                static_cast<LPARAM>(std::min(iterator->end, static_cast<std::int64_t>(end)) - std::max(iterator->start, static_cast<std::int64_t>(begin))));
+    }
+
+    void ScintillaTextView::reveal_search_match(std::size_t index) noexcept
+    {
+        if (index >= search_matches_.size()) return;
+        const auto& match = search_matches_[index];
+        call(SCI_SETSEL, static_cast<WPARAM>(match.start), static_cast<LPARAM>(match.end));
+        call(SCI_SCROLLCARET);
+        update_search_highlights();
+    }
+
     void ScintillaTextView::set_occlusions(
         std::span<const Occlusion> occlusions) noexcept
     {
@@ -732,6 +821,7 @@ namespace glance::app
 
     void ScintillaTextView::clear() noexcept
     {
+        search_matches_.clear();
         refresh_position_.reset();
         replacement_offset_.reset();
         follow_after_layout_ = false;
@@ -1038,6 +1128,11 @@ namespace glance::app
         DWORD_PTR reference_data) noexcept
     {
         auto* self = reinterpret_cast<ScintillaTextView*>(reference_data);
+        if (self && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) && self->search_key_callback_)
+        {
+            try { if (self->search_key_callback_(message, wparam)) return 0; }
+            catch (...) {}
+        }
         if (message == WM_MBUTTONDOWN && self != nullptr &&
             self->call(SCI_GETSELECTIONEMPTY) == FALSE)
         {
@@ -1560,6 +1655,7 @@ namespace glance::app
         if (header.code != SCN_UPDATEUI) { return; }
         if ((notification.updated & SC_UPDATE_V_SCROLL) != 0)
         {
+            update_search_highlights();
             request_near_end_check();
         }
         if ((notification.updated & SC_UPDATE_SELECTION) != 0)

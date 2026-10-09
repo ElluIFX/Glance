@@ -1216,7 +1216,7 @@ namespace winrt::Glance::App::implementation
             }
             else if (type == glance::contracts::MessageType::close_active_preview)
             {
-                close_active_preview();
+                close_active_preview(flags == glance::contracts::close_preview_escape_flag);
             }
             else if (type == glance::contracts::MessageType::gallery_response)
             {
@@ -1453,10 +1453,11 @@ namespace winrt::Glance::App::implementation
         glance::contracts::log_event(L"Preview request dispatch complete.");
     }
 
-    void App::close_active_preview()
+    void App::close_active_preview(bool dismiss_overlay)
     {
         if (active_window_ != nullptr && !update_prompt_active_)
         {
+            if (dismiss_overlay && get_self<implementation::MainWindow>(active_window_)->TryCloseSearch()) return;
             get_self<implementation::MainWindow>(active_window_)->HidePreview();
         }
     }

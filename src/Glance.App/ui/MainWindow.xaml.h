@@ -73,6 +73,7 @@ namespace winrt::Glance::App::implementation
             bool preserve_window = false);
         [[nodiscard]] bool IsPreviewingFile(const std::wstring& path) const noexcept;
         void CloseForReplacement();
+        [[nodiscard]] bool TryCloseSearch();
         void HidePreview();
         [[nodiscard]] bool NavigateBack();
         void ApplyAppearancePreferences();
@@ -329,6 +330,15 @@ namespace winrt::Glance::App::implementation
         void save_current_window_placement() const noexcept;
         void clear_preview_content();
         void release_component_view();
+        void initialize_text_search();
+        void update_text_search_labels();
+        [[nodiscard]] bool handle_text_search_key(WPARAM key);
+        void open_text_search();
+        void close_text_search();
+        void schedule_text_search(bool content_changed = false);
+        winrt::fire_and_forget run_text_search_async();
+        void navigate_text_search(int direction);
+        void update_text_search_status();
         void update_preview_navigation_ui();
         bool activate_folder_entry(const glance::app::ArchiveEntry& entry);
         [[nodiscard]] const glance::app::ArchiveEntry* selected_folder_entry() noexcept;
@@ -907,6 +917,24 @@ namespace winrt::Glance::App::implementation
         bool xaml_modal_overlay_active_{};
         std::shared_ptr<void> active_component_preview_;
         std::shared_ptr<void> active_component_view_;
+        struct SearchHit
+        {
+            glance::app::TextSearchMatch match;
+            std::size_t node_id{glance::app::json_no_parent};
+            bool key{};
+        };
+        Microsoft::UI::Xaml::DispatcherTimer text_search_timer_{nullptr};
+        std::shared_ptr<std::atomic_bool> text_search_cancellation_;
+        std::vector<SearchHit> text_search_hits_;
+        std::unordered_set<std::size_t> search_expanded_json_nodes_;
+        std::unordered_map<std::size_t, std::uint8_t> text_search_json_fields_;
+        std::uint64_t text_source_bytes_read_{};
+        std::size_t text_search_index_{};
+        std::uint64_t text_search_request_{};
+        bool text_search_loading_{};
+        bool text_search_query_validated_{};
+        glance::app::TextSearchError text_search_error_{};
+        bool text_search_incomplete_{};
         std::shared_ptr<glance::app::ComponentViewRegistration> component_view_registration_;
         glance::app::WindowPlacementIdentity window_placement_identity_;
         std::uint64_t component_view_session_{};

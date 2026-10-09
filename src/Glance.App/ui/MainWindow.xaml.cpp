@@ -1150,6 +1150,12 @@ namespace winrt::Glance::App::implementation
             if (const auto self = weak.get()) self->update_text_editor_occlusions();
         });
         RootGrid().PreviewKeyDown([weak](IInspectable const&, KeyRoutedEventArgs const& args) {
+            if (const auto self = weak.get(); self && self->visible_ &&
+                self->handle_text_search_key(static_cast<WPARAM>(args.Key())))
+            {
+                args.Handled(true);
+                return;
+            }
             if (const auto self = weak.get(); self && self->visible_ && !self->detached_ &&
                 !self->component_input_active_ && self->password_prompt_target_ == PasswordPromptTarget::none &&
                 !self->xaml_modal_overlay_active_ && args.Key() == Windows::System::VirtualKey::Space &&
@@ -1194,6 +1200,7 @@ namespace winrt::Glance::App::implementation
             }
         });
         initialize_media_player();
+        initialize_text_search();
         web_view_idle_timer_ = DispatcherTimer();
         web_view_idle_timer_.Interval(web_view_idle_timeout);
         web_view_idle_timer_.Tick([weak](IInspectable const&, IInspectable const&) {
@@ -1972,6 +1979,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::ApplyLocalizedResources()
     {
+        update_text_search_labels();
         if (component_view_registration_ && component_view_session_)
             component_view_registration_->api.set_language(component_view_session_,
                 glance::app::current_ui_language().c_str());
@@ -2592,6 +2600,11 @@ namespace winrt::Glance::App::implementation
         DWORD_PTR reference_data) noexcept
     {
         auto* self = reinterpret_cast<MainWindow*>(reference_data);
+        if (self && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN))
+        {
+            try { if (self->handle_text_search_key(wparam)) return 0; }
+            catch (...) { glance::contracts::log_event(L"Search keyboard handling failed."); }
+        }
         if (message == WM_APPCOMMAND && self != nullptr)
         {
             const auto command = GET_APPCOMMAND_LPARAM(lparam);
@@ -2632,7 +2645,7 @@ namespace winrt::Glance::App::implementation
                 self->password_prompt_focused_ = focused;
                 self->update_state();
             }
-            if (self->active_component_view_) self->update_state();
+            if (self->active_component_view_ || self->TextSearchPanel().Visibility() == Visibility::Visible) self->update_state();
         }
         if (message == WM_GETMINMAXINFO)
         {
@@ -3072,6 +3085,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::clear_preview_content()
     {
+        close_text_search();
         window_placement_identity_ = {};
         release_component_view();
         text_monitor_enabled_ = false;
@@ -3199,6 +3213,7 @@ namespace winrt::Glance::App::implementation
         NativeDocumentPanel().Visibility(Visibility::Collapsed);
         ArchivePanel().Visibility(Visibility::Collapsed);
         TextStatusControls().Visibility(Visibility::Collapsed);
+        TextFindButton().Visibility(Visibility::Collapsed);
         ImageStatusControls().Visibility(Visibility::Collapsed);
         SyntaxHighlightButton().Visibility(Visibility::Collapsed);
         TextMonitorButton().Visibility(Visibility::Collapsed);
@@ -3207,6 +3222,7 @@ namespace winrt::Glance::App::implementation
 
         current_text_.clear();
         text_line_endings_.clear();
+        text_source_bytes_read_ = 0;
         current_text_path_.clear();
         current_text_markdown_ = false;
         current_text_web_ = false;
@@ -4180,6 +4196,7 @@ namespace winrt::Glance::App::implementation
             ++text_monitor_epoch_;
             TextMonitorButton().IsChecked(false);
         }
+        close_text_search();
         release_component_view();
         release_native_preview_surface();
         if (component_preparation_cancellation_)
@@ -7254,6 +7271,7 @@ namespace winrt::Glance::App::implementation
         }
 
         auto initial_content = std::move(preview.content);
+        text_source_bytes_read_ = preview.bytes_read;
         text_line_endings_ = std::move(preview.line_endings);
         update_footer_metadata();
         current_text_ = markdown ? initial_content : std::wstring{};
@@ -7282,6 +7300,7 @@ namespace winrt::Glance::App::implementation
         update_line_number_visibility();
         set_text_loading(false);
         ensure_text_viewport_filled();
+        schedule_text_search(true);
 
         schedule_text_monitor();
 
@@ -7337,10 +7356,14 @@ namespace winrt::Glance::App::implementation
                     lifetime->current_text_reader_.reset();
                     lifetime->set_text_loading(false);
                     lifetime->show_text_preview_error(std::move(preview.error));
+                    lifetime->text_search_loading_ = false;
+                    lifetime->text_search_error_ = glance::app::TextSearchError::failed;
+                    lifetime->update_text_search_status();
                     return;
                 }
 
                 auto appended = std::move(preview.content);
+                lifetime->text_source_bytes_read_ += preview.bytes_read;
                 lifetime->text_line_endings_ = std::move(preview.line_endings);
                 lifetime->update_footer_metadata();
                 lifetime->current_text_reader_ = std::move(preview.reader);
@@ -7356,6 +7379,7 @@ namespace winrt::Glance::App::implementation
                 lifetime->set_text_loading(false);
                 lifetime->ensure_text_viewport_filled();
                 lifetime->schedule_text_monitor();
+                lifetime->schedule_text_search(true);
                 glance::contracts::log_event(
                     L"Incremental text chunk applied: characters=" +
                     std::to_wstring(appended.size()) +
@@ -7473,9 +7497,11 @@ namespace winrt::Glance::App::implementation
                     self->current_text_has_more_ = result.has_more;
                     if (self->text_editor_ && (result.replace_content || !result.content.empty()))
                     {
+                        self->text_source_bytes_read_ = result.replace_content ? result.bytes_read : self->text_source_bytes_read_ + result.bytes_read;
                         self->text_editor_->refresh_text(result.content, result.replace_content,
                             true,
                             result.has_more, result.undecodable_bytes);
+                        self->schedule_text_search(true);
                     }
                     if (self->current_text_encoding_ == glance::app::TextEncoding::automatic &&
                         !result.encoding.empty())
@@ -7659,6 +7685,7 @@ namespace winrt::Glance::App::implementation
             JsonParsingOverlay().Visibility(Visibility::Collapsed);
         }
         json_parse_complete_ = batch.complete;
+        schedule_text_search(true);
         sync_json_projection(json_depth_command_limit_.has_value());
 
         if (batch.fatal_error)
@@ -8485,6 +8512,10 @@ namespace winrt::Glance::App::implementation
         {
             return false;
         }
+        text_editor_->set_search_key_callback([weak](UINT, WPARAM key) {
+            if (const auto self = weak.get()) return self->handle_text_search_key(key);
+            return false;
+        });
         text_editor_->set_copy_callbacks(
             [weak](bool selected) {
                 if (const auto self = weak.get())
@@ -8589,6 +8620,7 @@ namespace winrt::Glance::App::implementation
             }
             append(TextFontSizeOverlay());
             append(TextSelectionCopyButton(), 0, TextSelectionCopyButton().CornerRadius().TopLeft);
+            append(TextSearchPanel(), 0, 6);
             text_editor_->set_occlusions(rectangles);
         }
         catch (...)
@@ -8715,6 +8747,7 @@ namespace winrt::Glance::App::implementation
         const bool component_web =
             kind == glance::app::PreviewKind::web &&
             active_component_web_preview_ != nullptr;
+        if ((!text || component_web) && TextSearchPanel().Visibility() == Visibility::Visible) close_text_search();
         GenericPanel().Visibility(kind == glance::app::PreviewKind::generic ? Visibility::Visible : Visibility::Collapsed);
         TextPanel().Visibility(text ? Visibility::Visible : Visibility::Collapsed);
         ImagePanel().Visibility(kind == glance::app::PreviewKind::image ? Visibility::Visible : Visibility::Collapsed);
@@ -8739,6 +8772,7 @@ namespace winrt::Glance::App::implementation
         GalleryModeButton().IsChecked(gallery_mode_ != GalleryMode::inactive);
         TextStatusControls().Visibility(
             text && !component_web ? Visibility::Visible : Visibility::Collapsed);
+        TextFindButton().Visibility(TextStatusControls().Visibility());
         LineNumbersButton().Visibility(
             text && !component_web && (!current_text_json_ || !json_tree_mode_)
                 ? Visibility::Visible
@@ -9678,6 +9712,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::set_markdown_preview_mode(bool preview)
     {
+        if (preview) close_text_search();
         markdown_preview_ = preview;
         MarkdownPreviewButton().IsChecked(preview);
         MarkdownCodeButton().IsChecked(!preview);
@@ -9723,6 +9758,7 @@ namespace winrt::Glance::App::implementation
 
     void MainWindow::set_json_tree_mode(bool tree)
     {
+        const bool searching = TextSearchPanel().Visibility() == Visibility::Visible;
         json_tree_mode_ = current_text_json_ && json_tree_available_ && tree;
         JsonTreeButton().IsChecked(json_tree_mode_);
         JsonRawButton().IsChecked(current_text_json_ && !json_tree_mode_);
@@ -9742,6 +9778,7 @@ namespace winrt::Glance::App::implementation
                 : Visibility::Collapsed);
         update_text_mode_controls();
         update_text_editor_visibility();
+        if (searching) open_text_search();
     }
 
     void MainWindow::JsonTreeButton_Click(IInspectable const&, RoutedEventArgs const&)
@@ -9809,6 +9846,7 @@ namespace winrt::Glance::App::implementation
             json_expanded_nodes_.insert(node_id);
             json_visible_child_counts_[node_id] = json_preloaded_child_count;
         }
+        search_expanded_json_nodes_.erase(node_id);
         sync_json_projection(true);
     }
 
@@ -10171,6 +10209,22 @@ namespace winrt::Glance::App::implementation
         value.TextTrimming(TextTrimming::CharacterEllipsis);
         value.TextWrapping(TextWrapping::NoWrap);
         value.VerticalAlignment(VerticalAlignment::Center);
+        if (const auto found = text_search_json_fields_.find(node_id); found != text_search_json_fields_.end())
+        {
+            const auto highlight = [&](const TextBlock& block, bool key_field) {
+                const bool current = text_search_index_ < text_search_hits_.size() &&
+                    text_search_hits_[text_search_index_].node_id == node_id &&
+                    text_search_hits_[text_search_index_].key == key_field;
+                TextHighlighter marker;
+                marker.Background(Media::SolidColorBrush(Windows::UI::Color{
+                    static_cast<std::uint8_t>(current ? 255 : 90), 210, 145, 20}));
+                if (current) marker.Foreground(Media::SolidColorBrush(Windows::UI::Color{255, 0, 0, 0}));
+                marker.Ranges().Append(TextRange{0, static_cast<std::int32_t>(block.Text().size())});
+                block.TextHighlighters().Append(marker);
+            };
+            if (found->second & 1) highlight(key, true);
+            if (found->second & 2) highlight(value, false);
+        }
         Grid::SetColumn(value, 2);
         row.Children().Append(value);
         animate_json_row(container, row_id);
@@ -11508,6 +11562,7 @@ namespace winrt::Glance::App::implementation
     void MainWindow::update_input_activation() noexcept
     {
         const bool enabled = password_prompt_target_ != PasswordPromptTarget::none ||
+            TextSearchPanel().Visibility() == Visibility::Visible ||
             (active_component_view_ && component_input_active_);
         if (window_ == nullptr || input_activation_enabled_ == enabled)
         {
@@ -11712,7 +11767,7 @@ namespace winrt::Glance::App::implementation
             state_ = glance::contracts::PreviewWindowState::hidden;
         }
         else if (((password_prompt_target_ != PasswordPromptTarget::none && password_prompt_focused_) ||
-                  (active_component_view_ && component_input_active_ && GetForegroundWindow() == window_)) &&
+                  (((active_component_view_ && component_input_active_) || TextSearchPanel().Visibility() == Visibility::Visible) && GetForegroundWindow() == window_)) &&
                  !detached_)
         {
             state_ = glance::contracts::PreviewWindowState::active_interactive;

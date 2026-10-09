@@ -547,4 +547,23 @@
   <data name="MigrationRestartFailedMessage" xml:space="preserve"><value>Migration is complete. Start Glance manually</value></data>
   <data name="MaintenanceFailedTitle" xml:space="preserve"><value>Data replacement failed</value></data>
   <data name="MaintenanceFailedMessage" xml:space="preserve"><value>Previous files have been restored\n{0}</value></data>
+  <data name="SearchPlaceholder" xml:space="preserve"><value>Find</value></data>
+  <data name="SearchOpen" xml:space="preserve"><value>Find</value></data>
+  <data name="SearchMatchCase" xml:space="preserve"><value>Match case&#xA;Alt+C</value></data>
+  <data name="SearchWholeWord" xml:space="preserve"><value>Match whole word&#xA;Alt+W</value></data>
+  <data name="SearchRegex" xml:space="preserve"><value>Use regular expression&#xA;Alt+R</value></data>
+  <data name="SearchPrevious" xml:space="preserve"><value>Previous match&#xA;Shift+Enter / Shift+F3</value></data>
+  <data name="SearchNext" xml:space="preserve"><value>Next match&#xA;Enter / F3</value></data>
+  <data name="SearchClose" xml:space="preserve"><value>Close find and cancel search&#xA;Esc</value></data>
+  <data name="SearchCount" xml:space="preserve"><value>{0} / {1}</value></data>
+  <data name="SearchPartialCount" xml:space="preserve"><value>{0} / {1} · Incomplete results</value></data>
+  <data name="SearchReading" xml:space="preserve"><value>Reading full text ({0} KiB)...</value></data>
+  <data name="SearchSearching" xml:space="preserve"><value>Searching...</value></data>
+  <data name="SearchInvalidRegex" xml:space="preserve"><value>Invalid regular expression</value></data>
+  <data name="SearchTimedOut" xml:space="preserve"><value>Regular expression took too long</value></data>
+  <data name="SearchFailed" xml:space="preserve"><value>Search failed</value></data>
+  <data name="JsonSearchScope" xml:space="preserve"><value>JSON search scope</value></data>
+  <data name="JsonSearchBoth" xml:space="preserve"><value>Keys and values</value></data>
+  <data name="JsonSearchKeys" xml:space="preserve"><value>Keys</value></data>
+  <data name="JsonSearchValues" xml:space="preserve"><value>Values</value></data>
 </root>
