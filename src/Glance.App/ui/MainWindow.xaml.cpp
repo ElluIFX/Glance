@@ -5994,6 +5994,10 @@ namespace winrt::Glance::App::implementation
         {
             state->status += L"  |  " + glance::app::localize(L"ArchiveDepthLimited");
         }
+        if (archive_preview_is_directory_)
+        {
+            state->status += L"  |  " + glance::app::localize(L"FolderNavigationHint");
+        }
         archive_render_state_ = state;
         render_archive_batch(state);
     }
@@ -6225,6 +6229,7 @@ namespace winrt::Glance::App::implementation
             {
                 ListViewItem item;
                 item.Content(row);
+                ToolTipService::SetToolTip(item, box_value(entry.name));
                 folder_items.Append(item);
                 if (!pending_folder_selection_path_.empty() &&
                     CompareStringOrdinal(entry.path.c_str(), -1,

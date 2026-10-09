@@ -51,6 +51,7 @@
   <data name="FolderReadError" xml:space="preserve"><value>The folder could not be read.</value></data>
   <data name="DeviceFileReadError" xml:space="preserve"><value>Unable to read file from device</value></data>
   <data name="FolderType" xml:space="preserve"><value>Folder</value></data>
+  <data name="FolderNavigationHint" xml:space="preserve"><value>Double-click: Next level | Right-click: Previous level</value></data>
   <data name="FileType" xml:space="preserve"><value>File</value></data>
   <data name="ExtensionFileType" xml:space="preserve"><value>{0} file</value></data>
   <data name="FileCount" xml:space="preserve"><value>{0} files</value></data>
