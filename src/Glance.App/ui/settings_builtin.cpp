@@ -15,6 +15,7 @@
 #include "webview_availability.h"
 #include "window_size_store.h"
 #include "glance/contracts/diagnostics.h"
+#include "glance/contracts/storage.h"
 #include "../../version.h"
 
 #include <microsoft.ui.xaml.window.h>
@@ -73,7 +74,9 @@ namespace winrt::Glance::App::implementation
         set_content(AboutProjectLink(), L"AboutProjectLink.Content");
         set_content(CheckForUpdatesButton(), L"CheckForUpdatesButton.Content");
         set_content(CancelUpdateButton(), L"Cancel");
-        AboutVersionText().Text(glance::app::localize_format(L"VersionFormat", {GLANCE_VERSION_WSTRING}));
+        AboutVersionText().Text(glance::app::localize_format(L"VersionFormat", {GLANCE_VERSION_WSTRING}) + L" " +
+                                glance::app::localize(glance::contracts::storage::portable
+                                                          ? L"DistributionPortable" : L"DistributionInstalled"));
         refresh_runtime_statuses();
         refresh_component_statuses();
         request_source_statuses();

@@ -342,7 +342,15 @@ namespace winrt::Glance::App::implementation
         initializing_ = was_initializing;
         AboutSettingsPanel().Visibility(tag == L"about" ? Visibility::Visible : Visibility::Collapsed);
         if (tag == L"about")
-            Hosting::ElementCompositionPreview::GetElementVisual(AboutSettingsPanel()).Opacity(1);
+        {
+            AboutSettingsPanel().IsHitTestVisible(true);
+            AboutSettingsPanel().Opacity(1);
+            const auto visual = Hosting::ElementCompositionPreview::GetElementVisual(AboutSettingsPanel());
+            visual.StopAnimation(L"Opacity");
+            visual.StopAnimation(L"Translation");
+            visual.Opacity(1);
+            visual.Properties().InsertVector3(L"Translation", Windows::Foundation::Numerics::float3{});
+        }
         if (tag == L"general")
         {
             refresh_launch_at_sign_in();

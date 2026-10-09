@@ -315,6 +315,8 @@
   <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="ExitButtonText.Text" xml:space="preserve"><value>Exit Glance</value></data>
   <data name="VersionFormat" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="DistributionInstalled" xml:space="preserve"><value>Installed</value></data>
+  <data name="DistributionPortable" xml:space="preserve"><value>Portable</value></data>
   <data name="TraySettings" xml:space="preserve"><value>Settings</value></data>
   <data name="TrayExit" xml:space="preserve"><value>Exit Glance</value></data>
   <data name="SystemCodePage" xml:space="preserve"><value>System code page</value></data>
