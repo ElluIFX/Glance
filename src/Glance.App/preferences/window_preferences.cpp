@@ -70,6 +70,18 @@ namespace
 
 namespace glance::app
 {
+    FileListPreferences load_file_list_preferences() noexcept
+    {
+        return { std::clamp<DWORD>(read_dword(L"FileListWidth", 220), 160, 480) };
+    }
+
+    void save_file_list_preferences(const FileListPreferences& preferences) noexcept
+    {
+        glance::contracts::storage::Batch key(registry_path);
+        write_dword(key, L"FileListWidth", std::clamp<std::uint32_t>(preferences.width, 160, 480));
+        static_cast<void>(key.commit());
+    }
+
     WindowPreferences load_window_preferences() noexcept
     {
         WindowPreferences preferences{

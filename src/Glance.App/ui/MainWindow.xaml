@@ -125,12 +125,15 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock
-                        x:Name="FileListCountText"
-                        Margin="12,8,12,6"
-                        FontSize="12"
-                        FontWeight="SemiBold"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Grid Margin="4,2,4,2">
+                        <TextBlock x:Name="FileListCountText" Margin="8,0,30,0"
+                            VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Button x:Name="FileListToggleButton" HorizontalAlignment="Right"
+                            Style="{StaticResource IconButtonStyle}" Width="28" Height="28">
+                            <FontIcon x:Name="FileListToggleIcon" FontSize="12" Glyph="&#xE76B;" />
+                        </Button>
+                    </Grid>
                     <ListView
                         x:Name="FileList"
                         Grid.Row="1"
@@ -191,6 +194,8 @@
                     </ListView>
                 </Grid>
             </Border>
+            <Border x:Name="FileListResizeHandle" Grid.Column="0" Width="6"
+                HorizontalAlignment="Right" Background="Transparent" Visibility="Collapsed" />
 
             <Grid Grid.Column="1">
                 <Grid

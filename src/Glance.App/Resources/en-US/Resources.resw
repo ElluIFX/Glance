@@ -566,4 +566,7 @@
   <data name="JsonSearchBoth" xml:space="preserve"><value>Keys and values</value></data>
   <data name="JsonSearchKeys" xml:space="preserve"><value>Keys</value></data>
   <data name="JsonSearchValues" xml:space="preserve"><value>Values</value></data>
+  <data name="FileListExpand" xml:space="preserve"><value>Expand item list</value></data>
+  <data name="FileListCollapse" xml:space="preserve"><value>Collapse item list</value></data>
+  <data name="FileListResize" xml:space="preserve"><value>Drag to resize item list</value></data>
 </root>

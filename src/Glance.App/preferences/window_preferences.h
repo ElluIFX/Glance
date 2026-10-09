@@ -26,6 +26,12 @@ namespace glance::app
 
     [[nodiscard]] WindowPreferences load_window_preferences() noexcept;
     void save_window_preferences(const WindowPreferences& preferences) noexcept;
+    struct FileListPreferences
+    {
+        std::uint32_t width{ 220 };
+    };
+    [[nodiscard]] FileListPreferences load_file_list_preferences() noexcept;
+    void save_file_list_preferences(const FileListPreferences& preferences) noexcept;
     [[nodiscard]] bool auto_fit_ignores_path(
         const WindowPreferences& preferences,
         std::wstring_view path) noexcept;

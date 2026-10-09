@@ -19,6 +19,7 @@
 #include "shell_icon_provider.h"
 #include "text_preferences.h"
 #include "window_acrylic_backdrop.h"
+#include "window_preferences.h"
 #include "window_size_store.h"
 
 #include "glance/contracts/preview_state.h"
@@ -738,6 +739,9 @@ namespace winrt::Glance::App::implementation
         GalleryRequestCallback gallery_request_callback_;
         std::vector<glance::app::PreviewFile> files_;
         std::uint64_t file_list_generation_{};
+        glance::app::FileListPreferences file_list_preferences_;
+        bool file_list_collapsed_{};
+        bool file_list_resizing_{};
         std::uint32_t current_index_{};
         std::uint32_t source_kind_{};
         HWND source_window_{};

@@ -1108,6 +1108,7 @@ namespace winrt::Glance::App::implementation
         InitializeComponent();
         glance::contracts::log_event(L"MainWindow InitializeComponent complete.");
         folder_preview_preferences_ = glance::app::load_folder_preview_preferences();
+        file_list_preferences_ = glance::app::load_file_list_preferences();
         ApplyLocalizedResources();
         ApplyAppearancePreferences();
         text_preferences_ = glance::app::load_text_preferences();
@@ -1134,6 +1135,51 @@ namespace winrt::Glance::App::implementation
         media_timer_ = DispatcherTimer();
         media_timer_.Interval(std::chrono::milliseconds(250));
         const auto weak = get_weak();
+        PreviewContentHost().SizeChanged([weak](IInspectable const&, SizeChangedEventArgs const&) {
+            if (const auto self = weak.get()) self->update_preview_navigation_ui();
+        });
+        FileListToggleButton().Click([weak](IInspectable const&, RoutedEventArgs const&) {
+            if (const auto self = weak.get())
+            {
+                self->file_list_collapsed_ = !self->file_list_collapsed_;
+                self->update_preview_navigation_ui();
+            }
+        });
+        FileListResizeHandle().PointerPressed([weak](IInspectable const&, PointerRoutedEventArgs const& args) {
+            if (const auto self = weak.get(); self &&
+                args.GetCurrentPoint(self->FileListResizeHandle()).Properties().IsLeftButtonPressed())
+            {
+                self->file_list_resizing_ = self->FileListResizeHandle().CapturePointer(args.Pointer());
+                args.Handled(true);
+            }
+        });
+        FileListResizeHandle().PointerMoved([weak](IInspectable const&, PointerRoutedEventArgs const& args) {
+            if (const auto self = weak.get(); self && self->file_list_resizing_)
+            {
+                const auto maximum = std::clamp(self->PreviewContentHost().ActualWidth() - 280.0, 160.0, 480.0);
+                self->file_list_preferences_.width = static_cast<std::uint32_t>(std::clamp(
+                    static_cast<double>(args.GetCurrentPoint(self->PreviewContentHost()).Position().X), 160.0, maximum));
+                self->update_preview_navigation_ui();
+                args.Handled(true);
+            }
+        });
+        FileListResizeHandle().PointerReleased([weak](IInspectable const&, PointerRoutedEventArgs const& args) {
+            if (const auto self = weak.get(); self && self->file_list_resizing_)
+            {
+                self->FileListResizeHandle().ReleasePointerCaptures();
+                args.Handled(true);
+            }
+        });
+        FileListResizeHandle().PointerCaptureLost([weak](IInspectable const&, PointerRoutedEventArgs const&) {
+            if (const auto self = weak.get(); self && self->file_list_resizing_)
+            {
+                self->file_list_resizing_ = false;
+                glance::app::save_file_list_preferences(self->file_list_preferences_);
+            }
+        });
+        FileListResizeHandle().PointerEntered([](IInspectable const&, PointerRoutedEventArgs const&) {
+            SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+        });
         PreviewContentHost().LayoutUpdated([weak](IInspectable const&, IInspectable const&) {
             if (const auto self = weak.get()) self->update_preview_mouse_bounds();
         });
@@ -2088,6 +2134,7 @@ namespace winrt::Glance::App::implementation
         }
         update_line_number_visibility();
         FileListCountText().Text(glance::app::localize_format(L"ItemCount", {std::to_wstring(files_.size())}));
+        update_preview_navigation_ui();
         update_generic_file_metadata();
         update_footer_metadata();
         refresh_realized_json_rows();
@@ -2575,7 +2622,8 @@ namespace winrt::Glance::App::implementation
         const auto host = PreviewContentHost();
         while (current != nullptr && get_abi(current) != get_abi(host))
         {
-            if (current.try_as<Controls::Primitives::ButtonBase>() != nullptr ||
+            if (current == FileListResizeHandle() ||
+                current.try_as<Controls::Primitives::ButtonBase>() != nullptr ||
                 current.try_as<Controls::Primitives::RangeBase>() != nullptr ||
                 current.try_as<Controls::Primitives::SelectorItem>() != nullptr ||
                 current.try_as<TextBox>() != nullptr ||
@@ -2756,6 +2804,7 @@ namespace winrt::Glance::App::implementation
         pending_folder_selection_path_.clear();
         pending_folder_scroll_offset_valid_ = false;
         files_ = std::move(files);
+        file_list_collapsed_ = false;
         source_kind_ = source_kind;
         source_window_ = source_window;
         source_id_ = std::move(source_id);
@@ -3055,10 +3104,20 @@ namespace winrt::Glance::App::implementation
         BackButton().Visibility(
             preview_navigation_.empty() ? Visibility::Collapsed : Visibility::Visible);
         const bool show_file_list = preview_navigation_.empty() && files_.size() > 1;
+        const bool collapsed = file_list_collapsed_;
+        const auto maximum = PreviewContentHost().ActualWidth() > 0
+            ? std::clamp(PreviewContentHost().ActualWidth() - 280.0, 160.0, 480.0) : 480.0;
         FileListColumn().Width(GridLength{
-            show_file_list ? 220.0 : 0.0,
+            show_file_list ? (collapsed ? 36.0 : std::min<double>(file_list_preferences_.width, maximum)) : 0.0,
             GridUnitType::Pixel });
         FileListPanel().Visibility(show_file_list ? Visibility::Visible : Visibility::Collapsed);
+        FileList().Visibility(collapsed ? Visibility::Collapsed : Visibility::Visible);
+        FileListCountText().Visibility(collapsed ? Visibility::Collapsed : Visibility::Visible);
+        FileListResizeHandle().Visibility(show_file_list && !collapsed ? Visibility::Visible : Visibility::Collapsed);
+        FileListToggleIcon().Glyph(collapsed ? L"\xE76C" : L"\xE76B");
+        ToolTipService::SetToolTip(FileListToggleButton(), box_value(glance::app::localize(
+            collapsed ? L"FileListExpand" : L"FileListCollapse")));
+        ToolTipService::SetToolTip(FileListResizeHandle(), box_value(glance::app::localize(L"FileListResize")));
         FileListCountText().Text(glance::app::localize_format(L"ItemCount", {std::to_wstring(files_.size())}));
     }
 
@@ -3184,6 +3243,8 @@ namespace winrt::Glance::App::implementation
         ++file_list_generation_;
         FileList().Items().Clear();
         FileListPanel().Visibility(Visibility::Collapsed);
+        FileListResizeHandle().Visibility(Visibility::Collapsed);
+        FileListResizeHandle().ReleasePointerCaptures();
         FileListColumn().Width(GridLength{ 0, GridUnitType::Pixel });
 
         TitleText().Text(L"");

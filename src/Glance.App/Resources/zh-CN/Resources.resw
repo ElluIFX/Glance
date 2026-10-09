@@ -566,4 +566,7 @@
   <data name="JsonSearchBoth" xml:space="preserve"><value>key 和 value</value></data>
   <data name="JsonSearchKeys" xml:space="preserve"><value>仅 key</value></data>
   <data name="JsonSearchValues" xml:space="preserve"><value>仅 value</value></data>
+  <data name="FileListExpand" xml:space="preserve"><value>展开项目列表</value></data>
+  <data name="FileListCollapse" xml:space="preserve"><value>收起项目列表</value></data>
+  <data name="FileListResize" xml:space="preserve"><value>拖动调整项目列表宽度</value></data>
 </root>
