@@ -32,7 +32,7 @@
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="ExitButton" Margin="0,0,0,8" SelectsOnInvoked="False" Tapped="ExitButton_Tapped">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="" />
+                        <FontIcon FontSize="16" Glyph="&#xE711;" />
                     </NavigationViewItem.Icon>
                     <TextBlock x:Name="ExitButtonText" x:Uid="ExitButtonText" Text="Exit Glance" />
                 </NavigationViewItem>
