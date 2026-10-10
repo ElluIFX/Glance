@@ -11206,8 +11206,9 @@ namespace winrt::Glance::App::implementation
                     session.NaturalDuration().count() / 10000000.0);
                 if (duration > 0.0)
                 {
+                    const double seek_step = std::clamp(std::floor(duration / 20.0), 1.0, 5.0);
                     const double position = std::clamp(
-                        session.Position().count() / 10000000.0 + steps * 5.0,
+                        session.Position().count() / 10000000.0 + steps * seek_step,
                         0.0,
                         duration);
                     session.Position(std::chrono::duration_cast<Windows::Foundation::TimeSpan>(
