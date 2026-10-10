@@ -4020,8 +4020,7 @@ namespace winrt::Glance::App::implementation
                 duration);
             lifetime->updating_media_position_ = true;
             lifetime->MediaSeekSlider().Maximum(std::max(1.0, duration));
-            lifetime->MediaSeekSlider().Value(
-                std::min(position, std::max(1.0, duration)));
+            lifetime->MediaSeekSlider().Value(std::min(position, std::max(1.0, duration)));
             lifetime->updating_media_position_ = false;
             lifetime->MediaTimeText().Text(
                 format_media_duration(position) + L" / " +
@@ -11329,14 +11328,10 @@ namespace winrt::Glance::App::implementation
         Primitives::RangeBaseValueChangedEventArgs const& args)
     try
     {
-        if (!updating_media_position_ && native_media_active_ &&
-            native_preview_surface_ != nullptr)
+        if (!updating_media_position_ && native_media_active_ && native_preview_surface_ != nullptr)
         {
-            send_native_media_control_async(
-                native_preview_surface_,
-                NativeMediaControl::seek,
-                static_cast<std::int64_t>(std::llround(
-                    args.NewValue() * 10000000.0)));
+            send_native_media_control_async(native_preview_surface_, NativeMediaControl::seek,
+                static_cast<std::int64_t>(std::llround(args.NewValue() * 10000000.0)));
             show_media_controls();
         }
         else if (!updating_media_position_ && media_player_ != nullptr)

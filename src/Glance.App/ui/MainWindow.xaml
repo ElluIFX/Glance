@@ -711,6 +711,7 @@
                                 x:Name="MediaSeekSlider"
                                 Grid.Column="1"
                                 VerticalAlignment="Center"
+                                IsThumbToolTipEnabled="False"
                                 ValueChanged="MediaSeekSlider_ValueChanged" />
                             <TextBlock
                                 x:Name="MediaTimeText"

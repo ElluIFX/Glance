@@ -35,7 +35,7 @@ namespace winrt::Glance::App::implementation
             try
             {
                 if (native_media_active_) ready = native_preview_ready_;
-                else if (const auto player = media_player_)
+                else if (const auto player = media_player_; player && media_playback_generation_ == content_generation_)
                 {
                     const auto state = player.PlaybackSession().PlaybackState();
                     ready = state != Windows::Media::Playback::MediaPlaybackState::Opening &&
@@ -103,7 +103,8 @@ namespace winrt::Glance::App::implementation
                 result.SetNamedValue(L"muted", JsonValue::CreateBooleanValue((native_media_state_.flags & glance::contracts::native_preview::media_state_muted) != 0));
                 result.SetNamedValue(L"playing", JsonValue::CreateBooleanValue((native_media_state_.flags & glance::contracts::native_preview::media_state_playing) != 0));
             }
-            else if (!(media_fallback_attempted_ && !software_media_source_))
+            else if (media_playback_generation_ == content_generation_ &&
+                !(media_fallback_attempted_ && !software_media_source_))
             {
                 try
                 {
