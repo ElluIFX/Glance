@@ -4,6 +4,29 @@ All notable changes to Glance are documented in this file.
 
 The project uses date-based versions in `YYYY.MM.DD[.revision]` format.
 
+## [2026.10.11] - 2026-10-11
+
+### Added
+
+- Search text previews, Markdown source and structured JSON, with case, whole-word, regular-expression and JSON key/value filters.
+- Resize or collapse the multi-file sidebar; new file lists open expanded.
+- Browse galleries with floating previous/next buttons, item progress, filenames and a seekable progress bar when supported.
+- View localized component and source information from the add-ons page, with status details on each status icon.
+
+### Improved
+
+- Organize generic preview details into stable, fully expanded sections and center basic information vertically.
+- Adapt audio and video wheel seeking to the media duration, using steps from one to five seconds.
+- Improve light-theme contrast, especially hovered buttons with acrylic disabled.
+- Use the standard close icon for the settings exit action.
+
+### Fixed
+
+- Release active preview sessions before application shutdown.
+- Distinguish structured JSON search matches from the current field highlight.
+- Avoid the initial black window in panorama previews and remove the redundant loading overlay.
+- Ignore stale media playback updates and remove redundant seek tooltips.
+
 ## [2026.10.09] - 2026-10-09
 
 ### Added
